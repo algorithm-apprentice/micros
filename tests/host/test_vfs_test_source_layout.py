@@ -4,12 +4,16 @@ import ast
 from pathlib import Path
 import re
 import unittest
-from tests.host import kernel_layout_source
+from tests.host.source_snapshot import isolated_source_view, source_bytes
 
 
 REPOSITORY_ROOT = Path(__file__).resolve().parents[2]
 CMAKE_PATH = REPOSITORY_ROOT / "CMakeLists.txt"
-FUNCTION_REVIEW_LINE_LIMIT = 120
+
+
+def current_text(path, encoding="utf-8"):
+    return source_bytes(REPOSITORY_ROOT, path).decode(encoding)
+
 
 SOURCE_SETS = {
     "MICROS_VFS_TEST_FIXTURE_SOURCES": (
@@ -73,85 +77,6 @@ PRIVATE_HEADERS = (
     "tests/host/vfs_model_internal.h",
     "tests/qemu/vfs_service_probe_internal.h",
 )
-
-INITIAL_MIGRATION_ALLOWLIST = (
-    ("tests/host/vfs_test_fixture.c", "fixture_lookup"),
-    ("tests/host/vfs_test_fixture.c", "fixture_tty_call"),
-    (
-        "tests/host/vfs_test.c",
-        "mount_attach_share_and_detach_are_atomic",
-    ),
-    (
-        "tests/host/vfs_test.c",
-        "open_read_close_and_validation_are_exact",
-    ),
-    (
-        "tests/host/vfs_test.c",
-        "backend_reply_validation_is_operation_specific",
-    ),
-    (
-        "tests/host/vfs_test.c",
-        "create_write_mkdir_and_chdir_are_exact",
-    ),
-    (
-        "tests/host/vfs_test.c",
-        "getdents_translation_and_cursor_are_exact",
-    ),
-    (
-        "tests/host/vfs_test.c",
-        "console_async_and_cleanup_are_exact",
-    ),
-    (
-        "tests/host/vfs_service_test.c",
-        "pm_control_requests_are_exact",
-    ),
-    (
-        "tests/host/vfs_service_test.c",
-        "pm_control_results_are_exact",
-    ),
-    (
-        "tests/host/vfs_service_test.c",
-        "backend_protocol_is_exact",
-    ),
-    (
-        "tests/host/vfs_service_test.c",
-        "service_dispatches_pm_control",
-    ),
-    ("tests/host/vfs_model_test.c", "run_vnode_pressure"),
-    ("tests/host/vfs_model_test.c", "execute_step"),
-    (
-        "tests/host/vfs_spawn_test.c",
-        "successful_prepare_and_release_are_exact",
-    ),
-    (
-        "tests/host/vfs_spawn_test.c",
-        "public_descriptor_prepare_and_abort_are_exact",
-    ),
-    (
-        "tests/host/vfs_spawn_test.c",
-        "reserved_process_slot_and_capacity_are_exact",
-    ),
-    (
-        "tests/host/vfs_spawn_test.c",
-        "expected_prepare_failures_roll_back",
-    ),
-    (
-        "tests/host/vfs_spawn_test.c",
-        "trusted_init_and_path_bounds_are_exact",
-    ),
-    (
-        "tests/host/vfs_spawn_test.c",
-        "prepared_snapshot_is_independent_from_vnode_size",
-    ),
-    ("tests/qemu/vfs_service_probe.c", "probe_test_filesystem"),
-    (
-        "kernel/vfs_service_test.c",
-        "micros_vfs_service_test_handle_trap",
-    ),
-    ("tools/generate_vfs_service_fixture.py", "render_fixture"),
-)
-
-MIGRATION_ALLOWLIST = ()
 
 
 def cmake_command(text: str, command: str, first_argument: str) -> str:
@@ -358,13 +283,13 @@ class VfsTestSourceLayoutTest(unittest.TestCase):
         missing = [
             path
             for path in required
-            if not kernel_layout_source.is_file_path(REPOSITORY_ROOT / path)
+            if not (REPOSITORY_ROOT / path).is_file()
         ]
 
         self.assertEqual([], missing)
 
     def test_cmake_source_sets_have_exact_ordered_membership(self) -> None:
-        cmake = kernel_layout_source.read_path(CMAKE_PATH, encoding="utf-8")
+        cmake = current_text(CMAKE_PATH, encoding="utf-8")
 
         for source_set_name, expected_sources in SOURCE_SETS.items():
             with self.subTest(source_set=source_set_name):
@@ -386,7 +311,7 @@ class VfsTestSourceLayoutTest(unittest.TestCase):
             self.assertEqual(1, cmake.count(source), source)
 
     def test_native_consumers_use_exact_source_sets_once(self) -> None:
-        cmake = kernel_layout_source.read_path(CMAKE_PATH, encoding="utf-8")
+        cmake = current_text(CMAKE_PATH, encoding="utf-8")
         expected_sets = {
             "vfs_test": (
                 "MICROS_VFS_TEST_FIXTURE_SOURCES",
@@ -414,7 +339,7 @@ class VfsTestSourceLayoutTest(unittest.TestCase):
                     )
 
     def test_probe_consumes_exact_probe_source_set(self) -> None:
-        cmake = kernel_layout_source.read_path(CMAKE_PATH, encoding="utf-8")
+        cmake = current_text(CMAKE_PATH, encoding="utf-8")
         block = cmake_command(
             cmake,
             "micros_add_bootstrap_user",
@@ -440,7 +365,7 @@ class VfsTestSourceLayoutTest(unittest.TestCase):
         }
 
         for relative_path, context_type in contexts.items():
-            text = kernel_layout_source.read_path(REPOSITORY_ROOT / relative_path,
+            text = current_text(REPOSITORY_ROOT / relative_path,
                 encoding="utf-8"
             )
             with self.subTest(path=relative_path):
@@ -455,10 +380,10 @@ class VfsTestSourceLayoutTest(unittest.TestCase):
 
         for relative_path in PRIVATE_HEADERS:
             path = REPOSITORY_ROOT / relative_path
-            if not kernel_layout_source.is_file_path(path):
+            if not (path).is_file():
                 continue
             selected = c_function_definitions(
-                kernel_layout_source.read_path(path, encoding="utf-8")
+                current_text(path, encoding="utf-8")
             )
             if selected:
                 definitions[relative_path] = selected
@@ -474,7 +399,7 @@ class VfsTestSourceLayoutTest(unittest.TestCase):
             for path in (REPOSITORY_ROOT / root).rglob("*"):
                 if path.suffix not in {".c", ".h", ".S"}:
                     continue
-                text = kernel_layout_source.read_path(path, encoding="utf-8")
+                text = current_text(path, encoding="utf-8")
                 for private_path in PRIVATE_HEADERS:
                     if private_path in text:
                         violations.append(
@@ -494,7 +419,7 @@ class VfsTestSourceLayoutTest(unittest.TestCase):
         for relative_path in model_sources:
             if relative_path == "tests/host/vfs_model_context.c":
                 continue
-            text = kernel_layout_source.read_path(REPOSITORY_ROOT / relative_path,
+            text = current_text(REPOSITORY_ROOT / relative_path,
                 encoding="utf-8"
             )
             self.assertEqual(
@@ -502,50 +427,6 @@ class VfsTestSourceLayoutTest(unittest.TestCase):
                 len(random_call.findall(text)),
                 relative_path,
             )
-
-    def test_migration_allowlist_matches_all_over_limit_functions(
-        self,
-    ) -> None:
-        accepted = set(INITIAL_MIGRATION_ALLOWLIST)
-        migration = set(MIGRATION_ALLOWLIST)
-        oversized = {}
-        c_paths = (
-            *all_test_sources(),
-            "kernel/vfs_service_test.c",
-        )
-
-        self.assertEqual(
-            len(MIGRATION_ALLOWLIST),
-            len(migration),
-            "migration allowlist contains duplicates",
-        )
-        self.assertTrue(
-            migration <= accepted,
-            "migration allowlist may only shrink",
-        )
-
-        for relative_path in c_paths:
-            path = REPOSITORY_ROOT / relative_path
-            if not kernel_layout_source.is_file_path(path):
-                continue
-            for function_name, line_count in c_function_definitions(
-                kernel_layout_source.read_path(path, encoding="utf-8")
-            ).items():
-                if line_count > FUNCTION_REVIEW_LINE_LIMIT:
-                    oversized[(relative_path, function_name)] = line_count
-
-        generator_path = "tools/generate_vfs_service_fixture.py"
-        for function_name, line_count in python_function_definitions(
-            kernel_layout_source.read_path(REPOSITORY_ROOT / generator_path, encoding="utf-8")
-        ).items():
-            if line_count > FUNCTION_REVIEW_LINE_LIMIT:
-                oversized[(generator_path, function_name)] = line_count
-
-        self.assertEqual(
-            migration,
-            set(oversized),
-            oversized,
-        )
 
 
 if __name__ == "__main__":

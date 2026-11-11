@@ -3082,18 +3082,33 @@ if(MICROS_BUILD_HOST_TESTS)
         "${CMAKE_CURRENT_SOURCE_DIR}/arch/*.h"
         "${CMAKE_CURRENT_SOURCE_DIR}/kernel/*.h"
     )
+    set(MEM01_NATIVE_SOURCES ${MEM01_NATIVE_OUTPUTS})
+    foreach(mem01_header IN LISTS MEM01_NATIVE_HEADERS)
+        file(RELATIVE_PATH mem01_relative_header "${CMAKE_CURRENT_SOURCE_DIR}" "${mem01_header}")
+        list(APPEND MEM01_NATIVE_OUTPUTS "${MEM01_NATIVE_ROOT}/${mem01_relative_header}")
+    endforeach()
+    set(MEM01_NATIVE_DEPENDENCIES ${MEM01_NATIVE_INPUTS})
+    list(TRANSFORM MEM01_NATIVE_DEPENDENCIES PREPEND "${CMAKE_CURRENT_SOURCE_DIR}/")
     add_custom_command(
         OUTPUT ${MEM01_NATIVE_OUTPUTS}
-        JOB_POOL mem03_source_proof
         COMMAND "${MICROS_PYTHON}" ${MICROS_PYTHON_ARGS}
             "${CMAKE_CURRENT_SOURCE_DIR}/tools/generate_bootstrap_allocation_fixture.py"
-        DEPENDS ${MEM01_NATIVE_INPUTS} ${MEM01_NATIVE_HEADERS}
+        DEPENDS ${MEM01_NATIVE_DEPENDENCIES} ${MEM01_NATIVE_HEADERS}
             tools/generate_bootstrap_allocation_fixture.py
             tests/host/bootstrap_allocation_source.py
+            tests/host/native_observations.py
+            tests/host/native_observations.json
+            tests/host/source_snapshot.py
+            tests/host/c_source_records.py
+            tests/host/work_count_lexical.py
+            tests/host/work_count_projection.py
+            tests/host/work_count_types.py
+            tools/validation_context.py
+            tools/validation_inputs.py
         WORKING_DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}"
         VERBATIM
     )
-    add_executable(bootstrap_allocation_test ${MEM01_NATIVE_OUTPUTS}
+    add_executable(bootstrap_allocation_test ${MEM01_NATIVE_SOURCES}
         tests/host/bootstrap_allocation_test.c
         tests/work/work_counts.c
     )
@@ -3153,19 +3168,34 @@ if(MICROS_BUILD_HOST_TESTS)
         "${CMAKE_CURRENT_SOURCE_DIR}/arch/*.h"
         "${CMAKE_CURRENT_SOURCE_DIR}/kernel/*.h"
     )
+    set(MEM02_NATIVE_SOURCES ${MEM02_NATIVE_OUTPUTS})
+    foreach(mem02_header IN LISTS MEM02_NATIVE_HEADERS)
+        file(RELATIVE_PATH mem02_relative_header "${CMAKE_CURRENT_SOURCE_DIR}" "${mem02_header}")
+        list(APPEND MEM02_NATIVE_OUTPUTS "${MEM02_NATIVE_ROOT}/${mem02_relative_header}")
+    endforeach()
+    set(MEM02_NATIVE_DEPENDENCIES ${MEM02_NATIVE_INPUTS})
+    list(TRANSFORM MEM02_NATIVE_DEPENDENCIES PREPEND "${CMAKE_CURRENT_SOURCE_DIR}/")
     add_custom_command(
         OUTPUT ${MEM02_NATIVE_OUTPUTS}
-        JOB_POOL mem03_source_proof
         COMMAND "${MICROS_PYTHON}" ${MICROS_PYTHON_ARGS}
             "${CMAKE_CURRENT_SOURCE_DIR}/tools/generate_kernel_mapping_fixture.py"
-        DEPENDS ${MEM02_NATIVE_INPUTS} ${MEM02_NATIVE_HEADERS}
+        DEPENDS ${MEM02_NATIVE_DEPENDENCIES} ${MEM02_NATIVE_HEADERS}
             tools/generate_kernel_mapping_fixture.py
             tests/host/kernel_mapping_source.py
             tests/host/kernel_mapping_test.h
+            tests/host/native_observations.py
+            tests/host/native_observations.json
+            tests/host/source_snapshot.py
+            tests/host/c_source_records.py
+            tests/host/work_count_lexical.py
+            tests/host/work_count_projection.py
+            tests/host/work_count_types.py
+            tools/validation_context.py
+            tools/validation_inputs.py
         WORKING_DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}"
         VERBATIM
     )
-    add_executable(kernel_mapping_test ${MEM02_NATIVE_OUTPUTS}
+    add_executable(kernel_mapping_test ${MEM02_NATIVE_SOURCES}
         tests/host/kernel_mapping_test.c
         tests/work/work_counts.c
     )
@@ -3183,23 +3213,6 @@ if(MICROS_BUILD_HOST_TESTS)
     add_dependencies(test-unit-fast kernel_mapping_test)
     add_dependencies(test-unit kernel_mapping_test)
 
-    set_property(GLOBAL APPEND PROPERTY JOB_POOLS mem03_source_proof=1)
-    add_custom_command(
-        OUTPUT ${MEM01_NATIVE_OUTPUTS} APPEND
-        DEPENDS tests/host/selected_ownership_source.py
-            tests/host/selected_ownership_authority.py
-            tests/host/evidence_authority_scope.py
-            tools/validation_context.py
-            tools/validation_inputs.py
-    )
-    add_custom_command(
-        OUTPUT ${MEM02_NATIVE_OUTPUTS} APPEND
-        DEPENDS tests/host/selected_ownership_source.py
-            tests/host/selected_ownership_authority.py
-            tests/host/evidence_authority_scope.py
-            tools/validation_context.py
-            tools/validation_inputs.py
-    )
     set(MEM03_NATIVE_ROOT "${CMAKE_CURRENT_BINARY_DIR}/selected-ownership")
     set(MEM03_NATIVE_INPUTS
         kernel/memory/frame_allocator.c
@@ -3314,23 +3327,25 @@ if(MICROS_BUILD_HOST_TESTS)
         file(RELATIVE_PATH mem03_relative_header "${CMAKE_CURRENT_SOURCE_DIR}" "${mem03_header}")
         list(APPEND MEM03_NATIVE_OUTPUTS "${MEM03_NATIVE_ROOT}/ordinary/${mem03_relative_header}")
     endforeach()
+    set(MEM03_NATIVE_DEPENDENCIES ${MEM03_NATIVE_INPUTS})
+    list(TRANSFORM MEM03_NATIVE_DEPENDENCIES PREPEND "${CMAKE_CURRENT_SOURCE_DIR}/")
     add_custom_command(
         OUTPUT ${MEM03_NATIVE_OUTPUTS}
-        JOB_POOL mem03_source_proof
         COMMAND "${MICROS_PYTHON}" ${MICROS_PYTHON_ARGS}
             "${CMAKE_CURRENT_SOURCE_DIR}/tools/generate_selected_ownership_fixture.py"
-        DEPENDS ${MEM03_NATIVE_INPUTS} ${MEM03_NATIVE_HEADERS}
+        DEPENDS ${MEM03_NATIVE_DEPENDENCIES} ${MEM03_NATIVE_HEADERS}
             tools/generate_selected_ownership_fixture.py
             tests/host/selected_ownership_source.py
-            tests/host/selected_ownership_authority.py
-            tests/host/evidence_authority_scope.py
+            tests/host/native_observations.py
+            tests/host/native_observations.json
+            tests/host/source_snapshot.py
             tools/validation_context.py
             tools/validation_inputs.py
             tests/host/selected_ownership_test.h
             tests/host/c_source_records.py
             tests/host/work_count_lexical.py
             tests/host/work_count_projection.py
-            tests/host/test_frame_ownership_source_layout.py
+            tests/host/work_count_types.py
         WORKING_DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}"
         VERBATIM
     )
@@ -3432,30 +3447,6 @@ if(MICROS_BUILD_HOST_TESTS)
     set_tests_properties(selected-ownership PROPERTIES LABELS slow)
     add_dependencies(test-unit selected_ownership_aggregate_test selected_ownership_active_frame_test selected_ownership_inactive_frame_test selected_ownership_active_geometry_test selected_ownership_inactive_geometry_test selected_ownership_ordinary_test)
 
-    add_custom_command(
-        OUTPUT ${MEM01_NATIVE_OUTPUTS} APPEND
-        DEPENDS tests/host/selected_address_space_source.py
-            tests/host/selected_address_space_authority.py
-            tests/host/evidence_authority_scope.py
-            tools/validation_context.py
-            tools/validation_inputs.py
-    )
-    add_custom_command(
-        OUTPUT ${MEM02_NATIVE_OUTPUTS} APPEND
-        DEPENDS tests/host/selected_address_space_source.py
-            tests/host/selected_address_space_authority.py
-            tests/host/evidence_authority_scope.py
-            tools/validation_context.py
-            tools/validation_inputs.py
-    )
-    add_custom_command(
-        OUTPUT ${MEM03_NATIVE_OUTPUTS} APPEND
-        DEPENDS tests/host/selected_address_space_source.py
-            tests/host/selected_address_space_authority.py
-            tests/host/evidence_authority_scope.py
-            tools/validation_context.py
-            tools/validation_inputs.py
-    )
     set(MEM04_NATIVE_ROOT "${CMAKE_CURRENT_BINARY_DIR}/selected-address-space")
     set(MEM04_NATIVE_INPUTS
         kernel/memory/frame_allocator.c
@@ -3557,25 +3548,28 @@ if(MICROS_BUILD_HOST_TESTS)
         file(RELATIVE_PATH mem04_relative_header "${CMAKE_CURRENT_SOURCE_DIR}" "${mem04_header}")
         list(APPEND MEM04_NATIVE_OUTPUTS "${MEM04_NATIVE_ROOT}/ordinary/${mem04_relative_header}")
     endforeach()
+    set(MEM04_NATIVE_DEPENDENCIES ${MEM04_NATIVE_INPUTS})
+    list(TRANSFORM MEM04_NATIVE_DEPENDENCIES PREPEND "${CMAKE_CURRENT_SOURCE_DIR}/")
     add_custom_command(
         OUTPUT ${MEM04_NATIVE_OUTPUTS}
-        JOB_POOL mem03_source_proof
         COMMAND "${MICROS_PYTHON}" ${MICROS_PYTHON_ARGS}
             "${CMAKE_CURRENT_SOURCE_DIR}/tools/generate_selected_address_space_fixture.py"
-        DEPENDS ${MEM04_NATIVE_INPUTS} ${MEM04_NATIVE_HEADERS}
+        DEPENDS ${MEM04_NATIVE_DEPENDENCIES} ${MEM04_NATIVE_HEADERS}
             tests/host/selected_address_space_test.c
             tests/host/selected_address_space_test.h
             tests/host/selected_address_space_source.py
             tests/host/selected_address_space_evidence.py
-            tests/host/selected_address_space_authority.py
+            tests/host/native_observations.py
+            tests/host/native_observations.json
+            tests/host/selected_release_handoff_source.py
             tests/host/test_selected_address_space.py
             tools/generate_selected_address_space_fixture.py
             tools/check_selected_address_space.py
-            tests/host/evidence_authority_scope.py
-            tests/host/selected_ownership_source.py
+            tests/host/source_snapshot.py
             tests/host/c_source_records.py
             tests/host/work_count_lexical.py
             tests/host/work_count_projection.py
+            tests/host/work_count_types.py
             tools/validation_context.py
             tools/validation_inputs.py
         WORKING_DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}"
@@ -3653,38 +3647,6 @@ if(MICROS_BUILD_HOST_TESTS)
     set_tests_properties(selected-address-space PROPERTIES LABELS slow)
     add_dependencies(test-unit selected_address_space_aggregate_test selected_address_space_path_test selected_address_space_context_test selected_address_space_ordinary_test)
 
-    add_custom_command(
-        OUTPUT ${MEM01_NATIVE_OUTPUTS} APPEND
-        DEPENDS tests/host/selected_release_handoff_source.py
-            tests/host/selected_release_handoff_authority.py
-            tests/host/evidence_authority_scope.py
-            tools/validation_context.py
-            tools/validation_inputs.py
-    )
-    add_custom_command(
-        OUTPUT ${MEM02_NATIVE_OUTPUTS} APPEND
-        DEPENDS tests/host/selected_release_handoff_source.py
-            tests/host/selected_release_handoff_authority.py
-            tests/host/evidence_authority_scope.py
-            tools/validation_context.py
-            tools/validation_inputs.py
-    )
-    add_custom_command(
-        OUTPUT ${MEM03_NATIVE_OUTPUTS} APPEND
-        DEPENDS tests/host/selected_release_handoff_source.py
-            tests/host/selected_release_handoff_authority.py
-            tests/host/evidence_authority_scope.py
-            tools/validation_context.py
-            tools/validation_inputs.py
-    )
-    add_custom_command(
-        OUTPUT ${MEM04_NATIVE_OUTPUTS} APPEND
-        DEPENDS tests/host/selected_release_handoff_source.py
-            tests/host/selected_release_handoff_authority.py
-            tests/host/evidence_authority_scope.py
-            tools/validation_context.py
-            tools/validation_inputs.py
-    )
     set(MEM05_NATIVE_ROOT "${CMAKE_CURRENT_BINARY_DIR}/selected-release-handoff")
     set(MEM05_NATIVE_INPUTS
         kernel/memory/frame_allocator.c
@@ -3797,25 +3759,28 @@ if(MICROS_BUILD_HOST_TESTS)
         file(RELATIVE_PATH mem05_relative_header "${CMAKE_CURRENT_SOURCE_DIR}" "${mem05_header}")
         list(APPEND MEM05_NATIVE_OUTPUTS "${MEM05_NATIVE_ROOT}/ordinary/${mem05_relative_header}")
     endforeach()
+    set(MEM05_NATIVE_DEPENDENCIES ${MEM05_NATIVE_INPUTS})
+    list(TRANSFORM MEM05_NATIVE_DEPENDENCIES PREPEND "${CMAKE_CURRENT_SOURCE_DIR}/")
     add_custom_command(
         OUTPUT ${MEM05_NATIVE_OUTPUTS}
-        JOB_POOL mem03_source_proof
         COMMAND "${MICROS_PYTHON}" ${MICROS_PYTHON_ARGS}
             "${CMAKE_CURRENT_SOURCE_DIR}/tools/generate_selected_release_handoff_fixture.py"
-        DEPENDS ${MEM05_NATIVE_INPUTS} ${MEM05_NATIVE_HEADERS}
+        DEPENDS ${MEM05_NATIVE_DEPENDENCIES} ${MEM05_NATIVE_HEADERS}
             tests/host/selected_release_handoff_test.c
             tests/host/selected_release_handoff_test.h
             tests/host/selected_release_handoff_source.py
             tests/host/selected_release_handoff_evidence.py
-            tests/host/selected_release_handoff_authority.py
+            tests/host/native_observations.py
+            tests/host/native_observations.json
             tests/host/test_selected_release_handoff.py
             tools/generate_selected_release_handoff_fixture.py
             tools/check_selected_release_handoff.py
-            tests/host/evidence_authority_scope.py
-            tests/host/selected_ownership_source.py
+            tests/host/source_snapshot.py
             tests/host/selected_address_space_source.py
             tests/host/c_source_records.py
             tests/host/work_count_lexical.py
+            tests/host/work_count_projection.py
+            tests/host/work_count_types.py
             tests/host/work_count_projection.py
             tools/validation_context.py
             tools/validation_inputs.py
@@ -3910,51 +3875,6 @@ if(MICROS_BUILD_HOST_TESTS)
     set_tests_properties(selected-release-handoff PROPERTIES LABELS slow)
     add_dependencies(test-unit selected_release_handoff_aggregate_test selected_release_handoff_frames_test selected_release_handoff_plans_test selected_release_handoff_context_test selected_release_handoff_ordinary_test)
 
-    add_custom_command(
-        OUTPUT ${MEM01_NATIVE_OUTPUTS} APPEND
-        DEPENDS tests/host/object_hart_validation_source.py
-            tests/host/object_hart_validation_authority.py
-            tests/host/object_hart_native_source_bindings.py
-            tests/host/evidence_authority_scope.py
-            tools/validation_context.py
-            tools/validation_inputs.py
-    )
-    add_custom_command(
-        OUTPUT ${MEM02_NATIVE_OUTPUTS} APPEND
-        DEPENDS tests/host/object_hart_validation_source.py
-            tests/host/object_hart_validation_authority.py
-            tests/host/object_hart_native_source_bindings.py
-            tests/host/evidence_authority_scope.py
-            tools/validation_context.py
-            tools/validation_inputs.py
-    )
-    add_custom_command(
-        OUTPUT ${MEM03_NATIVE_OUTPUTS} APPEND
-        DEPENDS tests/host/object_hart_validation_source.py
-            tests/host/object_hart_validation_authority.py
-            tests/host/object_hart_native_source_bindings.py
-            tests/host/evidence_authority_scope.py
-            tools/validation_context.py
-            tools/validation_inputs.py
-    )
-    add_custom_command(
-        OUTPUT ${MEM04_NATIVE_OUTPUTS} APPEND
-        DEPENDS tests/host/object_hart_validation_source.py
-            tests/host/object_hart_validation_authority.py
-            tests/host/object_hart_native_source_bindings.py
-            tests/host/evidence_authority_scope.py
-            tools/validation_context.py
-            tools/validation_inputs.py
-    )
-    add_custom_command(
-        OUTPUT ${MEM05_NATIVE_OUTPUTS} APPEND
-        DEPENDS tests/host/object_hart_validation_source.py
-            tests/host/object_hart_validation_authority.py
-            tests/host/object_hart_native_source_bindings.py
-            tests/host/evidence_authority_scope.py
-            tools/validation_context.py
-            tools/validation_inputs.py
-    )
     set(OBJ01_NATIVE_ROOT "${CMAKE_CURRENT_BINARY_DIR}/object-hart-validation")
     set(OBJ01_NATIVE_INPUTS
         kernel/objects/kernel_objects.c
@@ -3987,30 +3907,6 @@ if(MICROS_BUILD_HOST_TESTS)
         kernel/scheduler/scheduler_core_private.h
     )
     set(OBJ01_NATIVE_OUTPUTS)
-    set(OBJ01_SOURCES_0)
-    foreach(obj01_source IN LISTS OBJ01_NATIVE_INPUTS)
-        list(APPEND OBJ01_SOURCES_0 "${OBJ01_NATIVE_ROOT}/baseline/ordinary/${obj01_source}")
-    endforeach()
-    list(APPEND OBJ01_NATIVE_OUTPUTS ${OBJ01_SOURCES_0})
-    foreach(obj01_header IN LISTS OBJ01_NATIVE_HEADERS)
-        list(APPEND OBJ01_NATIVE_OUTPUTS "${OBJ01_NATIVE_ROOT}/baseline/ordinary/${obj01_header}")
-    endforeach()
-    set(OBJ01_SOURCES_1)
-    foreach(obj01_source IN LISTS OBJ01_NATIVE_INPUTS)
-        list(APPEND OBJ01_SOURCES_1 "${OBJ01_NATIVE_ROOT}/baseline/aggregate/${obj01_source}")
-    endforeach()
-    list(APPEND OBJ01_NATIVE_OUTPUTS ${OBJ01_SOURCES_1})
-    foreach(obj01_header IN LISTS OBJ01_NATIVE_HEADERS)
-        list(APPEND OBJ01_NATIVE_OUTPUTS "${OBJ01_NATIVE_ROOT}/baseline/aggregate/${obj01_header}")
-    endforeach()
-    set(OBJ01_SOURCES_2)
-    foreach(obj01_source IN LISTS OBJ01_NATIVE_INPUTS)
-        list(APPEND OBJ01_SOURCES_2 "${OBJ01_NATIVE_ROOT}/baseline/stack/${obj01_source}")
-    endforeach()
-    list(APPEND OBJ01_NATIVE_OUTPUTS ${OBJ01_SOURCES_2})
-    foreach(obj01_header IN LISTS OBJ01_NATIVE_HEADERS)
-        list(APPEND OBJ01_NATIVE_OUTPUTS "${OBJ01_NATIVE_ROOT}/baseline/stack/${obj01_header}")
-    endforeach()
     set(OBJ01_SOURCES_3)
     foreach(obj01_source IN LISTS OBJ01_NATIVE_INPUTS)
         list(APPEND OBJ01_SOURCES_3 "${OBJ01_NATIVE_ROOT}/current/aggregate/${obj01_source}")
@@ -4035,75 +3931,34 @@ if(MICROS_BUILD_HOST_TESTS)
     foreach(obj01_header IN LISTS OBJ01_NATIVE_HEADERS)
         list(APPEND OBJ01_NATIVE_OUTPUTS "${OBJ01_NATIVE_ROOT}/current/ordinary/${obj01_header}")
     endforeach()
+    set(OBJ01_NATIVE_DEPENDENCIES ${OBJ01_NATIVE_INPUTS} ${OBJ01_NATIVE_HEADERS})
+    list(TRANSFORM OBJ01_NATIVE_DEPENDENCIES PREPEND "${CMAKE_CURRENT_SOURCE_DIR}/")
     add_custom_command(
         OUTPUT ${OBJ01_NATIVE_OUTPUTS}
-        JOB_POOL mem03_source_proof
         COMMAND "${MICROS_PYTHON}" ${MICROS_PYTHON_ARGS}
             "${CMAKE_CURRENT_SOURCE_DIR}/tools/generate_object_hart_validation_fixture.py"
-        DEPENDS ${OBJ01_NATIVE_INPUTS} ${OBJ01_NATIVE_HEADERS}
+        DEPENDS ${OBJ01_NATIVE_DEPENDENCIES}
             tests/host/object_hart_validation_test.c
             tests/host/object_hart_validation_test.h
             tests/host/object_hart_validation_source.py
             tests/host/object_hart_validation_evidence.py
-            tests/host/object_hart_validation_authority.py
-            tests/host/object_hart_native_source_bindings.py
+            tests/host/common_scheduler_return_source.py
+            tests/host/native_observations.py
+            tests/host/native_observations.json
+            tests/host/object_hart_reference.json
             tests/host/test_object_hart_validation.py
             tools/generate_object_hart_validation_fixture.py
             tools/check_object_hart_validation.py
-            tests/host/evidence_authority_scope.py
-            tests/host/selected_release_handoff_source.py
-            tests/host/selected_ownership_source.py
-            tests/host/selected_address_space_source.py
+            tests/host/source_snapshot.py
             tests/host/c_source_records.py
             tests/host/work_count_lexical.py
+            tests/host/work_count_projection.py
+            tests/host/work_count_types.py
             tools/validation_context.py
             tools/validation_inputs.py
         WORKING_DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}"
         VERBATIM
     )
-    add_executable(object_hart_baseline_ordinary_test ${OBJ01_SOURCES_0}
-        tests/host/object_hart_validation_test.c
-    )
-    target_include_directories(object_hart_baseline_ordinary_test PRIVATE
-        "${OBJ01_NATIVE_ROOT}/baseline/ordinary" "${OBJ01_NATIVE_ROOT}/baseline/ordinary/include"
-        "${CMAKE_CURRENT_SOURCE_DIR}" "${CMAKE_CURRENT_SOURCE_DIR}/include")
-    target_compile_features(object_hart_baseline_ordinary_test PRIVATE c_std_17)
-    target_compile_options(object_hart_baseline_ordinary_test PRIVATE -Wall -Wextra -Werror -Wpedantic -Wmissing-prototypes -Wstrict-prototypes -fno-builtin)
-    target_compile_definitions(object_hart_baseline_ordinary_test PRIVATE MICROS_OBJ01_NATIVE_STAGE=0)
-    if(MICROS_ENABLE_SANITIZERS AND CMAKE_C_COMPILER_ID MATCHES "Clang|GNU")
-        target_compile_options(object_hart_baseline_ordinary_test PRIVATE -fno-omit-frame-pointer -fsanitize=address,undefined)
-        target_link_options(object_hart_baseline_ordinary_test PRIVATE -fsanitize=address,undefined)
-    endif()
-    add_executable(object_hart_baseline_aggregate_test ${OBJ01_SOURCES_1}
-        tests/host/object_hart_validation_test.c
-        tests/work/work_counts.c
-    )
-    target_include_directories(object_hart_baseline_aggregate_test PRIVATE
-        "${OBJ01_NATIVE_ROOT}/baseline/aggregate" "${OBJ01_NATIVE_ROOT}/baseline/aggregate/include"
-        "${CMAKE_CURRENT_SOURCE_DIR}" "${CMAKE_CURRENT_SOURCE_DIR}/include")
-    target_compile_features(object_hart_baseline_aggregate_test PRIVATE c_std_17)
-    target_compile_options(object_hart_baseline_aggregate_test PRIVATE -Wall -Wextra -Werror -Wpedantic -Wmissing-prototypes -Wstrict-prototypes -fno-builtin)
-    target_compile_definitions(object_hart_baseline_aggregate_test PRIVATE MICROS_OBJ01_NATIVE_STAGE=0)
-    if(MICROS_ENABLE_SANITIZERS AND CMAKE_C_COMPILER_ID MATCHES "Clang|GNU")
-        target_compile_options(object_hart_baseline_aggregate_test PRIVATE -fno-omit-frame-pointer -fsanitize=address,undefined)
-        target_link_options(object_hart_baseline_aggregate_test PRIVATE -fsanitize=address,undefined)
-    endif()
-    target_compile_definitions(object_hart_baseline_aggregate_test PRIVATE MICROS_TEST_WORK_COUNTS=1 MICROS_OBJ01_NATIVE_CHANNEL=0)
-    add_executable(object_hart_baseline_stack_test ${OBJ01_SOURCES_2}
-        tests/host/object_hart_validation_test.c
-        tests/work/work_counts.c
-    )
-    target_include_directories(object_hart_baseline_stack_test PRIVATE
-        "${OBJ01_NATIVE_ROOT}/baseline/stack" "${OBJ01_NATIVE_ROOT}/baseline/stack/include"
-        "${CMAKE_CURRENT_SOURCE_DIR}" "${CMAKE_CURRENT_SOURCE_DIR}/include")
-    target_compile_features(object_hart_baseline_stack_test PRIVATE c_std_17)
-    target_compile_options(object_hart_baseline_stack_test PRIVATE -Wall -Wextra -Werror -Wpedantic -Wmissing-prototypes -Wstrict-prototypes -fno-builtin)
-    target_compile_definitions(object_hart_baseline_stack_test PRIVATE MICROS_OBJ01_NATIVE_STAGE=0)
-    if(MICROS_ENABLE_SANITIZERS AND CMAKE_C_COMPILER_ID MATCHES "Clang|GNU")
-        target_compile_options(object_hart_baseline_stack_test PRIVATE -fno-omit-frame-pointer -fsanitize=address,undefined)
-        target_link_options(object_hart_baseline_stack_test PRIVATE -fsanitize=address,undefined)
-    endif()
-    target_compile_definitions(object_hart_baseline_stack_test PRIVATE MICROS_TEST_WORK_COUNTS=1 MICROS_OBJ01_NATIVE_CHANNEL=1)
     add_executable(object_hart_current_aggregate_test ${OBJ01_SOURCES_3}
         tests/host/object_hart_validation_test.c
         tests/work/work_counts.c
@@ -4154,57 +4009,12 @@ if(MICROS_BUILD_HOST_TESTS)
         "MICROS_OBJECT_HART_VALIDATION_ROOT=\"${CMAKE_CURRENT_SOURCE_DIR}\""
     )
     add_test(NAME object-hart-validation COMMAND object_hart_current_ordinary_test
-        "$<TARGET_FILE:object_hart_baseline_ordinary_test>"
-        "$<TARGET_FILE:object_hart_baseline_aggregate_test>"
-        "$<TARGET_FILE:object_hart_baseline_stack_test>"
         "$<TARGET_FILE:object_hart_current_aggregate_test>"
         "$<TARGET_FILE:object_hart_current_stack_test>"
     )
     set_tests_properties(object-hart-validation PROPERTIES LABELS slow)
-    add_dependencies(test-unit object_hart_baseline_ordinary_test object_hart_baseline_aggregate_test object_hart_baseline_stack_test object_hart_current_aggregate_test object_hart_current_stack_test object_hart_current_ordinary_test)
+    add_dependencies(test-unit object_hart_current_aggregate_test object_hart_current_stack_test object_hart_current_ordinary_test)
 
-    add_custom_command(
-        OUTPUT ${MEM01_NATIVE_OUTPUTS} APPEND
-        DEPENDS tests/host/common_scheduler_return_source.py
-            tests/host/common_scheduler_return_authority.py
-            tests/host/common_scheduler_return_native_source_bindings.py
-            tests/host/evidence_authority_scope.py
-    )
-    add_custom_command(
-        OUTPUT ${MEM02_NATIVE_OUTPUTS} APPEND
-        DEPENDS tests/host/common_scheduler_return_source.py
-            tests/host/common_scheduler_return_authority.py
-            tests/host/common_scheduler_return_native_source_bindings.py
-            tests/host/evidence_authority_scope.py
-    )
-    add_custom_command(
-        OUTPUT ${MEM03_NATIVE_OUTPUTS} APPEND
-        DEPENDS tests/host/common_scheduler_return_source.py
-            tests/host/common_scheduler_return_authority.py
-            tests/host/common_scheduler_return_native_source_bindings.py
-            tests/host/evidence_authority_scope.py
-    )
-    add_custom_command(
-        OUTPUT ${MEM04_NATIVE_OUTPUTS} APPEND
-        DEPENDS tests/host/common_scheduler_return_source.py
-            tests/host/common_scheduler_return_authority.py
-            tests/host/common_scheduler_return_native_source_bindings.py
-            tests/host/evidence_authority_scope.py
-    )
-    add_custom_command(
-        OUTPUT ${MEM05_NATIVE_OUTPUTS} APPEND
-        DEPENDS tests/host/common_scheduler_return_source.py
-            tests/host/common_scheduler_return_authority.py
-            tests/host/common_scheduler_return_native_source_bindings.py
-            tests/host/evidence_authority_scope.py
-    )
-    add_custom_command(
-        OUTPUT ${OBJ01_NATIVE_OUTPUTS} APPEND
-        DEPENDS tests/host/common_scheduler_return_source.py
-            tests/host/common_scheduler_return_authority.py
-            tests/host/common_scheduler_return_native_source_bindings.py
-            tests/host/evidence_authority_scope.py
-    )
     set(OBJ02_NATIVE_ROOT "${CMAKE_CURRENT_BINARY_DIR}/common-scheduler-return")
     set(OBJ02_NATIVE_INPUTS
         kernel/objects/kernel_objects.c
@@ -4236,58 +4046,44 @@ if(MICROS_BUILD_HOST_TESTS)
         kernel/scheduler/scheduler_core_internal.h
         kernel/scheduler/scheduler_core_private.h
     )
+    set(OBJ02_NATIVE_DEPENDENCIES ${OBJ02_NATIVE_INPUTS} ${OBJ02_NATIVE_HEADERS})
+    list(TRANSFORM OBJ02_NATIVE_DEPENDENCIES PREPEND "${CMAKE_CURRENT_SOURCE_DIR}/")
     set(OBJ02_NATIVE_OUTPUTS)
     set(OBJ02_SOURCES_0)
     foreach(obj02_source IN LISTS OBJ02_NATIVE_INPUTS)
-        list(APPEND OBJ02_SOURCES_0 "${OBJ02_NATIVE_ROOT}/baseline/ordinary/${obj02_source}")
+        list(APPEND OBJ02_SOURCES_0 "${OBJ02_NATIVE_ROOT}/current/ordinary/${obj02_source}")
     endforeach()
     list(APPEND OBJ02_NATIVE_OUTPUTS ${OBJ02_SOURCES_0})
     foreach(obj02_header IN LISTS OBJ02_NATIVE_HEADERS)
-        list(APPEND OBJ02_NATIVE_OUTPUTS "${OBJ02_NATIVE_ROOT}/baseline/ordinary/${obj02_header}")
+        list(APPEND OBJ02_NATIVE_OUTPUTS "${OBJ02_NATIVE_ROOT}/current/ordinary/${obj02_header}")
     endforeach()
     set(OBJ02_SOURCES_1)
     foreach(obj02_source IN LISTS OBJ02_NATIVE_INPUTS)
-        list(APPEND OBJ02_SOURCES_1 "${OBJ02_NATIVE_ROOT}/baseline/work/${obj02_source}")
+        list(APPEND OBJ02_SOURCES_1 "${OBJ02_NATIVE_ROOT}/current/work/${obj02_source}")
     endforeach()
     list(APPEND OBJ02_NATIVE_OUTPUTS ${OBJ02_SOURCES_1})
-    foreach(obj02_header IN LISTS OBJ02_NATIVE_HEADERS)
-        list(APPEND OBJ02_NATIVE_OUTPUTS "${OBJ02_NATIVE_ROOT}/baseline/work/${obj02_header}")
-    endforeach()
-    set(OBJ02_SOURCES_2)
-    foreach(obj02_source IN LISTS OBJ02_NATIVE_INPUTS)
-        list(APPEND OBJ02_SOURCES_2 "${OBJ02_NATIVE_ROOT}/current/ordinary/${obj02_source}")
-    endforeach()
-    list(APPEND OBJ02_NATIVE_OUTPUTS ${OBJ02_SOURCES_2})
-    foreach(obj02_header IN LISTS OBJ02_NATIVE_HEADERS)
-        list(APPEND OBJ02_NATIVE_OUTPUTS "${OBJ02_NATIVE_ROOT}/current/ordinary/${obj02_header}")
-    endforeach()
-    set(OBJ02_SOURCES_3)
-    foreach(obj02_source IN LISTS OBJ02_NATIVE_INPUTS)
-        list(APPEND OBJ02_SOURCES_3 "${OBJ02_NATIVE_ROOT}/current/work/${obj02_source}")
-    endforeach()
-    list(APPEND OBJ02_NATIVE_OUTPUTS ${OBJ02_SOURCES_3})
     foreach(obj02_header IN LISTS OBJ02_NATIVE_HEADERS)
         list(APPEND OBJ02_NATIVE_OUTPUTS "${OBJ02_NATIVE_ROOT}/current/work/${obj02_header}")
     endforeach()
     add_custom_command(
         OUTPUT ${OBJ02_NATIVE_OUTPUTS}
-        JOB_POOL mem03_source_proof
         COMMAND "${MICROS_PYTHON}" ${MICROS_PYTHON_ARGS}
             "${CMAKE_CURRENT_SOURCE_DIR}/tools/generate_common_scheduler_return_fixture.py"
-        DEPENDS ${OBJ02_NATIVE_INPUTS} ${OBJ02_NATIVE_HEADERS}
+        DEPENDS ${OBJ02_NATIVE_DEPENDENCIES}
             tests/host/common_scheduler_return_test.c
             tests/host/common_scheduler_return_test.h
             tests/host/common_scheduler_return_source.py
             tests/host/common_scheduler_return_evidence.py
-            tests/host/common_scheduler_return_authority.py
-            tests/host/common_scheduler_return_native_source_bindings.py
+            tests/host/native_observations.py
+            tests/host/native_observations.json
             tests/host/test_common_scheduler_return.py
             tests/qemu/common_scheduler_return_work.c
             tests/qemu/common_scheduler_return_work.h
             tools/generate_common_scheduler_return_fixture.py
             tools/check_common_scheduler_return.py
+            tests/host/object_hart_validation_evidence.py
             tests/host/object_hart_validation_source.py
-            tests/host/evidence_authority_scope.py
+            tests/host/source_snapshot.py
             tests/host/c_source_records.py
             tests/host/work_count_lexical.py
             tools/validation_context.py
@@ -4295,35 +4091,7 @@ if(MICROS_BUILD_HOST_TESTS)
         WORKING_DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}"
         VERBATIM
     )
-    add_executable(common_scheduler_return_baseline_ordinary ${OBJ02_SOURCES_0}
-        tests/host/common_scheduler_return_test.c
-    )
-    target_include_directories(common_scheduler_return_baseline_ordinary PRIVATE
-        "${OBJ02_NATIVE_ROOT}/baseline/ordinary" "${OBJ02_NATIVE_ROOT}/baseline/ordinary/include"
-        "${CMAKE_CURRENT_SOURCE_DIR}" "${CMAKE_CURRENT_SOURCE_DIR}/include")
-    target_compile_features(common_scheduler_return_baseline_ordinary PRIVATE c_std_17)
-    target_compile_options(common_scheduler_return_baseline_ordinary PRIVATE -Wall -Wextra -Werror -Wpedantic -Wmissing-prototypes -Wstrict-prototypes -fno-builtin)
-    target_compile_definitions(common_scheduler_return_baseline_ordinary PRIVATE MICROS_OBJ02_NATIVE_STAGE=0)
-    if(MICROS_ENABLE_SANITIZERS AND CMAKE_C_COMPILER_ID MATCHES "Clang|GNU")
-        target_compile_options(common_scheduler_return_baseline_ordinary PRIVATE -fno-omit-frame-pointer -fsanitize=address,undefined)
-        target_link_options(common_scheduler_return_baseline_ordinary PRIVATE -fsanitize=address,undefined)
-    endif()
-    add_executable(common_scheduler_return_baseline_work ${OBJ02_SOURCES_1}
-        tests/host/common_scheduler_return_test.c
-        tests/work/work_counts.c
-    )
-    target_include_directories(common_scheduler_return_baseline_work PRIVATE
-        "${OBJ02_NATIVE_ROOT}/baseline/work" "${OBJ02_NATIVE_ROOT}/baseline/work/include"
-        "${CMAKE_CURRENT_SOURCE_DIR}" "${CMAKE_CURRENT_SOURCE_DIR}/include")
-    target_compile_features(common_scheduler_return_baseline_work PRIVATE c_std_17)
-    target_compile_options(common_scheduler_return_baseline_work PRIVATE -Wall -Wextra -Werror -Wpedantic -Wmissing-prototypes -Wstrict-prototypes -fno-builtin)
-    target_compile_definitions(common_scheduler_return_baseline_work PRIVATE MICROS_OBJ02_NATIVE_STAGE=0)
-    if(MICROS_ENABLE_SANITIZERS AND CMAKE_C_COMPILER_ID MATCHES "Clang|GNU")
-        target_compile_options(common_scheduler_return_baseline_work PRIVATE -fno-omit-frame-pointer -fsanitize=address,undefined)
-        target_link_options(common_scheduler_return_baseline_work PRIVATE -fsanitize=address,undefined)
-    endif()
-    target_compile_definitions(common_scheduler_return_baseline_work PRIVATE MICROS_TEST_WORK_COUNTS=1)
-    add_executable(common_scheduler_return_current_ordinary ${OBJ02_SOURCES_2}
+    add_executable(common_scheduler_return_current_ordinary ${OBJ02_SOURCES_0}
         tests/host/common_scheduler_return_test.c
     )
     target_include_directories(common_scheduler_return_current_ordinary PRIVATE
@@ -4336,7 +4104,7 @@ if(MICROS_BUILD_HOST_TESTS)
         target_compile_options(common_scheduler_return_current_ordinary PRIVATE -fno-omit-frame-pointer -fsanitize=address,undefined)
         target_link_options(common_scheduler_return_current_ordinary PRIVATE -fsanitize=address,undefined)
     endif()
-    add_executable(common_scheduler_return_test ${OBJ02_SOURCES_3}
+    add_executable(common_scheduler_return_test ${OBJ02_SOURCES_1}
         tests/host/common_scheduler_return_test.c
         tests/work/work_counts.c
     )
@@ -4358,12 +4126,10 @@ if(MICROS_BUILD_HOST_TESTS)
         "MICROS_COMMON_SCHEDULER_RETURN_ROOT=\"${CMAKE_CURRENT_SOURCE_DIR}\""
     )
     add_test(NAME common-scheduler-return COMMAND common_scheduler_return_test
-        "$<TARGET_FILE:common_scheduler_return_baseline_ordinary>"
-        "$<TARGET_FILE:common_scheduler_return_baseline_work>"
         "$<TARGET_FILE:common_scheduler_return_current_ordinary>"
     )
     set_tests_properties(common-scheduler-return PROPERTIES LABELS slow)
-    add_dependencies(test-unit common_scheduler_return_baseline_ordinary common_scheduler_return_baseline_work common_scheduler_return_current_ordinary common_scheduler_return_test)
+    add_dependencies(test-unit common_scheduler_return_current_ordinary common_scheduler_return_test)
 
     include("${CMAKE_CURRENT_SOURCE_DIR}/tests/stack/StackEvidence.cmake")
     include("${CMAKE_CURRENT_SOURCE_DIR}/tests/work/WorkCounts.cmake")
@@ -6752,6 +6518,8 @@ if(MICROS_BUILD_USER_RUNTIME_TEST)
             "${MICROS_PYTHON}"
             ${MICROS_PYTHON_ARGS}
             "${CMAKE_CURRENT_SOURCE_DIR}/tools/run_qemu_smoke.py"
+            --require-current-evidence
+            runtime-memory
             --qemu
             "${MICROS_QEMU}"
             --kernel
@@ -6870,6 +6638,8 @@ if(MICROS_BUILD_USER_ADDRESS_SPACE_TEST)
             "${MICROS_PYTHON}"
             ${MICROS_PYTHON_ARGS}
             "${CMAKE_CURRENT_SOURCE_DIR}/tools/run_qemu_smoke.py"
+            --require-current-evidence
+            user-address-space
             --report-transcript
             --qemu
             "${MICROS_QEMU}"
@@ -6906,6 +6676,8 @@ if(MICROS_BUILD_ADDRESS_SPACE_HANDOFF_TEST)
             "${MICROS_PYTHON}"
             ${MICROS_PYTHON_ARGS}
             "${CMAKE_CURRENT_SOURCE_DIR}/tools/run_qemu_smoke.py"
+            --require-current-evidence
+            address-space-handoff
             --report-transcript
             --qemu
             "${MICROS_QEMU}"
@@ -6978,6 +6750,8 @@ if(MICROS_BUILD_SCHEDULER_TEST)
             "${MICROS_PYTHON}"
             ${MICROS_PYTHON_ARGS}
             "${CMAKE_CURRENT_SOURCE_DIR}/tools/run_qemu_smoke.py"
+            --require-current-evidence
+            scheduler-return
             --report-transcript
             --qemu
             "${MICROS_QEMU}"
@@ -7440,6 +7214,8 @@ if(MICROS_BUILD_PANIC_TEST)
             "${MICROS_PYTHON}"
             ${MICROS_PYTHON_ARGS}
             "${CMAKE_CURRENT_SOURCE_DIR}/tools/run_qemu_smoke.py"
+            --require-current-evidence
+            diagnostic-history
             --qemu
             "${MICROS_QEMU}"
             --kernel
@@ -7652,6 +7428,8 @@ if(MICROS_BUILD_MMU_TEST)
             "${MICROS_PYTHON}"
             ${MICROS_PYTHON_ARGS}
             "${CMAKE_CURRENT_SOURCE_DIR}/tools/run_qemu_smoke.py"
+            --require-current-evidence
+            kernel-mapping
             --qemu
             "${MICROS_QEMU}"
             --kernel

@@ -30,8 +30,6 @@ from tools.python_host_runtime import (
     UnsupportedPythonRuntime,
     validate_environment as validate_python_environment,
 )
-from tests.host.work_count_recipe import projected_recipe_digest
-from tests.host.diagnostic_history_source import projected_runner_digest
 
 
 PROFILE_NAME = "darwin-arm64-ninja-python315-v2"
@@ -51,7 +49,7 @@ PROFILES = {
     "build-tty-service-image": ("riscv64-tty-service-image", "micros_tty_service", True),
 }
 RECIPE_DIGESTS = {
-    "CMakeLists.txt": "fa35a3f3a5ddc9259124a1ef6099952f7514d5038c11a39374cc00f21a23bc95",
+    "CMakeLists.txt": "7a5188c1fa644db983fd9bd0764c68ddc7251f5b5a637c76e064b65f3a373160",
     "cmake/toolchains/riscv64-clang.cmake": "1a1bbab2b91b54222bfbae93cdf2ae9d7847f521760dcba9119d306d3a36d459",
     "tests/work/WorkCounts.cmake": "61bee706c6b45f70712021cf4df49829a39bac82e6fb28c446bf84ed83013fc5",
 }
@@ -61,12 +59,12 @@ QEMU_RUNNER_SOURCE_DIGESTS = {
     "tools/qemu_smoke_records.py": "c1ddf036528c55ac93dda15522558d37cdd5efb09ed57675f3dea976bb96f8ec",
     "tools/qemu_smoke_platform.py": "e7e4b16fe4c729ae9d0f275c9276a01717ab2e67f12cd666bb4f0fe94f0cea16",
     "tools/qemu_smoke_objects.py": "5998b2bd91c71491e39cf5ad61a0e331aeb8a5bf4586a675aa7564af3a69cf00",
-    "tools/qemu_smoke_faults.py": "72f7d248ebe3884b8987471d387f1903dc5686eea9ac2b853e6e2df961fc3bbe",
+    "tools/qemu_smoke_faults.py": "05ee4617672595047f4922bbb91b56f2289b78eb5def47f28896ff9a9d858bc6",
     "tools/qemu_smoke_command.py": "cfd4ce156aa945eff9233755c36fa885e61696bad5d8bd4f4537772aba504484",
     "tools/qemu_smoke_execution.py": "62a3146a854f6faea843ac40d6675efc381f8c30b153d95ac7395f4109127493",
-    "tools/qemu_smoke_outcome.py": "78639dd9d203c0d93fc189277f16347b82f739e7f5f0e3890423c6bb4068f897",
-    "tools/qemu_smoke_arguments.py": "e66ac296f6ce79fd71bb1ff56704de67d6414456987126b0fd620ff52607af9c",
-    "tools/qemu_smoke_cli.py": "b8646433cd99c534ae9a5d37dff5e0652455e50c60045ed0255f4ce22d5e4019",
+    "tools/qemu_smoke_outcome.py": "11a653265f556f1d08b003c8165bd7f5c0748de4562fd72b16c2bb0a80dfc451",
+    "tools/qemu_smoke_arguments.py": "3fb4fa0f34d1f606f2e18b0750c3b2e2c0742831a6682b1c4dfa2587ba780881",
+    "tools/qemu_smoke_cli.py": "b338e8a0a527dd613e088d3830672a16224884d10d339f19a8fbfc9b6963eb1d",
 }
 QEMU_LOADER_PROBE = """
 import importlib.machinery as m, json, sys
@@ -115,7 +113,7 @@ def _validate_qemu_runner_family(root):
         raise UnsupportedContext("QEMU argument builder is outside the reviewed closure")
     for name, expected in QEMU_RUNNER_SOURCE_DIGESTS.items():
         path = root / name
-        if path.is_symlink() or not path.is_file() or projected_runner_digest(path) != expected:
+        if path.is_symlink() or not path.is_file() or _file_digest(path) != expected:
             raise UnsupportedContext("QEMU argument builder is outside the reviewed closure")
     names = tuple(Path(name).stem for name in QEMU_RUNNER_SOURCE_DIGESTS if name != "tools/run_qemu_smoke.py")
     forbidden = [
@@ -894,7 +892,7 @@ def collect(root, workflow, *, preparation=None):
         validate_environment(environment, target=profile.target_build)
         host = platform_identity()
         for name, expected in RECIPE_DIGESTS.items():
-            if projected_recipe_digest(root / name) != expected:
+            if _file_digest(root / name) != expected:
                 raise UnsupportedContext("build recipe is outside the initial reviewed closure")
         if workflow == "test-qemu-smoke":
             _validate_qemu_runner_family(root)

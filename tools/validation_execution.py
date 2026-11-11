@@ -267,10 +267,14 @@ def _fresh_workflow(
 
 def _execute_workflow(
     root, name, source, reuse, store, entry, *,
-    producer_profile=None,
+    producer_profile=None, record=False,
 ):
     _source(root, source)
-    profile, reason = _profile(root, name, source)
+    profile, reason = (
+        _profile(root, name, source)
+        if reuse or producer_profile is not None or record
+        else (None, None)
+    )
     if producer_profile is not None:
         if profile is None or not _producer_profile_matches(
             producer_profile, profile
@@ -347,7 +351,7 @@ def _producer_is_complete(
 
 def _run_commands(
     root, commands, workflows, source, reuse, entries,
-    producer_profiles, producer_report,
+    producer_profiles, producer_report, *, gate_only=False,
 ):
     needs_store = any(
         _workflow(command, workflows) is not None
@@ -372,6 +376,7 @@ def _run_commands(
                         if producer_profiles is not None
                         else None
                     ),
+                    record=gate_only,
                 )
             else:
                 result = _execute_nonworkflow(
@@ -455,7 +460,7 @@ def execute_plan(
                 )
         result = _run_commands(
             root, commands, workflows, source, reuse, entries,
-            producer_profiles, producer_report,
+            producer_profiles, producer_report, gate_only=gate_only,
         )
     except KeyboardInterrupt:
         if (

@@ -3,168 +3,19 @@
 import ast
 import importlib.util
 import json
+import re
 from pathlib import Path
 import subprocess
 import tempfile
 import unittest
 
-from tests.host.diagnostic_history_authority import ORACLE_RULES
-from tests.host.diagnostic_history_source import (
-    AUTHORITY_PATH, FAMILY, SOURCE_PATH, SOURCE_PROJECTION,
-    checked_oracle_rules, declaration_facts,
-    project_diagnostic_cmake, project_diagnostic_context, project_diagnostic_gate,
-    project_runner_options, project_runner_source,
-)
-from tests.host.evidence_authority_inventory import current_inventory
-from tests.host.evidence_authority_types import AuthorityClass
 from tests.host.qemu_smoke_test_fixture import PANIC_OUTPUT, TRAP_CONTEXT_RECORD
+from tests.host.diagnostic_history_source import SOURCE_PROJECTION
 from tools import qemu_smoke_arguments, qemu_smoke_cli, qemu_smoke_faults
 from tools.qemu_smoke_records import QemuResult, SmokeOutcome
 
 
 ROOT = Path(__file__).resolve().parents[2]
-
-
-class DiagnosticHistoryAuthorityTest(unittest.TestCase):
-    def test_only_the_eleven_new_production_members_may_be_absent_for_red(self):
-        from unittest.mock import patch
-        from tests.host import diagnostic_history_authority as authority
-
-        base = authority.base_membership(ROOT)
-        expected = set(base) | set(authority.SOURCE_ROLES["candidate_paths"]) | set(
-            authority.SOURCE_ROLES["immutable_additions"]
-        )
-        new_production = set(authority.SOURCE_ROLES["candidate_paths"]) - set(base)
-        self.assertEqual(11, len(new_production))
-        observed = expected - new_production
-
-        def membership(_, *arguments):
-            return b"" if "--others" in arguments else b"".join(
-                name.encode() + b"\0" for name in sorted(observed)
-            )
-
-        with (
-            tempfile.TemporaryDirectory(prefix="micros-plat01-typed-absence-") as directory,
-            patch.object(authority, "base_membership", return_value=base),
-            patch.object(authority, "git", side_effect=membership),
-        ):
-            root = Path(directory)
-            self.assertEqual(new_production, authority.current_membership(root, allow_absent=True)[2])
-            with self.assertRaises(ValueError):
-                authority.current_membership(root, allow_absent=False)
-            observed.remove("README.md")
-            with self.assertRaises(ValueError):
-                authority.current_membership(root, allow_absent=True)
-            observed.add("README.md")
-            path = root / sorted(new_production)[0]
-            path.parent.mkdir(parents=True)
-            path.touch()
-            with self.assertRaises(ValueError):
-                authority.current_membership(root, allow_absent=True)
-
-    def test_staged_claim_without_a_terminal_journal_keeps_every_assertion(self):
-        from unittest.mock import patch
-        from tests.host import diagnostic_history_authority as authority
-
-        def absent_claim(root, *arguments):
-            self.assertEqual(ROOT, root)
-            self.assertEqual(
-                ("ls-tree", "-r", "--name-only", "-z", "HEAD", "--", AUTHORITY_PATH, SOURCE_PATH),
-                arguments,
-            )
-            return b""
-
-        with (
-            patch.object(authority, "_provisional", None),
-            patch.object(authority, "git", side_effect=absent_claim),
-            patch.object(authority, "read_current", return_value=None),
-            patch.object(authority, "capture_author_context", side_effect=AssertionError("no author receipt")),
-        ):
-            for key in SOURCE_PROJECTION["retirement_keys"]:
-                self.assertTrue(authority.identity_required(ROOT, key), key)
-        with tempfile.TemporaryDirectory(prefix="micros-plat01-no-authority-") as directory:
-            self.assertTrue(authority.identity_required(Path(directory), SOURCE_PROJECTION["retirement_keys"][0]))
-        self.assertTrue(authority.identity_required(ROOT, "unrelated:permanent:invariant"))
-
-    def test_real_design_plan_registers_all_properties_without_retiring_them(self):
-        from tests.host.diagnostic_history_authority import task_definition
-        from tests.host.evidence_authority_types import Environment, TransitionState
-        from tests.host.evidence_authority_validation import validate_transition
-
-        authority, authorities, plan, registry = task_definition(ROOT)
-        candidates = set(dict(authority.unit_input_paths)["B14"])
-        immutable = set(authority.command_input_paths) | set(plan.declared_external_inputs)
-        for oracle in plan.replacement_oracles:
-            immutable.update(oracle.input_paths)
-        self.assertEqual(29, len(candidates))
-        self.assertFalse(candidates & immutable)
-        self.assertEqual(tuple(f"B{index:02d}" for index in range(1, 13)) + ("B14",), plan.recertification_units)
-        self.assertEqual(20, len(plan.planned_retirement_identity_keys))
-        self.assertEqual(4, len(plan.replacement_oracles))
-        self.assertEqual({"COPY01-runtime-memory", "PLAT01-diagnostic-history"}, {
-            claim.transition_id for claim in registry.claims
-        })
-        current = tuple((path, "0" * 64) for path in sorted(candidates))
-        environment = Environment(
-            tuple((path, "0" * 64) for path in sorted(immutable)), current, current,
-            tuple((unit, current) for unit in plan.recertification_units),
-            authority.base_head, authority.base_tree,
-        )
-        result = validate_transition(current_inventory(ROOT), authorities, registry, plan, (), environment)
-        self.assertTrue(result.ok, result)
-        self.assertIs(TransitionState.REPLACEMENT_REGISTERED, result.state)
-        self.assertFalse(result.retired_identity_keys)
-        self.assertTrue(set(plan.planned_retirement_identity_keys) <= set(result.active_identity_keys))
-
-    def test_inventory_materializes_the_exact_eight_authorities(self):
-        expected = {
-            AUTHORITY_PATH + ":design-anchor:PLAT01": AuthorityClass.TRANSPORT_IDENTITY,
-            AUTHORITY_PATH + ":source-membership:PLAT01": AuthorityClass.PERMANENT_INVARIANT,
-            AUTHORITY_PATH + ":artifact-contract:PLAT01-recipes": AuthorityClass.ARTIFACT_CONTRACT,
-            SOURCE_PATH + ":source-projection:PLAT01": AuthorityClass.TRANSPORT_IDENTITY,
-        }
-        for identifier in (
-            "plat01-history-storage", "plat01-reader-commands",
-            "plat01-forwarded-diagnostics", "plat01-panic-history",
-        ):
-            expected[AUTHORITY_PATH + ":baseline-oracle:" + identifier] = AuthorityClass.BASELINE_ORACLE
-        facts = tuple(fact for fact in current_inventory(ROOT).facts if fact.family == FAMILY)
-        self.assertEqual(len(expected), len(facts))
-        self.assertEqual(expected, {fact.key: fact.authority_class for fact in facts})
-
-    def test_oracle_coverage_rejects_duplicate_tests_and_uncovered_keys(self):
-        identities = SOURCE_PROJECTION["retirement_keys"]
-        rows = list(ORACLE_RULES)
-        identifier, _, property_name, adr, section, positions = rows[1]
-        rows[1] = (identifier, rows[0][1], property_name, adr, section, positions)
-        with self.assertRaisesRegex(ValueError, "duplicate"):
-            checked_oracle_rules(tuple(rows), identities)
-        rows = list(ORACLE_RULES)
-        identifier, test, property_name, adr, section, _ = rows[3]
-        rows[3] = (identifier, test, property_name, adr, section, (1,))
-        with self.assertRaisesRegex(ValueError, "omits"):
-            checked_oracle_rules(tuple(rows), identities)
-        rows[3] = (identifier, test, property_name, adr, section, (21,))
-        with self.assertRaisesRegex(ValueError, "unbound"):
-            checked_oracle_rules(tuple(rows), identities)
-
-    def test_literal_declarations_reject_duplicate_or_computed_roles(self):
-        with tempfile.TemporaryDirectory(prefix="micros-plat01-declaration-") as directory:
-            root = Path(directory)
-            for name in (AUTHORITY_PATH, SOURCE_PATH):
-                destination = root / name
-                destination.parent.mkdir(parents=True, exist_ok=True)
-                destination.write_bytes((ROOT / name).read_bytes())
-            source = (root / AUTHORITY_PATH).read_text(encoding="utf-8")
-            needle = '    "candidate_paths": (\n'
-            duplicate = source.replace(needle, '    "candidate_paths": (),\n' + needle, 1)
-            self.assertNotEqual(source, duplicate)
-            (root / AUTHORITY_PATH).write_text(duplicate, encoding="utf-8")
-            with self.assertRaisesRegex(ValueError, "duplicate dictionary key"):
-                declaration_facts(root, AUTHORITY_PATH)
-            (root / AUTHORITY_PATH).write_text(source + "\nSOURCE_ROLES = dict(SOURCE_ROLES)\n", encoding="utf-8")
-            with self.assertRaisesRegex(ValueError, "one ordinary SOURCE_ROLES"):
-                declaration_facts(root, AUTHORITY_PATH)
 
 
 class DiagnosticReportTest(unittest.TestCase):
@@ -277,281 +128,42 @@ class DiagnosticReportTest(unittest.TestCase):
             self.assertTrue(accepted(current))
 
 
-class DiagnosticExecutionTest(unittest.TestCase):
-    def evidence(self):
-        name = "tests.host.diagnostic_history_evidence"
-        self.assertIsNotNone(importlib.util.find_spec(name), "the actual diagnostic evidence executor is absent")
-        return importlib.import_module(name)
-
-    def test_baseline_archive_retains_exact_git_blobs_and_ordinary_modes(self):
-        evidence = self.evidence()
-        with tempfile.TemporaryDirectory(prefix="micros-plat01-fixed-archive-") as directory:
-            source = evidence.extract_baseline(ROOT, Path(directory))
-            evidence.require_archive(ROOT, source)
-            path = source / "README.md"
-            path.chmod(0o600)
-            with self.assertRaises(ValueError):
-                evidence.require_archive(ROOT, source)
-            path.chmod(0o644)
-            moved = source.with_name("relocated")
-            source.rename(moved)
-            source.symlink_to(moved, target_is_directory=True)
-            with self.assertRaises(ValueError):
-                evidence.require_archive(ROOT, source)
-
-    def test_reader_observations_require_two_complete_actual_results(self):
-        evidence = self.evidence()
-        red = [
-            {"command": command, "result": -1, "shape": False, "preserved": True}
-            for command in (3, 4)
-        ]
-        output = "".join(json.dumps(row) + "\n" for row in red)
-        self.assertEqual(tuple(red), evidence.reader_observations(output, stage="red"))
-        for malformed in (
-            output[:-1], output + output, json.dumps(red[0]) + "\n",
-            output.replace('"result": -1', '"result": -2', 1),
-            output.replace('"shape": false', '"shape": 0', 1),
-            output.replace('"preserved": true', '"preserved": false', 1),
-            output.replace('"command": 3', '"command": 3, "command": 4', 1),
-        ):
-            with self.subTest(output=malformed), self.assertRaises(ValueError):
-                evidence.reader_observations(malformed, stage="red")
-        green = output.replace('"result": -1', '"result": 0').replace(
-            '"shape": false', '"shape": true'
-        ).replace('"preserved": true', '"preserved": false')
-        self.assertEqual((0, 0), tuple(
-            row["result"] for row in evidence.reader_observations(green, stage="green")
-        ))
-        with self.assertRaises(ValueError):
-            evidence.reader_observations(green, stage="red")
-
-    def test_missing_new_witness_does_not_turn_legacy_failure_into_red(self):
-        evidence = self.evidence()
-        with tempfile.TemporaryDirectory(prefix="micros-plat01-legacy-result-") as directory:
-            kernel = Path(directory) / "kernel.elf"
-            kernel.touch()
-            arguments = qemu_smoke_arguments.parse_arguments((
-                "--kernel", str(kernel), "--marker", "MICROS_BOOT 0.1.0",
-                "--expect", "panic", "--require-panic-report",
-            ))
-            evidence.require_legacy_result(arguments, QemuResult(PANIC_OUTPUT, 0, False))
-            for result in (
-                QemuResult(PANIC_OUTPUT, None, True),
-                QemuResult(PANIC_OUTPUT, 1, False),
-                QemuResult(PANIC_OUTPUT.replace("MICROS_PANIC_HART", "missing"), 0, False),
-            ):
-                with self.subTest(result=result), self.assertRaises(ValueError):
-                    evidence.require_legacy_result(arguments, result)
-
-    def test_four_named_oracles_report_only_discriminating_red_failures(self):
-        from tests.host.evidence_authority_types import ObservedResult
-
-        evidence = self.evidence()
-        observed = evidence.OracleObservations(
-            (), tuple({"command": value, "result": -1, "shape": False, "preserved": True} for value in (3, 4)),
-            QemuResult("", 0, False), QemuResult(PANIC_OUTPUT, 0, False),
-        )
-        results, output = evidence.run_oracles(observed, stage="red")
-        self.assertEqual(tuple(row[0] for row in ORACLE_RULES), tuple(row.oracle_id for row in results))
-        self.assertEqual({ObservedResult.EXPECTED_FAILURE}, {row.observed for row in results})
-        self.assertIn("Ran 4 tests", output)
-        with self.assertRaises(ValueError):
-            evidence.run_oracles(observed, stage="green")
-
-
-class DiagnosticJournalTest(unittest.TestCase):
-    def driver(self):
-        name = "tools.check_diagnostic_history"
-        self.assertIsNotNone(importlib.util.find_spec(name), "the three-intent author transaction is absent")
-        return importlib.import_module(name)
-
-    def test_driver_admits_only_the_three_documented_intents(self):
-        from contextlib import redirect_stderr
-        import io
-
-        driver = self.driver()
-        for phase in ("red", "green", "recertify"):
-            self.assertEqual(phase, driver.parse_arguments(("--" + phase,)).phase)
-        for argv in ((), ("--red", "--green"), ("--red", "--source", "/tmp"), ("--rec",)):
-            with self.subTest(argv=argv), redirect_stderr(io.StringIO()), self.assertRaises(SystemExit):
-                driver.parse_arguments(argv)
-
-    def test_journal_selector_is_byte_bound_and_writer_lock_is_exclusive(self):
-        from tests.host import diagnostic_history_authority as authority
-
-        self.driver()
-        with tempfile.TemporaryDirectory(prefix="micros-plat01-selector-") as directory:
-            root = Path(directory)
-            with authority.author_lock(root) as storage:
-                journal = authority.begin_attempt(storage)
-                value, identity = authority.read_selection(storage)
-                self.assertEqual(identity, journal.selector_sha256)
-                self.assertEqual(0, value["count"])
-                with self.assertRaises(BlockingIOError):
-                    with authority.author_lock(root):
-                        self.fail("a competing writer entered the journal")
-                path = storage / "current.json"
-                path.write_bytes(path.read_bytes() + b"\n")
-                changed, rewritten = authority.read_selection(storage)
-                self.assertEqual(value, changed)
-                self.assertNotEqual(journal.selector_sha256, rewritten)
-
-    def model_context(self, root):
-        from types import SimpleNamespace
-        from tests.host.diagnostic_history_authority import task_definition
-        from tests.host.evidence_authority_types import Environment
-
-        root.mkdir(parents=True, exist_ok=True)
-        authority, authorities, plan, registry = task_definition(ROOT)
-        candidates = tuple(sorted((path, "1" * 64) for path in dict(authority.unit_input_paths)["B14"]))
-        immutable = tuple(sorted((path, "0" * 64) for path in (
-            *authority.command_input_paths, *plan.declared_external_inputs,
-        )))
-        environment = Environment(
-            immutable, candidates, candidates,
-            tuple((unit, candidates) for unit in plan.recertification_units),
-            authority.base_head, "a" * 40,
-        )
-        return SimpleNamespace(
-            root=root, authority=authority, authorities=authorities, plan=plan, registry=registry,
-            inventory=current_inventory(ROOT), environment=environment, allow_absent=False,
-        )
-
-    @staticmethod
-    def model_results(_, value, *, phase, attempt):
-        from tests.host.evidence_authority_types import ObservedResult, OracleResult, RunStatus
-
-        if value != {"synthetic_phase": phase}:
-            raise ValueError("synthetic execution is incomplete")
-        observed = ObservedResult.EXPECTED_FAILURE if phase == "red" else ObservedResult.PASS
-        return tuple(OracleResult(row[0], RunStatus.RUN, observed, row[2]) for row in ORACLE_RULES)
-
-    def model_append(self, driver, context, journal, phase, *, omitted_unit=None):
-        logs = {}
-        if phase == "recertify":
-            logs = {
-                unit: {
-                    "version": 1, "unit": unit, "command": list(command),
-                    "exit_code": 0, "output": "Synthetic journal model; not author execution.\n",
-                }
-                for unit, command in context.plan.unit_commands if unit != omitted_unit
-            }
-        replay = {"synthetic_phase": phase}
-        results = self.model_results(context, replay, phase=phase, attempt=journal.attempt)
-        return driver.append_phase(context, journal, phase, replay, results, logs)
-
-    def test_journal_model_rejects_raw_rewrites_and_input_drift_before_publication(self):
-        from dataclasses import replace
-        from unittest.mock import patch
-        from tests.host import diagnostic_history_authority as authority
-
-        driver = self.driver()
-        with (
-            patch.object(driver, "recheck_context"),
-            patch("tests.host.diagnostic_history_evidence.validate_execution_log", side_effect=self.model_results),
-            tempfile.TemporaryDirectory(prefix="micros-plat01-chain-model-") as directory,
-        ):
-            for mutation in ("selector", "record", "log", "immutable"):
-                with self.subTest(mutation=mutation):
-                    context = self.model_context(Path(directory) / mutation)
-                    with authority.author_lock(context.root) as storage:
-                        journal = self.model_append(driver, context, authority.begin_attempt(storage), "red")
-                        if mutation == "immutable":
-                            rows = context.environment.immutable_inputs
-                            context.environment = replace(
-                                context.environment, immutable_inputs=((rows[0][0], "f" * 64), *rows[1:]),
-                            )
-                        else:
-                            path = storage / "current.json" if mutation == "selector" else (
-                                journal.directory / ("red.json" if mutation == "record" else "red-execution.log")
-                            )
-                            path.write_bytes(path.read_bytes() + b"\n")
-                        with self.assertRaises(ValueError):
-                            self.model_append(driver, context, journal, "green")
-                        self.assertEqual(1, authority.read_current(storage)["count"])
-                        self.assertFalse((journal.directory / "green.json").exists())
-
-    def test_terminal_model_requires_all_units_and_scoped_suppression_cannot_leak(self):
-        from dataclasses import replace
-        from unittest.mock import patch
-        from tests.host import diagnostic_history_authority as authority
-        from tests.host.evidence_authority_types import TransitionState
-
-        driver = self.driver()
-        with (
-            patch.object(authority, "_provisional", None),
-            patch.object(authority, "recheck_context"),
-            patch.object(driver, "recheck_context"),
-            patch("tests.host.diagnostic_history_evidence.validate_execution_log", side_effect=self.model_results),
-            tempfile.TemporaryDirectory(prefix="micros-plat01-terminal-model-") as directory,
-        ):
-            context = self.model_context(Path(directory))
-            with authority.author_lock(context.root) as storage:
-                journal = authority.begin_attempt(storage)
-                for phase in ("red", "green"):
-                    journal = self.model_append(driver, context, journal, phase)
-                previous = context.environment
-                changed = ((previous.current_candidate_inputs[0][0], "e" * 64), *previous.current_candidate_inputs[1:])
-                context.environment = replace(
-                    previous, current_candidate_inputs=changed,
-                    unit_inputs=tuple((unit, changed) for unit in context.plan.recertification_units),
-                    current_tree="b" * 40,
-                )
-                with self.assertRaises(ValueError):
-                    authority.read_journal(context)
-                context.environment = previous
-                replay = {"synthetic_phase": "recertify"}
-                with self.assertRaisesRegex(RuntimeError, "model interruption"):
-                    with authority.provisional_retirement(context, journal, replay):
-                        with self.assertRaises(ValueError):
-                            with authority.provisional_retirement(context, journal, replay):
-                                self.fail("nested suppression was admitted")
-                        raise RuntimeError("model interruption")
-                self.assertIsNone(authority._provisional)
-                with self.assertRaises(ValueError):
-                    self.model_append(driver, context, journal, "recertify", omitted_unit="B12")
-                self.assertEqual(2, authority.read_current(storage)["count"])
-                journal = self.model_append(driver, context, journal, "recertify")
-                result = authority.validate_journal(context, journal)
-                self.assertIs(TransitionState.RETIREMENT_READY, result.state)
-                self.assertEqual(set(SOURCE_PROJECTION["retirement_keys"]), set(result.retired_identity_keys))
-                packed = {fact.key for fact in context.inventory.facts if fact.family == "scheduler-packed-transport"}
-                self.assertEqual(177, len(packed))
-                self.assertTrue(packed <= set(result.active_identity_keys))
-
-    def test_failed_terminal_publication_restores_the_exact_prior_selector(self):
-        from unittest.mock import patch
-        from tests.host import diagnostic_history_authority as authority
-
-        driver = self.driver()
-        publish = driver.publish_json
-        with (
-            patch.object(driver, "recheck_context"),
-            patch("tests.host.diagnostic_history_evidence.validate_execution_log", side_effect=self.model_results),
-            tempfile.TemporaryDirectory(prefix="micros-plat01-publication-model-") as directory,
-        ):
-            context = self.model_context(Path(directory))
-            with authority.author_lock(context.root) as storage:
-                journal = authority.begin_attempt(storage)
-                for phase in ("red", "green"):
-                    journal = self.model_append(driver, context, journal, phase)
-                before = (storage / "current.json").read_bytes()
-
-                def reject_published(path, payload, *, validate=None):
-                    def check():
-                        validate()
-                        if path.name == "current.json" and authority.read_current(storage)["count"] == 3:
-                            raise ValueError("synthetic postpublication drift")
-                    return publish(path, payload, validate=check)
-
-                with patch.object(driver, "publish_json", side_effect=reject_published):
-                    with self.assertRaisesRegex(ValueError, "postpublication drift"):
-                        self.model_append(driver, context, journal, "recertify")
-                self.assertEqual(before, (storage / "current.json").read_bytes())
-                self.assertEqual(journal, authority.read_journal(context))
-
-
 class DiagnosticSourceTest(unittest.TestCase):
+    def test_current_scheduler_pump_keeps_custody_and_precedes_selection(self):
+        from tests.host.c_source_records import c_lexical_text, function_records, matching_lexical
+
+        def check(source, argument):
+            records = [
+                record for record in function_records(source).values()
+                if "micros_diagnostic_notify_pending" in record.body
+            ]
+            self.assertEqual(1, len(records))
+            body = c_lexical_text(records[0].body)
+            call = re.compile(r"\bmicros_diagnostic_notify_pending\s*\(\s*hart\s*,\s*" + argument + r"\s*\)\s*;")
+            sites = tuple(call.finditer(body))
+            self.assertEqual(1, len(sites))
+            self.assertIn("micros_hart_plan_user_return", body)
+            self.assertLess(sites[0].end(), body.index("micros_hart_plan_user_return"))
+            if argument == "NULL":
+                self.assertLess(body.index("preflight_idle_selection(objects, hart);"), sites[0].start())
+            else:
+                guard = body.index("if (scheduler_error != MICROS_SCHEDULER_OK)")
+                opening = body.index("{", guard)
+                end = matching_lexical(body, opening, "{", "}")
+                self.assertIn("return scheduler_error;", body[opening:end])
+                self.assertLess(end, sites[0].start())
+
+        for name, argument in (("scheduler_return.c", "frame"), ("scheduler_idle.c", "NULL")):
+            source = (ROOT / "kernel/scheduler" / name).read_text()
+            check(source, argument)
+            call = f"    micros_diagnostic_notify_pending(hart, {argument});\n"
+            for changed in (
+                source.replace(call, call * 2),
+                source.replace(call, "").replace("    if (error != ", call + "    if (error != ", 1),
+            ):
+                with self.subTest(name=name), self.assertRaises(AssertionError):
+                    check(changed, argument)
+
     def test_current_retrigger_transfer_binding_is_complete(self):
         from tests.host.diagnostic_history_source import validate_retrigger_kernel_fixture, validate_retrigger_read_adapter
 
@@ -587,146 +199,6 @@ class DiagnosticSourceTest(unittest.TestCase):
             with self.assertRaises(AssertionError):
                 validate_fixture(changed)
 
-    def test_scheduler_pump_cannot_move_across_custody_or_selection(self):
-        from tests.host import diagnostic_history_source as source_contract
-
-        changes = getattr(source_contract, "SCHEDULER_PUMP_CHANGES", None)
-        self.assertIsNotNone(changes, "the two diagnostic pump sites lack exact custody anchors")
-        for name, additions in changes.items():
-            baseline = subprocess.check_output(
-                ("git", "show", SOURCE_PROJECTION["source_reference"] + ":" + name),
-                cwd=ROOT, timeout=30,
-            ).decode("utf-8")
-            candidate = baseline
-            for added, original in additions:
-                self.assertEqual(1, candidate.count(original))
-                candidate = candidate.replace(original, added, 1)
-            source_contract.validate_legacy_subject(ROOT, name, candidate, required=True)
-            call = "    micros_diagnostic_notify_pending(hart, " + (
-                "NULL" if name.endswith("scheduler_idle.c") else "frame"
-            ) + ");\n"
-            moved = candidate.replace(call, "", 1).replace("    if (error != ", call + "    if (error != ", 1)
-            self.assertNotEqual(candidate, moved)
-            with self.assertRaises(AssertionError):
-                source_contract.validate_legacy_subject(ROOT, name, moved, required=True)
-
-    def test_native_dispatch_double_cannot_change_or_hide_an_old_body(self):
-        from tests.host.diagnostic_history_source import project_diagnostic_native_fixture
-
-        name = "tests/host/tty_control_syscall_test_controller.c"
-        baseline = subprocess.check_output(
-            ("git", "show", SOURCE_PROJECTION["source_reference"] + ":" + name),
-            cwd=ROOT, timeout=30,
-        ).decode("utf-8")
-        source = (ROOT / name).read_text(encoding="utf-8")
-        self.assertEqual(baseline, project_diagnostic_native_fixture(name, source))
-        changed = source.replace("    abort();", "    return 0;", 1)
-        self.assertNotEqual(baseline, project_diagnostic_native_fixture(name, changed))
-        changed = source.replace("fixture->operation_stage != 5", "fixture->operation_stage != 4", 1)
-        self.assertNotEqual(baseline, project_diagnostic_native_fixture(name, changed))
-
-    def test_legacy_subject_adapters_preserve_every_original_case(self):
-        from tests.host import diagnostic_history_source as source_contract
-
-        changes = getattr(source_contract, "LEGACY_SUBJECT_CHANGES", None)
-        validate = getattr(source_contract, "validate_legacy_subject", None)
-        self.assertIsNotNone(changes, "legacy target additions have no closed source register")
-        self.assertIsNotNone(validate, "legacy cases have no independent conservation check")
-        for name, additions in changes.items():
-            baseline = subprocess.check_output(
-                ("git", "show", SOURCE_PROJECTION["source_reference"] + ":" + name),
-                cwd=ROOT, timeout=30,
-            ).decode("utf-8")
-            candidate = baseline
-            for added, original in additions:
-                self.assertEqual(1, candidate.count(original), original)
-                candidate = candidate.replace(original, added, 1)
-            with self.subTest(path=name):
-                validate(ROOT, name, candidate, required=True)
-                validate(ROOT, name, baseline, required=False)
-                with self.assertRaises(AssertionError):
-                    validate(ROOT, name, baseline, required=True)
-                changed = candidate.replace("return false;", "return true;", 1)
-                self.assertNotEqual(candidate, changed)
-                with self.assertRaises(AssertionError):
-                    validate(ROOT, name, changed, required=True)
-                incomplete = candidate.replace(additions[0][0], additions[0][1], 1)
-                with self.assertRaises(AssertionError):
-                    validate(ROOT, name, incomplete, required=False)
-
-    def test_seed_extension_retains_the_original_branch_and_rejects_relocation(self):
-        from tests.host.diagnostic_history_source import project_boot_diagnostic_seed
-
-        original = (
-            "#ifdef MICROS_BUILD_PANIC_TEST\n"
-            '    MICROS_PANIC(boot->hart_id, "intentional-test");\n#endif'
-        )
-        call = "    micros_diagnostic_test_seed_panic();\n"
-        candidate = original.replace('    MICROS_PANIC', call + "    MICROS_PANIC", 1)
-        self.assertEqual(original, project_boot_diagnostic_seed(candidate))
-        for changed in (
-            original, candidate + "\n" + call,
-            original.replace("\n#endif", "\n" + call + "#endif"),
-            candidate.replace("MICROS_BUILD_PANIC_TEST", "MICROS_BUILD_TRAP_TEST"),
-        ):
-            with self.subTest(source=changed), self.assertRaises(AssertionError):
-                project_boot_diagnostic_seed(changed)
-
-    def test_assertion_adapters_restore_all_original_modules_without_bypass(self):
-        from tests.host.diagnostic_history_source import validate_source_adapters
-
-        validate_source_adapters(ROOT)
-        name = "tests/host/kernel_layout_source.py"
-        source = (ROOT / name).read_text(encoding="utf-8")
-        for changed in (
-            source.replace("transports, required=required)", "transports, required=False)", 1),
-            source.replace("if required and hashlib.sha256(restored)", "if False and hashlib.sha256(restored)", 1),
-            source.replace("source_bytes(root, selected)", "selected.read_bytes()", 1),
-            source.replace("diagnostic_identity_required, source_bytes\n", "diagnostic_identity_required\n", 1),
-            source.replace('data.decode("utf-8")', 'data.decode("ascii")', 1),
-        ):
-            self.assertNotEqual(source, changed)
-            with self.assertRaises(AssertionError):
-                project_diagnostic_gate(name, changed)
-
-    def test_source_consumers_reuse_the_owned_view_without_rebuilding_proof(self):
-        from contextlib import ExitStack
-        from unittest.mock import patch
-        from tests.host import (
-            evidence_authority_scope as scope,
-            kernel_layout_source,
-            test_grant_data_plane_source_layout,
-            test_kernel_directory_layout,
-            test_kernel_object_source_layout,
-            test_tty_source_layout,
-        )
-
-        key = SOURCE_PROJECTION["retirement_keys"][0]
-        consumers = (
-            kernel_layout_source, test_kernel_directory_layout,
-            test_grant_data_plane_source_layout, test_kernel_object_source_layout,
-            test_tty_source_layout,
-        )
-        with ExitStack() as patches:
-            patches.enter_context(patch.object(scope, "_active", None))
-            patches.enter_context(patch.object(
-                scope, "_capture_snapshot", return_value=scope._Snapshot("fixture", {}),
-            ))
-            verify = patches.enter_context(patch.object(
-                scope, "_verify_authorities",
-                return_value=scope.VerifiedAuthority(frozenset({key}), ()),
-            ))
-            for provider in scope._providers():
-                patches.enter_context(patch.object(provider, "_provisional", None))
-            patches.enter_context(patch(
-                "tests.host.evidence_authority_inventory.current_inventory",
-                side_effect=AssertionError("source lookup rebuilt inventory outside its checked view"),
-            ))
-            with scope.checked_source_view(ROOT):
-                for consumer in consumers:
-                    for _ in range(3):
-                        self.assertFalse(consumer.diagnostic_identity_required(ROOT, key))
-            self.assertEqual(1, verify.call_count)
 
     def test_kernel_extension_keeps_exact_ordinary_owners_and_private_direction(self):
         from tests.host import diagnostic_history_source as source_contract
@@ -843,7 +315,7 @@ class DiagnosticSourceTest(unittest.TestCase):
                     else:
                         self.assertEqual(((), ()), bind_current_callbacks(root, build, catalog))
 
-    def test_only_declared_callback_free_sources_avoid_absent_historical_blobs(self):
+    def test_callback_free_source_names_are_not_frozen_but_callback_use_is_qualified(self):
         from unittest.mock import patch
         from tools.stack_bound_bindings import reference_source, require_callback_type_scope
         from tools.stack_bound_callback_contracts import GROUPS
@@ -872,14 +344,12 @@ class DiagnosticSourceTest(unittest.TestCase):
 
             with patch("tools.stack_bound_bindings.reference_source", side_effect=pinned):
                 require_callback_type_scope(root, group, {unit})
-                (root / header).write_text("typedef void (*hidden_hook)(void);\n")
+                require_callback_type_scope(root, group, {"servers/tty/undeclared.c"})
+                (root / unit).write_text(
+                    "void helper(struct micros_tty_uart_bus *bus) { (void)bus; }\n",
+                )
                 with self.assertRaises(StackEvidenceError):
                     require_callback_type_scope(root, group, {unit})
-                (root / header).write_text("struct micros_tty_uart_bus *carrier;\n")
-                with self.assertRaises(StackEvidenceError):
-                    require_callback_type_scope(root, group, {unit})
-                with self.assertRaises(StackEvidenceError):
-                    require_callback_type_scope(root, group, {"servers/tty/undeclared.c"})
 
     def test_existing_tty_owner_admits_only_actual_callback_free_diagnostic_wrappers(self):
         from types import SimpleNamespace
@@ -925,83 +395,6 @@ class DiagnosticSourceTest(unittest.TestCase):
                     else:
                         with self.assertRaises(StackEvidenceError):
                             bind_current_callbacks(ROOT, build, catalog)
-
-    def test_runner_and_guard_inverses_preserve_complete_fixed_source(self):
-        names = (
-            "tools/qemu_smoke_faults.py", "tools/qemu_smoke_arguments.py",
-            "tools/qemu_smoke_outcome.py", "tools/qemu_smoke_cli.py",
-            "tools/validation_context.py",
-        )
-        for name in names:
-            baseline = subprocess.check_output(
-                ("git", "show", SOURCE_PROJECTION["source_reference"] + ":" + name),
-                cwd=ROOT, timeout=30,
-            ).decode("utf-8")
-            source = (ROOT / name).read_text(encoding="utf-8")
-            projected = project_diagnostic_context(source) if name == names[-1] else project_runner_source(name, source)
-            with self.subTest(path=name):
-                self.assertEqual(baseline, projected)
-                for node in ast.parse(source).body:
-                    if isinstance(node, ast.FunctionDef) and name != names[-1]:
-                        self.assertLessEqual(node.end_lineno - node.lineno + 1, 120, node.name)
-
-    def test_incomplete_forwarding_or_changed_legacy_body_cannot_project_away(self):
-        name = "tools/qemu_smoke_outcome.py"
-        source = (ROOT / name).read_text(encoding="utf-8")
-        incomplete = source.replace("    require_diagnostic_history=None,\n", "", 1)
-        with self.assertRaisesRegex(AssertionError, "incomplete"):
-            project_runner_source(name, incomplete)
-        changed = source.replace("or result.return_code != 0", "or result.return_code == 0", 1)
-        self.assertNotEqual(source, changed)
-        self.assertNotEqual(project_runner_source(name, source), project_runner_source(name, changed))
-
-    def test_malformed_runner_source_is_an_explicit_unsupported_context(self):
-        from tests.host.diagnostic_history_source import projected_runner_digest
-        from tools.validation_inputs import UnsupportedContext
-
-        with tempfile.TemporaryDirectory(prefix="micros-plat01-malformed-runner-") as directory:
-            path = Path(directory) / "qemu_smoke_faults.py"
-            path.write_text("def incomplete(\n", encoding="utf-8")
-            with self.assertRaises(UnsupportedContext):
-                projected_runner_digest(path)
-
-    def test_option_observation_adapter_preserves_the_original_gate(self):
-        name = "tests/host/test_qemu_runner_source_layout.py"
-        baseline = subprocess.check_output(
-            ("git", "show", SOURCE_PROJECTION["source_reference"] + ":" + name),
-            cwd=ROOT, timeout=30,
-        ).decode("utf-8")
-        self.assertEqual(baseline, project_diagnostic_gate(name, (ROOT / name).read_text(encoding="utf-8")))
-        observations = (
-            (1, "--require-panic-report"), (1, "--require-diagnostic-history"),
-            (1, "--require-diagnostic-forwarding"), (1, "--require-trap-ready"),
-        )
-        self.assertEqual((observations[0], observations[3]), project_runner_options(observations))
-        for changed in (
-            (observations[1], observations[0], *observations[2:]),
-            (*observations, observations[1]),
-            (observations[0], (2, observations[1][1]), *observations[2:]),
-        ):
-            with self.subTest(observations=changed), self.assertRaises(AssertionError):
-                project_runner_options(changed)
-
-    def test_complete_recipe_has_an_exact_inverse(self):
-        from tests.host.terminal_failure_source import project_terminal_cmake
-
-        baseline = subprocess.check_output(
-            ("git", "show", SOURCE_PROJECTION["source_reference"] + ":CMakeLists.txt"),
-            cwd=ROOT, timeout=30,
-        ).decode("utf-8")
-        source = project_terminal_cmake((ROOT / "CMakeLists.txt").read_text(encoding="utf-8"))
-        self.assertEqual(baseline, project_diagnostic_cmake(source))
-        for changed in (
-            source.replace("            --require-diagnostic-forwarding\n", "", 1),
-            source.replace("            --require-diagnostic-history\n            retained\n",
-                           "            --require-diagnostic-history\n            seeded\n", 1),
-            source.replace("PRIVATE MICROS_TEST_WORK_COUNTS=1)", "PRIVATE MICROS_TEST_WORK_COUNTS=0)", 1),
-        ):
-            with self.subTest(recipe=changed[-100:]), self.assertRaises(AssertionError):
-                project_diagnostic_cmake(changed)
 
 
 class DiagnosticFatalMachineTest(unittest.TestCase):

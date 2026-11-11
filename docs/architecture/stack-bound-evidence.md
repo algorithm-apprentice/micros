@@ -170,6 +170,14 @@ current acceptance remain separate from the abandoned reference.
 
 ### MEM04 kernel-visitor extension admission
 
+**Historical admission rule:** ADR-0123 replaces the whole-header and
+five-helper-name exceptions below with the
+[current narrow proof boundary](current-contract-validation.md#narrow-proof-critical-source-qualifications).
+Unrelated ordinary prototypes and callback-free helpers no longer need a
+metadata prerequisite. Callback type/carrier, constructor/provider, actual
+source/machine inventory, qualified origin and unknown-indirect rejection
+remain mandatory.
+
 This is the Accepted exception under
 [ADR-0110](../adr/0110-kernel-visitor-extension-admission.md), separately
 merged as design #226. Its two existing implementation owners are frozen
@@ -441,6 +449,13 @@ node is `(function-key, qualifier)`, with exactly `UNQUALIFIED` and
 normal-return and preservation proof below.
 
 #### MEM04 fatal TTY header extension
+
+**Historical admission rule:** ADR-0123 replaces the exact ordinary-prototype
+exception below with current proof-relevant declarations and per-function
+source/machine qualification. Unrelated APIs and helper bodies no longer
+freeze the complete header/module. Storage, types, macros, CSR operations,
+fatal effects, all stack epochs and budgets remain unchanged; see the
+[current proof boundary](current-contract-validation.md#narrow-proof-critical-source-qualifications).
 
 [Accepted ADR-0111](../adr/0111-fatal-tty-header-extension.md) addresses the
 [next observed source-unit rejection](../research/minix-selected-user-address-space.md#fatal-tty-header-certificate-gap)

@@ -12,10 +12,8 @@ import unittest
 from tools import validation_context
 from tools.validation_build_manifest import native_outputs
 from tests.host.c_source_records import tokens
-from tests.host.stack_recipe import MODULE_PATH as STACK_MODULE_PATH, RECIPE as STACK_RECIPE
 from tests.host.work_count_recipe import (
-    INCLUDE, MODULE_PATH, project_root_recipe, projected_recipe_digest,
-    render_native_recipe, validate_native_recipe,
+    MODULE_PATH, native_test_declarations, render_native_recipe, validate_native_recipe,
 )
 from tests.host.work_count_evidence import (
     Capture,
@@ -101,6 +99,22 @@ def capture(producer, units):
 
 
 class WorkCountEvidenceTest(unittest.TestCase):
+    def test_c_parser_does_not_import_historical_test_suites(self):
+        from tools.python_host_runtime import python_command, selected_executable
+
+        code = (
+            "import sys\n"
+            "from tests.host.c_source_records import function_records\n"
+            "assert tuple(function_records('int probe(void) { return 1; }')) == ('probe',)\n"
+            "loaded = [name for name in sys.modules if name.startswith('tests.host.test_')]\n"
+            "assert not loaded, loaded\n"
+        )
+        completed = subprocess.run(
+            python_command(selected_executable(), "-c", code),
+            cwd=ROOT, capture_output=True, text=True, timeout=30,
+        )
+        self.assertEqual(0, completed.returncode, completed.stdout + completed.stderr)
+
     def test_shared_source_owner_is_composed_once_per_producer(self):
         result = compose_snapshots(
             (capture(1, 2), capture(2, 3)),
@@ -268,44 +282,35 @@ class WorkCountEvidenceTest(unittest.TestCase):
             observed = re.findall(rf"^\s*{prefix}([A-Z_]+),", header, re.MULTILINE)
             self.assertEqual([item.name for item in enum] + ["COUNT"], observed)
 
-    def test_native_recipe_preserves_original_closure_without_rebaselining(self):
+    def test_native_recipe_keeps_its_current_artifact_and_observation_contract(self):
         validate_native_recipe(ROOT)
         source = (ROOT / "CMakeLists.txt").read_text()
         self.assertEqual(
             validation_context.RECIPE_DIGESTS["CMakeLists.txt"],
-            hashlib.sha256(project_root_recipe(source).encode()).hexdigest(),
+            hashlib.sha256(source.encode()).hexdigest(),
         )
         self.assertEqual(
             validation_context.RECIPE_DIGESTS[MODULE_PATH],
             hashlib.sha256(render_native_recipe().encode()).hexdigest(),
         )
-        self.assertEqual(
-            validation_context.RECIPE_DIGESTS["CMakeLists.txt"],
-            projected_recipe_digest(ROOT / "CMakeLists.txt"),
-        )
-        with self.assertRaises(AssertionError):
-            project_root_recipe(source.replace(INCLUDE, "").replace(
-                "cmake_minimum_required(VERSION 3.25)\n",
-                "cmake_minimum_required(VERSION 3.25)\n" + INCLUDE,
-            ))
         with tempfile.TemporaryDirectory(prefix="micros-work-recipe-") as directory:
             root = Path(directory)
             (root / "CMakeLists.txt").write_text(source)
             module = root / MODULE_PATH
             module.parent.mkdir(parents=True)
             module.write_text(render_native_recipe())
-            stack_module = root / STACK_MODULE_PATH
-            stack_module.parent.mkdir(parents=True)
-            stack_module.write_text(STACK_RECIPE)
             self.assertEqual(
-                validation_context.RECIPE_DIGESTS["CMakeLists.txt"],
-                projected_recipe_digest(root / "CMakeLists.txt"),
+                (
+                    ("work-counts", "work_counts_test"),
+                    ("work-observation-disabled", "work_observation_disabled_test"),
+                ),
+                native_test_declarations(root),
             )
             module.write_text(render_native_recipe().replace(
                 "MICROS_TEST_WORK_COUNTS=1", "MICROS_TEST_WORK_COUNTS=0",
             ))
             with self.assertRaises(validation_context.UnsupportedContext):
-                projected_recipe_digest(root / "CMakeLists.txt")
+                native_test_declarations(root)
 
     def test_complete_native_inventory_includes_only_the_closed_extension(self):
         source = (ROOT / "CMakeLists.txt").read_text()
@@ -327,9 +332,6 @@ class WorkCountEvidenceTest(unittest.TestCase):
             module = root / MODULE_PATH
             module.parent.mkdir(parents=True)
             module.write_text(render_native_recipe())
-            stack_module = root / STACK_MODULE_PATH
-            stack_module.parent.mkdir(parents=True)
-            stack_module.write_text(STACK_RECIPE)
             output = root / "build"
             output.mkdir()
             inventory = {"tests": []}

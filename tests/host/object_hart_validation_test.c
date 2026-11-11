@@ -351,20 +351,9 @@ static bool check_declared_success(enum object_operation operation, const char *
         hart->ready_tail[fixture.priority] = fixture.threads[fixture.selected_thread];
         REQUIRE(memcmp(&fixture.objects, &fixture.before, sizeof(fixture.objects)) == 0);
     } else if (operation == OP_RETURN_PLAN && strcmp(variant, "unselected-hart-queue") == 0) {
-#if !defined(MICROS_OBJ02_LEGACY_PLAN)
-        memset(&fixture.plan_before, 0, sizeof(fixture.plan_before));
-        fixture.plan_before.hart = fixture.harts[0];
-        fixture.plan_before.selected = fixture.threads[0];
-        fixture.plan_before.action = MICROS_SCHEDULER_RETURN_SELECT_THREAD;
-        fixture.plan_before.ready_bitmap[0] = 1;
-        fixture.plan_before.ready_head[7] = fixture.threads[0];
-        fixture.plan_before.ready_tail[7] = fixture.threads[0];
-        REQUIRE(memcmp(&fixture.plan, &fixture.plan_before, sizeof(fixture.plan)) == 0);
-#else
         REQUIRE(fixture.plan.action == MICROS_SCHEDULER_RETURN_SELECT_THREAD);
         REQUIRE(fixture.plan.selected.slot == fixture.threads[0].slot);
         REQUIRE(fixture.plan.selected.generation == fixture.threads[0].generation);
-#endif
     }
     return true;
 }
@@ -1171,7 +1160,7 @@ static bool return_scope_cases(void)
 #if defined(MICROS_OBJECT_HART_VALIDATION_LAUNCHER)
 static int launch_native_products(int argc, char **argv)
 {
-    char *arguments[19];
+    char *arguments[13];
     size_t count = 0;
     const char *launcher = getenv("__PYVENV_LAUNCHER__");
 
@@ -1205,11 +1194,11 @@ int main(int argc, char **argv)
     enum object_operation operation;
 
 #if defined(MICROS_OBJECT_HART_VALIDATION_LAUNCHER)
-    if (argc == 6) {
+    if (argc == 3 && argv[1][0] == '/' && argv[2][0] == '/') {
         return launch_native_products(argc, argv);
     }
 #endif
-    if (argc != 3 || strcmp(argv[1], MICROS_OBJ01_NATIVE_STAGE == 0 ? "baseline" : "current") != 0) {
+    if (argc != 3 || strcmp(argv[1], "current") != 0) {
         return 2;
     }
 #if defined(MICROS_TEST_WORK_COUNTS)

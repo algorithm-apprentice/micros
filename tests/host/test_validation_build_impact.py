@@ -3,8 +3,6 @@ import re
 import unittest
 from unittest import mock
 
-from tests.host.diagnostic_history_source import project_diagnostic_cmake
-from tests.host.terminal_failure_source import project_terminal_cmake
 from tools import validation_build_impact
 from tools import validation_plan
 
@@ -12,8 +10,137 @@ from tools import validation_plan
 ROOT = pathlib.Path(__file__).resolve().parents[2]
 
 
+# Fixed #246 parser inputs match the unchanged supported template hashes.
+# They are not a projection of, or acceptance oracle for, the current root recipe.
+SUPPORTED_TIMEOUT_FIXTURE = (
+    'project(micros LANGUAGES C)\n'
+    'add_custom_target(\n'
+    '    test-qemu-smoke\n'
+    '    COMMAND\n'
+    '        "${MICROS_PYTHON}"\n'
+    '        ${MICROS_PYTHON_ARGS}\n'
+    '        "${CMAKE_CURRENT_SOURCE_DIR}/tools/run_qemu_smoke.py"\n'
+    '        --qemu\n'
+    '        "${MICROS_QEMU}"\n'
+    '        --kernel\n'
+    '        "$<TARGET_FILE:micros>"\n'
+    '        --marker\n'
+    '        "MICROS_BOOT ${PROJECT_VERSION}"\n'
+    '        --marker\n'
+    '        "MICROS_FDT_MEMORY base=0x0000000080000000 size=0x0000000008000000"\n'
+    '        --marker\n'
+    '        "MICROS_FDT_READY"\n'
+    '        --marker\n'
+    '        "MICROS_TRAP_READY"\n'
+    '        --require-fdt-events\n'
+    '        --require-fdt-reservations\n'
+    '        --require-trap-ready\n'
+    '        --require-frame-allocator-ready\n'
+    '        --require-mmu-ready\n'
+    '        --require-frame-ownership-ready\n'
+    '        --require-objects-ready\n'
+    '        --timeout\n'
+    '        8\n'
+    '    DEPENDS micros\n'
+    '    WORKING_DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}"\n'
+    '    USES_TERMINAL\n'
+    ')\n'
+    'if(MICROS_BUILD_PANIC_TEST)\n'
+    'add_custom_target(\n'
+    '        test-qemu-panic\n'
+    '        COMMAND\n'
+    '            "${MICROS_PYTHON}"\n'
+    '            ${MICROS_PYTHON_ARGS}\n'
+    '            "${CMAKE_CURRENT_SOURCE_DIR}/tools/run_qemu_smoke.py"\n'
+    '            --qemu\n'
+    '            "${MICROS_QEMU}"\n'
+    '            --kernel\n'
+    '            "$<TARGET_FILE:micros>"\n'
+    '            --marker\n'
+    '            "MICROS_BOOT ${PROJECT_VERSION}"\n'
+    '            --marker\n'
+    '            "MICROS_FDT_MEMORY base=0x0000000080000000 size=0x0000000008000000"\n'
+    '            --marker\n'
+    '            "MICROS_FDT_READY"\n'
+    '            --marker\n'
+    '            "MICROS_TRAP_READY"\n'
+    '            --marker\n'
+    '            "MICROS_PANIC reason=intentional-test"\n'
+    '            --marker\n'
+    '            "MICROS_PANIC_BUILD version=${PROJECT_VERSION}"\n'
+    '            --marker\n'
+    '            "MICROS_PANIC_HART mode=S id=0x0000000000000000"\n'
+    '            --pattern\n'
+    '            "MICROS_PANIC_SOURCE file=kernel/boot_component_tests[.]c line=0x[0-9a-f]{16}"\n'
+    '            --pattern\n'
+    '            "MICROS_PANIC_MACHINE sstatus=0x[0-9a-f]{16} scause=0x[0-9a-f]{16} stval=0x[0-9a-f]{16} sepc=0x[0-9a-f]{16} ra=0x[0-9a-f]{16} sp=0x[0-9a-f]{16}"\n'
+    '            --expect\n'
+    '            panic\n'
+    '            --require-fdt-events\n'
+    '            --require-fdt-reservations\n'
+    '            --require-panic-report\n'
+    '            --require-trap-ready\n'
+    '            --require-frame-allocator-ready\n'
+    '            --require-mmu-ready\n'
+    '            --require-frame-ownership-ready\n'
+    '            --require-objects-ready\n'
+    '            --timeout\n'
+    '            8\n'
+    '        DEPENDS micros\n'
+    '        WORKING_DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}"\n'
+    '        USES_TERMINAL\n'
+    '    )\n'
+    'endif()\n'
+    'if(MICROS_BUILD_SCHEDULER_INVALID_OUTGOING_TEST OR MICROS_BUILD_SCHEDULER_INVALID_NEXT_TEST)\n'
+    'add_custom_target(\n'
+    '        test-qemu-scheduler-invalid-context\n'
+    '        COMMAND\n'
+    '            "${MICROS_PYTHON}"\n'
+    '            ${MICROS_PYTHON_ARGS}\n'
+    '            "${CMAKE_CURRENT_SOURCE_DIR}/tools/run_qemu_smoke.py"\n'
+    '            --qemu\n'
+    '            "${MICROS_QEMU}"\n'
+    '            --kernel\n'
+    '            "$<TARGET_FILE:micros>"\n'
+    '            --marker\n'
+    '            "MICROS_BOOT ${PROJECT_VERSION}"\n'
+    '            --marker\n'
+    '            "MICROS_FDT_READY"\n'
+    '            --marker\n'
+    '            "MICROS_TRAP_READY"\n'
+    '            --marker\n'
+    '            "MICROS_PANIC reason=invalid-bootstrap-user-context"\n'
+    '            --marker\n'
+    '            "MICROS_SCHEDULER_INVALID_CONTEXT state=${MICROS_SCHEDULER_INVALID_STATE} ownership=preserved accounting=kernel"\n'
+    '            --pattern\n'
+    '            "MICROS_TRAP_CONTEXT origin=U sstatus=0x[0-9a-f]{16} scause=0x8000000000000005 stval=0x[0-9a-f]{16} sepc=0x[0-9a-f]{16} ra=0x[0-9a-f]{16} sp=0x[0-9a-f]{16}"\n'
+    '            --expect\n'
+    '            panic\n'
+    '            --require-fdt-events\n'
+    '            --require-fdt-reservations\n'
+    '            --require-panic-report\n'
+    '            --require-trap-ready\n'
+    '            --require-frame-allocator-ready\n'
+    '            --require-mmu-ready\n'
+    '            --require-frame-ownership-ready\n'
+    '            --require-objects-ready\n'
+    '            --require-trap-context\n'
+    '            --require-scheduler-invalid-context\n'
+    '            "${MICROS_SCHEDULER_INVALID_STATE}"\n'
+    '            --timeout\n'
+    '            8\n'
+    '        DEPENDS micros\n'
+    '        WORKING_DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}"\n'
+    '        USES_TERMINAL\n'
+    '    )\n'
+    'endif()\n'
+    'add_custom_target(test-qemu-trap COMMAND unused --timeout 8)\n'
+    'add_custom_target(test-qemu-scheduler COMMAND unused --timeout 8)\n'
+)
+
+
 def timeout_edit(content, target, value):
-    start = re.search(r"add_custom_target\(\s+" + target + r"\s", content).start()
+    start = re.search(r"add_custom_target\(\s*" + target + r"\s", content).start()
     timeout = re.search(r"--timeout\s+([0-9]+)", content[start:])
     first = start + timeout.start(1)
     last = start + timeout.end(1)
@@ -23,9 +150,7 @@ def timeout_edit(content, target, value):
 class ValidationBuildImpactTests(unittest.TestCase):
     @classmethod
     def setUpClass(cls):
-        cls.original = project_diagnostic_cmake(
-            project_terminal_cmake((ROOT / "CMakeLists.txt").read_text(encoding="utf-8"))
-        )
+        cls.original = SUPPORTED_TIMEOUT_FIXTURE
 
     def test_panic_timeout_has_one_explicit_owner(self):
         edited = timeout_edit(self.original, "test-qemu-panic", 12)

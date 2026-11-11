@@ -55,27 +55,18 @@ Acceptance criteria are represented by tests or deterministic build checks.
 Prose explains why behavior is required; executable feedback demonstrates that
 the repository currently provides it.
 
-Repeated verification of one immutable proof is not another independent
-experiment. The measured
-[feedback-cost investigation](../research/validation-feedback-cost.md) and
-Accepted [ADR-0105](../adr/0105-bounded-validation-feedback.md) define a
-separate bounded-feedback prerequisite. Until its design and implementation
-merge, the existing commands and authority requirements remain in force;
-no unchecked cache or omitted unit/target/integration result is permitted.
+Repeated verification of development history is not another independent
+experiment. The [owned host runner](building.md#native-unit-tests) has explicit
+fast/full selection, current-source snapshots and live per-test feedback.
+Focused success is not a replacement for the minimum PR gate.
 
-Design #217 is separately merged. Its implementation exposes the
-[owned host runner](building.md#native-unit-tests), with explicit fast/full
-selection and live per-test feedback. Focused or fast success is development
-evidence, not a replacement for the minimum PR gate. Complete input checking
-and independent implementation review still govern publication.
-
-After completed OBJ02 #246, the separate
-[current-contract validation design](../architecture/current-contract-validation.md)
-addresses the remaining historical source-freeze, metadata-prerequisite and
-duplicate-execution costs. [Accepted ADR-0123](../adr/0123-current-contract-validation.md)
-preserves paired design/implementation phases and independent review.
-Its separate design-merge and implementation barriers apply before the existing
-executable workflow changes; this design itself supplies no validation shortcut.
+[Current-contract validation](../architecture/current-contract-validation.md),
+Accepted under ADR-0123 and separately merged as design #247, removes
+historical source catalogs, metadata-only naming prerequisites and duplicate
+recertification executions. Preserve real Red, independent expectations,
+current input/observation checks and the required native, target, integration
+and stack evidence. Run one sufficient final planner gate and obtain
+independent review; do not recreate the retired author protocol.
 
 ### Independent review
 
@@ -219,11 +210,12 @@ For a MINIX-derived portable algorithm, the Red step also demonstrates the
 required structure or work bound with deterministic comparison, probe, link,
 or record-visit counts. Wall-clock timing is not the parity oracle.
 
-When a correction changes a frozen historical source identity, ADR-0082's
-authority transition is part of the same Red-Green outcome. The historical
-transport assertion stays active until an independent replacement oracle has
-failed for the audited divergence and passed for the correction. Candidate-
-derived digest rebaselining is prohibited.
+Current metadata and test ownership evolve with the correction that needs
+them. No catalog-key or historical-source retirement prerequisite is required.
+An independent oracle must still distinguish the real defect, and changing
+that oracle invalidates the Red claim that depended on it. Expected behavior,
+work bounds and finite source/machine contracts cannot be replaced with
+candidate-derived success values.
 
 The Red step may require first creating a test harness. The harness itself must
 have an observable failure mode and cannot report success merely because the

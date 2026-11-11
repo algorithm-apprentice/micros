@@ -80,9 +80,15 @@ This directory contains the design baseline for `micros`.
   and live progress while preserving actual acceptance and necessary target
   and cross-service evidence.
 - [Current-contract validation](architecture/current-contract-validation.md)
-  defines the Accepted design to end historical source-freeze and
-  metadata-prerequisite chains, retaining current contracts and using one
-  sufficient final author plan.
+  is the current implementation/evidence map for source snapshots, native
+  observations, target ownership and one sufficient final author plan.
+
+### Historical validation-admission records
+
+The following records explain completed evidence prerequisites. ADR-0123
+retires their live catalogs, binding tables and author ceremonies; they are
+not prerequisites to repeat or extend for current development.
+
 - [Evidence authority transition](architecture/evidence-authority-transition.md)
   separates historical source-transport identities from independent
   MINIX-derived correction oracles and defines fail-closed retirement.
@@ -110,6 +116,9 @@ This directory contains the design baseline for `micros`.
 - [Object and panic source authority](architecture/object-and-panic-source-authority.md)
   defines Accepted EV01-C09's exact portable-object payload repair and existing panic
   source-policy names, without changing runtime or stack admission.
+
+### Runtime and measurement contracts
+
 - [Selected object and hart validation](architecture/selected-object-and-hart-validation.md)
   defines Accepted OBJ01's selected scheduler checks, direct current identity and
   regular/exceptional stack proof while retaining complete diagnostics.
@@ -118,7 +127,7 @@ This directory contains the design baseline for `micros`.
   and independently reviewed implementation #246.
 - [Operation-count evidence](architecture/operation-count-evidence.md)
   defines the Accepted EV02 primitive-counter, complete-composition, and
-  transport-preserving annotation contract.
+  primitive-placement/passivity contract.
 - [Stack-bound evidence](architecture/stack-bound-evidence.md)
   defines the Accepted EV03 compiler/call-graph, assembly/indirect, target
   high-water, and future node-Q admission contract.

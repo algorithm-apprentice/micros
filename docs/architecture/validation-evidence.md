@@ -1,5 +1,12 @@
 # Validation Evidence and Owned Build Changes
 
+Ordinary fresh execution follows
+[ADR-0123's current-contract rules](current-contract-validation.md#fresh-execution-and-explicit-receipts):
+it does not collect reusable profiles or publish new receipts. Explicit
+producer, reuse and recording modes retain the closure below. Historical
+recipe/AST restoration descriptions record earlier implementations; current
+profiles bind directly to reviewed current recipes.
+
 ## Status and outcome
 
 This is the design contract for Accepted

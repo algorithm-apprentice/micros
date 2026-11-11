@@ -1,5 +1,10 @@
 # Granular Selected Release/Handoff Native Source Authority
 
+This is a historical metadata prerequisite record. Its live binding catalog
+is retired by [ADR-0123](../adr/0123-current-contract-validation.md);
+[current-contract validation](current-contract-validation.md) retains the
+actual source/observation and runtime obligations without per-assertion keys.
+
 ## Status and outcome
 
 This is the Accepted EV01-C08 contract under
@@ -402,7 +407,7 @@ declaration, extractor or test edit, the author independently froze all
 185 retirements and every one of the 453 expected rows/facts from the fixed
 #236 policy and #232 inputs.
 
-The [literal declaration](../../tests/host/selected_release_handoff_native_source_bindings.py)
+The [historical literal declaration at #238](https://github.com/algorithm-apprentice/micros/blob/89d3b85314754ae225f01fd16f257745bf19ce71/tests/host/selected_release_handoff_native_source_bindings.py)
 contains only its permitted docstring and two assignments. Its independent
 new-family fingerprint is:
 

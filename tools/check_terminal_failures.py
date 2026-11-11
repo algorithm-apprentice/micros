@@ -4,9 +4,7 @@
 
 import argparse
 from dataclasses import asdict, dataclass
-from functools import lru_cache
 import hashlib
-import io
 import json
 from pathlib import Path
 import re
@@ -14,7 +12,6 @@ import shutil
 import socket
 import subprocess
 import sys
-import tarfile
 import tempfile
 import time
 import traceback
@@ -24,17 +21,12 @@ if __package__ in (None, ""):
     sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
 from tests.host.terminal_failure_evidence import (
-    DESIGN_PINS, GuestState, TerminalCapture, TerminalCase, require_case, run_oracles, validate_capture, validate_case,
+    GuestState, TerminalCapture, TerminalCase, require_case, run_oracles, validate_capture, validate_case,
 )
-from tests.host.terminal_failure_source import (
-    RECIPE_ADMISSION, SOURCE_ROLES, SOURCE_PROJECTION,
-    extend_cmake, extend_presets, observe_source, project_observations,
-    project_terminal_cmake, project_terminal_presets, validate_terminal_runtime,
-)
+from tests.host.terminal_failure_source import RECIPE_ADMISSION
 from tools.qemu_smoke_command import build_qemu_command
 from tools.stack_artifact_files import read_regular
 from tools.stack_bound_manifest import encoded, owned_artifact, publish_json, snapshot_files
-from tools.stack_bound_machine import branch_offset
 from tools.stack_bound_objects import instructions
 from tools.user_elf_parse import load_elf
 
@@ -44,11 +36,6 @@ MAX_PACKET = 16384
 SELECTOR = "micros_terminal_test_scenario"
 REGISTERS = (2, 10, 11, 16, 17, 32)
 SUPPORTED = b"qSupported:swbreak+;hwbreak+"
-SOURCE_OVERLAYS = (
-    "arch/riscv64/uart.c", "arch/riscv64/sbi.c",
-    "kernel/diagnostic/panic.c", "kernel/boot/boot_component_tests.c",
-)
-GUEST_ADDITIONS = ("tests/qemu/terminal_failure_kernel.c", "tests/qemu/terminal_failure_kernel.h")
 
 
 @dataclass(frozen=True)
@@ -103,7 +90,7 @@ def require_stop(payload):
 class Remote:
     def __init__(self, connection, binding, scenario, deadline):
         require_case(scenario)
-        if type(binding) is not ImageBinding:
+        if type(binding) is not ImageBinding or binding.control_present is not True:
             raise ValueError("PLAT02 debugger requires its bound image objects")
         self.connection = connection
         self.binding = binding
@@ -154,7 +141,7 @@ class Remote:
             if self.stopped_at == "kernel_main":
                 if self.objects.get(SELECTOR) == (address, size):
                     return
-            elif self.stopped_at in ("armed", "reset", "overrun", "corruption"):
+            elif self.stopped_at in ("armed", "reset", "overrun"):
                 if any(start <= address and address + size <= start + extent for start, extent in self.objects.values()):
                     return
                 if self.scenario in (3, 6) and (address, size) == (0x10000001, 1):
@@ -309,9 +296,7 @@ def _function_instructions(image, name):
     return tuple(instructions(image.data[offset:offset + symbol.size], symbol.value))
 
 
-def bind_image(path, *, baseline):
-    if type(baseline) is not bool:
-        raise ValueError("PLAT02 image has no exact source stage")
+def bind_image(path):
     image = load_elf(path)
     if (image.header.elf_type, image.header.machine, image.header.version, image.header.flags) != (2, 243, 1, 1):
         raise ValueError("PLAT02 requires its ordinary RV64 little-endian kernel ELF")
@@ -326,13 +311,8 @@ def bind_image(path, *, baseline):
     ):
         symbol = _data_symbol(image, name, size, alignment, section_type)
         objects.append((name, symbol.value, symbol.size))
-    controls = tuple(symbol for symbol in image.symbols if symbol.name == "panic_control" and symbol.symbol_type == 1)
-    if baseline:
-        if controls:
-            raise ValueError("PLAT02 baseline invented a panic-control object")
-    else:
-        symbol = _data_symbol(image, "panic_control", 4, 4, 8)
-        objects.append(("panic_control", symbol.value, symbol.size))
+    control = _data_symbol(image, "panic_control", 4, 4, 8)
+    objects.append(("panic_control", control.value, control.size))
     stack = tuple(_symbol(image, name).value for name in ("__boot_stack_bottom", "__boot_stack_top"))
     if stack[1] - stack[0] != 16384 or any(value % 16 for value in stack):
         raise ValueError("PLAT02 fixture does not use the exact linker-owned boot stack")
@@ -350,12 +330,10 @@ def bind_image(path, *, baseline):
         for other, start, extent in objects[index + 1:]:
             if address < start + extent and start < address + size:
                 raise ValueError("PLAT02 data objects overlap: " + name + "/" + other)
-    if controls:
-        control, = controls
-        for other in image.symbols:
-            if other != control and other.symbol_type == 1 and other.size and other.section_index != 0:
-                if control.value < other.value + other.size and other.value < control.value + control.size:
-                    raise ValueError("PLAT02 terminal ownership aliases another ELF object")
+    for other in image.symbols:
+        if other != control and other.symbol_type == 1 and other.size and other.section_index != 0:
+            if control.value < other.value + other.size and other.value < control.value + control.size:
+                raise ValueError("PLAT02 terminal ownership aliases another ELF object")
     stops = []
     for name, function in (("kernel_main", "kernel_main"), ("armed", "micros_terminal_test_armed")):
         address, width, _ = _function_instructions(image, function)[0]
@@ -371,15 +349,9 @@ def bind_image(path, *, baseline):
         if len(matches) != 1:
             raise ValueError("PLAT02 checkpoint lacks one actual required machine instruction: " + name)
         stops.append((name, *matches[0]))
-    if baseline:
-        loops = tuple((address, width) for address, width, word in _function_instructions(image, "uart_panic_seize")
-                      if branch_offset(width, word) == (0, False))
-        if len(loops) != 1:
-            raise ValueError("PLAT02 baseline has no unique actual corrupt-magic self-loop")
-        stops.append(("corruption", *loops[0]))
     if len({address for _, address, _ in stops}) != len(stops):
         raise ValueError("PLAT02 checkpoint addresses are ambiguous")
-    return ImageBinding(hashlib.sha256(image.data).hexdigest(), tuple(objects), tuple(stops), stack, not baseline)
+    return ImageBinding(hashlib.sha256(image.data).hexdigest(), tuple(objects), tuple(stops), stack, True)
 
 
 def capture_state(remote):
@@ -388,8 +360,8 @@ def capture_state(remote):
         remote.read_object("diagnostic_history"),
         remote.read_object("uart_console_state"),
         remote.read_object("diagnostic_routing"),
-        remote.read_object("panic_control") if remote.binding.control_present else None,
-        None if remote.stopped_at == "corruption" else remote.read_object("micros_terminal_test_work_snapshot"),
+        remote.read_object("panic_control"),
+        remote.read_object("micros_terminal_test_work_snapshot"),
         remote.read_ier() if remote.scenario in (3, 6) else None,
         remote.register(2),
     )
@@ -405,8 +377,10 @@ def _cleanup_process(process):
             process.communicate(timeout=2)
 
 
-def run_case(image, binding, scenario, qemu, *, baseline):
+def run_case(image, binding, scenario, qemu):
     require_case(scenario)
+    if type(binding) is not ImageBinding or binding.control_present is not True:
+        raise ValueError("PLAT02 requires the current image's panic control")
     if read_regular(image)[1]["sha256"] != binding.image_sha256:
         raise ValueError("PLAT02 kernel image changed before its actual VM")
     process = None
@@ -447,19 +421,15 @@ def run_case(image, binding, scenario, qemu, *, baseline):
                     capture = TerminalCapture(
                         scenario, stopped, armed, final, registers, binding.stack, remote.stops[stopped][0],
                     )
-                    validate_capture(capture, baseline=baseline)
-                    terminated = stopped != "reset"
-                    if terminated:
-                        process.terminate()
-                    else:
-                        remote.breakpoint("reset", False)
-                        remote.exchange(b"c", reply=False)
+                    validate_capture(capture)
+                    remote.breakpoint("reset", False)
+                    remote.exchange(b"c", reply=False)
                     output, diagnostic = process.communicate(timeout=remote.remaining())
                     remote.remaining()
                 if len(output) > 65536 or len(diagnostic) > 65536:
                     raise ValueError("PLAT02 VM produced an oversized transcript")
-                case = TerminalCase(capture, output.decode("ascii"), process.returncode, terminated)
-                validate_case(case, baseline=baseline)
+                case = TerminalCase(capture, output.decode("ascii"), process.returncode, False)
+                validate_case(case)
                 if read_regular(image)[1]["sha256"] != binding.image_sha256:
                     raise ValueError("PLAT02 kernel image changed during its actual VM")
                 return case, {"argv": command, "packets": remote.packets, "stderr": diagnostic.decode("utf-8")}
@@ -467,175 +437,35 @@ def run_case(image, binding, scenario, qemu, *, baseline):
                 _cleanup_process(process)
 
 
-def run_cases(image, *, baseline):
-    binding = bind_image(image, baseline=baseline)
+def run_cases(image):
+    binding = bind_image(image)
     qemu = shutil.which("qemu-system-riscv64")
     if qemu is None:
         raise ValueError("PLAT02 requires the configured real QEMU")
     cases, records = [], []
     for scenario in range(1, 13):
-        print(f"MICROS_PLAT02_CASE_BEGIN id={scenario} baseline={int(baseline)}", flush=True)
-        case, record = run_case(image, binding, scenario, qemu, baseline=baseline)
+        print(f"MICROS_PLAT02_CASE_BEGIN id={scenario}", flush=True)
+        case, record = run_case(image, binding, scenario, qemu)
         cases.append(case)
         records.append(record)
         print(f"MICROS_PLAT02_CASE_COMPLETE id={scenario} stop={case.capture.checkpoint} exit={case.exit_code}", flush=True)
     return binding, tuple(cases), tuple(records)
 
 
-def git(*arguments):
-    return subprocess.check_output(("git", *arguments), cwd=ROOT, timeout=60)
 
 
-@lru_cache(maxsize=1)
-def baseline_members():
-    if git("rev-parse", DESIGN_PINS["runtime_reference"] + "^{tree}").decode().strip() != DESIGN_PINS["runtime_tree"]:
-        raise ValueError("PLAT02 fixed runtime does not have its independently bound tree")
-    result = []
-    for row in git("ls-tree", "-r", "-z", DESIGN_PINS["runtime_reference"]).split(b"\0"):
-        if not row:
-            continue
-        fields, raw_name = row.split(b"\t", 1)
-        mode, kind, identity = fields.split()
-        name = raw_name.decode("utf-8")
-        owned_artifact(ROOT, name)
-        if mode not in (b"100644", b"100755") or kind != b"blob":
-            raise ValueError("PLAT02 fixed archive contains a nonordinary source member")
-        result.append((name, int(mode, 8) & 0o777, identity.decode("ascii")))
-    if len({name for name, _, _ in result}) != len(result):
-        raise ValueError("PLAT02 fixed archive contains duplicate source ownership")
-    return tuple(result)
 
 
-def validate_baseline(source, *, observed=True):
-    source = Path(source)
-    if source.is_symlink() or not source.is_dir() or not source.resolve().is_relative_to(ROOT / "build"):
-        raise ValueError("PLAT02 baseline is outside its owned build workspace")
-    members = {name: (mode, identity) for name, mode, identity in baseline_members()}
-    additions = set(GUEST_ADDITIONS) if observed else set()
-    seen = set()
-    for path in source.rglob("*"):
-        if path.is_symlink():
-            raise ValueError("PLAT02 baseline contains a linked source")
-        if path.is_dir():
-            continue
-        name = path.relative_to(source).as_posix()
-        if name not in members and name not in additions:
-            raise ValueError("PLAT02 baseline contains an unapproved source or substitute implementation: " + name)
-        data, identity = read_regular(path)
-        if name in additions:
-            if (data, identity) != read_regular(owned_artifact(ROOT, name)):
-                raise ValueError("PLAT02 baseline does not use the identical immutable guest fixture")
-        else:
-            if observed and name in SOURCE_OVERLAYS:
-                data = project_observations(name, data.decode("utf-8")).encode()
-            elif observed and name == "CMakeLists.txt":
-                data = project_terminal_cmake(data.decode("utf-8"), production=False).encode()
-            elif observed and name == "CMakePresets.json":
-                data = project_terminal_presets(data.decode("utf-8")).encode()
-            blob = hashlib.sha1(b"blob " + str(len(data)).encode() + b"\0" + data).hexdigest()
-            if (identity["mode"], blob) != members[name]:
-                raise ValueError("PLAT02 baseline does not recover the exact original Git blob/mode: " + name)
-        seen.add(name)
-    if seen != set(members) | additions:
-        raise ValueError("PLAT02 baseline omitted an original or immutable fixture input")
 
 
-def prepare_baseline(workspace):
-    workspace = Path(workspace)
-    if workspace.is_symlink() or not workspace.is_dir() or not workspace.resolve().is_relative_to(ROOT / "build"):
-        raise ValueError("PLAT02 baseline workspace is not an owned ordinary directory")
-    source = owned_artifact(workspace, "source")
-    source.mkdir(mode=0o700)
-    archive = git("-c", "tar.umask=0022", "archive", "--format=tar", DESIGN_PINS["runtime_reference"])
-    members = {name: mode for name, mode, _ in baseline_members()}
-    seen = set()
-    with tarfile.open(fileobj=io.BytesIO(archive), mode="r:") as entries:
-        for member in entries:
-            path = owned_artifact(source, member.name.rstrip("/"))
-            if member.isdir():
-                path.mkdir(parents=True, exist_ok=True)
-                continue
-            if (
-                not member.isfile() or member.name not in members or member.name in seen
-                or member.mode & 0o777 != members[member.name]
-            ):
-                raise ValueError("PLAT02 Git archive has an unexpected path, member kind or mode")
-            path.parent.mkdir(parents=True, exist_ok=True)
-            with path.open("xb") as stream:
-                stream.write(entries.extractfile(member).read())
-            path.chmod(members[member.name])
-            seen.add(member.name)
-    validate_baseline(source, observed=False)
-    for name in SOURCE_OVERLAYS:
-        path = source / name
-        path.write_text(observe_source(name, path.read_text()), encoding="utf-8")
-    cmake, presets = source / "CMakeLists.txt", source / "CMakePresets.json"
-    cmake.write_text(extend_cmake(cmake.read_text(), production=False), encoding="utf-8")
-    presets.write_text(extend_presets(presets.read_text()), encoding="utf-8")
-    for name in GUEST_ADDITIONS:
-        original = owned_artifact(ROOT, name)
-        data, identity = read_regular(original)
-        target = owned_artifact(source, name)
-        target.parent.mkdir(parents=True, exist_ok=True)
-        with target.open("xb") as stream:
-            stream.write(data)
-        target.chmod(identity["mode"])
-    validate_baseline(source)
-    return source
 
 
 def source_manifest():
-    from tests.host.diagnostic_history_evidence import closed_tool_inputs
-    from tools.stack_bound_fatal_firmware import resolve_default_firmware
-    from tools.validation_context import capture_candidate
+    from tests.host.diagnostic_history_evidence import current_target_manifest
 
-    candidate = capture_candidate(ROOT)
-    if not candidate.clean or git("ls-files", "--others", "--exclude-standard", "-z"):
-        raise ValueError("PLAT02 requires the complete clean staged candidate, with no untracked inputs")
-    names = tuple(sorted(name.decode() for name in git("ls-files", "-z").split(b"\0") if name))
-    if len(names) != len(set(names)):
-        raise ValueError("PLAT02 source membership is ambiguous")
-    immutable = tuple(name for name in names if name not in SOURCE_ROLES["candidate_paths"])
-    subjects = tuple(name for name in SOURCE_ROLES["candidate_paths"] if name in names)
-    for name in SOURCE_ROLES["immutable_additions"]:
-        if name not in immutable:
-            raise ValueError("PLAT02 source manifest omitted an immutable fixture/tool owner")
-    for name in SOURCE_ROLES["candidate_paths"]:
-        if name not in names and (ROOT / name).exists():
-            raise ValueError("PLAT02 candidate has an untracked or ignored runtime replacement")
-    project_terminal_cmake(read_regular(ROOT / "CMakeLists.txt")[0].decode())
-    project_terminal_presets(read_regular(ROOT / "CMakePresets.json")[0].decode())
-    tools = closed_tool_inputs(ROOT)
-    qemu = shutil.which("qemu-system-riscv64")
-    return {
-        "candidate": asdict(candidate),
-        "immutable": {"files": snapshot_files(ROOT, immutable), "tools": tools, "firmware": resolve_default_firmware(qemu)},
-        "subjects": snapshot_files(ROOT, subjects),
-    }
+    return current_target_manifest(ROOT)
 
 
-def require_baseline_scope():
-    from tests.host.evidence_authority_types import digest
-
-    base = tuple(sorted(name.decode() for name in git(
-        "ls-tree", "-r", "--name-only", "-z", DESIGN_PINS["design_commit"],
-    ).split(b"\0") if name))
-    if digest(base) != SOURCE_ROLES["base_membership_sha256"]:
-        raise ValueError("PLAT02 design membership differs from its pre-edit independent declaration")
-    present = {name.decode() for name in git("ls-files", "-z").split(b"\0") if name}
-    allowed = set(base) | set(SOURCE_ROLES["candidate_paths"]) | set(SOURCE_ROLES["immutable_additions"])
-    optional = set(SOURCE_PROJECTION["new_kernel_members"])
-    if present - allowed or (allowed - present) - optional:
-        raise ValueError("PLAT02 author source membership escaped its exact task roles")
-    for name, mode, identity in baseline_members():
-        if not name.startswith(("arch/", "kernel/", "include/", "lib/", "servers/", "user/")) or name in SOURCE_ROLES["candidate_paths"]:
-            continue
-        data, current = read_regular(owned_artifact(ROOT, name))
-        if name == "kernel/boot/boot_component_tests.c":
-            data = project_observations(name, data.decode()).encode()
-        actual = hashlib.sha1(b"blob " + str(len(data)).encode() + b"\0" + data).hexdigest()
-        if (current["mode"], actual) != (mode, identity):
-            raise ValueError("PLAT02 changed production outside its eight candidates: " + name)
 
 
 def build_target(source, workspace):
@@ -657,7 +487,7 @@ def build_target(source, workspace):
         records.append(record)
         if result.returncode:
             print(result.stdout, flush=True)
-            raise ValueError("PLAT02 configure/compile/link failure is an execution error, never baseline Red")
+            raise ValueError("PLAT02 configure/compile/link failure is an execution error")
     return directory, tuple(records)
 
 
@@ -671,60 +501,45 @@ def case_record(case):
     return value
 
 
-def execute(baseline):
+def execute():
     from tests.host.diagnostic_history_evidence import build_artifacts
     from tools.python_host_runtime import require_current_runtime
 
     require_current_runtime()
-    if baseline:
-        require_baseline_scope()
-    else:
-        validate_terminal_runtime(ROOT)
     before = source_manifest()
     root = owned_artifact(ROOT, "build/terminal-failure")
     root.mkdir(parents=True, exist_ok=True)
     workspace = owned_artifact(root, uuid.uuid4().hex)
     workspace.mkdir(mode=0o700)
-    source = prepare_baseline(workspace) if baseline else ROOT
-    directory, commands = build_target(source, workspace)
-    if baseline:
-        validate_baseline(source)
+    directory, commands = build_target(ROOT, workspace)
     artifacts = snapshot_files(directory, build_artifacts(directory, configure=RECIPE_ADMISSION["target_configure"]))
-    binding, cases, records = run_cases(directory / "kernel/micros.elf", baseline=baseline)
-    results, output = run_oracles(cases, baseline=baseline)
+    binding, cases, records = run_cases(directory / "kernel/micros.elf")
+    results, output = run_oracles(cases)
     print(output, flush=True)
-    if baseline:
-        validate_baseline(source)
-        require_baseline_scope()
     if source_manifest() != before or snapshot_files(directory, tuple(artifacts)) != artifacts:
-        raise ValueError("PLAT02 source, tool, firmware or actual artifact changed during execution")
+        raise ValueError("PLAT02 source, tools, firmware or actual artifacts changed during execution")
     record = {
-        "version": 1, "baseline": baseline, "input_manifest": before,
-        "source_reference": DESIGN_PINS["runtime_reference"] if baseline else before["candidate"]["source"]["head"],
-        "source_directory": str(source), "build_directory": str(directory),
+        "version": 1, "input_manifest": before,
+        "source_reference": before["candidate"]["source"]["head"],
+        "source_directory": str(ROOT), "build_directory": str(directory),
         "commands": commands, "artifacts": artifacts, "binding": asdict(binding),
         "cases": tuple(case_record(case) for case in cases), "debugger": records,
         "oracles": results, "oracle_output": output,
     }
     publish_json(workspace / "result.json", record)
-    report = owned_artifact(root, "baseline.json" if baseline else "current.json")
+    report = owned_artifact(root, "current.json")
     publish_json(report, record)
-    if read_regular(report)[0] != encoded(record):
-        raise ValueError("PLAT02 published evidence does not match the completed execution")
-    print(
-        "MICROS_PLAT02_BASELINE_RED cases=12 controls=4 divergences=8"
-        if baseline else "MICROS_PLAT02_TARGET_PASS cases=12",
-        flush=True,
-    )
-    return 1 if baseline else 0
+    if read_regular(report)[0] != encoded(record) or read_regular(workspace / "result.json")[0] != encoded(record):
+        raise ValueError("PLAT02 published evidence does not match the complete actual execution")
+    print("MICROS_PLAT02_TARGET_PASS cases=12", flush=True)
+    return 0
 
 
 def main(argv=None):
     parser = argparse.ArgumentParser(description=__doc__, allow_abbrev=False)
-    parser.add_argument("--baseline", action="store_true", help="Observe only the fixed pre-correction runtime")
-    arguments = parser.parse_args(argv)
+    parser.parse_args(argv)
     try:
-        return execute(arguments.baseline)
+        return execute()
     except Exception:
         traceback.print_exc()
         print("MICROS_PLAT02_EXECUTION_ERROR", file=sys.stderr)

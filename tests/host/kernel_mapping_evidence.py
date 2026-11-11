@@ -1,29 +1,27 @@
 """Actual native kernel-mapping measurements and independent topology/work oracles."""
 
-from dataclasses import asdict, dataclass, replace
-import hashlib
-import io
+from dataclasses import dataclass, replace
 import json
 from pathlib import Path
 import re
 import shutil
 import subprocess
-import tarfile
 import tempfile
 import unittest
-import uuid
 
 from tests.host.bootstrap_allocation_evidence import json_pairs
-from tests.host.kernel_mapping_authority import DESIGN_PINS, ORACLE_RULES
 from tests.host.kernel_mapping_source import (
-    RECIPE_ADMISSION, SOURCE_PROJECTION, STATE_WORK_CONTRACT, project_mmu_source_bytes,
+    RECIPE_ADMISSION, STATE_WORK_CONTRACT,
 )
 from tests.host.runtime_memory_evidence import native_compiler
 from tests.host.work_count_snapshots import compose_snapshots
 from tests.host.work_count_types import Capture, Kind, Owner, Snapshot, Stage, Status
 from tools.generate_kernel_mapping_fixture import prepare_sources
 from tools.stack_artifact_files import read_regular
-from tools.stack_bound_manifest import owned_artifact, snapshot_files
+from tools.stack_bound_manifest import snapshot_files
+
+
+LOAD_PROBE_INSTRUCTIONS = ("00053503", "00008067")
 
 
 @dataclass(frozen=True)
@@ -65,24 +63,14 @@ class NativeRun:
     observation_symbols: tuple
 
 
-@dataclass(frozen=True)
-class TargetRun:
-    stage: Stage
-    workspace: str
-    source_directory: str
-    source_inputs: dict
-    commands: tuple
-    artifacts: dict
-    binding: dict
-    cases: tuple
-    tools: dict
-    firmware: object
-
-
 FIXTURE_PATHS = (
     "tests/host/kernel_mapping_test.c", "tests/host/kernel_mapping_test.h",
     "tests/host/kernel_mapping_source.py", "tests/host/kernel_mapping_evidence.py",
-    "tests/host/kernel_mapping_authority.py", "tools/generate_kernel_mapping_fixture.py",
+    "tests/host/native_observations.py", "tests/host/native_observations.json",
+    "tests/host/source_snapshot.py", "tools/generate_kernel_mapping_fixture.py",
+    "tests/host/c_source_records.py", "tests/host/work_count_lexical.py",
+    "tests/host/work_count_projection.py", "tests/host/work_count_types.py",
+    "tests/host/work_count_snapshots.py",
     "tests/work/work_counts.c", "tests/work/work_counts.h",
 )
 
@@ -232,6 +220,8 @@ def native_command(root, compiler, generated, executable, stage, observed):
 
 
 def measure_native(root, stage, *, observed=True):
+    if stage is not Stage.GREEN or type(observed) is not bool:
+        raise ValueError("kernel mapping evidence requires current source and a known observation mode")
     root = Path(root).resolve()
     compiler = native_compiler(root)
     fixtures = snapshot_files(root, FIXTURE_PATHS)
@@ -276,7 +266,6 @@ def measure_native(root, stage, *, observed=True):
 
 class KernelMappingOracles(unittest.TestCase):
     measured = None
-    target = None
 
     def selected(self, operation):
         self.assertIsNotNone(self.measured)
@@ -300,7 +289,7 @@ class KernelMappingOracles(unittest.TestCase):
         for row in self.selected("construct"):
             counts = row.capture.snapshot.counts[Owner.KERNEL_MEMORY]
             leaves, tables, ranges = sum(row.leaves), row.tables, row.managed_ranges
-            metadata = row.middle_tables if self.measured.stage is Stage.GREEN else 0
+            metadata = row.middle_tables
             with self.subTest(case=row.case, operation=row.operation):
                 self.assertLessEqual(counts[Kind.INDEX_PROBE], 32 * (leaves + tables + ranges + 1))
                 self.assertLessEqual(counts[Kind.PTE_VISIT], 4 * leaves + 2 * tables)
@@ -328,17 +317,6 @@ class KernelMappingOracles(unittest.TestCase):
                     row.capture.snapshot.counts[Owner.KERNEL_MEMORY][Kind.PTE_VISIT],
                     3 * (expected_leaves + row.tables + 4),
                 )
-
-    def test_target_mmu_baseline(self):
-        self.assertIsNotNone(self.target)
-        self.assertEqual(("128M", "256M"), tuple(case["memory"] for case in self.target.cases))
-        for case in self.target.cases:
-            observation = case["observation"]
-            with self.subTest(memory=case["memory"]):
-                self.assertTrue(observation["largest"])
-                self.assertEqual(observation["expected_tables"], observation["tables"])
-                self.assertEqual(observation["expected_leaves"], observation["leaves"])
-
 
 def _merge_intervals(intervals):
     result = []
@@ -425,7 +403,7 @@ def bind_target_image(path):
     section = image.sections[probe.section_index]
     offset = section.offset + probe.value - section.address
     expected = b"".join(int(word, 16).to_bytes(4, "little")
-                        for word in SOURCE_PROJECTION["mmu_fixture_inputs"]["load_instructions"])
+                        for word in LOAD_PROBE_INSTRUCTIONS)
     if (
         probe.symbol_type != 2 or probe.size != 8 or section.section_type != 1 or section.flags != 6
         or not section.address <= probe.value <= probe.value + 8 <= section.address + section.size
@@ -492,341 +470,3 @@ def decode_target_output(result, binding):
         "tables": tables, "leaves": tuple(leaves), "largest": bool(largest),
         "expected_tables": expected_tables, "expected_leaves": expected_leaves,
     }
-
-
-def _target_members(root):
-    output = subprocess.check_output(
-        ("git", "ls-tree", "-r", "-z", DESIGN_PINS["runtime_reference"]), cwd=root, timeout=30,
-    )
-    members = {}
-    for row in filter(None, output.split(b"\0")):
-        metadata, raw_path = row.split(b"\t", 1)
-        mode, kind, oid = metadata.split()
-        path = raw_path.decode()
-        owned_artifact(root, path)
-        if mode not in (b"100644", b"100755") or kind != b"blob" or path in members:
-            raise ValueError("MEM02 target baseline has a nonordinary or duplicate source")
-        members[path] = (int(mode, 8) & 0o777, oid.decode())
-    return members
-
-
-def _validate_target_baseline(root, source, members):
-    seen = set()
-    fixtures = set(RECIPE_ADMISSION["qemu_fixture_paths"])
-    for path in source.rglob("*"):
-        if path.is_symlink():
-            raise ValueError("MEM02 target baseline contains a linked source")
-        if path.is_dir():
-            continue
-        name = path.relative_to(source).as_posix()
-        if name not in members:
-            raise ValueError("MEM02 target baseline contains an unadmitted source")
-        data, identity = read_regular(path)
-        if name in fixtures:
-            if (data, identity) != read_regular(root / name):
-                raise ValueError("MEM02 baseline does not use the identical immutable MMU fixture")
-            data = project_mmu_source_bytes(name, data)
-        oid = hashlib.sha1(b"blob " + str(len(data)).encode() + b"\0" + data).hexdigest()
-        if (identity["mode"], oid) != members[name]:
-            raise ValueError("MEM02 target baseline does not recover its fixed Git blob/mode: " + name)
-        seen.add(name)
-    if seen != set(members):
-        raise ValueError("MEM02 target baseline omitted an original input")
-
-
-def _prepare_target_baseline(root, workspace):
-    members = _target_members(root)
-    source = owned_artifact(workspace, "source")
-    source.mkdir(mode=0o700)
-    data = subprocess.check_output(
-        ("git", "-c", "tar.umask=022", "archive", DESIGN_PINS["runtime_reference"]), cwd=root, timeout=30,
-    )
-    seen = set()
-    with tarfile.open(fileobj=io.BytesIO(data)) as archive:
-        for member in archive:
-            path = owned_artifact(source, member.name.rstrip("/"))
-            if member.isdir():
-                path.mkdir(parents=True, exist_ok=True)
-                continue
-            if not member.isfile() or member.name not in members or member.name in seen:
-                raise ValueError("MEM02 baseline archive has an unadmitted member")
-            body = archive.extractfile(member).read()
-            oid = hashlib.sha1(b"blob " + str(len(body)).encode() + b"\0" + body).hexdigest()
-            if (member.mode & 0o777, oid) != members[member.name]:
-                raise ValueError("MEM02 baseline archive changed a fixed source")
-            path.parent.mkdir(parents=True, exist_ok=True)
-            path.write_bytes(body)
-            path.chmod(member.mode & 0o777)
-            seen.add(member.name)
-    if seen != set(members):
-        raise ValueError("MEM02 baseline archive is incomplete")
-    for name in RECIPE_ADMISSION["qemu_fixture_paths"]:
-        body, identity = read_regular(root / name)
-        project_mmu_source_bytes(name, body)
-        (source / name).write_bytes(body)
-        (source / name).chmod(identity["mode"])
-    _validate_target_baseline(root, source, members)
-    return source, members
-
-
-def measure_target(root, stage):
-    from tests.host.diagnostic_history_evidence import build_artifacts, closed_tool_inputs
-    from tools.qemu_smoke_command import build_qemu_command
-    from tools.qemu_smoke_execution import run_qemu
-    from tools.stack_bound_fatal_firmware import resolve_default_firmware
-
-    root = Path(root).resolve()
-    if stage not in (Stage.RED, Stage.GREEN):
-        raise ValueError("MEM02 target execution has an unknown source stage")
-    tools = closed_tool_inputs(root)
-    qemu = shutil.which("qemu-system-riscv64")
-    if qemu is None:
-        raise ValueError("MEM02 requires its existing configured QEMU")
-    firmware = resolve_default_firmware(qemu)
-    parent = owned_artifact(root, "build/kernel-mapping")
-    parent.mkdir(parents=True, exist_ok=True)
-    workspace = owned_artifact(parent, uuid.uuid4().hex)
-    workspace.mkdir(mode=0o700)
-    if stage is Stage.RED:
-        source, members = _prepare_target_baseline(root, workspace)
-    else:
-        source = root
-        members = {
-            path.decode(): None for path in subprocess.check_output(
-                ("git", "ls-files", "-z"), cwd=root, timeout=30,
-            ).split(b"\0") if path
-        }
-    inputs = snapshot_files(source, tuple(sorted(members)))
-    if (source / "CMakeUserPresets.json").exists() or (source / "CMakeUserPresets.json").is_symlink():
-        raise ValueError("MEM02 does not admit caller-owned preset overrides")
-    directory = owned_artifact(workspace, "target")
-    commands = (
-        ("cmake", "--fresh", "--preset", "riscv64-mmu-test", "-S", str(source), "-B", str(directory),
-         "-DCMAKE_EXPORT_COMPILE_COMMANDS=ON"),
-        ("cmake", "--build", str(directory), "--clean-first", "--target", "micros"),
-    )
-    records = []
-    for command in commands:
-        run = subprocess.run(
-            command, cwd=source, stdin=subprocess.DEVNULL, capture_output=True, text=True,
-        )
-        records.append({"argv": command, "cwd": str(source), "exit_code": run.returncode, "output": run.stdout + run.stderr})
-        if run.returncode:
-            raise ValueError("MEM02 target configure/compile failure is not runtime Red:\n" + run.stdout + run.stderr)
-    artifacts = snapshot_files(directory, build_artifacts(directory, configure="riscv64-mmu-test"))
-    image = directory / "kernel/micros.elf"
-    binding = bind_target_image(image)
-    cases = []
-    for memory in RECIPE_ADMISSION["qemu_memories"]:
-        command = tuple(build_qemu_command(qemu=qemu, kernel=str(image), memory=memory))
-        run = run_qemu(command, RECIPE_ADMISSION["qemu_timeout"])
-        cases.append({
-            "memory": memory, "command": command, "result": asdict(run),
-            "observation": decode_target_output(run, binding),
-        })
-    if stage is Stage.RED:
-        _validate_target_baseline(root, source, members)
-    if (
-        snapshot_files(source, tuple(inputs)) != inputs
-        or snapshot_files(directory, tuple(artifacts)) != artifacts
-        or closed_tool_inputs(root) != tools or resolve_default_firmware(qemu) != firmware
-    ):
-        raise ValueError("MEM02 target source, tools, firmware or actual artifacts changed during execution")
-    return TargetRun(stage, str(workspace), str(source), inputs, tuple(records), artifacts,
-                     binding, tuple(cases), tools, firmware)
-
-
-def run_oracles(native, target):
-    from tests.host.evidence_authority_types import ObservedResult, OracleResult, RunStatus
-
-    if type(native) is not NativeRun or type(target) is not TargetRun or not native.observed or native.stage is not target.stage:
-        raise ValueError("MEM02 requires complete matching actual native and target executions")
-    output = io.StringIO()
-    outcomes = []
-    for identifier, test, property_name, _, _, _ in ORACLE_RULES:
-        case = KernelMappingOracles(test.rsplit(".", 1)[1])
-        case.measured = native
-        case.target = target
-        result = unittest.TextTestRunner(stream=output, verbosity=2).run(unittest.TestSuite((case,)))
-        if result.testsRun != 1 or result.errors or result.skipped:
-            raise ValueError("MEM02 oracle was skipped or failed outside its measured assertion")
-        if native.stage is Stage.RED:
-            if result.wasSuccessful():
-                raise ValueError("MEM02 baseline did not demonstrate every required audited divergence")
-            observed = ObservedResult.EXPECTED_FAILURE
-        else:
-            observed = ObservedResult.PASS if result.wasSuccessful() else ObservedResult.FAIL
-        outcomes.append(OracleResult(identifier, RunStatus.RUN, observed, property_name))
-    return tuple(outcomes), output.getvalue()
-
-
-def execution_log(native, target, results, oracle_output, *, phase, attempt):
-    native_value = asdict(native)
-    del native_value["records"]
-    native_value["stage"] = native.stage.value
-    target_value = asdict(target)
-    target_value["stage"] = target.stage.value
-    return json.loads(json.dumps({
-        "version": 1, "phase": phase, "attempt": attempt,
-        "native": native_value, "target": target_value,
-        "results": [asdict(result) for result in results], "oracle_output": oracle_output,
-    }, allow_nan=False))
-
-
-def _validate_native_replay(context, native, stage):
-    from tests.host.diagnostic_history_authority import record_fields, record_strings
-    from tools.generate_kernel_mapping_fixture import source_bundle
-
-    record_fields(native, (
-        "stage", "observed", "compiler", "command", "execution_command", "source_inputs",
-        "fixture_inputs", "generated_sources", "executable", "output", "build_output", "observation_symbols",
-    ))
-    if (
-        native["stage"] != stage.value or native["observed"] is not True
-        or native["compiler"] != context.native_compiler
-        or type(native["output"]) is not str or type(native["build_output"]) is not str
-    ):
-        raise ValueError("MEM02 native replay borrowed a source stage/compiler or omitted output")
-    execution = record_strings(native["execution_command"])
-    if len(execution) != 1:
-        raise ValueError("MEM02 native replay lacks its exact executed image")
-    executable = Path(execution[0])
-    directory = executable.parent
-    if (
-        not executable.is_absolute() or executable.name != "kernel-mapping"
-        or not directory.name.startswith("micros-mem02-native-")
-        or directory.parent.resolve() != Path(tempfile.gettempdir()).resolve()
-    ):
-        raise ValueError("MEM02 native replay names an unowned execution")
-    command = record_strings(native["command"])
-    if command != native_command(context.root, context.native_compiler, directory / "source", executable, stage, True):
-        raise ValueError("MEM02 native replay changed its exact compile/link command")
-    inputs, outputs = source_bundle(context.root, stage)
-    generated = {
-        name: {"kind": "file", "mode": mode, "size": len(data), "sha256": hashlib.sha256(data).hexdigest()}
-        for name, (data, mode) in outputs.items()
-    }
-    if (
-        native["source_inputs"] != inputs or native["generated_sources"] != generated
-        or native["fixture_inputs"] != {name: context.files[name] for name in FIXTURE_PATHS}
-    ):
-        raise ValueError("MEM02 native replay substituted a source/header/observation/fixture input")
-    identity = native["executable"]
-    record_fields(identity, ("kind", "mode", "size", "sha256"))
-    if (
-        identity["kind"] != "file" or type(identity["mode"]) is not int
-        or not 0 < identity["mode"] <= 0o777 or not identity["mode"] & 0o100
-        or type(identity["size"]) is not int or identity["size"] <= 0
-        or type(identity["sha256"]) is not str or re.fullmatch(r"[a-f0-9]{64}", identity["sha256"]) is None
-    ):
-        raise ValueError("MEM02 native replay lacks a complete executable identity")
-    symbols = record_strings(native["observation_symbols"])
-    if set(symbols) != {"micros_test_work_begin", "micros_test_work_finish", "micros_test_work_record"}:
-        raise ValueError("MEM02 native replay omitted its actual observation symbols")
-    return NativeRun(
-        stage, True, decode_measurements(native["output"], stage, observed=True),
-        context.native_compiler, command, execution, inputs, native["fixture_inputs"], generated,
-        identity, native["output"], native["build_output"], symbols,
-    )
-
-
-def _validate_target_replay(context, target, stage):
-    from tests.host.diagnostic_history_authority import record_fields, record_strings
-    from tests.host.diagnostic_history_evidence import build_artifacts, closed_tool_inputs
-    from tests.host.evidence_authority_types import digest
-    from tools.qemu_smoke_command import build_qemu_command
-    from tools.qemu_smoke_records import QemuResult
-    from tools.stack_bound_fatal_firmware import resolve_default_firmware
-
-    record_fields(target, (
-        "stage", "workspace", "source_directory", "source_inputs", "commands", "artifacts",
-        "binding", "cases", "tools", "firmware",
-    ))
-    if target["stage"] != stage.value or type(target["workspace"]) is not str:
-        raise ValueError("MEM02 target replay has a borrowed source stage")
-    workspace = Path(target["workspace"])
-    if (
-        workspace.parent != context.root / "build/kernel-mapping"
-        or re.fullmatch(r"[a-f0-9]{32}", workspace.name) is None
-        or owned_artifact(context.root, workspace.relative_to(context.root).as_posix()) != workspace
-    ):
-        raise ValueError("MEM02 target replay leaves its owned workspace")
-    source = workspace / "source" if stage is Stage.RED else context.root
-    directory = workspace / "target"
-    if target["source_directory"] != str(source):
-        raise ValueError("MEM02 target replay has another source root")
-    if stage is Stage.RED:
-        members = _target_members(context.root)
-        _validate_target_baseline(context.root, source, members)
-        inputs = snapshot_files(source, tuple(sorted(members)))
-    else:
-        inputs = context.files
-    if target["source_inputs"] != inputs:
-        raise ValueError("MEM02 target replay changed its complete source inputs")
-    commands = (
-        ("cmake", "--fresh", "--preset", "riscv64-mmu-test", "-S", str(source), "-B", str(directory),
-         "-DCMAKE_EXPORT_COMPILE_COMMANDS=ON"),
-        ("cmake", "--build", str(directory), "--clean-first", "--target", "micros"),
-    )
-    if type(target["commands"]) is not list or len(target["commands"]) != 2:
-        raise ValueError("MEM02 target replay omitted a build stage")
-    for row, command in zip(target["commands"], commands):
-        record_fields(row, ("argv", "cwd", "exit_code", "output"))
-        if (
-            record_strings(row["argv"]) != command or row["cwd"] != str(source)
-            or type(row["exit_code"]) is not int or row["exit_code"] != 0
-            or type(row["output"]) is not str or not row["output"]
-        ):
-            raise ValueError("MEM02 target replay changed or failed a canonical build command")
-    artifacts = snapshot_files(directory, build_artifacts(directory, configure="riscv64-mmu-test"))
-    image = directory / "kernel/micros.elf"
-    binding = bind_target_image(image)
-    qemu = shutil.which("qemu-system-riscv64")
-    if (
-        target["artifacts"] != artifacts or target["binding"] != binding or qemu is None
-        or digest(target["tools"]) != digest(closed_tool_inputs(context.root))
-        or digest(target["firmware"]) != digest(resolve_default_firmware(qemu))
-    ):
-        raise ValueError("MEM02 target replay changed actual artifacts, tool or firmware identities")
-    if type(target["cases"]) is not list or len(target["cases"]) != 2:
-        raise ValueError("MEM02 target replay omitted or duplicated a memory run")
-    for case, memory in zip(target["cases"], RECIPE_ADMISSION["qemu_memories"]):
-        record_fields(case, ("memory", "command", "result", "observation"))
-        record_fields(case["result"], ("output", "return_code", "timed_out", "serial_input_sent"))
-        if (
-            case["memory"] != memory
-            or record_strings(case["command"]) != tuple(build_qemu_command(qemu=qemu, kernel=str(image), memory=memory))
-            or type(case["result"]["output"]) is not str
-            or type(case["result"]["return_code"]) is not int
-            or type(case["result"]["timed_out"]) is not bool
-            or type(case["result"]["serial_input_sent"]) is not bool
-        ):
-            raise ValueError("MEM02 target replay has a foreign command or malformed run result")
-        observed = decode_target_output(QemuResult(**case["result"]), binding)
-        if case["observation"] != json.loads(json.dumps(observed)):
-            raise ValueError("MEM02 target replay does not follow its actual complete output")
-    return TargetRun(
-        stage, str(workspace), str(source), inputs, tuple(target["commands"]), artifacts,
-        binding, tuple(target["cases"]), target["tools"], target["firmware"],
-    )
-
-
-def validate_execution_log(context, replay, *, phase, attempt):
-    from tests.host.diagnostic_history_authority import record_fields
-
-    if phase not in ("red", "green", "recertify") or type(attempt) is not str or re.fullmatch(r"[a-f0-9]{32}", attempt) is None:
-        raise ValueError("MEM02 replay has an unadmitted phase or attempt")
-    record_fields(replay, ("version", "phase", "attempt", "native", "target", "results", "oracle_output"))
-    if (
-        type(replay["version"]) is not int or replay["version"] != 1
-        or replay["phase"] != phase or replay["attempt"] != attempt
-        or type(replay["oracle_output"]) is not str
-    ):
-        raise ValueError("MEM02 replay belongs to a different phase or attempt")
-    stage = Stage.RED if phase == "red" else Stage.GREEN
-    native = _validate_native_replay(context, replay["native"], stage)
-    target = _validate_target_replay(context, replay["target"], stage)
-    results, _ = run_oracles(native, target)
-    if replay["results"] != json.loads(json.dumps([asdict(result) for result in results])):
-        raise ValueError("MEM02 replay outcomes do not follow the actual complete executions")
-    return results

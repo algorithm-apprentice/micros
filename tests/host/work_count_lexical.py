@@ -147,3 +147,74 @@ def matches_at(values, fragment, start, end):
         index for index in range(start, end - width + 1)
         if values[index:index + width] == fragment
     )
+
+
+def matching_tokens(values, opening):
+    pairs = {"(": ")", "[": "]", "{": "}"}
+    stack = []
+    for index in range(opening, len(values)):
+        if values[index] in pairs:
+            stack.append(pairs[values[index]])
+        elif stack and values[index] == stack[-1]:
+            stack.pop()
+            if not stack:
+                return index
+    raise WorkEvidenceError("work primitive has an unbalanced delimiter")
+
+
+def region_header(values, opening):
+    if opening and values[opening - 1] == ")":
+        depth = 1
+        for start in range(opening - 2, -1, -1):
+            if values[start] == ")":
+                depth += 1
+            elif values[start] == "(":
+                depth -= 1
+                if depth == 0:
+                    if start and values[start - 1] in ("if", "for", "while", "switch"):
+                        return start - 1
+                    break
+        else:
+            raise WorkEvidenceError("work primitive has an unbalanced region header")
+    if opening and values[opening - 1] in ("else", "do"):
+        return opening - 1
+    return opening
+
+
+def enclosing_regions(values, stacks, closings, enclosing):
+    result, parent = [], ()
+    start, end = 0, len(values)
+    for opening in enclosing:
+        begin = region_header(values, opening)
+        fragment = values[begin:opening + 1]
+        candidates = [
+            index for index in matches_at(values, fragment, start, end)
+            if stacks[index] == parent
+        ]
+        if begin not in candidates:
+            raise WorkEvidenceError("work primitive lacks its enclosing compound")
+        result.append((" ".join(fragment), candidates.index(begin)))
+        parent = (*parent, opening)
+        start, end = opening + 1, closings[opening]
+    return tuple(result)
+
+
+def loop_shape(body):
+    values = tuple(token.value for token in positional_tokens(body))
+    stacks, closings = compound_layout(values)
+    result = []
+    for index, value in enumerate(values):
+        if value == "do":
+            raise WorkEvidenceError("current work observation does not admit a do loop")
+        if value not in ("for", "while"):
+            continue
+        if values[index + 1:index + 2] != ("(",):
+            raise WorkEvidenceError("work loop has no complete condition")
+        closing = matching_tokens(values, index + 1)
+        if values[closing + 1:closing + 2] != ("{",):
+            raise WorkEvidenceError("work loop has no explicit compound")
+        result.append((
+            " ".join(values[index:closing + 2]),
+            enclosing_regions(values, stacks, closings, stacks[index]),
+        ))
+    return tuple(result)

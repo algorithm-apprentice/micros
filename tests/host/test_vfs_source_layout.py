@@ -1,7 +1,7 @@
 from pathlib import Path
 import re
 import unittest
-from tests.host import kernel_layout_source
+from tests.host.source_snapshot import source_bytes
 
 
 REPOSITORY_ROOT = Path(__file__).resolve().parents[2]
@@ -229,7 +229,7 @@ inline bool split_inline_body(void)
         missing = [
             source
             for source in PORTABLE_SOURCES
-            if not kernel_layout_source.is_file_path(REPOSITORY_ROOT / source)
+            if not (REPOSITORY_ROOT / source).is_file()
         ]
 
         self.assertEqual([], missing)
@@ -237,12 +237,12 @@ inline bool split_inline_body(void)
     def test_private_contract_has_no_static_function_bodies(
         self,
     ) -> None:
-        header = kernel_layout_source.read_path(INTERNAL_HEADER_PATH, encoding="utf-8")
+        header = source_bytes(REPOSITORY_ROOT, INTERNAL_HEADER_PATH).decode()
 
         self.assertEqual([], static_function_definitions(header))
 
     def test_consumers_use_complete_portable_source_set(self) -> None:
-        cmake = kernel_layout_source.read_path(CMAKE_PATH, encoding="utf-8")
+        cmake = source_bytes(REPOSITORY_ROOT, CMAKE_PATH).decode()
         source_set = cmake_command(cmake, "set", PORTABLE_SOURCE_SET)
         listed_sources = tuple(
             re.findall(r"servers/vfs/[A-Za-z0-9_]+\.c", source_set)
@@ -279,9 +279,7 @@ inline bool split_inline_body(void)
         oversized = {}
 
         for relative_path, function_name in REQUIRED_SPLIT_FUNCTIONS:
-            text = kernel_layout_source.read_path(REPOSITORY_ROOT / relative_path,
-                encoding="utf-8"
-            )
+            text = source_bytes(REPOSITORY_ROOT, REPOSITORY_ROOT / relative_path).decode()
             line_count = function_line_count(text, function_name)
             if line_count > FUNCTION_REVIEW_LINE_LIMIT:
                 oversized[function_name] = line_count

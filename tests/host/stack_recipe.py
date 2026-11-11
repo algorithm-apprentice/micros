@@ -1,15 +1,13 @@
-"""Finite EV03 workflow/recipe additions; historical authorities stay unchanged."""
+"""Current stack workflow and host-only aggregate ownership."""
 
 import json
 from pathlib import Path
 
-from tests.host.diagnostic_history_source import project_diagnostic_cmake
-from tests.host.terminal_failure_source import project_terminal_cmake, project_terminal_presets
+from tests.host.build_source_records import cmake_if_blocks
 
 
 MODULE_PATH = "tests/stack/StackEvidence.cmake"
 INCLUDE = '    include("${CMAKE_CURRENT_SOURCE_DIR}/tests/stack/StackEvidence.cmake")\n'
-ANCHOR = '    include("${CMAKE_CURRENT_SOURCE_DIR}/tests/work/WorkCounts.cmake")\n'
 RECIPE = (
     "add_custom_target(\n"
     "    test-stack-evidence\n"
@@ -30,106 +28,14 @@ WORKFLOW_PRESET = {
     ],
 }
 COMMAND = ("cmake", "--workflow", "--preset", "test-stack-evidence")
-PLANNER_ADDITIONS = (
-    ("from tests.host.stack_recipe import validate_stack_workflow\n", ""),
-    ('STACK_EVIDENCE = ("cmake", "--workflow", "--preset", "test-stack-evidence")\n', ""),
-    (
-        "        commands.extend(workflow(name) for name in IMAGE_WORKFLOWS)\n"
-        "        commands.append(STACK_EVIDENCE)\n",
-        "        commands.extend(workflow(name) for name in IMAGE_WORKFLOWS)\n",
-    ),
-    (
-        "    if workflows or image_workflows:\n"
-        "        append_unique(commands, STACK_EVIDENCE)\n"
-        "    commands.extend(diff_commands(base))\n",
-        "    commands.extend(diff_commands(base))\n",
-    ),
-    (
-        "def validate_inventory(root):\n    validate_stack_workflow(root)\n",
-        "def validate_inventory(root):\n",
-    ),
-    (
-        "        *SLOW_MODEL_INPUTS, *QEMU_WORKFLOWS, *IMAGE_WORKFLOWS, STACK_EVIDENCE[-1],\n",
-        "        *SLOW_MODEL_INPUTS, *QEMU_WORKFLOWS, *IMAGE_WORKFLOWS,\n",
-    ),
-)
-
-
-def project_root_recipe(source):
-    try:
-        source = project_terminal_cmake(source)
-    except ValueError as error:
-        raise AssertionError(str(error)) from error
-    source = project_diagnostic_cmake(source)
-    if INCLUDE not in source:
-        return source
-    if source.count(INCLUDE) != 1 or source.count(INCLUDE + ANCHOR) != 1:
-        raise AssertionError("stack include is not the exact host-only extension")
-    return source.replace(INCLUDE, "", 1)
-
-
-def project_presets(source):
-    try:
-        source = project_terminal_presets(source)
-    except ValueError as error:
-        raise AssertionError(str(error)) from error
-    if '"name": "test-stack-evidence"' not in source:
-        return source
-    if source.count('"name": "test-stack-evidence"') != 3:
-        raise AssertionError("stack preset extension has an undeclared occurrence")
-    for declaration, ending in (
-        (BUILD_PRESET, '\n  ],\n  "workflowPresets": ['),
-        (WORKFLOW_PRESET, "\n  ]\n}\n"),
-    ):
-        block = "\n".join("    " + line for line in json.dumps(declaration, indent=2).splitlines())
-        added = ",\n" + block + ending
-        if source.count(added) != 1:
-            raise AssertionError("stack presets are not the exact appended extension")
-        source = source.replace(added, ending, 1)
-    return source
-
-
-def project_external_evidence(relative, data):
-    if relative == "CMakePresets.json":
-        return project_presets(data.decode("utf-8")).encode("utf-8")
-    return data
-
-
-def project_planner_registration(source):
-    if PLANNER_ADDITIONS[0][0] not in source:
-        return source
-    for current, original in PLANNER_ADDITIONS:
-        if source.count(current) != 1:
-            raise AssertionError("stack planner registration is not the exact additive extension")
-        source = source.replace(current, original, 1)
-    return source
-
-
-def project_command_extension(commands):
-    if COMMAND not in commands:
-        return commands
-    if commands.count(COMMAND) != 1:
-        raise AssertionError("duplicate stack gate cannot be projected")
-    position = commands.index(COMMAND)
-    suffix = commands[position + 1:]
-    if suffix and tuple(suffix[0][1:]) == ("-E", "-S", "-B", "tools/check_docs.py"):
-        suffix = suffix[1:]
-    if (
-        len(suffix) != 3
-        or suffix[0] != ("git", "diff", "--cached", "--check")
-        or suffix[1] != ("git", "diff", "--check")
-        or len(suffix[2]) != 4 or suffix[2][:3] != ("git", "diff", "--check")
-    ):
-        raise AssertionError("relocated stack gate cannot be projected")
-    return [command for command in commands if command != COMMAND]
 
 
 def validate_stack_recipe(root):
     root = Path(root)
     source = (root / "CMakeLists.txt").read_text()
-    if INCLUDE not in source:
-        raise AssertionError("missing current stack aggregate include")
-    project_root_recipe(source)
+    host, = cmake_if_blocks(source, "MICROS_BUILD_HOST_TESTS")
+    if source.count(MODULE_PATH) != 1 or host.count(INCLUDE) != 1:
+        raise AssertionError("stack aggregate requires one current host-only include")
     if any((root / name).is_symlink() for name in ("tests", "tests/stack", MODULE_PATH)):
         raise AssertionError("stack recipe namespace is linked")
     if (root / MODULE_PATH).read_text() != RECIPE:

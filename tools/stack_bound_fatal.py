@@ -48,7 +48,7 @@ from tools.stack_bound_flow import (
 )
 from tools.stack_bound_artifacts import object_frames
 from tools.stack_bound_assembly import assembly_object_evidence, trace_trap_effects
-from tools.stack_bound_bindings import reference_source
+from tools.stack_bound_bindings import proof_header_tokens, reference_source
 from tools.stack_bound_link import FunctionLocation, join_function_locations
 from tools.stack_bound_machine import is_return
 from tools.stack_bound_objects import function_symbols, load_object, section_bytes
@@ -437,8 +437,22 @@ def one_token_declaration(source, declaration):
     ) == 1
 
 
+def fatal_state_tokens(source, protected):
+    """Function effects are qualified separately against their actual objects."""
+    for record in function_records(source).values():
+        directives = re.findall(r"(?m)^\s*#\s*([A-Za-z_]+)", c_lexical_text(record.body))
+        if set(directives) - {"if", "ifdef", "ifndef", "elif", "else", "endif"}:
+            raise StackEvidenceError("fatal source function changes shared preprocessor state")
+        definition = record.signature + "{" + record.body + "}"
+        if source.count(definition) != 1:
+            raise StackEvidenceError("fatal source has an ambiguous function extent")
+        source = source.replace(definition, "", 1)
+    return proof_header_tokens(source, protected)
+
+
 def require_fatal_source_units(root, *, terminal_test=False, trace_test=False):
     try:
+        protected = {name for _, name in PRESERVERS} | {"micros_panic_entry", "micros_trap_panic_entry"}
         for unit in SOURCE_UNITS:
             actual = read_regular(owned_file(root, unit))[0].decode("utf-8")
             if unit in CONTROL_SOURCES:
@@ -450,19 +464,10 @@ def require_fatal_source_units(root, *, terminal_test=False, trace_test=False):
                 project_fatal_report(restored) if unit == REPORT else restored
             )
             reference = reference_source(str(root), unit)
-            actual_tokens = tokens(projected)
-            admitted = actual_tokens == tokens(reference)
-            if not admitted and unit == "kernel/tty/tty_handoff_runtime.h":
-                prefix, terminator, suffix = reference.rpartition("\n#endif")
-                declaration = (
-                    "enum micros_tty_device_authority_status\n"
-                    "micros_tty_handoff_runtime_inspect_device_binding(\n"
-                    "    const struct micros_kernel_objects *objects,\n"
-                    "    struct micros_tty_device_authority *binding);\n"
-                )
-                admitted = bool(terminator) and not suffix.strip() and actual_tokens == tokens(
-                    prefix + "\n" + declaration + terminator + suffix,
-                )
+            if unit.endswith(".h"):
+                admitted = proof_header_tokens(projected, protected) == proof_header_tokens(reference, protected)
+            else:
+                admitted = fatal_state_tokens(projected, protected) == fatal_state_tokens(reference, protected)
             if not admitted:
                 raise StackEvidenceError("fatal source/type/CSR contract changed from its fixed stage: " + unit)
         public = read_regular(owned_file(root, "include/micros/diagnostic.h"))[0].decode("utf-8")

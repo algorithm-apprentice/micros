@@ -689,8 +689,7 @@ static int launch_native_products(char **argv)
     char *arguments[] = {
         MICROS_COMMON_SCHEDULER_RETURN_PYTHON, "-E", "-S", "-B",
         MICROS_COMMON_SCHEDULER_RETURN_DRIVER, "--native",
-        "--executable", argv[1], "--executable", argv[2],
-        "--executable", argv[3], "--executable", argv[0], NULL,
+        "--executable", argv[1], "--executable", argv[0], NULL,
     };
 
     if (launcher != NULL && launcher[0] != '\0') {
@@ -708,7 +707,7 @@ static int launch_native_products(char **argv)
 int main(int argc, char **argv)
 {
 #if defined(MICROS_COMMON_SCHEDULER_RETURN_LAUNCHER)
-    if (argc == 4) {
+    if (argc == 2) {
         return launch_native_products(argv);
     }
 #endif

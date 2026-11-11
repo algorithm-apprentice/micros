@@ -1,3 +1,4 @@
+# Golden output was captured from independently reviewed OBJ02 #246, before consumer changes.
 from dataclasses import replace
 import hashlib
 import unittest
@@ -6,15 +7,6 @@ from tests.host.test_generate_bootstrap_fixture import bootstrap_image
 from tests.host.test_generate_vm_handoff_fixture import vm_image
 from tools import check_user_elf
 from tools import generate_vm_scratch_preemption_fixture
-from tests.host import kernel_layout_source
-
-GENERATOR_PATH = "tools/generate_vm_scratch_preemption_fixture.py"
-
-def _render_fixture(*args, **kwargs):
-    return kernel_layout_source.restore_generated_fixture(
-        GENERATOR_PATH,
-        generate_vm_scratch_preemption_fixture.render_fixture(*args, **kwargs),
-    )
 
 
 def with_symbols(image, names, start_offset=52):
@@ -47,7 +39,7 @@ class VmScratchPreemptionFixtureGeneratorTest(unittest.TestCase):
             256,
         )
 
-        output = _render_fixture(
+        output = generate_vm_scratch_preemption_fixture.render_fixture(
             bootstrap_image(),
             vm,
             pm,
@@ -55,7 +47,7 @@ class VmScratchPreemptionFixtureGeneratorTest(unittest.TestCase):
         )
 
         self.assertEqual(
-            "83130e7d37432e986fda755e2c2e8861e35f45f46f5eaa3834cbcba9434e15c4",
+            "4542e4b52381b68526ce253a7ebcb812e280dcf4509c8d5d43f0bdd5fb22fe7b",
             hashlib.sha256(output.encode("utf-8")).hexdigest(),
         )
         self.assertIn(
@@ -85,7 +77,7 @@ class VmScratchPreemptionFixtureGeneratorTest(unittest.TestCase):
 
     def test_rejects_missing_vm_hook_symbol(self):
         with self.assertRaises(check_user_elf.ElfFormatError):
-            _render_fixture(
+            generate_vm_scratch_preemption_fixture.render_fixture(
                 bootstrap_image(),
                 vm_image(),
                 with_symbols(
@@ -97,7 +89,7 @@ class VmScratchPreemptionFixtureGeneratorTest(unittest.TestCase):
 
     def test_rejects_missing_peer_report_symbol(self):
         with self.assertRaises(check_user_elf.ElfFormatError):
-            _render_fixture(
+            generate_vm_scratch_preemption_fixture.render_fixture(
                 bootstrap_image(),
                 with_symbols(
                     vm_image(),

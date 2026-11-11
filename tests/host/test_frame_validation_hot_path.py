@@ -1,4 +1,3 @@
-import hashlib
 import json
 from pathlib import Path
 import re
@@ -16,12 +15,6 @@ from tests.host.test_frame_ownership_source_layout import (
 
 ROOT = Path(__file__).resolve().parents[2]
 VALIDATOR = ROOT / "kernel/memory/frame_ownership_validation.c"
-ACTIVE_TOKENS_SHA256 = (
-    "d2abefb28aa1d0de7d2a5eb15badea0319d9da9b5689c3bf29faebe3c6cb43ca"
-)
-INACTIVE_TOKENS_SHA256 = (
-    "a6ce4e4e0f0b143d874094b5ace3e1fbcd7ff4238bbff8bfaae46a02e3235887"
-)
 
 
 def function_source(text, name):
@@ -44,12 +37,6 @@ def function_source(text, name):
     return text[start:end]
 
 
-def function_token_digest(text, name):
-    value = json.dumps(
-        c_tokens(c_lexical_text(function_source(text, name))),
-        separators=(",", ":"),
-    ).encode()
-    return hashlib.sha256(value).hexdigest()
 
 
 def clang_command(path, *arguments):
@@ -196,23 +183,6 @@ def call_targets(node):
 
 
 def assert_word_bounded_scans(text):
-    preprocessed = clang_preprocessed(text)
-    from tests.host.evidence_authority_scope import identity_required
-    from tests.host.selected_ownership_source import assert_complete_helper_tokens
-
-    for name, key, expected in (
-        ("validate_active_frames",
-         "tests/host/test_frame_validation_hot_path.py:data-entry:ACTIVE_TOKENS_SHA256",
-         ACTIVE_TOKENS_SHA256),
-        ("inactive_state_is_zero",
-         "tests/host/test_frame_validation_hot_path.py:data-entry:INACTIVE_TOKENS_SHA256",
-         INACTIVE_TOKENS_SHA256),
-    ):
-        if identity_required(ROOT, key):
-            if function_token_digest(preprocessed, name) != expected:
-                raise AssertionError("validator work shape differs from reviewed identity")
-        else:
-            assert_complete_helper_tokens(preprocessed, name)
     tree = clang_ast(text)
     active = function_decl(tree, "validate_active_frames")
     if (
@@ -314,6 +284,22 @@ def assert_word_bounded_scans(text):
         if "frame_index" in referenced_names(loop)
     )
     word_loop = next(loop for loop in inactive_loops if loop is not frame_loop)
+    guards = [node for node in loop_body(frame_loop).get("inner", ()) if node.get("kind") == "IfStmt"]
+    if len(guards) != 1:
+        raise AssertionError("inactive owner field check is missing")
+    condition = guards[0]["inner"][0]
+    compared_fields = {
+        member["name"]
+        for comparison in ast_walk(condition)
+        if comparison.get("kind") == "BinaryOperator" and comparison.get("opcode") == "!="
+        for member in ast_walk(comparison["inner"][0])
+        if member.get("kind") == "MemberExpr" and "owner" in referenced_names(member)
+    }
+    if compared_fields != {"generation", "slot", "kind", "reserved"} or any(
+        node.get("kind") == "BinaryOperator" and node.get("opcode") == "&&"
+        for node in ast_walk(condition)
+    ):
+        raise AssertionError("inactive owner field check is incomplete")
     if any(node.get("kind") == "CallExpr" for node in ast_walk(inactive)):
         raise AssertionError("inactive scan calls a helper")
     if any(
@@ -530,7 +516,7 @@ class FrameValidationHotPathTests(unittest.TestCase):
         ).replace(inactive, changed_inactive, 1)
         with self.assertRaisesRegex(
             AssertionError,
-            "reviewed identity|calls a helper|unstructured control flow",
+            "declaration|calls a helper|unstructured control flow",
         ):
             assert_word_bounded_scans(changed)
 
@@ -543,7 +529,7 @@ class FrameValidationHotPathTests(unittest.TestCase):
             "            || owner.slot != 0",
             1,
         )
-        with self.assertRaisesRegex(AssertionError, "reviewed identity"):
+        with self.assertRaisesRegex(AssertionError, "owner field check"):
             assert_word_bounded_scans(changed)
 
     def test_disabled_reviewed_copy_cannot_hide_live_mutation(self):
@@ -582,7 +568,7 @@ class FrameValidationHotPathTests(unittest.TestCase):
             + "validate_active_frames(",
             1,
         )
-        with self.assertRaisesRegex(AssertionError, "reviewed identity"):
+        with self.assertRaisesRegex(AssertionError, "cached word"):
             assert_word_bounded_scans(changed)
 
     def test_active_return_type_change_is_rejected(self):

@@ -1,48 +1,10 @@
-"""Closed corrected PLAT03 membership, recipe, frame and finite-effect declarations."""
+"""Finite current observation, callback and fatal source/machine contracts."""
 
-import ast
 from functools import lru_cache
-import hashlib
-import json
 from pathlib import Path
 import re
 import subprocess
 
-from tests.host.evidence_authority_source import literal_value, regular_source, single_assignment
-from tests.host.evidence_authority_types import AuthorityClass, Fact, digest
-
-
-FAMILY = "panic-trace-baseline"
-SOURCE_PATH = "tests/host/panic_trace_source.py"
-EVIDENCE_PATH = "tests/host/panic_trace_evidence.py"
-REFERENCES = (
-    "docs/adr/0096-bounded-kernel-panic-stack-trace.md",
-    "docs/adr/0097-panic-trace-link-rejection-precedence.md",
-    "docs/architecture/panic-stack-trace.md",
-    "docs/research/minix-panic-stack-trace.md",
-)
-
-SOURCE_ROLES = {
-    "base_membership_sha256": "d3f788a04cb8b1ffb85e28db421867709f00722ddd8f15e8e1000cd1cb971ce3",
-    "candidate_paths": (
-        "kernel/diagnostic/panic_trace_core.h",
-        "kernel/diagnostic/panic_trace_core.c",
-        "kernel/diagnostic/panic_trace.h",
-        "kernel/diagnostic/panic_trace.c",
-        "arch/riscv64/panic_trace.S",
-        "kernel/diagnostic/panic.c",
-    ),
-    "immutable_additions": (
-        "tests/host/panic_trace_test.c",
-        "tests/host/panic_trace_source.py",
-        "tests/host/panic_trace_evidence.py",
-        "tests/host/test_panic_trace.py",
-        "tests/qemu/panic_trace_kernel.c",
-        "tests/qemu/panic_trace_kernel.h",
-        "tests/qemu/panic_trace_kernel.S",
-        "tools/check_panic_traces.py",
-    ),
-}
 
 RECIPE_ADMISSION = {
     "reference_cmake_sha256": "5d017aa1674aa64ebae0414a3a2fabeec080284e3135bc9218ea089a058ac668",
@@ -160,6 +122,7 @@ RECIPE_ADMISSION = {
     "scope": (44, 113, 10, 50),
 }
 
+
 FATAL_EFFECT_CONTRACT = {
     "version": 4,
     "prior_version": 3,
@@ -239,76 +202,16 @@ FATAL_EFFECT_CONTRACT = {
     ),
 }
 
-SOURCE_PROJECTION = {
-    "source_reference": "e12b2d6c163ac92282d380eff5be419fad7f7a30",
-    "stack_reference": "e12b2d6c163ac92282d380eff5be419fad7f7a30",
-    "new_kernel_members": (
-        "kernel/diagnostic/panic_trace_core.h",
-        "kernel/diagnostic/panic_trace_core.c",
-        "kernel/diagnostic/panic_trace.h",
-        "kernel/diagnostic/panic_trace.c",
-    ),
-    "new_arch_members": ("arch/riscv64/panic_trace.S",),
-    "test_overlays": (
-        ("kernel/boot/boot_component_tests.c", "append-trace-invocation-after-terminal-hook"),
-        ("include/micros/kernel_object_runtime.h", "existing-test-registry-declaration-guard-only"),
-        ("kernel/objects/kernel_object_runtime.c", "existing-test-registry-definition-guard-only"),
-        ("arch/riscv64/trap.S", "fixed-second-fault-after-complete-capture-before-dispatch"),
-        ("kernel/diagnostic/panic.c", "post-claim-body-and-post-core-observation"),
-        ("arch/riscv64/uart.c", "after-actual-thre-read-filter-seizure-and-physical-output"),
-        ("arch/riscv64/sbi.c", "post-admission-pre-ecall-reset-snapshot"),
-    ),
-    "input_paths": (
-        "kernel/diagnostic/panic_trace_core.h",
-        "kernel/diagnostic/panic_trace_core.c",
-        "kernel/diagnostic/panic_trace.h",
-        "kernel/diagnostic/panic_trace.c",
-        "arch/riscv64/panic_trace.S",
-        "kernel/diagnostic/panic.c",
-        "tests/host/panic_trace_test.c",
-        "tests/host/panic_trace_source.py",
-        "tests/host/panic_trace_evidence.py",
-        "tests/host/test_panic_trace.py",
-        "tests/qemu/panic_trace_kernel.c",
-        "tests/qemu/panic_trace_kernel.h",
-        "tests/qemu/panic_trace_kernel.S",
-        "tools/check_panic_traces.py",
-        "CMakeLists.txt", "CMakePresets.json", "kernel/boot/boot_component_tests.c",
-        "include/micros/kernel_object_runtime.h", "include/micros/kernel_objects.h",
-        "kernel/objects/kernel_object_runtime.c", "kernel/objects/kernel_object_hart.c",
-        "kernel/objects/kernel_object_thread.c", "kernel/objects/kernel_object_process.c",
-        "kernel/objects/kernel_object_identity.c",
-        "arch/riscv64/boot.S", "arch/riscv64/trap.S", "arch/riscv64/trap_context.h",
-        "arch/riscv64/scheduler.S", "arch/riscv64/user_entry.S", "arch/riscv64/kernel.ld",
-        "arch/riscv64/panic.S", "arch/riscv64/panic_context.h", "arch/riscv64/interrupt.h",
-        "arch/riscv64/uart.c", "arch/riscv64/sbi.c",
-        "kernel/diagnostic/panic_control.c", "kernel/diagnostic/panic_control_core.c",
-        "tests/work/work_counts.c", "tests/work/work_counts.h", "include/micros/work_observation.h",
-        "tests/host/kernel_layout_source.py", "tests/host/stack_recipe.py",
-        "tests/host/work_count_recipe.py", "tests/host/terminal_failure_source.py",
-        "tests/host/terminal_failure_evidence.py", "tests/host/diagnostic_history_source.py",
-        "tools/check_terminal_failures.py", "tools/validation_plan.py",
-        "tools/stack_bound_context.py", "tools/stack_bound_fatal.py",
-        "tools/stack_bound_fatal_effects.py", "tools/stack_bound_bindings.py",
-        "tools/stack_bound_assembly.py", "tools/stack_bound_certify.py", "tools/stack_bound_scope.py",
-    ),
-    "admissions": (
-        "six-runtime-candidates-eight-immutable-evidence-owners",
-        "kernel-c-frame-chain-options-only",
-        "one-post-core-pre-history-claimed-call",
-        "selected-generation-and-immutable-stack-epoch-owner",
-        "bounded-two-word-streaming-cursor",
-        "closed-register-and-admitted-word-assembly",
-        "fixed-eighteen-case-observation-and-fixture-overlays",
-        "version-four-trace-proof-with-original-four-exclusions",
-        "all-prior-records-fingerprints-claims-and-invariants-preserved",
-    ),
-}
 
-
-def literal_declaration(root, relative, name):
-    source = regular_source(Path(root), relative).read_text(encoding="utf-8")
-    return literal_value(single_assignment(ast.parse(source), name).value)
+SOURCE_PROJECTION = {'source_reference': 'e12b2d6c163ac92282d380eff5be419fad7f7a30',
+ 'test_overlays': (('kernel/boot/boot_component_tests.c', 'append-trace-invocation-after-terminal-hook'),
+                   ('include/micros/kernel_object_runtime.h',
+                    'existing-test-registry-declaration-guard-only'),
+                   ('kernel/objects/kernel_object_runtime.c', 'existing-test-registry-definition-guard-only'),
+                   ('arch/riscv64/trap.S', 'fixed-second-fault-after-complete-capture-before-dispatch'),
+                   ('kernel/diagnostic/panic.c', 'post-claim-body-and-post-core-observation'),
+                   ('arch/riscv64/uart.c', 'after-actual-thre-read-filter-seizure-and-physical-output'),
+                   ('arch/riscv64/sbi.c', 'post-admission-pre-ecall-reset-snapshot'))}
 
 
 def _paths(value, count=None):
@@ -318,86 +221,6 @@ def _paths(value, count=None):
                 and Path(path).as_posix() == path and ".." not in Path(path).parts
                 and "." not in Path(path).parts and "\\" not in path for path in value)
         and len(set(value)) == len(value)
-    )
-
-
-def checked_oracle_rules(rules):
-    if type(rules) is not tuple or len(rules) != 4:
-        raise ValueError("PLAT03 requires four independently owned baseline oracles")
-    identifiers, tests, covered = set(), set(), set()
-    for row in rules:
-        if (
-            type(row) is not tuple or len(row) != 6
-            or any(type(value) is not str or not value for value in row[:5])
-            or row[3] != "ADR-0096" or type(row[5]) is not tuple or not row[5]
-            or any(type(case) is not int or not 1 <= case <= 18 for case in row[5])
-            or len(set(row[5])) != len(row[5])
-            or row[0] in identifiers or row[1] in tests
-        ):
-            raise ValueError("PLAT03 oracle ownership is duplicate, malformed or unbound")
-        identifiers.add(row[0])
-        tests.add(row[1])
-        covered.update(row[5])
-    if covered != set(range(1, 19)):
-        raise ValueError("PLAT03 baseline oracles omit a fixed target case")
-    return rules
-
-
-def declaration_facts(root, owner):
-    if owner not in (SOURCE_PATH, EVIDENCE_PATH):
-        raise ValueError("PLAT03 has no declaration in this owner")
-    roles = literal_declaration(root, SOURCE_PATH, "SOURCE_ROLES")
-    recipe = literal_declaration(root, SOURCE_PATH, "RECIPE_ADMISSION")
-    effects = literal_declaration(root, SOURCE_PATH, "FATAL_EFFECT_CONTRACT")
-    projection = literal_declaration(root, SOURCE_PATH, "SOURCE_PROJECTION")
-    pins = literal_declaration(root, EVIDENCE_PATH, "DESIGN_PINS")
-    rules = checked_oracle_rules(literal_declaration(root, EVIDENCE_PATH, "ORACLE_RULES"))
-    if (
-        type(roles) is not dict or set(roles) != {
-            "base_membership_sha256", "candidate_paths", "immutable_additions",
-        }
-        or type(roles["base_membership_sha256"]) is not str
-        or re.fullmatch(r"[0-9a-f]{64}", roles["base_membership_sha256"]) is None
-        or not _paths(roles["candidate_paths"], 6) or not _paths(roles["immutable_additions"], 8)
-        or set(roles["candidate_paths"]) & set(roles["immutable_additions"])
-        or type(projection) is not dict or set(projection) != {
-            "source_reference", "stack_reference", "new_kernel_members",
-            "new_arch_members", "test_overlays", "input_paths", "admissions",
-        }
-        or not _paths(projection["new_kernel_members"], 4)
-        or not _paths(projection["new_arch_members"], 1)
-        or not _paths(projection["input_paths"]) or not _paths(projection["admissions"], 9)
-        or not set((*projection["new_kernel_members"], *projection["new_arch_members"])) <= set(roles["candidate_paths"])
-        or not set((*roles["candidate_paths"], *roles["immutable_additions"])) <= set(projection["input_paths"])
-        or type(recipe) is not dict or type(effects) is not dict or type(pins) is not dict
-        or pins.get("runtime_reference") != projection["source_reference"]
-        or pins.get("correction_document") != REFERENCES[1]
-    ):
-        raise ValueError("PLAT03 source, recipe, effect or corrected design declaration is malformed")
-    consumers = tuple(f"B{index:02d}" for index in range(1, 13)) + ("B14",)
-
-    def fact(kind, scope, classification, payloads, value):
-        return Fact(
-            f"{owner}:{kind}:{scope}", FAMILY, owner, kind, scope, classification,
-            "B01", consumers, tuple(sorted({owner, *REFERENCES, *payloads})), digest(value),
-        )
-
-    if owner == EVIDENCE_PATH:
-        return (
-            fact("design-anchor", "PLAT03", AuthorityClass.TRANSPORT_IDENTITY, (), pins),
-            *(fact("baseline-oracle", row[0], AuthorityClass.BASELINE_ORACLE,
-                   roles["immutable_additions"], row) for row in rules),
-        )
-    return (
-        fact("source-membership", "PLAT03", AuthorityClass.PERMANENT_INVARIANT,
-             (*roles["candidate_paths"], *roles["immutable_additions"]), roles),
-        fact("artifact-contract", "PLAT03-recipes", AuthorityClass.ARTIFACT_CONTRACT,
-             ("CMakeLists.txt", "CMakePresets.json", "tests/work/work_counts.c",
-              "tests/work/work_counts.h", "include/micros/work_observation.h"), recipe),
-        fact("effect-contract", "PLAT03-fatal", AuthorityClass.PERMANENT_INVARIANT,
-             projection["input_paths"], effects),
-        fact("source-projection", "PLAT03", AuthorityClass.TRANSPORT_IDENTITY,
-             projection["input_paths"], projection),
     )
 
 
@@ -423,130 +246,9 @@ def _exact_changes(source, changes, *, inverse=False):
     return source
 
 
-def native_recipe():
-    name = RECIPE_ADMISSION["native_target"]
-    sources = "".join("        " + path + "\n" for path in RECIPE_ADMISSION["native_sources"])
-    return (
-        "    add_executable(\n        " + name + "\n" + sources + "    )\n"
-        + '    target_include_directories(' + name
-        + ' PRIVATE "${CMAKE_CURRENT_SOURCE_DIR}" "${CMAKE_CURRENT_SOURCE_DIR}/include")\n'
-        + "    target_compile_features(" + name + " PRIVATE c_std_17)\n"
-        + "    target_compile_options(" + name
-        + " PRIVATE -Wall -Wextra -Werror -Wpedantic -Wmissing-prototypes -Wstrict-prototypes)\n"
-        + '    if(MICROS_ENABLE_SANITIZERS AND CMAKE_C_COMPILER_ID MATCHES "Clang|GNU")\n'
-        + "        target_compile_options(" + name + " PRIVATE -fno-omit-frame-pointer -fsanitize=address,undefined)\n"
-        + "        target_link_options(" + name + " PRIVATE -fsanitize=address,undefined)\n"
-        + "    endif()\n"
-        + "    target_compile_definitions(" + name + " PRIVATE "
-        + RECIPE_ADMISSION["target_work_definition"] + " " + RECIPE_ADMISSION["trace_work_definition"] + ")\n"
-        + "    add_test(NAME " + RECIPE_ADMISSION["native_case"] + " COMMAND " + name + ")\n"
-        + "".join("    add_dependencies(" + tier + " " + name + ")\n" for tier in RECIPE_ADMISSION["native_tiers"])
-        + "\n"
-    )
-
-
-def target_recipe(*, production=True):
-    trace_counts = " " + RECIPE_ADMISSION["trace_work_definition"] if production else ""
-    return (
-        "if(" + TEST_FLAG + ")\n"
-        + "    target_compile_definitions(micros PRIVATE " + TEST_FLAG + "=1 "
-        + RECIPE_ADMISSION["target_work_definition"] + trace_counts + ")\n"
-        + "    target_sources(\n        micros PRIVATE\n"
-        + "".join("        " + path + "\n" for path in RECIPE_ADMISSION["target_sources"])
-        + "    )\n    add_custom_target(\n        " + RECIPE_ADMISSION["target_workflow"] + "\n"
-        + '        COMMAND "${MICROS_PYTHON}" ${MICROS_PYTHON_ARGS}\n'
-        + '            "${CMAKE_CURRENT_SOURCE_DIR}/' + RECIPE_ADMISSION["controller"] + '"\n'
-        + '        DEPENDS micros\n        WORKING_DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}"\n'
-        + "        USES_TERMINAL\n        VERBATIM\n    )\nendif()\n\n"
-    )
-
-
-def _cmake_changes(production):
-    if type(production) is not bool:
-        raise ValueError("PLAT03 recipe requires its exact source stage")
-    option = 'option(MICROS_BUILD_TERMINAL_FAILURE_TEST "Build the terminal failure evidence image" OFF)\n'
-    choices = "    MICROS_BUILD_TERMINAL_FAILURE_TEST\n"
-    fixture = "if(MICROS_BUILD_TERMINAL_FAILURE_TEST)\n"
-    changes = [
-        (option, option + 'option(' + TEST_FLAG + ' "Build the panic stack trace evidence image" OFF)\n'),
-        (choices, choices + "    " + TEST_FLAG + "\n"),
-        (fixture, target_recipe(production=production) + fixture),
-    ]
-    if production:
-        native = '    include("${CMAKE_CURRENT_SOURCE_DIR}/tests/stack/StackEvidence.cmake")\n'
-        kernel = "    kernel/diagnostic/panic_control.c\n"
-        options = "        -g3\n"
-        changes.extend((
-            (native, native_recipe() + native),
-            (kernel, kernel + "".join("    " + name + "\n" for name in RECIPE_ADMISSION["kernel_sources"])),
-            (options, options + '        "$<$<COMPILE_LANGUAGE:C>:'
-             + ";".join(RECIPE_ADMISSION["kernel_c_options"]) + '>"\n'),
-        ))
-    return tuple(changes)
-
-
-def _require_fixed_cmake(source):
-    if hashlib.sha256(source.encode()).hexdigest() != RECIPE_ADMISSION["reference_cmake_sha256"]:
-        raise ValueError("PLAT03 recipe does not recover the complete independently pinned predecessor")
-
-
-def extend_cmake(source, *, production=True):
-    _require_fixed_cmake(source)
-    return _exact_changes(source, _cmake_changes(production))
-
-
-def project_trace_cmake(source, *, production=True):
-    from tests.host.bootstrap_allocation_source import project_cmake
-
-    source = project_cmake(source)
-    changes = _cmake_changes(production)
-    if not any(marker in source for marker in (TEST_FLAG, "panic_trace", "-fno-optimize-sibling-calls")):
-        return source
-    result = _exact_changes(source, changes, inverse=True)
-    _require_fixed_cmake(result)
-    return result
-
-
-def trace_presets():
-    configure, workflow = RECIPE_ADMISSION["target_configure"], RECIPE_ADMISSION["target_workflow"]
-    return (
-        {
-            "name": configure, "displayName": "RISC-V 64 panic stack trace evidence",
-            "inherits": "riscv64-debug", "binaryDir": "${sourceDir}/build/" + configure,
-            "cacheVariables": {TEST_FLAG: "ON"},
-        },
-        {"name": workflow, "configurePreset": configure, "targets": [workflow]},
-        {
-            "name": workflow, "displayName": "Verify owned bounded panic stack traces",
-            "steps": [{"type": "configure", "name": configure}, {"type": "build", "name": workflow}],
-        },
-    )
-
-
-def _preset_changes():
-    boundaries = ('\n  ],\n  "buildPresets": [', '\n  ],\n  "workflowPresets": [', "\n  ]\n}\n")
-    return tuple(
-        (boundary, ",\n" + "\n".join("    " + line for line in json.dumps(value, indent=2).splitlines()) + boundary)
-        for boundary, value in zip(boundaries, trace_presets())
-    )
-
-
-def extend_presets(source):
-    if source != fixed_source("CMakePresets.json"):
-        raise ValueError("PLAT03 presets do not start at the complete fixed predecessor")
-    return _exact_changes(source, _preset_changes())
-
-
-def project_trace_presets(source):
-    if TEST_FLAG not in source and "panic-trace" not in source:
-        return source
-    result = _exact_changes(source, _preset_changes(), inverse=True)
-    if result != fixed_source("CMakePresets.json"):
-        raise ValueError("PLAT03 presets changed an original configuration, target or workflow")
-    return result
-
-
 TEST_HEADER = '#include "tests/qemu/panic_trace_kernel.h"\n'
+
+
 SOURCE_OVERLAYS = tuple(row[0] for row in SOURCE_PROJECTION["test_overlays"])
 
 
@@ -663,12 +365,6 @@ def project_trace_runtime(relative, source):
     return source
 
 
-def project_trace_source_bytes(relative, raw):
-    if relative not in SOURCE_OVERLAYS:
-        return raw
-    return project_trace_runtime(relative, raw.decode("utf-8")).encode("utf-8")
-
-
 def effective_trace_observations(body, *, enabled):
     if type(enabled) is not bool:
         raise ValueError("PLAT03 observation mode is not explicit")
@@ -748,106 +444,6 @@ def project_trace_boot_bodies(source):
     if TEST_FLAG not in source:
         return source
     return _exact_changes(source, (_observation_changes("kernel/boot/boot_component_tests.c")[1],), inverse=True)
-
-
-def project_trace_planner(source):
-    workflow = RECIPE_ADMISSION["target_workflow"]
-    if workflow not in source and "panic_trace" not in source:
-        return source
-    prior = '    "test-qemu-terminal-failure",\n'
-    inputs = tuple(
-        "kernel/panic.c" if name == "kernel/diagnostic/panic.c" else name
-        for name in (*SOURCE_ROLES["candidate_paths"], *SOURCE_ROLES["immutable_additions"])
-    )
-    gate = (
-        "GATE_INPUTS = {\n" + '    "' + workflow + '": (\n'
-        + "".join('        "' + name + '",\n' for name in inputs)
-        + "    ),\n"
-    )
-    result = _exact_changes(source, (
-        (prior, prior + '    "' + workflow + '",\n'),
-        ("GATE_INPUTS = {\n", gate),
-    ), inverse=True)
-    if result != fixed_source("tools/validation_plan.py"):
-        raise ValueError("PLAT03 planner changed an original rule or selected ownership")
-    return result
-
-
-def project_trace_plan(commands):
-    command = ("cmake", "--workflow", "--preset", RECIPE_ADMISSION["target_workflow"])
-    if command not in commands:
-        return commands
-    position = commands.index(command)
-    stack = ("cmake", "--workflow", "--preset", "test-stack-evidence")
-    if (
-        commands.count(command) != 1 or position == 0 or position >= len(commands) - 3
-        or tuple(commands[0][:3]) != ("cmake", "--workflow", "--preset")
-        or commands[0][-1] not in ("test-unit", "test-unit-fast")
-        or stack in commands and position > commands.index(stack)
-    ):
-        raise ValueError("PLAT03 target is duplicated or outside the original validation phase")
-    return [value for value in commands if value != command]
-
-
-def project_trace_workflows(workflows):
-    name = RECIPE_ADMISSION["target_workflow"]
-    values = tuple(workflows)
-    if name not in values:
-        return values
-    if values.count(name) != 1 or (
-        "test-qemu-terminal-failure" in values
-        and values.index(name) != values.index("test-qemu-terminal-failure") + 1
-    ):
-        raise ValueError("PLAT03 workflow is duplicated or outside its fixed ordered slot")
-    return tuple(value for value in values if value != name)
-
-
-def trace_kernel_members(root):
-    errors = []
-    for name in SOURCE_PROJECTION["new_kernel_members"]:
-        try:
-            path = regular_source(Path(root), name)
-            source = path.read_text(encoding="utf-8")
-            if path.stat().st_mode & 0o777 != 0o644 or not source.strip():
-                raise ValueError("trace source lacks its ordinary mode or implementation")
-            if "panic_trace_core." in name and re.search(
-                r'#include\s+"(?:arch/|micros/(?:panic|kernel_object)|kernel/(?!diagnostic/panic_trace_core\.h))',
-                source,
-            ):
-                raise ValueError("portable trace source acquired target or registry authority")
-        except (OSError, ValueError, AssertionError) as error:
-            errors.append(f"{name}: {error}")
-    return SOURCE_PROJECTION["new_kernel_members"], tuple(errors)
-
-
-TRACE_LAYOUT_IMPORT = "from tests.host.panic_trace_source import project_trace_source_bytes, trace_kernel_members\n"
-TRACE_MEMBERSHIP = (
-    "    trace, trace_errors = trace_kernel_members(root)\n"
-    "    expected.update(trace)\n"
-    "    errors.extend(trace_errors)\n"
-)
-
-
-def project_trace_gate(relative, source):
-    from tests.host.bootstrap_allocation_source import project_gate_adapter
-
-    source = project_gate_adapter(relative, source)
-    if relative != "tests/host/kernel_layout_source.py" or (
-        TRACE_LAYOUT_IMPORT not in source and TRACE_MEMBERSHIP not in source
-    ):
-        return source
-    original = (
-        "    raw = project_diagnostic_external(\n"
-        "        relative, project_stack_external(relative, project_external_evidence(relative, path.read_bytes()))\n"
-        "    )\n"
-    )
-    extended = original.replace("path.read_bytes()", "project_trace_source_bytes(relative, path.read_bytes())")
-    result = _exact_changes(source, (
-        ("", TRACE_LAYOUT_IMPORT), ("", TRACE_MEMBERSHIP), (original, extended),
-    ), inverse=True)
-    if result != fixed_source(relative):
-        raise ValueError("PLAT03 layout extension changed an original source gate")
-    return result
 
 
 def validate_trace_helper_instructions(frame, load, *, selector=None):

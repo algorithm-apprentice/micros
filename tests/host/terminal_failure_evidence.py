@@ -1,4 +1,4 @@
-"""PLAT02's fixed merged-design and independent baseline-oracle declarations."""
+"""Current terminal ownership, work and transcript evidence."""
 
 from dataclasses import dataclass
 import io
@@ -120,8 +120,8 @@ class GuestState:
     history: bytes
     console: bytes
     routing: bytes
-    control: bytes | None
-    work: bytes | None
+    control: bytes
+    work: bytes
     ier: int | None
     sp: int
 
@@ -154,29 +154,21 @@ def _valid_sp(value, stack):
     return type(value) is int and value % 16 == 0 and stack[0] <= value <= stack[1]
 
 
-def _case_bounds(capture, *, baseline):
+def _case_bounds(capture):
     scenario = capture.scenario
     value = decode_observation(capture.final.observation, scenario)
     reporting = scenario in (4, 7, 8, 9, 10, 11)
-    seizures = 2 if scenario == 4 or baseline and scenario == 9 else int(reporting)
-    bodies = 2 if baseline and scenario == 9 else int(reporting)
-    resets = int(not baseline or scenario in (1, 2, 3, 4, 9, 12))
+    seizures = 2 if scenario == 4 else int(reporting)
+    bodies = int(reporting)
     _require(
-        (value["seizure_entries"], value["report_bodies"], value["reset_entries"]) == (seizures, bodies, resets),
+        (value["seizure_entries"], value["report_bodies"], value["reset_entries"]) == (seizures, bodies, 1),
         f"case {scenario} has the wrong first-body, seizure or reset count",
     )
-    excess = int(baseline)
     exact = {
         1: (1, 0, 1), 2: (100000, 0, 1), 3: (0, 100000, 0),
-        5: (100000 + excess, 0, 0), 6: (0, 100000 + excess, 0),
-        7: (100000 + excess, 0, 0),
+        5: (100000, 0, 0), 6: (0, 100000, 0),
+        7: (100000, 0, 0), 9: (0, 0, 0), 11: (100000, 0, 0),
     }
-    if scenario == 9 and not baseline:
-        exact[9] = (0, 0, 0)
-    if scenario in (10, 11) and baseline:
-        exact[scenario] = (0, 0, 0)
-    elif scenario == 11:
-        exact[11] = (100000, 0, 0)
     if scenario in exact:
         _require(
             tuple(value[name] for name in ("thre_reads", "temt_reads", "thr_writes")) == exact[scenario],
@@ -188,13 +180,12 @@ def _case_bounds(capture, *, baseline):
             f"case {scenario} has no bounded complete physical output",
         )
         if scenario == 8:
-            _require(value["temt_reads"] == 100000 + excess, "panic drain has the wrong exact attempt count")
+            _require(value["temt_reads"] == 100000, "panic drain has the wrong exact attempt count")
         else:
             _require(1 <= value["temt_reads"] <= 100000, "successful final drain is missing or unbounded")
     if scenario == 12:
         _require(value["thr_writes"] == len(FDT_FAILURE) + 1, "FDT failure changed its exact physical output")
-        if not baseline:
-            _require(capture.final.control == struct.pack("<I", 2), "FDT failure reset has no published ownership")
+        _require(capture.final.control == struct.pack("<I", 2), "FDT failure reset has no published ownership")
     if bodies:
         _require(_valid_sp(value["first_entry_sp"], capture.stack), "first captured panic SP leaves its owned stack")
         _require(capture.final.sp < value["first_entry_sp"], "panic capture has no retained first-entry frame")
@@ -204,7 +195,7 @@ def _case_bounds(capture, *, baseline):
         _require(value["first_entry_sp"] == 0, "non-reporting case invented a captured panic SP")
 
 
-def _capture_objects(capture, *, baseline):
+def _capture_objects(capture):
     scenario, initial, final = capture.scenario, capture.armed, capture.final
     magic = 0x554152544F574E52 ^ int(scenario in (10, 11))
     _require(
@@ -215,7 +206,7 @@ def _capture_objects(capture, *, baseline):
     expected_console = bytearray(initial.console)
     if scenario == 3:
         expected_console[12] = 1
-    elif 4 <= scenario <= 11 and scenario not in (5, 6) and not (baseline and scenario in (10, 11)):
+    elif 4 <= scenario <= 11 and scenario not in (5, 6):
         struct.pack_into("<QIB", expected_console, 0, 0x554152544F574E52, 3, 1)
     _require(final.console == bytes(expected_console), "console transition/repair changed the wrong semantic fields or padding")
     _require(initial.routing == bytes(8), "armed diagnostic routing is not unhanded-off and empty")
@@ -226,8 +217,8 @@ def _capture_objects(capture, *, baseline):
     appended = b"x" if scenario in (1, 2) else FDT_FAILURE if scenario == 12 else b""
     history, copied = expected_history(initial.history, appended)
     _require(final.history == history, "failed output, panic or handoff changed retained history")
-    expected_control = None if baseline else struct.pack("<I", 0 if scenario <= 3 else 2)
-    _require(initial.control == (None if baseline else bytes(4)), "armed panic ownership is not genuine IDLE or baseline absence")
+    expected_control = struct.pack("<I", 0 if scenario <= 3 else 2)
+    _require(initial.control == bytes(4), "armed panic ownership is not genuine IDLE")
     _require(final.control == expected_control, "reset ownership is absent, unlatched or spuriously invented")
     if scenario in (3, 6):
         _require(
@@ -240,8 +231,8 @@ def _capture_objects(capture, *, baseline):
     return copied
 
 
-def validate_capture(capture, *, baseline):
-    _require(type(capture) is TerminalCapture and type(baseline) is bool, "capture has no exact source stage or type")
+def validate_capture(capture):
+    _require(type(capture) is TerminalCapture, "capture has no exact type")
     require_case(capture.scenario)
     _require(type(capture.armed) is GuestState and type(capture.final) is GuestState, "capture omits a complete checkpoint")
     _require(
@@ -255,11 +246,7 @@ def validate_capture(capture, *, baseline):
         "stopped SP is outside its aligned linker-owned boot stack",
     )
     scenario = capture.scenario
-    expected_stop = (
-        "overrun" if baseline and scenario in (5, 6, 7, 8)
-        else "corruption" if baseline and scenario in (10, 11) else "reset"
-    )
-    _require(capture.checkpoint == expected_stop, "capture is not its exact reset, overrun or pinned corruption witness")
+    _require(capture.checkpoint == "reset", "capture did not reach its actual reset instruction")
     before, after = (decode_observation(state.observation, scenario) for state in (capture.armed, capture.final))
     _require(before["phase"] == 1 and before["work_status"] == 0xffffffff, "capture was not armed before observation")
     _require(all(before[name] == 0 for name in (
@@ -271,21 +258,15 @@ def validate_capture(capture, *, baseline):
         not any(value["sstatus"] & 2 or value["sie"] & 512 for value in (before, after)),
         "terminal observation retains enabled supervisor/external interrupts",
     )
-    copied = _capture_objects(capture, baseline=baseline)
-    _require(after["phase"] == {"reset": 2, "overrun": 3, "corruption": 1}[expected_stop], "checkpoint phase is inconsistent")
-    if expected_stop == "corruption":
-        _require(
-            capture.final.work is None and after["work_status"] == 0xffffffff,
-            "baseline corruption spin invented a completed work capture",
-        )
-    else:
-        _require(after["work_status"] == 0, "work collection failed before the checkpoint")
-        snapshot = decode_work(capture.final.work, scenario)
-        counts = [0] * len(Kind)
-        counts[Kind.COMPARISON] = after["thre_reads"] + after["temt_reads"]
-        counts[Kind.COPY_UNIT] = copied
-        counts[Kind.COPIED_BYTE] = copied
-        _require(snapshot.counts[Owner.KERNEL_DIAGNOSTIC] == tuple(counts), "EV02 work is not the exact actual waits/history movement")
+    copied = _capture_objects(capture)
+    _require(after["phase"] == 2, "checkpoint phase is inconsistent")
+    _require(after["work_status"] == 0, "work collection failed before the checkpoint")
+    snapshot = decode_work(capture.final.work, scenario)
+    counts = [0] * len(Kind)
+    counts[Kind.COMPARISON] = after["thre_reads"] + after["temt_reads"]
+    counts[Kind.COPY_UNIT] = copied
+    counts[Kind.COPIED_BYTE] = copied
+    _require(snapshot.counts[Owner.KERNEL_DIAGNOSTIC] == tuple(counts), "EV02 work is not the exact actual waits/history movement")
     _require(
         type(capture.registers) is tuple and len(capture.registers) == 6
         and all(type(row) is tuple and len(row) == 2 and all(type(value) is int for value in row) for row in capture.registers),
@@ -298,36 +279,31 @@ def validate_capture(capture, *, baseline):
         and registers[2] == capture.final.sp and registers[32] == capture.stop_address,
         "registers do not name the actual stopped SP/instruction",
     )
-    if expected_stop == "reset":
-        reason = int(scenario > 3)
-        _require(tuple(registers[number] for number in (10, 11, 16, 17)) == (0, reason, 0, 0x53525354),
-                 "actual SRST instruction has a changed EID/FID/type/reason")
-        _require((after["reset_type"], after["reset_reason"]) == (0, reason), "reset observation disagrees with actual registers")
-    else:
-        _require((after["reset_type"], after["reset_reason"]) == (0, 0), "non-reset stop invented a firmware request")
-    _case_bounds(capture, baseline=baseline)
+    reason = int(scenario > 3)
+    _require(tuple(registers[number] for number in (10, 11, 16, 17)) == (0, reason, 0, 0x53525354),
+             "actual SRST instruction has a changed EID/FID/type/reason")
+    _require((after["reset_type"], after["reset_reason"]) == (0, reason), "reset observation disagrees with actual registers")
+    _case_bounds(capture)
 
 
-def validate_case(case, *, baseline):
+def validate_case(case):
     from tools.qemu_smoke_faults import _diagnostic_history_payload, _has_complete_panic_report
 
     _require(type(case) is TerminalCase and type(case.output) is str, "case has no actual capture and transcript")
-    validate_capture(case.capture, baseline=baseline)
+    validate_capture(case.capture)
     scenario, output = case.capture.scenario, case.output
-    terminated = baseline and case.capture.checkpoint != "reset"
-    _require(type(case.terminated_after_witness) is bool and case.terminated_after_witness == terminated,
+    _require(case.terminated_after_witness is False,
              "a host-terminated case borrowed natural firmware termination")
-    _require(type(case.exit_code) is int and (terminated or case.exit_code == 0), "firmware did not actually terminate QEMU successfully")
-    complete_report = scenario in (4, 8) or scenario == 10 and not baseline or scenario == 9 and baseline
+    _require(type(case.exit_code) is int and case.exit_code == 0, "firmware did not actually terminate QEMU successfully")
+    complete_report = scenario in (4, 8, 10)
     notices = output.count("MICROS_CONSOLE_METADATA_REPAIRED")
-    _require(notices == int(scenario == 10 and not baseline), "repair notice is missing, duplicate or emitted on another path")
+    _require(notices == int(scenario == 10), "repair notice is missing, duplicate or emitted on another path")
     failures = tuple(line for line in output.splitlines() if line.startswith("MICROS_TEST_FAILURE"))
     _require(failures == ((FDT_FAILURE.decode().rstrip(),) if scenario == 12 else ()),
              "target has a missing FDT failure or another explicit failure")
     if complete_report:
         _require(_has_complete_panic_report(output), "healthy report lost its five contiguous core records")
-        reason = "terminal-recursive-test" if scenario == 9 else "terminal-failure-test"
-        _require("MICROS_PANIC reason=" + reason + "\r\n" in output, "first report has the wrong fixture reason")
+        _require("MICROS_PANIC reason=terminal-failure-test\r\n" in output, "first report has the wrong fixture reason")
         _require("MICROS_TRAP_CONTEXT" not in output, "direct panic invented a trap record")
         history = case.capture.armed.history
         length = struct.unpack_from("<I", history, 12008)[0]
@@ -354,7 +330,7 @@ class TerminalFailureOracles(unittest.TestCase):
     def require_current(self, cases):
         for scenario in cases:
             try:
-                _case_bounds(self.observed[scenario - 1].capture, baseline=False)
+                _case_bounds(self.observed[scenario - 1].capture)
             except ValueError as error:
                 self.fail(str(error))
 
@@ -371,12 +347,12 @@ class TerminalFailureOracles(unittest.TestCase):
         self.require_current((10, 11))
 
 
-def run_oracles(cases, *, baseline):
+def run_oracles(cases):
     _require(type(cases) is tuple and len(cases) == 12, "requires twelve complete cases before named oracle execution")
     _require(all(type(case) is TerminalCase for case in cases), "case set contains an untyped observation")
     _require(tuple(case.capture.scenario for case in cases) == tuple(range(1, 13)), "case set is missing, duplicate or reordered")
     for case in cases:
-        validate_case(case, baseline=baseline)
+        validate_case(case)
     suite = []
     for row in ORACLE_RULES:
         test, = unittest.defaultTestLoader.loadTestsFromName(row[1])
@@ -389,7 +365,7 @@ def run_oracles(cases, *, baseline):
         "named oracle execution is incomplete or contains an execution error",
     )
     _require(
-        {test.id() for test, _ in result.failures} == ({row[1] for row in ORACLE_RULES} if baseline else set()),
-        "named oracle results do not discriminate the exact baseline/current properties:\n" + output.getvalue(),
+        not result.failures,
+        "named current terminal oracles failed:\n" + output.getvalue(),
     )
-    return tuple((row[0], "EXPECTED_FAILURE" if baseline else "PASS") for row in ORACLE_RULES), output.getvalue()
+    return tuple((row[0], "PASS") for row in ORACLE_RULES), output.getvalue()

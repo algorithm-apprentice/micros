@@ -74,34 +74,45 @@ class LegacyPlanObservationTest(unittest.TestCase):
         with self.assertRaises(ValueError):
             validate_plan_observations(untouched, ({**plans[0], "after": 31},))
 
-    def test_actual_fixed_legacy_fixture_emits_every_raw_plan_observation(self):
-        from tests.host.object_hart_validation_evidence import measure_native_channel
-
-        measured = measure_native_channel(ROOT, "baseline", "ordinary")
-        self.assertEqual(len(measured["records"]), 171)
-        validate_plan_observations(measured["records"], measured["plans"])
-        self.assertTrue(any(row["has_effect"] for row in measured["plans"]))
-
-
 class CommonReturnFixtureTest(unittest.TestCase):
-    def test_fixed_source_executes_the_complete_independent_queue_model(self):
-        from tests.host.common_scheduler_return_evidence import (
-            check_native_semantics,
-            measure_native_channel,
+    def test_current_header_admission_does_not_restore_history_or_freeze_comments(self):
+        from tests.host.common_scheduler_return_source import validate_current_native_source
+
+        path = "include/micros/scheduler_core.h"
+        text = (ROOT / path).read_text() + "\n/* Current declarations are unchanged. */\n"
+        validate_current_native_source(path, text)
+
+    def test_current_primitive_admission_uses_no_historical_source(self):
+        from tests.host.common_scheduler_return_source import PLAN_PATH, validate_current_native_source
+
+        text = "/* Current measured algorithm. */\n" + (ROOT / PLAN_PATH).read_text()
+        validate_current_native_source(PLAN_PATH, text)
+
+    def test_current_return_inputs_reject_hidden_state_and_header_bodies(self):
+        from tests.host.common_scheduler_return_source import PLAN_PATH, validate_current_native_source
+        from tests.host.work_count_lexical import function_spans
+
+        text = (ROOT / PLAN_PATH).read_text()
+        start = function_spans(text)["clear_return_candidate"].body_start
+        header = "include/micros/scheduler_core.h"
+        mutations = (
+            (PLAN_PATH, "static unsigned int hidden[128];\n" + text),
+            (PLAN_PATH, text[:start] + "\nstatic unsigned int hidden;\n" + text[start:]),
+            (header, (ROOT / header).read_text() + "\nstatic inline int hidden(void) { return 1; }\n"),
         )
+        for path, changed in mutations:
+            with self.subTest(path=path), self.assertRaises(ValueError):
+                validate_current_native_source(path, changed)
 
-        measured = measure_native_channel(ROOT, "baseline", "ordinary")
-        check_native_semantics(measured["records"], "baseline")
-        self.assertEqual(measured["work"], ())
+    def test_current_return_cannot_hide_a_new_loop_without_primitive_stores(self):
+        from tests.host.common_scheduler_return_source import PLAN_PATH, validate_current_native_source
+        from tests.host.work_count_lexical import function_spans
 
-    def test_fixed_source_exposes_real_projection_shift_and_apply_work(self):
-        from tests.host.common_scheduler_return_evidence import measure_native_channel, native_work_failures
-
-        measured = measure_native_channel(ROOT, "baseline", "work")
-        failures = native_work_failures(measured)
-        self.assertTrue({"workspace", "plan-size", "copied-bytes", "zeroed-bytes", "queue-shifts", "apply-stores"}
-                        <= {row[1] for row in failures})
-
+        text = (ROOT / PLAN_PATH).read_text()
+        start = function_spans(text)["clear_return_candidate"].body_start
+        changed = text[:start] + "\nfor (size_t hidden = 0; hidden < 128; ++hidden) {}\n" + text[start:]
+        with self.assertRaisesRegex(ValueError, "loop"):
+            validate_current_native_source(PLAN_PATH, changed)
 
 class ContextCaptureProtocolTest(unittest.TestCase):
     @staticmethod
@@ -159,15 +170,15 @@ class ContextCaptureProtocolTest(unittest.TestCase):
                 "# MICROS_TEST_FAILURE scheduler-test", "# MICROS_TEST_FAILURE other-test",
             ), "baseline", 1)
 
-    def test_passive_hooks_preserve_fixed_source_and_close_before_timer_work(self):
+    def test_current_hooks_are_passive_and_close_before_timer_work(self):
         from tests.host.common_scheduler_return_source import (
-            TARGET_PATHS, extend_target_observations, fixed_source, project_target_observations,
+            TARGET_PATHS, extend_target_observations, project_target_observations,
         )
 
         for path in TARGET_PATHS:
-            original = fixed_source(str(ROOT), path)
-            observed = extend_target_observations(path, original)
-            self.assertEqual(original, project_target_observations(path, observed))
+            observed = (ROOT / path).read_text()
+            original = project_target_observations(path, observed)
+            self.assertEqual(observed, extend_target_observations(path, original))
             if "MICROS_OBJ02_RETURN_END(plan.selected);" in observed:
                 removed = observed.replace("MICROS_OBJ02_RETURN_END(plan.selected);", "(void)0;", 1)
                 with self.subTest(path=path), self.assertRaises(ValueError):
@@ -179,109 +190,29 @@ class ContextCaptureProtocolTest(unittest.TestCase):
                     project_target_observations(path, late)
 
 
-class CommonReturnAuthorityTest(unittest.TestCase):
-    def test_task_definition_reuses_one_complete_predecessor_resolution(self):
-        from tests.host import common_scheduler_return_authority as authority
-        from tests.host import object_hart_validation_authority as previous
-        from tests.host.evidence_authority_types import TransitionClaim, TransitionRegistry
-
-        claims = tuple(
-            TransitionClaim("prior-" + str(index), "prior", (), (),
-                            tuple("prior-key-" + str(index * 35 + key) for key in range(35)))
-            for index in range(8)
-        )
-        with (
-            patch.object(previous, "committed_claim", return_value=claims[-1]),
-            patch.object(previous, "task_definition", return_value=(
-                None, {}, None, TransitionRegistry(claims),
-            )) as resolve,
-        ):
-            _, _, plan, registry = authority.task_definition(ROOT)
-            self.assertEqual(58, len(plan.planned_retirement_identity_keys))
-            self.assertEqual(9, len(registry.claims))
-            self.assertEqual(1, resolve.call_count)
-
-    def test_registered_source_scope_preserves_every_predecessor_and_exact_selected_record(self):
-        from tests.host.common_scheduler_return_authority import predecessor_records
-        from tests.host.common_scheduler_return_source import (
-            NATIVE_FAMILY, SOURCE_PROJECTION, candidate_paths, native_assertion_records,
-        )
-        from tests.host.evidence_authority_inventory import current_inventory
-        from tests.host.evidence_authority_types import fact_set_digest
-
-        inventory = current_inventory(ROOT)
-        prior = predecessor_records(ROOT, inventory)
-        selected = tuple(fact for fact in prior if fact.key in SOURCE_PROJECTION["retirement_keys"])
-        self.assertEqual(SOURCE_PROJECTION["affected_facts_sha256"], fact_set_digest(selected))
-        self.assertEqual(set(candidate_paths()), {path for fact in selected for path in (fact.owner_path, *fact.payload_paths)})
-        actual = tuple(fact for fact in inventory.facts if fact.family == NATIVE_FAMILY)
-        self.assertEqual(len(native_assertion_records(ROOT)), len(actual))
-        self.assertTrue(actual, "the current source predicates need real individual authority identities")
-
-    def test_scaffold_or_foreign_process_cannot_retire_a_source_identity(self):
-        from types import SimpleNamespace
-        from tests.host import common_scheduler_return_authority as authority
-        from tests.host.common_scheduler_return_source import SOURCE_PROJECTION
-
-        with (
-            patch.object(authority, "_provisional", None),
-            patch.object(authority, "committed_claim", return_value=None),
-            patch.object(authority, "read_current", return_value=None),
-        ):
-            self.assertEqual(frozenset(), authority.retired_identity_keys(ROOT))
-            self.assertTrue(authority.identity_required(ROOT, SOURCE_PROJECTION["retirement_keys"][0]))
-            with patch.object(authority, "_provisional", (os.getpid() + 1, SimpleNamespace(root=ROOT))):
-                self.assertEqual(frozenset(), authority.retired_identity_keys(ROOT))
-
-    def test_complete_recipe_and_adapters_preserve_the_fixed_predecessor(self):
-        from tests.host import common_scheduler_return_source as source
-
-        source.validate_scaffold(ROOT)
-        original = source.fixed_source(str(ROOT), "CMakeLists.txt")
-        current = (ROOT / "CMakeLists.txt").read_text()
-        self.assertEqual(original, source.project_cmake(current))
-        with self.assertRaises(ValueError):
-            source.project_cmake(current.replace(
-                "set_tests_properties(common-scheduler-return PROPERTIES LABELS slow)",
-                "set_tests_properties(common-scheduler-return PROPERTIES LABELS fast)",
-            ))
-        for path in source.SOURCE_ROLES["fixed_adapters"]:
-            fixed = source.fixed_source(str(ROOT), path)
-            actual = (ROOT / path).read_text()
-            self.assertEqual(fixed, source.project_legacy_adapter(ROOT, path, actual))
-            if source._legacy_changes(path):
-                with self.subTest(path=path), self.assertRaises(ValueError):
-                    source.project_legacy_adapter(ROOT, path, actual + "\n")
-
+class CommonReturnBoundaryTest(unittest.TestCase):
     def test_scheduler_success_keeps_the_actual_context_transcript(self):
-        from tests.host.test_scheduler_source_layout import cmake_command
+        from tests.host.build_source_records import cmake_command
 
         command = cmake_command((ROOT / "CMakeLists.txt").read_text(), "add_custom_target", "test-qemu-scheduler")
         self.assertEqual(1, command.count("--report-transcript"))
 
-    def test_finish_report_preserves_the_original_stack_observer_slot(self):
-        from tests.host.common_scheduler_return_source import fixed_source
+    def test_finish_report_keeps_its_current_stack_observer_hook(self):
         from tests.host.stack_source_projection import project_stack_source
 
         path = "kernel/tests/scheduler/scheduler_test_finish.c"
         actual = (ROOT / path).read_text()
-        original = fixed_source(str(ROOT), path)
-        self.assertEqual(original.splitlines()[1], actual.splitlines()[1])
         self.assertIn("micros_obj02_return_report()", project_stack_source(path, actual))
-        lines = actual.splitlines(keepends=True)
-        lines[1], lines[2] = lines[2], lines[1]
         with self.assertRaises(AssertionError):
-            project_stack_source(path, "".join(lines))
+            project_stack_source(path, actual.replace("MICROS_TEST_STACK_REPORT();", "", 1))
 
-    def test_unchanged_bootstrap_callers_compile_with_the_declared_private_header(self):
-        from tests.host.common_scheduler_return_source import declared_header
-
+    def test_current_bootstrap_callers_compile_against_the_private_header(self):
         with tempfile.TemporaryDirectory(prefix="micros-obj02-callers-") as directory:
             directory = Path(directory)
             path = "kernel/scheduler/scheduler_runtime_internal.h"
             header = directory / path
             header.parent.mkdir(parents=True)
-            header.write_text(declared_header(ROOT, path))
+            header.write_bytes((ROOT / path).read_bytes())
             for profile in (
                 "MICROS_BUILD_USER_EXECUTION_TEST", "MICROS_BUILD_ADDRESS_SPACE_HANDOFF_TEST",
                 "MICROS_BUILD_IPC_ECALL_CORE_TEST", "MICROS_BUILD_GRANT_SYSCALL_TEST",
@@ -323,7 +254,7 @@ class CommonReturnLauncherTest(unittest.TestCase):
                 "#define MICROS_COMMON_SCHEDULER_RETURN_DRIVER " + json.dumps(str(ROOT / "tools/check_common_scheduler_return.py")) + "\n"
                 "#define MICROS_COMMON_SCHEDULER_RETURN_ROOT " + json.dumps(str(ROOT)) + "\n"
                 + record.signature + "{" + record.body + "}\n"
-                "int main(int argc, char **argv) { return argc == 4 ? launch_native_products(argv) : 2; }\n"
+                "int main(int argc, char **argv) { return argc == 2 ? launch_native_products(argv) : 2; }\n"
             )
             for input_path, output_path in ((child_source, child), (source, launcher)):
                 completed = subprocess.run(
@@ -331,7 +262,7 @@ class CommonReturnLauncherTest(unittest.TestCase):
                     capture_output=True, text=True, timeout=30,
                 )
                 self.assertEqual((0, ""), (completed.returncode, completed.stderr), completed.stdout)
-            products = ("baseline-ordinary", "baseline-work", "current-ordinary")
+            products = ("current-ordinary",)
             environment = dict(os.environ)
             environment.pop("__PYVENV_LAUNCHER__", None)
             completed = subprocess.run(

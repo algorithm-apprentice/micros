@@ -5,11 +5,9 @@ from tests.host.test_frame_validation_hot_path import (
     ast_walk,
     call_targets,
     clang_ast,
-    clang_preprocessed,
     function_body,
     function_decl,
     function_source,
-    function_token_digest,
     loop_body,
     referenced_names,
 )
@@ -17,18 +15,11 @@ from tests.host.test_frame_validation_hot_path import (
 
 ROOT = Path(__file__).resolve().parents[2]
 VALIDATOR = ROOT / "servers/vm/vm_validation.c"
-EXPECTED_TOKEN_DIGESTS = {
-    "vm_validation_digest_bytes":
-        "b7107877ba9a2c632a2c88a7e07f00635e8d1f49ff74ed45726b61166e3944fc",
-    "vm_validation_digest_zero_bytes":
-        "eb1e24c3ce1d1d7f0bdc3a522b987ca216a81af86deec63edc3c0e097088f549",
-    "vm_validation_digest_active_frame_states":
-        "19c10c06765c4ba968667309a9f5f9700865cdb483ade3b4d2e2f6563e5dec46",
-    "vm_validation_initial_free_tail_is_zero":
-        "f2dd657c5fea054551ded2130c941c416d24f84196c338e89cd484371dd96b0e",
-    "vm_core_boot_database_is_immutable":
-        "f09663c7ca98dfaed5f67e888595b230d6aa32305ed2900427e9e268bf87128e",
-}
+WORK_HELPERS = (
+    "vm_validation_digest_bytes", "vm_validation_digest_zero_bytes",
+    "vm_validation_digest_active_frame_states", "vm_validation_initial_free_tail_is_zero",
+    "vm_core_boot_database_is_immutable",
+)
 
 
 def member_subscripts(node, member_name):
@@ -61,12 +52,18 @@ def top_level_loops(function):
     ]
 
 
-def assert_reviewed_token_identities(preprocessed):
-    for name, expected in EXPECTED_TOKEN_DIGESTS.items():
-        if function_token_digest(preprocessed, name) != expected:
-            raise AssertionError(
-                f"{name} differs from the reviewed work-shape identity"
-            )
+def scalar_expression(node):
+    kind = node.get("kind")
+    children = node.get("inner", ())
+    if kind in ("ImplicitCastExpr", "CStyleCastExpr", "ParenExpr"):
+        return scalar_expression(children[0])
+    if kind == "DeclRefExpr":
+        return ("name", node["referencedDecl"]["name"])
+    if kind == "IntegerLiteral":
+        return ("integer", int(node["value"]))
+    if kind == "BinaryOperator":
+        return (node["opcode"], *(scalar_expression(child) for child in children))
+    raise AssertionError("unsupported bitmap boundary expression")
 
 
 def assert_count_guard_dominates(immutable):
@@ -238,6 +235,21 @@ def assert_inactive_bitmap_scan(tree):
     }
     if "/" not in start_operators or "%" not in boundary_operators:
         raise AssertionError("inactive bitmap boundary arithmetic is missing")
+    if (
+        scalar_expression(first_words[0]["inner"][-1])
+        != ("/", ("name", "managed_frame_count"), ("integer", 64))
+        or scalar_expression(boundary_bits[0]["inner"][-1])
+        != ("%", ("name", "managed_frame_count"), ("integer", 64))
+    ):
+        raise AssertionError("inactive bitmap start is shifted")
+    conditions = [
+        node for node in loop.get("inner", ())
+        if node.get("kind") == "BinaryOperator" and node.get("opcode") == "<"
+    ]
+    if len(conditions) != 1 or scalar_expression(conditions[0]) != (
+        "<", ("name", "first_word"), ("name", "MICROS_VM_INITIAL_FREE_BITMAP_WORDS"),
+    ):
+        raise AssertionError("inactive bitmap loop bounds are incomplete")
     if not {
         "first_word",
         "MICROS_VM_INITIAL_FREE_BITMAP_WORDS",
@@ -288,8 +300,6 @@ def assert_immutable_orchestration(tree):
 
 
 def assert_bounded_vm_validation(text):
-    preprocessed = clang_preprocessed(text)
-    assert_reviewed_token_identities(preprocessed)
     tree = clang_ast(text)
     assert_zero_advance(tree)
     assert_active_scan(tree)
@@ -297,7 +307,7 @@ def assert_bounded_vm_validation(text):
     assert_immutable_orchestration(tree)
     if any(
         node.get("kind") in {"GotoStmt", "LabelStmt"}
-        for name in EXPECTED_TOKEN_DIGESTS
+        for name in WORK_HELPERS
         for node in ast_walk(function_decl(tree, name))
     ):
         raise AssertionError("VM validation uses unstructured control flow")
@@ -326,7 +336,7 @@ class VmValidationHotPathTests(unittest.TestCase):
         )
         self.assert_mutation_rejected(
             text.replace(active, changed_active, 1),
-            "reviewed work-shape identity|unreviewed helper",
+            "consume the word|unreviewed helper",
         )
 
     def test_per_frame_bitmap_reload_is_rejected(self):
@@ -360,7 +370,7 @@ class VmValidationHotPathTests(unittest.TestCase):
         )
         self.assert_mutation_rejected(
             changed,
-            "reviewed work-shape identity|tail check",
+            "immutability calls|tail check",
         )
 
     def test_shifted_first_inactive_word_is_rejected(self):

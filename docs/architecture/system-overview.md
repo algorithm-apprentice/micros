@@ -323,8 +323,11 @@ runtime evidence. Implementation #246 has now completed that renewed evidence,
 independent review and exact-tree publication; its
 [acceptance record](common-scheduler-return.md#implementation-acceptance)
 closes only B03-F002/F005. The next separate
-[Accepted current-contract validation design](current-contract-validation.md)
-addresses tooling overhead without changing operating-system behavior.
+[current-contract validation outcome](current-contract-validation.md), following
+separately merged design #247, removes historical tooling admission without
+changing operating-system behavior. Its implementation/evidence map is the
+current validation reference; the earlier correction chronology above is
+historical, not an instruction to repeat those author ceremonies.
 
 Every delivered trap frame carries the registered hart context. Outside
 dispatch, `sscratch` points to the hart's trap anchor; during dispatch it is

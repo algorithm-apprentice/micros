@@ -6,7 +6,10 @@ This is the Accepted contract for
 [ADR-0123](../adr/0123-current-contract-validation.md).
 The paired tasks are `validation-simplification-design` and
 `validation-simplification-implementation`. Complete independent design review
-is clean. Implementation remains pending the separate design merge.
+is clean and design #247 is separately merged as
+`7f621f58129b298e983bd5bf41a196087e354e8d`. The dependent implementation
+supplies the current owners described below; its PR records the exact final
+author gate and independent implementation review.
 
 The dependency-ready base is merged OBJ02 #246:
 
@@ -374,3 +377,149 @@ Record before/after native orchestrator, full host, fast-loop and build costs
 separately. Timing is diagnostic, not a flaky correctness threshold. The
 deterministic acceptance condition is removal of historical proof/execution
 work while retaining the current checks and real coverage above.
+
+## Implementation and retained evidence map
+
+The implementation removes the EV01 inventory, scope, provider, binding and
+author-journal modules rather than leaving compatibility readers. No ordinary
+native generator or orchestrator selects an ancestor implementation. The
+remaining fixed-source reads belong to the finite compiler/observer/stack
+qualifications described below, not cumulative runtime-correction admission.
+
+| Responsibility | Current owner |
+| --- | --- |
+| Invocation-owned current bytes, namespace and closing checks | `tests/host/source_snapshot.py`, owned by `tools/run_host_tests.py` and generator entry points |
+| Strict record fields, digests and owned regular source paths | `tests/host/evidence_records.py` |
+| Shared current C and bounded CMake inspection | `tests/host/c_source_records.py`, `tests/host/build_source_records.py` |
+| Complete native primitive coverage and placement | `tests/host/native_observations.py` and its independently captured JSON declarations |
+| Necessary OBJ01 non-plan/effect reference fields | `tests/host/object_hart_reference.json` |
+| Current native cases, work bounds and product identities | The existing memory/object/return `*_evidence.py` modules and seven fixture generators |
+| Current source sets, private dependencies, ABI/state/fixture ownership and independent models | The existing `test_*_source_layout.py` families and kernel-directory tests |
+| Ordinary fresh versus explicit receipt dispatch | `tools/validation_execution.py`; current profile inputs in `tools/validation_context.py` |
+| Complete twelve/eighteen-case platform execution | `tools/check_terminal_failures.py`, `tools/check_panic_traces.py` and their current capture/oracle modules |
+| Compiler-derived stack closure and finite qualifiers | Existing `tools/stack_bound_*` owners, including the narrowed callback and fatal source boundaries |
+
+### Independent reference and observation data
+
+Before changing the consumers, the author retained the actual #246 products,
+their source/executable identities, and complete current ordinary/observed
+outputs. The native observation declaration covers 82 source owners,
+774 compiled functions and 2,624 primitive sites. Empty site sets are
+intentional coverage declarations, not exemptions for unobserved work.
+The existing work bounds remain independent of these source-site records.
+
+OBJ01's retained reference table contains only the necessary fields from its
+171 independently captured current cases. It does not store a production
+implementation, weaken error/output preservation, or normalize an observed
+representation into success.
+
+The nine ordinary fixture generators were also executed in the unchanged
+#246 checkout before their old include-spelling wrappers were removed.
+All 46 original generator assertions passed; twelve distinct outputs were
+captured with source/interpreter identities. Only the six affected output
+hashes and two lengths changed, using that independent capture. All fifty
+current generator cases retain their payload, ELF/seed and deterministic-byte
+checks. Generator implementations were not changed for this transport removal.
+
+### Required target evidence has an ordinary owner
+
+The existing runner accepts six finite current-evidence scopes:
+
+| Scope | Existing workflow and retained evidence |
+| --- | --- |
+| `kernel-mapping` | `test-qemu-mmu`: exact mapping records, largest legal leaves and actual ELF/load-probe binding |
+| `user-address-space` | `test-qemu-user-address-space`: selected operation, release and rollback witnesses |
+| `address-space-handoff` | `test-qemu-address-space-handoff`: complete handoff, wired/index and downstream witnesses |
+| `scheduler-return` | `test-qemu-scheduler`: exact selected context counts, including 1/2/1 validation |
+| `runtime-memory` | `test-qemu-user-runtime`: actual linked memory object, ELF/map/Ninja recipe and non-stack wide transfers |
+| `diagnostic-history` | `test-qemu-panic`: the unique aligned 12,012-byte local BSS history and complete seeded panic witness |
+
+The first five require a pass result. Diagnostic history requires panic,
+the complete panic report and the seeded-history expectation. Each scope
+uses the same owned `QemuResult` as its workflow, with kernel identity checks
+before execution, after execution and after witness validation. Missing
+witnesses or artifact drift use the normal failed TAP/raw reporting path.
+They never cause a second guest to run.
+
+Both exact diagnostic command decoders remain exercised by
+`diagnostic_control_test.c` in the ordinary `diagnostic-history` CTest.
+The separate author-only decoder executable is removed. Real TTY execution
+continues to require its diagnostic-forwarding witness.
+
+The terminal and trace controllers retain complete current source/tool/
+firmware manifests, artifact revalidation, private debugger authority,
+all twelve/eighteen scenarios and atomic report publication. They no longer
+have baseline selectors, archive workspaces or accepted historical-absence
+modes, including in their internal image/capture/oracle interfaces.
+Missing required control or trace state remains a negative case.
+
+### Narrow proof-critical source qualifications
+
+The unchanged fixed stack reference still supplies independent callback,
+assembly and fatal-operation expectations. It is not replaced with the
+candidate's own bytes. Fixed linked fixtures test those proof engines; they
+do not rerun an old operating-system implementation as current acceptance.
+
+Callback headers retain type/layout, preprocessor and callback-bearing API
+contracts, but unrelated ordinary prototypes no longer participate in
+equality. Qualified callback functions and constructors still bind to their
+independent source contracts and complete actual machine occurrences,
+carrier offsets and provider sets. A callback-free current helper needs its
+actual regular source, exact catalog origin/object/symbol and independently
+decoded machine calls, not a historical helper name. Missing or omitted
+indirect sites still fail. The VM phase-lifetime qualification remains.
+
+Fatal module checks retain shared declarations, storage, macros and types.
+Unrelated function bodies are not whole-module transport obligations;
+each used fatal operation is qualified separately against its actual object
+and fixed source/effect contract. Hidden shared preprocessor mutation,
+changed CSR/state/layout, incomplete calls, unknown effects and altered
+qualifiers still fail. The observation overlays, assembly epochs, budgets,
+ordinary/metadata byte equality and observed producer ownership remain.
+
+### Python case disposition
+
+The unchanged #246 runner lists 1,686 test identities. Complete current
+discovery executes 1,058 with zero skips. There are 891 surviving names,
+795 removed names and 167 added names; renames and consolidation contribute
+to both latter sets. A surviving name does not imply an unchanged body.
+No removed identity is reported as a pass.
+
+The implementation diff and author census enumerate the names. The following
+module-level disposition maps their useful properties to current owners;
+it is a static review record, not another runtime assertion registry.
+Module names below are under `tests/host/`, with the `test_` prefix omitted.
+
+| Modules | Removed mechanism; retained current property |
+| --- | --- |
+| `evidence_authority`, `evidence_authority_scope` (131 cases removed) | Global catalog, predecessor, journal and provisional-retirement protocols are retired; current bytes/lifetime/failure rules belong to `source_snapshot` and `validation_execution` |
+| `runtime_memory`, `bootstrap_allocation`, `kernel_mapping` | Historical compilation, author transactions and old-body identities are removed; actual current work, semantics, malformed records, compiler/access/rollback and target checks remain |
+| `selected_ownership`, `selected_address_space`, `selected_release_handoff` | Ancestor products, immutable attempt envelopes and cumulative claims are removed; complete current channels, cases, diagnostic boundaries, failures, work/storage and input/product checks remain |
+| `object_hart_validation`, `common_scheduler_return` | Historical plan-ABI executions and author protocols are removed; 171/180 current cases, independent non-plan/effect fields, complete record guards and actual plan/context work remain |
+| `diagnostic_history`, `terminal_failure`, `panic_trace` | Author selectors, historical recipe/archive admission and old-runtime expected-failure modes are removed; current state/decoder/capture/model, packet authority, real machine and all target-scenario checks remain |
+| `frame_ownership_source_layout`, `kernel_address_space_source_layout`, `kernel_vm_handoff_source_layout`, `kernel_pm_control_source_layout` | Ancestor reconstruction/migration and body/type transport are removed; current complete source sets, private boundaries, state/ABI and full-audit ownership remain |
+| `kernel_object_source_layout`, `scheduler_source_layout`, `endpoint_source_layout`, `kernel_ipc_source_layout`, `grant_data_plane_source_layout` | Frozen helper/body inventories and inverse chains are removed; current owner/source sets, independent references, fixture/state custody, cases and tier/consumer bindings remain |
+| `vm_service_source_layout`, `pm_service_source_layout`, `ramfs_source_layout`, `tty_source_layout`, `vfs_test_source_layout` | Completed migration tables, original bodies and generated-include transport are removed; current private graphs, storage, independent model directions, seeds/counts and actual consumers remain |
+| `kernel_bootstrap_source_layout`, `trap_syscall_source_layout`, `kernel_directory_layout` | Historical path/line/body reconstruction is removed; current module boundaries, live supervisor capture, modes/headers and real native/RV64 diagnostic mapping remain |
+| `user_elf_source_layout`, `qemu_runner_source_layout`, `qemu_transcript`, `generate_tty_service_fixture` | Whole-module AST and include/line transport are removed; actual parsing, CLI/result, transcript, generated bytes and current ownership remain |
+| `stack_bound_evidence`, `stack_source_projection`, `stack_workflow` | The old kernel-oracle test and unrelated header/helper/recipe freezes are removed; real indirect/fatal/assembly, passivity, complete static/observed scope and new harmless-extension controls remain |
+| `host_test_runner`, `validation_context`, `validation_context_layout`, `validation_execution`, `work_count_evidence` | Historical runner/recipe/module transport and automatic fresh receipts are removed; complete discovery, current recipes, strict explicit profiles, honest fresh outcomes and actual work observations remain |
+| New `source_snapshot`, `native_observations`, `current_target_evidence` | Current namespace/lifetime/drift, complete independently declared primitive coverage and same-result target/artifact ownership regressions |
+
+The frame/VM work-shape modules retain their existing cases. Whole-function
+token hashes no longer mask their actual Clang-AST checks: inactive owner
+fields and exact first/last bitmap-word arithmetic now have direct checks,
+with the existing line-splice, shifted-start and early-end negatives.
+
+### Measured implementation checkpoint
+
+At staged tree `4bcf3aa8c3f7f658c6221b240e6e3193876071cc`, complete Python
+discovery passed all 1,058 cases in 83.253 seconds. The actual
+`riscv64-debug` ordinary/metadata pair also completed its callback, assembly,
+fatal, stack and byte-passivity proofs. These are development evidence,
+not the complete final stack certificate or independent review.
+
+The [before/after study](../research/current-validation-overhead.md) separates
+native orchestrators, full host discovery and fast/build measurements.
+The final implementation PR supplies the exact current fifty-command
+producer, supported-profile reuse and independent-review record.

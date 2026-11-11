@@ -255,8 +255,8 @@ def _owned_sp(value, region):
     return type(value) is int and value % 16 == 0 and region[0] <= value < region[1]
 
 
-def _validate_execution(capture, *, baseline):
-    _require(type(capture) is TraceCapture and type(baseline) is bool, "capture has no exact type or source stage")
+def _validate_execution(capture):
+    _require(type(capture) is TraceCapture, "capture has no exact type")
     require_case(capture.scenario)
     _require(
         type(capture.armed) is GuestState and type(capture.final) is GuestState,
@@ -321,7 +321,7 @@ def _validate_execution(capture, *, baseline):
         "registers do not bind the actual final SP/FP/SRST instruction and operands",
     )
     physical = stacks[_physical_owner(capture.scenario)]
-    final_region = stacks["primary"] if not baseline and capture.scenario == 15 else physical
+    final_region = stacks["primary"] if capture.scenario == 15 else physical
     _require(_owned_sp(capture.final.sp, final_region), "final SP leaves its actual execution epoch")
     if reporting:
         _require(_owned_sp(after["first_panic_sp"], physical), "first panic capture has no actual owned SP")
@@ -342,11 +342,11 @@ def _validate_execution(capture, *, baseline):
     return stacks, stops, after
 
 
-def validate_capture(capture, *, baseline):
-    stacks, stops, after = _validate_execution(capture, baseline=baseline)
+def validate_capture(capture):
+    stacks, stops, after = _validate_execution(capture)
     physical = stacks[_physical_owner(capture.scenario)]
-    final_region = stacks["primary"] if not baseline and capture.scenario == 15 else physical
-    if baseline or capture.scenario == 18:
+    final_region = stacks["primary"] if capture.scenario == 15 else physical
+    if capture.scenario == 18:
         _require(capture.started is None and capture.stack is None and capture.reentry is None,
                  "absent trace invented a start, stack snapshot or reentry")
         _require(all(after[name] == 0 for name in (
@@ -415,12 +415,12 @@ def validate_capture(capture, *, baseline):
     return expected
 
 
-def validate_case(case, *, baseline):
+def validate_case(case):
     from tools.qemu_smoke_faults import _diagnostic_history_payload, _has_complete_panic_report, _has_complete_trap_context
 
     _require(type(case) is TraceCase and type(case.output) is str and type(case.exit_code) is int and case.exit_code == 0,
              "case lacks its real transcript and natural firmware exit")
-    expected = validate_capture(case.capture, baseline=baseline)
+    expected = validate_capture(case.capture)
     scenario, output = case.capture.scenario, case.output
     _require("MICROS_TEST_FAILURE" not in output, "guest emitted an explicit failure")
     if scenario == 18:
@@ -440,27 +440,24 @@ def validate_case(case, *, baseline):
         after_core += 1
     else:
         _require("MICROS_TRAP_CONTEXT" not in output, "another case invented a saved trap record")
-    fault = not baseline and scenario in (15, 16, 17)
-    if baseline:
-        _require("MICROS_TRACE_" not in output, "fixed baseline invented a trace")
+    fault = scenario in (15, 16, 17)
+    trace = decode_trace(output, complete=not fault)
+    owner = "unavailable" if scenario in (13, 14) else _physical_owner(scenario)
+    _require(trace.owner == owner and after_core < len(lines) and lines[after_core].startswith("MICROS_TRACE_BEGIN "),
+             "trace changed its owner or pre-history placement")
+    if fault:
+        _require(trace.frames == () and trace.stop is None, "faulting trace emitted a frame or successful end")
     else:
-        trace = decode_trace(output, complete=not fault)
-        owner = "unavailable" if scenario in (13, 14) else _physical_owner(scenario)
-        _require(trace.owner == owner and after_core < len(lines) and lines[after_core].startswith("MICROS_TRACE_BEGIN "),
-                 "trace changed its owner or pre-history placement")
-        if fault:
-            _require(trace.frames == () and trace.stop is None, "faulting trace emitted a frame or successful end")
-        else:
-            _require((trace.frames, trace.stop) == (expected.frames, expected.stop), "serial trace differs from the independent actual stack")
-            after_core += len(trace.frames) + 2
-            if scenario in (1, 2):
-                _require(type(case.capture.return_sites) is tuple and len(case.capture.return_sites) == len(set(case.capture.return_sites)) == 3,
-                         "ordinary chain omitted its three actual linked return sites")
-                pcs = [pc for _, pc in trace.frames]
-                position = 0
-                for site in case.capture.return_sites:
-                    _require(site in pcs[position:], "ordinary trace omitted or reordered a required real C caller")
-                    position = pcs.index(site, position) + 1
+        _require((trace.frames, trace.stop) == (expected.frames, expected.stop), "serial trace differs from the independent actual stack")
+        after_core += len(trace.frames) + 2
+        if scenario in (1, 2):
+            _require(type(case.capture.return_sites) is tuple and len(case.capture.return_sites) == len(set(case.capture.return_sites)) == 3,
+                     "ordinary chain omitted its three actual linked return sites")
+            pcs = [pc for _, pc in trace.frames]
+            position = 0
+            for site in case.capture.return_sites:
+                _require(site in pcs[position:], "ordinary trace omitted or reordered a required real C caller")
+                position = pcs.index(site, position) + 1
     if fault:
         _require("MICROS_DIAGNOSTIC_HISTORY" not in output, "failed trace continued into ordinary history")
     else:
@@ -479,7 +476,7 @@ class PanicTraceOracles(unittest.TestCase):
     def require_current(self, scenarios):
         for scenario in scenarios:
             try:
-                validate_case(self.observed[scenario - 1], baseline=False)
+                validate_case(self.observed[scenario - 1])
             except ValueError as error:
                 self.fail(f"case {scenario}: {error}")
 
@@ -496,13 +493,13 @@ class PanicTraceOracles(unittest.TestCase):
         self.require_current((15, 16, 17, 18))
 
 
-def run_oracles(cases, *, baseline):
-    _require(type(baseline) is bool and type(cases) is tuple and len(cases) == 18, "requires eighteen complete cases and an exact source stage")
+def run_oracles(cases):
+    _require(type(cases) is tuple and len(cases) == 18, "requires eighteen complete current cases")
     _require(all(type(case) is TraceCase and type(case.capture) is TraceCapture for case in cases),
              "case set contains an untyped observation")
     _require(tuple(case.capture.scenario for case in cases) == tuple(range(1, 19)), "case set is missing, duplicate or reordered")
     for case in cases:
-        validate_case(case, baseline=baseline)
+        validate_case(case)
     suite = []
     for row in ORACLE_RULES:
         test, = unittest.defaultTestLoader.loadTestsFromName(row[1])
@@ -515,7 +512,7 @@ def run_oracles(cases, *, baseline):
         "named oracle execution is incomplete or contains an execution error",
     )
     _require(
-        {test.id() for test, _ in result.failures} == ({row[1] for row in ORACLE_RULES} if baseline else set()),
-        "named oracles do not discriminate their exact baseline/current properties:\n" + output.getvalue(),
+        not result.failures,
+        "named current trace oracles failed:\n" + output.getvalue(),
     )
-    return tuple((row[0], "EXPECTED_FAILURE" if baseline else "PASS") for row in ORACLE_RULES), output.getvalue()
+    return tuple((row[0], "PASS") for row in ORACLE_RULES), output.getvalue()

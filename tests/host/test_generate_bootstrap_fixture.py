@@ -1,3 +1,4 @@
+# Golden output was captured from independently reviewed OBJ02 #246, before consumer changes.
 from dataclasses import replace
 import hashlib
 import unittest
@@ -5,15 +6,6 @@ import unittest
 from tests.host.test_check_user_elf import build_elf
 from tools import check_user_elf
 from tools import generate_bootstrap_fixture
-from tests.host import kernel_layout_source
-
-GENERATOR_PATH = "tools/generate_bootstrap_fixture.py"
-
-def _render_fixture(*args, **kwargs):
-    return kernel_layout_source.restore_generated_fixture(
-        GENERATOR_PATH,
-        generate_bootstrap_fixture.render_fixture(*args, **kwargs),
-    )
 
 
 def bootstrap_image():
@@ -40,13 +32,13 @@ def bootstrap_image():
 
 class BootstrapFixtureGeneratorTest(unittest.TestCase):
     def test_renders_catalog_and_permuted_manifest(self):
-        output = _render_fixture(
+        output = generate_bootstrap_fixture.render_fixture(
             bootstrap_image(),
             bootstrap_image(),
         )
 
         self.assertEqual(
-            "e264c2a10046d0c188f4d581354c40bf8cd7ea1ada24f3da1dd049c96df64782",
+            "93f0c29a8e0e81447b9628dfe1e0f5f0550949a20691fa3d7b9bc0ca40640bfb",
             hashlib.sha256(output.encode("utf-8")).hexdigest(),
         )
         self.assertIn("micros_bootstrap_test_images", output)
@@ -79,7 +71,7 @@ class BootstrapFixtureGeneratorTest(unittest.TestCase):
         )
 
         with self.assertRaises(check_user_elf.ElfFormatError):
-            _render_fixture(image, bootstrap_image())
+            generate_bootstrap_fixture.render_fixture(image, bootstrap_image())
 
     def test_rejects_nonzero_file_backed_configuration(self):
         image = bootstrap_image()
@@ -98,7 +90,7 @@ class BootstrapFixtureGeneratorTest(unittest.TestCase):
         )
 
         with self.assertRaises(check_user_elf.ElfFormatError):
-            _render_fixture(image, bootstrap_image())
+            generate_bootstrap_fixture.render_fixture(image, bootstrap_image())
 
 
 if __name__ == "__main__":

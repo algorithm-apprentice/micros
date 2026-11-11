@@ -12,6 +12,19 @@ COMMAND = ("cmake", "--workflow", "--preset", "test-stack-evidence")
 
 
 class StackWorkflowTest(unittest.TestCase):
+    def test_current_aggregate_does_not_freeze_unrelated_root_recipe_text(self):
+        from tests.host.stack_recipe import MODULE_PATH, RECIPE, validate_stack_recipe
+
+        with tempfile.TemporaryDirectory(prefix="micros-current-stack-recipe-") as temporary:
+            root = Path(temporary)
+            (root / "CMakeLists.txt").write_text(
+                (ROOT / "CMakeLists.txt").read_text() + "\n# Unrelated current build documentation.\n",
+            )
+            module = root / MODULE_PATH
+            module.parent.mkdir(parents=True)
+            module.write_text(RECIPE)
+            validate_stack_recipe(root)
+
     def test_full_and_affected_runtime_plans_require_one_stack_gate(self):
         full = validation_plan.plan([], "full")
         self.assertEqual(1, full.count(COMMAND))
@@ -30,42 +43,13 @@ class StackWorkflowTest(unittest.TestCase):
         for path in ("docs/testing-strategy.md", "tests/host/elf_spawn_fixture_test.c"):
             self.assertNotIn(COMMAND, validation_plan.plan([path], "fast"))
 
-    def test_projection_retains_old_commands_and_rejects_duplicate_or_relocated_gates(self):
-        from tests.host.stack_recipe import project_command_extension
 
-        commands = validation_plan.plan([], "full")
-        original = project_command_extension(commands)
-        self.assertEqual(len(commands) - 1, len(original))
-        self.assertEqual(commands[-3:], original[-3:])
-        self.assertIn(validation_plan.UNIT_FULL, original)
-        for changed in (commands + [COMMAND], [COMMAND] + original):
-            with self.assertRaises(AssertionError):
-                project_command_extension(changed)
 
-    def test_preset_projection_keeps_existing_order_and_cannot_erase_a_changed_gate(self):
-        import json
-        from tests.host.stack_recipe import project_presets
-        from tests.host.terminal_failure_source import project_terminal_presets
-
-        source = project_terminal_presets((ROOT / "CMakePresets.json").read_text())
-        original = json.loads(project_presets(source))
-        current = json.loads(source)
-        self.assertEqual(original["buildPresets"], current["buildPresets"][:-1])
-        self.assertEqual(original["workflowPresets"], current["workflowPresets"][:-1])
-        with self.assertRaises(AssertionError):
-            project_presets(source.replace(
-                '"targets": [\n        "test-stack-evidence"\n',
-                '"targets": [\n        "test-unit"\n',
-            ))
-
-    def test_only_the_closed_host_extension_can_be_projected(self):
-        from tests.host.stack_recipe import INCLUDE, MODULE_PATH, RECIPE, project_root_recipe, validate_stack_recipe
+    def test_current_aggregate_keeps_host_ownership_and_the_real_checker(self):
+        from tests.host.stack_recipe import INCLUDE, MODULE_PATH, RECIPE, validate_stack_recipe
 
         validate_stack_recipe(ROOT)
         source = (ROOT / "CMakeLists.txt").read_text()
-        self.assertNotIn(INCLUDE, project_root_recipe(source))
-        with self.assertRaises(AssertionError):
-            project_root_recipe(INCLUDE + source.replace(INCLUDE, ""))
         with tempfile.TemporaryDirectory(prefix="micros-stack-recipe-") as temporary:
             root = Path(temporary)
             (root / "CMakeLists.txt").write_text(source)
@@ -73,6 +57,15 @@ class StackWorkflowTest(unittest.TestCase):
             module.parent.mkdir(parents=True)
             module.write_text(RECIPE)
             validate_stack_recipe(root)
+            for changed in (
+                source.replace(INCLUDE, ""),
+                INCLUDE + source.replace(INCLUDE, ""),
+                source + INCLUDE,
+            ):
+                (root / "CMakeLists.txt").write_text(changed)
+                with self.assertRaises(AssertionError):
+                    validate_stack_recipe(root)
+            (root / "CMakeLists.txt").write_text(source)
             module.write_text(RECIPE.replace("check_stack_evidence.py", "check_docs.py"))
             with self.assertRaises(AssertionError):
                 validate_stack_recipe(root)

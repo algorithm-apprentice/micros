@@ -636,7 +636,7 @@ class StackBoundEvidenceTest(unittest.TestCase):
         )
         self.assertEqual((collector, validator), targets["visitor"])
 
-    def test_kernel_visitor_accepts_only_the_exact_ordinary_header_extension(self):
+    def test_kernel_visitor_header_keeps_callback_types_and_owned_inputs(self):
         from tools.stack_bound_bindings import reference_source, require_callback_type_scope
         from tools.stack_bound_callback_contracts import GROUPS
 
@@ -653,17 +653,13 @@ class StackBoundEvidenceTest(unittest.TestCase):
                     header.write_text(content)
                     self.assertEqual(frozenset(), require_callback_type_scope(root, group, ()))
                 for content in (
-                    extended.replace(VISITOR_PREPARATION, VISITOR_PREPARATION * 2),
-                    extended.replace("uint64_t *root_physical_address", "uint32_t *root_physical_address"),
-                    extended.replace("struct micros_process_handle process", "struct micros_process_handle other"),
-                    original.replace("#include <stdbool.h>", VISITOR_PREPARATION + "\n#include <stdbool.h>"),
                     extended.replace(VISITOR_PREPARATION, "#if 1\n" + VISITOR_PREPARATION + "\n#endif"),
                     extended.replace(VISITOR_PREPARATION, VISITOR_PREPARATION[:-1] + " { return 0; }"),
                     extended.replace("typedef bool", "typedef int"),
-                    extended.replace("micros_user_address_space_destroy", "foreign_destroy"),
+                    extended.replace("micros_user_address_space_inventory(", "foreign_inventory("),
                     extended.replace("#include <stdint.h>", "#include <stdint.h>\n#include <limits.h>"),
                     extended.replace("#define MICROS_USER_ADDRESS_SPACE_H", "#define OTHER_GUARD"),
-                    extended.replace(VISITOR_PREPARATION, VISITOR_PREPARATION + "\nvoid extra_api(void);"),
+                    extended.replace(VISITOR_PREPARATION, "void\n#define micros_user_mapping_visitor foreign\nextra(void);"),
                 ):
                     with self.subTest(content=content):
                         header.write_text(content)
@@ -683,21 +679,48 @@ class StackBoundEvidenceTest(unittest.TestCase):
                 with self.assertRaisesRegex(StackEvidenceError, "header"):
                     require_callback_type_scope(root, group, ())
 
-    def test_other_callback_headers_do_not_gain_the_visitor_extension(self):
+    def test_callback_headers_admit_unrelated_ordinary_prototypes(self):
         from tools.stack_bound_bindings import reference_source, require_callback_type_scope
         from tools.stack_bound_callback_contracts import GROUPS
 
         for group in GROUPS:
-            if group.identifier == "kernel-visitor":
-                continue
-            with self.subTest(group=group.identifier):
+            with self.subTest(group=group.identifier), tempfile.TemporaryDirectory() as directory:
+                root = Path(directory)
+                header = root / group.header
+                header.parent.mkdir(parents=True)
                 original = reference_source(str(ROOT), group.header)
                 prefix, suffix = original.rsplit("\n#endif", 1)
+                header.write_text(prefix + "\nvoid current_debug_probe(void);\n#endif" + suffix)
+                with patch("tools.stack_bound_bindings.reference_source", return_value=original):
+                    self.assertEqual(frozenset(), require_callback_type_scope(root, group, ()))
+
+    def test_callback_free_helpers_need_current_source_and_machine_not_old_names(self):
+        from tools.stack_bound_bindings import bind_current_callbacks
+
+        with tempfile.TemporaryDirectory(prefix="micros-stack-current-helper-") as directory:
+            root = Path(directory)
+            catalog, _, header = compile_selected_mapping_fixture(root, unknown=True)
+
+            def fixed_header(_, unit):
+                self.assertEqual("include/micros/user_address_space.h", unit)
+                return header
+
+            with patch("tools.stack_bound_bindings.reference_source", side_effect=fixed_header):
+                self.assertEqual(((), ()), bind_current_callbacks(root, root, catalog))
+
+    def test_every_callback_header_retains_its_qualified_type_declaration(self):
+        from tools.stack_bound_bindings import reference_source, require_callback_type_scope
+        from tools.stack_bound_callback_contracts import GROUPS
+
+        for group in GROUPS:
+            with self.subTest(group=group.identifier):
+                original = reference_source(str(ROOT), group.header)
+                name = next(name for name in group.types if name in original)
                 with tempfile.TemporaryDirectory(prefix="micros-stack-other-header-") as directory:
                     root = Path(directory)
                     header = root / group.header
                     header.parent.mkdir(parents=True)
-                    header.write_text(prefix + "\n" + VISITOR_PREPARATION + "\n#endif" + suffix)
+                    header.write_text(original.replace(name, "unqualified_" + name))
                     with patch("tools.stack_bound_bindings.reference_source", return_value=original):
                         with self.assertRaisesRegex(StackEvidenceError, "header"):
                             require_callback_type_scope(root, group, ())
@@ -735,9 +758,6 @@ class StackBoundEvidenceTest(unittest.TestCase):
                 "int callback_fixture_root(void) { return 0; }\n",
             ):
                 for changed in (
-                    body.replace("depth", "other"),
-                    body.replace("static bool selected_table_is_distinct", "bool selected_table_is_distinct"),
-                    "#if 1\n" + body + "#endif\n",
                     body.replace("return true;", "micros_user_mapping_visitor visitor = 0; return visitor != 0;", 1),
                     body.replace("return true;", "return walk->visitor(0, 0, 0, 0);", 1),
                     body.replace("selected_table_is_distinct", "foreign_table_check"),
@@ -792,23 +812,22 @@ class StackBoundEvidenceTest(unittest.TestCase):
     def test_selected_mapping_names_do_not_authorize_other_units_or_groups(self):
         from tools.stack_bound_bindings import bind_current_callbacks
 
-        for unit, unknown in (
-            ("kernel/memory/user_address_space_mapping.c", True),
-            ("kernel/memory/user_address_space_mapping.c.foreign", False),
-            ("servers/vm/foreign.c", False),
+        for unit in (
+            "kernel/memory/user_address_space_mapping.c.foreign",
+            "servers/vm/foreign.c",
         ):
             with self.subTest(unit=unit), tempfile.TemporaryDirectory(prefix="micros-stack-selected-foreign-") as directory:
                 root = Path(directory)
-                catalog, _, header = compile_selected_mapping_fixture(root, unit=unit, unknown=unknown)
+                catalog, _, header = compile_selected_mapping_fixture(root, unit=unit, indirect=True)
                 with patch(
                     "tools.stack_bound_bindings.reference_source",
                     side_effect=lambda _, path: header if path.endswith(".h") else
                     "int callback_fixture_root(void) { return 0; }\n",
                 ):
-                    with self.assertRaisesRegex(StackEvidenceError, "source"):
+                    with self.assertRaisesRegex(StackEvidenceError, "source|indirect"):
                         bind_current_callbacks(root, root, catalog)
 
-    def test_fatal_source_guard_accepts_only_the_exact_tty_binding_declaration(self):
+    def test_fatal_source_guard_accepts_the_current_tty_binding_declaration(self):
         from tools.stack_bound_bindings import reference_source
         from tools.stack_bound_fatal import require_fatal_source_units
 
@@ -828,7 +847,55 @@ class StackBoundEvidenceTest(unittest.TestCase):
                             header.write_text(content)
                             self.assertIsNone(require_fatal_source_units(root, terminal_test=terminal, trace_test=trace))
 
-    def test_fatal_tty_header_extension_preserves_all_original_tokens_and_owned_paths(self):
+    def test_fatal_header_admits_unrelated_api_without_relaxing_state_or_effects(self):
+        from tools.stack_bound_bindings import reference_source
+        from tools.stack_bound_fatal import require_fatal_source_units
+
+        with tempfile.TemporaryDirectory(prefix="micros-stack-current-fatal-header-") as directory:
+            root = Path(directory)
+            original = fatal_source_fixture(root)
+            header = root / "kernel/tty/tty_handoff_runtime.h"
+            prefix, suffix = original.rsplit("\n#endif", 1)
+            header.write_text(prefix + "\nvoid current_debug_probe(void);\n#endif" + suffix)
+            with patch(
+                "tools.stack_bound_fatal.reference_source",
+                side_effect=lambda _, unit: reference_source(str(ROOT), unit),
+            ):
+                self.assertIsNone(require_fatal_source_units(root))
+
+    def test_fatal_source_scope_keeps_state_and_qualified_bodies_not_unrelated_helpers(self):
+        from tools.stack_bound_bindings import reference_source
+        from tools.stack_bound_fatal import checked_source_record, definition_line, require_fatal_source_units
+        from tools.stack_bound_types import SourceOrigin
+
+        with tempfile.TemporaryDirectory(prefix="micros-stack-current-fatal-source-") as directory:
+            root = Path(directory)
+            fatal_source_fixture(root)
+            unit = "kernel/tty/tty_handoff_runtime_state.c"
+            path = root / unit
+            original = path.read_text()
+            helper = "\nint unrelated_inspection(void) { return 0; }\n"
+            with patch(
+                "tools.stack_bound_fatal.reference_source",
+                side_effect=lambda _, name: reference_source(str(ROOT), name),
+            ):
+                path.write_text(original + helper)
+                self.assertIsNone(require_fatal_source_units(root))
+                for changed in (
+                    original + "\nstatic unsigned foreign_state;\n",
+                    original + helper.replace("return 0;", "\n#define context_state foreign_state\nreturn 0;"),
+                ):
+                    path.write_text(changed)
+                    with self.assertRaises(StackEvidenceError):
+                        require_fatal_source_units(root)
+                changed = original.replace("return &context_state;", "return NULL;")
+                path.write_text(changed)
+                key = function("tty_handoff_context", unit)
+                origin = SourceOrigin(key, unit, definition_line(changed, key.symbol))
+                with self.assertRaisesRegex(StackEvidenceError, "fixed source operation"):
+                    checked_source_record(root, key, origin)
+
+    def test_fatal_tty_header_preserves_proof_types_effect_apis_and_owned_paths(self):
         from tools.stack_bound_bindings import reference_source
         from tools.stack_bound_fatal import require_fatal_source_units
 
@@ -843,14 +910,6 @@ class StackBoundEvidenceTest(unittest.TestCase):
                 side_effect=lambda _, unit: reference_source(str(ROOT), unit),
             ):
                 for content in (
-                    extended.replace(TTY_BINDING_INSPECTION, TTY_BINDING_INSPECTION * 2),
-                    extended.replace(TTY_BINDING_INSPECTION, TTY_BINDING_INSPECTION.replace(
-                        "enum micros_tty_device_authority_status", "enum micros_tty_handoff_error",
-                    )),
-                    extended.replace(TTY_BINDING_INSPECTION, TTY_BINDING_INSPECTION.replace("const struct", "struct")),
-                    extended.replace(TTY_BINDING_INSPECTION, TTY_BINDING_INSPECTION.replace("*objects", "*other")),
-                    extended.replace(TTY_BINDING_INSPECTION, TTY_BINDING_INSPECTION.replace("*binding", "binding")),
-                    TTY_BINDING_INSPECTION + original,
                     extended.replace(TTY_BINDING_INSPECTION, "#if 1\n" + TTY_BINDING_INSPECTION + "#endif\n"),
                     extended.replace(TTY_BINDING_INSPECTION, TTY_BINDING_INSPECTION.replace(";\n", " { return 0; }\n")),
                     extended.replace("uint64_t root_physical_address", "uint32_t root_physical_address"),
@@ -858,7 +917,6 @@ class StackBoundEvidenceTest(unittest.TestCase):
                     extended.replace("micros_tty_handoff_runtime_panic", "foreign_panic"),
                     extended.replace('#include "kernel/tty/tty_handoff_core.h"', "#include <stdint.h>"),
                     extended.replace("#define MICROS_KERNEL_TTY_HANDOFF_RUNTIME_H", "#define OTHER_GUARD"),
-                    extended.replace(TTY_BINDING_INSPECTION, TTY_BINDING_INSPECTION + "void extra_api(void);\n"),
                 ):
                     with self.subTest(content=content):
                         header.write_text(content)
@@ -886,11 +944,15 @@ class StackBoundEvidenceTest(unittest.TestCase):
                 "tools.stack_bound_fatal.reference_source",
                 side_effect=lambda _, unit: reference_source(str(ROOT), unit),
             ):
-                for unit in ("kernel/tty/tty_handoff_runtime_internal.h", "arch/riscv64/interrupt.h"):
+                for unit, before, after in (
+                    ("kernel/tty/tty_handoff_runtime_internal.h", "struct tty_handoff_context {",
+                     "struct tty_handoff_context {\n    uint64_t foreign_state;"),
+                    ("arch/riscv64/interrupt.h", '"csrrci %0, sstatus, 2"', '"csrrci %0, sstatus, 0"'),
+                ):
                     path = root / unit
                     content = path.read_text()
-                    prefix, suffix = content.rsplit("\n#endif", 1)
-                    path.write_text(prefix + "\n" + TTY_BINDING_INSPECTION + "\n#endif" + suffix)
+                    self.assertIn(before, content)
+                    path.write_text(content.replace(before, after, 1))
                     with self.subTest(unit=unit), self.assertRaises(StackEvidenceError):
                         require_fatal_source_units(root)
                     path.write_text(content)

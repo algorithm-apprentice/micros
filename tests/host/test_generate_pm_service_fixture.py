@@ -1,3 +1,4 @@
+# Golden output was captured from independently reviewed OBJ02 #246, before consumer changes.
 from dataclasses import replace
 import hashlib
 import unittest
@@ -6,15 +7,6 @@ from tests.host.test_generate_bootstrap_fixture import bootstrap_image
 from tests.host.test_generate_vm_handoff_fixture import vm_image
 from tools import check_user_elf
 from tools import generate_pm_service_fixture
-from tests.host import kernel_layout_source
-
-GENERATOR_PATH = "tools/generate_pm_service_fixture.py"
-
-def _render_fixture(*args, **kwargs):
-    return kernel_layout_source.restore_generated_fixture(
-        GENERATOR_PATH,
-        generate_pm_service_fixture.render_fixture(*args, **kwargs),
-    )
 
 
 def pm_image():
@@ -32,7 +24,7 @@ def pm_image():
 
 class PmServiceFixtureGeneratorTest(unittest.TestCase):
     def test_renders_pm_topology_and_report(self):
-        output = _render_fixture(
+        output = generate_pm_service_fixture.render_fixture(
             bootstrap_image(),
             vm_image(),
             pm_image(),
@@ -40,7 +32,7 @@ class PmServiceFixtureGeneratorTest(unittest.TestCase):
         )
 
         self.assertEqual(
-            "0792855c7e977b78c07e47b08da10e849e753cbd833f2ebeb46ba2725fda8585",
+            "ef42304e9b5f6b240c097c49157ccd2152b5e0d33b344615f36503c14d49f1f4",
             hashlib.sha256(output.encode("utf-8")).hexdigest(),
         )
         self.assertIn("micros_pm_service_test_images", output)
@@ -53,7 +45,7 @@ class PmServiceFixtureGeneratorTest(unittest.TestCase):
 
     def test_rejects_pm_without_report_symbol(self):
         with self.assertRaises(check_user_elf.ElfFormatError):
-            _render_fixture(
+            generate_pm_service_fixture.render_fixture(
                 bootstrap_image(),
                 vm_image(),
                 bootstrap_image(),
