@@ -10,8 +10,9 @@ Design #244 is separately merged. Its uncommitted implementation is archived
 after B14 exposed incomplete historical-consumer bindings.
 [Accepted ADR-0122](../adr/0122-obj02-evidence-consumer-scope.md) owns the
 correction below and separately merged as #245 after clean independent review.
-The fresh implementation is now the sole active outcome. The Accepted runtime
-contract remains unchanged.
+The fresh implementation is independently reviewed and merged as #246.
+The [acceptance record](#implementation-acceptance) closes only B03-F002/F005;
+the Accepted runtime contract remains unchanged.
 
 ```text
 task:       OBJ02
@@ -677,3 +678,46 @@ material only. Renewed native/target Red and Green, all thirteen units,
 terminal source-view construction, full current author/stack acceptance and
 independent implementation review still precede publication and finding
 closure. No workflow simplification starts in this outcome.
+
+## Implementation acceptance
+
+The fresh implementation completed its actual native/target transaction,
+all thirteen recertification units and the complete author gate before
+independent review and merge as #246.
+
+```text
+implementation commit: b07b69ed7e6718405a73ddda0ae10e7046f81a32
+merge preview:         7d77ee05126fe927c2b50c7531424bc26f49b077
+squash/actual main:    f31c3654c5ede2837dad8e89ba90e8c4c0e37e12
+reviewed/published tree:
+  3601709af706a810f835f101acf394abbe9e560d
+actual attempt:        391b98caa74a43c0a8fa85b29743b805
+final producer:        57d7217259bd4682b15b33deec6c2c7a
+```
+
+Actual measurements are a 220-byte plan, zero static workspace and zero
+queue shifts; the reference values are 1,344 bytes, 4,224 bytes and a maximum
+16,256 shifts in the fixed corpus. Real target validation counts are `1/2/1`
+for ordinary same-thread, ordinary different-thread and captured selection.
+
+B14 passed all 717 selected cases. The final producer passed all fifty
+commands fresh: 47 CTests, all 1,686 Python tests, forty QEMU workflows,
+four standalone images and complete 44-configuration/113-ELF/ten-scope
+stack evidence. B13 remains explicitly blocked. All three exact same-run
+receipt checks passed.
+
+Independent read-only GPT-6.1 Sol review inspected all 43 changed files and
+the complete evidence, reporting no substantive issue. No reviewer
+reproduction or author-suite rerun was performed. The first implementation
+commit followed that review.
+
+Fresh build-free committed-checkout and actual-main checks forbade every
+author-journal accessor and verified 6,789 facts, twenty-nine families,
+nine claims and 338 retirements. Reviewed, committed, remote, preview,
+squash and main trees matched. Completed task refs and the temporary checkout
+were removed while purposeful archives were preserved.
+
+The user-prioritized
+[Accepted current-contract validation design](current-contract-validation.md)
+is the next separate design. It does not change this runtime outcome or
+claim hosted-CI, later correction or node-Q completion.

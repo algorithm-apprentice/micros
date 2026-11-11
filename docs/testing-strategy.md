@@ -50,6 +50,14 @@ correction's actual source and execution evidence.
 Unit tests remain the primary portable feedback; QEMU components and focused
 cross-service integration remain necessary at their actual boundaries.
 
+After completed OBJ02 #246, the separate
+[current-contract validation design](architecture/current-contract-validation.md)
+under [Accepted ADR-0123](adr/0123-current-contract-validation.md) addresses
+the remaining historical source/admission and repeated-execution costs.
+It preserves current behavior, observation, artifact, hardware, integration
+and stack obligations. This documentation-only design does not remove a
+test or change a command; its phase barriers govern the later implementation.
+
 ## Structural and algorithmic baseline evidence
 
 For MINIX-derived runtime work, semantic output is necessary but not
@@ -969,7 +977,10 @@ records the four full-only native products, complete target captures and exact
 historical-test adapters. Focused consumer regressions retain the old expected
 recipes and source/site sets; no current acceptance falls back to historical
 records. The original complete native, QEMU, integration and stack gates
-remain required.
+have now passed, and independently reviewed implementation #246 is merged.
+Its [acceptance record](architecture/common-scheduler-return.md#implementation-acceptance)
+retains the exact author/review/publication evidence. The separate validation
+simplification starts only after that completed outcome.
 
 ## POSIX conformance evidence
 

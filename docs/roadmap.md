@@ -581,7 +581,14 @@ committed, remote, preview, squash and main tree
 Journal-free committed/main authority and completed-ref cleanup passed.
 The fresh [implementation map](architecture/common-scheduler-return.md#implementation-and-evidence-map)
 freezes the actual 1,551-member base and corrected consumer inputs.
-No prior execution is borrowed; complete renewed acceptance remains required.
+No prior execution is borrowed. Implementation #246 has now completed the
+[renewed acceptance](architecture/common-scheduler-return.md#implementation-acceptance),
+independent review and exact-tree publication, closing B03-F002/F005.
+The next separate
+[Accepted current-contract validation design](architecture/current-contract-validation.md)
+addresses the user-prioritized historical-freeze, metadata-prerequisite and
+duplicate-execution costs. Its implementation remains pending the separate
+design merge; it does not advance another runtime correction or hosted CI.
 
 Current Milestone 2 progress includes trap recovery, supervisor timer
 interrupts, the bootstrap frame allocator, the Sv39 kernel address space, and

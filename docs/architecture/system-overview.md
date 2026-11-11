@@ -319,7 +319,12 @@ implementation acceptance and independent review.
 That corrective design separately merged as #245. The fresh
 [implementation map](common-scheduler-return.md#implementation-and-evidence-map)
 binds its actual new base and exact historical-consumer owners before renewed
-runtime evidence. The archived Green does not supply current acceptance.
+runtime evidence. Implementation #246 has now completed that renewed evidence,
+independent review and exact-tree publication; its
+[acceptance record](common-scheduler-return.md#implementation-acceptance)
+closes only B03-F002/F005. The next separate
+[Accepted current-contract validation design](current-contract-validation.md)
+addresses tooling overhead without changing operating-system behavior.
 
 Every delivered trap frame carries the registered hart context. Outside
 dispatch, `sscratch` points to the hart's trap anchor; during dispatch it is
