@@ -79,6 +79,10 @@ This directory contains the design baseline for `micros`.
   defines the Accepted checked source-view boundary, distinct fast/full host tiers
   and live progress while preserving actual acceptance and necessary target
   and cross-service evidence.
+- [Current-contract validation](architecture/current-contract-validation.md)
+  defines the Accepted design to end historical source-freeze and
+  metadata-prerequisite chains, retaining current contracts and using one
+  sufficient final author plan.
 - [Evidence authority transition](architecture/evidence-authority-transition.md)
   separates historical source-transport identities from independent
   MINIX-derived correction oracles and defines fail-closed retirement.
@@ -107,9 +111,11 @@ This directory contains the design baseline for `micros`.
   defines Accepted EV01-C09's exact portable-object payload repair and existing panic
   source-policy names, without changing runtime or stack admission.
 - [Selected object and hart validation](architecture/selected-object-and-hart-validation.md)
-- [Common scheduler return](architecture/common-scheduler-return.md)
   defines Accepted OBJ01's selected scheduler checks, direct current identity and
   regular/exceptional stack proof while retaining complete diagnostics.
+- [Common scheduler return](architecture/common-scheduler-return.md)
+  records Accepted OBJ02's bounded queue/link plan, protected context reuse
+  and independently reviewed implementation #246.
 - [Operation-count evidence](architecture/operation-count-evidence.md)
   defines the Accepted EV02 primitive-counter, complete-composition, and
   transport-preserving annotation contract.
@@ -155,6 +161,9 @@ This directory contains the design baseline for `micros`.
 
 ## Research
 
+- [Current validation overhead](research/current-validation-overhead.md)
+  traces the measured post-OBJ02 proof, historical-execution and receipt costs
+  behind the Accepted current-contract simplification.
 - [Validation feedback cost](research/validation-feedback-cost.md)
   records the measured repeated authority-query cost, current tier/logging
   defects and the distinct roles of unit, structural and integration tests.
@@ -185,9 +194,11 @@ This directory contains the design baseline for `micros`.
   records fifty misbound object identities and eleven existing projected-file
   policies found when OBJ01 research resumed after #238.
 - [MINIX selected object and hart validation](research/minix-selected-object-and-hart-validation.md)
-- [MINIX common scheduler return](research/minix-common-scheduler-return.md)
   traces the fixed local mechanisms, forty-two actual audit calls, failure
   boundaries, stack geometry and OBJ01's ninety-four-key source closure.
+- [MINIX common scheduler return](research/minix-common-scheduler-return.md)
+  traces fixed linked-queue selection, remaining projection work and the
+  same-thread context-validation boundary corrected by OBJ02.
 
 - [MINIX kernel mapping topology baseline](research/minix-kernel-mapping-topology.md)
   traces fixed large-page and direct-table mechanisms, shared-root compatibility,

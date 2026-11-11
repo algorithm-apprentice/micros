@@ -69,6 +69,14 @@ selection and live per-test feedback. Focused or fast success is development
 evidence, not a replacement for the minimum PR gate. Complete input checking
 and independent implementation review still govern publication.
 
+After completed OBJ02 #246, the separate
+[current-contract validation design](../architecture/current-contract-validation.md)
+addresses the remaining historical source-freeze, metadata-prerequisite and
+duplicate-execution costs. [Accepted ADR-0123](../adr/0123-current-contract-validation.md)
+preserves paired design/implementation phases and independent review.
+Its separate design-merge and implementation barriers apply before the existing
+executable workflow changes; this design itself supplies no validation shortcut.
+
 ### Independent review
 
 The authoring persona does not serve as the only reviewer. A separate review

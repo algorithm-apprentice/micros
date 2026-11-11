@@ -269,10 +269,16 @@ are the sole active corrective design. The same runtime contract, 58-key/
 the correction's separate reviewed merge.
 
 Corrective design #245 has now separately merged after clean complete and
-Acceptance-only independent review. The fresh OBJ02 implementation follows
-its [implementation map](common-scheduler-return.md#implementation-and-evidence-map)
-as the sole active outcome. The archived attempt supplies no current author
-event; no runtime edge, later finding or hosted-CI status changes.
+Acceptance-only independent review. Fresh OBJ02 implementation #246 has
+completed its [acceptance](common-scheduler-return.md#implementation-acceptance)
+and independently merged. Only B03-F002/F005 close.
+
+The user-prioritized
+[current-contract validation design](current-contract-validation.md) is now
+the sole active outcome. Its implementation depends on its separate reviewed
+design merge; IPC01 and later runtime corrections do not start in parallel.
+This tooling prerequisite changes no runtime edge, later finding owner or
+hosted-CI status.
 
 The Accepted [ADR-0087](../adr/0087-phase-bounded-vm-load-temporaries.md)
 prerequisite repair is confined to EV03's demonstrated VM automatic-storage
