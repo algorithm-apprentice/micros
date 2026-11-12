@@ -4131,6 +4131,108 @@ if(MICROS_BUILD_HOST_TESTS)
     set_tests_properties(common-scheduler-return PROPERTIES LABELS slow)
     add_dependencies(test-unit common_scheduler_return_current_ordinary common_scheduler_return_test)
 
+    set(IPC01_NATIVE_ROOT "${CMAKE_CURRENT_BINARY_DIR}/selected-ipc-validation")
+    set(IPC01_NATIVE_INPUTS
+        ${MICROS_KERNEL_OBJECT_CORE_SOURCES}
+        ${MICROS_SCHEDULER_CORE_SOURCES}
+        ${MICROS_ENDPOINT_CORE_SOURCES}
+        ${MICROS_IPC_CORE_SOURCES}
+        kernel/ipc/ipc_buffer.c
+        kernel/ipc/ipc_abi.c
+        kernel/scheduler/scheduler_completion.c
+    )
+    set(IPC01_NATIVE_HEADERS
+        ${OBJ02_NATIVE_HEADERS}
+        include/micros/endpoint.h
+        include/micros/bootstrap_control.h
+        include/micros/bootstrap.h
+        include/micros/user_address_space.h
+        include/micros/syscall_abi.h
+        include/micros/grant.h
+        include/micros/tty.h
+        include/micros/ipc_core.h
+        kernel/ipc/ipc_internal.h
+        include/micros/ipc_buffer.h
+        include/micros/ipc_abi.h
+        include/micros/ipc_runtime.h
+        include/micros/sv39.h
+        include/micros/scheduler.h
+        include/micros/work_observation.h
+        kernel/ipc/ipc_buffer_internal.h
+        kernel/scheduler/scheduler_runtime_internal.h
+        tests/qemu/selected_ipc_work.h
+        kernel/endpoint/endpoint_private.h
+        kernel/endpoint/endpoint_internal.h
+    )
+    set(IPC01_NATIVE_DEPENDENCIES ${IPC01_NATIVE_INPUTS} ${IPC01_NATIVE_HEADERS})
+    list(TRANSFORM IPC01_NATIVE_DEPENDENCIES PREPEND "${CMAKE_CURRENT_SOURCE_DIR}/")
+    set(IPC01_NATIVE_OUTPUTS)
+    foreach(ipc01_channel IN ITEMS ordinary work)
+        set(IPC01_SOURCES_${ipc01_channel})
+        foreach(ipc01_source IN LISTS IPC01_NATIVE_INPUTS)
+            list(APPEND IPC01_SOURCES_${ipc01_channel}
+                "${IPC01_NATIVE_ROOT}/${ipc01_channel}/${ipc01_source}")
+        endforeach()
+        list(APPEND IPC01_NATIVE_OUTPUTS ${IPC01_SOURCES_${ipc01_channel}})
+        foreach(ipc01_header IN LISTS IPC01_NATIVE_HEADERS)
+            list(APPEND IPC01_NATIVE_OUTPUTS
+                "${IPC01_NATIVE_ROOT}/${ipc01_channel}/${ipc01_header}")
+        endforeach()
+    endforeach()
+    add_custom_command(
+        OUTPUT ${IPC01_NATIVE_OUTPUTS}
+        COMMAND "${MICROS_PYTHON}" ${MICROS_PYTHON_ARGS}
+            "${CMAKE_CURRENT_SOURCE_DIR}/tools/generate_selected_ipc_validation_fixture.py"
+        DEPENDS ${IPC01_NATIVE_DEPENDENCIES}
+            tests/host/selected_ipc_validation_test.c
+            tests/host/selected_ipc_validation_test.h
+            tests/host/selected_ipc_completion_test.c
+            tests/host/selected_ipc_validation_evidence.py
+            tests/host/selected_ipc_validation_source.py
+            tests/host/native_observations.py
+            tests/host/native_observations.json
+            tests/host/source_snapshot.py
+            tests/host/c_source_records.py
+            tests/host/work_count_lexical.py
+            tests/host/work_count_projection.py
+            tests/host/work_count_types.py
+            tools/generate_selected_ipc_validation_fixture.py
+        WORKING_DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}"
+        VERBATIM
+    )
+    add_executable(selected_ipc_validation_ordinary ${IPC01_SOURCES_ordinary}
+        tests/host/selected_ipc_validation_test.c tests/host/selected_ipc_completion_test.c)
+    add_executable(selected_ipc_validation_test ${IPC01_SOURCES_work}
+        tests/host/selected_ipc_validation_test.c tests/host/selected_ipc_completion_test.c
+        tests/work/work_counts.c)
+    foreach(ipc01_channel IN ITEMS ordinary work)
+        if(ipc01_channel STREQUAL ordinary)
+            set(ipc01_target selected_ipc_validation_ordinary)
+        else()
+            set(ipc01_target selected_ipc_validation_test)
+        endif()
+        target_include_directories(${ipc01_target} PRIVATE
+            "${IPC01_NATIVE_ROOT}/${ipc01_channel}"
+            "${IPC01_NATIVE_ROOT}/${ipc01_channel}/include"
+            "${CMAKE_CURRENT_SOURCE_DIR}" "${CMAKE_CURRENT_SOURCE_DIR}/include")
+        target_compile_features(${ipc01_target} PRIVATE c_std_17)
+        target_compile_options(${ipc01_target} PRIVATE
+            -Wall -Wextra -Werror -Wpedantic -Wmissing-prototypes -Wstrict-prototypes -fno-builtin)
+        if(MICROS_ENABLE_SANITIZERS AND CMAKE_C_COMPILER_ID MATCHES "Clang|GNU")
+            target_compile_options(${ipc01_target} PRIVATE -fno-omit-frame-pointer -fsanitize=address,undefined)
+            target_link_options(${ipc01_target} PRIVATE -fsanitize=address,undefined)
+        endif()
+    endforeach()
+    target_compile_definitions(selected_ipc_validation_test PRIVATE
+        MICROS_TEST_WORK_COUNTS=1 MICROS_SELECTED_IPC_LAUNCHER=1
+        "MICROS_SELECTED_IPC_PYTHON=\"${MICROS_PYTHON}\""
+        "MICROS_SELECTED_IPC_DRIVER=\"${CMAKE_CURRENT_SOURCE_DIR}/tools/check_selected_ipc_validation.py\""
+        "MICROS_SELECTED_IPC_ROOT=\"${CMAKE_CURRENT_SOURCE_DIR}\"")
+    add_test(NAME selected-ipc-validation COMMAND selected_ipc_validation_test
+        "$<TARGET_FILE:selected_ipc_validation_ordinary>")
+    set_tests_properties(selected-ipc-validation PROPERTIES LABELS slow)
+    add_dependencies(test-unit selected_ipc_validation_ordinary selected_ipc_validation_test)
+
     include("${CMAKE_CURRENT_SOURCE_DIR}/tests/stack/StackEvidence.cmake")
     include("${CMAKE_CURRENT_SOURCE_DIR}/tests/work/WorkCounts.cmake")
     return()
@@ -5871,6 +5973,9 @@ if(MICROS_BUILD_IPC_SYSCALL_TEST)
             "${MICROS_PYTHON}"
             ${MICROS_PYTHON_ARGS}
             "${CMAKE_CURRENT_SOURCE_DIR}/tools/run_qemu_smoke.py"
+            --require-current-evidence
+            selected-ipc
+            --report-transcript
             --qemu
             "${MICROS_QEMU}"
             --kernel
@@ -6903,6 +7008,23 @@ if(MICROS_BUILD_IPC_SYSCALL_TEST)
         PRIVATE
             arch/riscv64/ipc_syscall_test.S
             ${MICROS_IPC_SYSCALL_QEMU_TEST_SOURCES}
+            tests/qemu/selected_ipc_work.c
+            tests/work/work_counts.c
+    )
+    set_source_files_properties(
+        kernel/objects/kernel_objects.c
+        kernel/objects/kernel_object_validation.c
+        kernel/scheduler/scheduler_core_validate.c
+        kernel/endpoint/endpoint_registry.c
+        kernel/endpoint/endpoint_object_validation.c
+        kernel/ipc/ipc_runtime.c
+        kernel/ipc/ipc_buffer.c
+        kernel/ipc/ipc_syscall.c
+        kernel/scheduler/scheduler_completion.c
+        tests/qemu/selected_ipc_work.c
+        kernel/tests/ipc/ipc_syscall_test_report.c
+        tests/work/work_counts.c
+        PROPERTIES COMPILE_DEFINITIONS MICROS_TEST_WORK_COUNTS=1
     )
 endif()
 

@@ -1,4 +1,5 @@
 #include "kernel/ipc/ipc_syscall_internal.h"
+#include "tests/qemu/selected_ipc_work.h"
 
 #include <stdbool.h>
 #include <stdint.h>
@@ -7,6 +8,8 @@
 #include "kernel/boot/bootstrap_runtime.h"
 #include "kernel/ipc/ipc_runtime_internal.h"
 #include "kernel/objects/kernel_object_runtime_internal.h"
+#include "kernel/endpoint/endpoint_internal.h"
+#include "kernel/scheduler/scheduler_core_internal.h"
 #include "micros/ipc_abi.h"
 #include "micros/ipc_buffer.h"
 #include "micros/ipc_core.h"
@@ -36,6 +39,7 @@ static struct micros_endpoint_registry *resolve_current_runtime(
 {
     struct micros_endpoint_registry *registry;
     const struct micros_thread *resolved;
+    const struct micros_hart *selected_hart;
 
     registry = micros_ipc_runtime_authoritative_registry();
     if (registry == NULL) {
@@ -45,7 +49,12 @@ static struct micros_endpoint_registry *resolve_current_runtime(
             "ipc-runtime-not-initialized"
         );
     }
-    if (micros_ipc_runtime_validate() != MICROS_ENDPOINT_OK) {
+    if (
+        context->objects != micros_kernel_object_runtime_authoritative_registry()
+        || endpoint_preflight_registry(registry) != MICROS_ENDPOINT_OK
+        || scheduler_core_preflight_hart(context->objects, context->hart, &selected_hart)
+            != MICROS_KERNEL_OBJECT_OK
+    ) {
         ipc_syscall_panic(hart, frame, "ipc-runtime-invariant");
     }
     if (
@@ -55,10 +64,16 @@ static struct micros_endpoint_registry *resolve_current_runtime(
             &resolved
         )
             != MICROS_KERNEL_OBJECT_OK
+        || selected_hart != hart
+        || selected_hart->current_thread.slot != context->current.slot
+        || selected_hart->current_thread.generation != context->current.generation
         || resolved->owner.slot != context->process.slot
         || resolved->owner.generation != context->process.generation
     ) {
         ipc_syscall_panic(hart, frame, "ipc-current-invariant");
+    }
+    if (!micros_endpoint_thread_ipc_state_is_valid(registry, context->objects, context->current)) {
+        ipc_syscall_panic(hart, frame, "ipc-runtime-invariant");
     }
     return registry;
 }
@@ -185,6 +200,7 @@ enum micros_syscall_return micros_ipc_handle_captured_user_ecall(
     ) {
         ipc_syscall_panic(hart, frame, "ipc-syscall-argument");
     }
+    MICROS_IPC01_SYSCALL_BEGIN(arguments->a7, context->current);
     registry = resolve_current_runtime(hart, frame, context);
     preflight_result = ipc_syscall_preflight_request(
         hart,
@@ -194,6 +210,7 @@ enum micros_syscall_return micros_ipc_handle_captured_user_ecall(
         &request
     );
     if (preflight_result != MICROS_IPC_ABI_OK) {
+        MICROS_IPC01_SYSCALL_END(false);
         return ipc_syscall_return_abi_error(frame, preflight_result);
     }
     if (
@@ -203,6 +220,7 @@ enum micros_syscall_return micros_ipc_handle_captured_user_ecall(
         )
         && micros_bootstrap_runtime_is_active_controller(context->process)
     ) {
+        MICROS_IPC01_SYSCALL_END(false);
         return ipc_syscall_return_abi_error(frame, MICROS_IPC_ABI_UNAUTHORIZED);
     }
     begin_current_guard(hart, frame, context, &guard);
@@ -213,7 +231,10 @@ enum micros_syscall_return micros_ipc_handle_captured_user_ecall(
         &request
     );
     if (ipc_error != MICROS_IPC_OK) {
-        return rollback_current_error(hart, frame, context, &guard, ipc_error);
+        enum micros_syscall_return result = rollback_current_error(hart, frame, context, &guard, ipc_error);
+
+        MICROS_IPC01_SYSCALL_END(false);
+        return result;
     }
     stage_immediate_completion(hart, frame, context, registry, request.operation);
     if (
@@ -224,5 +245,6 @@ enum micros_syscall_return micros_ipc_handle_captured_user_ecall(
     ) {
         ipc_syscall_panic(hart, frame, "ipc-guard-commit");
     }
+    MICROS_IPC01_SYSCALL_END(true);
     return MICROS_SYSCALL_RETURN_CAPTURED;
 }

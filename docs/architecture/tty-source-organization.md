@@ -19,6 +19,9 @@ Abandoned #142 patches and old-head receipts are historical, not current
 cross-HEAD acceptance evidence.
 Accepted ADR-0047 remains the authority
 for every existing TTY, UART, PLIC, mapping, grant and request transition.
+The [selected IPC contract](selected-ipc-validation.md#complete-audit-boundary-ledger)
+keeps TTY's complete diagnostic dependency explicit when endpoint queries
+become selected; it does not change the separate binding inspector's scope.
 
 ```text
 reviewed micros base: ac94a21141b86c2e9b661cf90f500cca82e0c0c4

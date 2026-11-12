@@ -511,3 +511,50 @@ bool test_close_failures_are_atomic(struct ipc_close_test_context *fixture)
         && reject_staged_source_and_current_scheduler_state(fixture, &scenario)
     );
 }
+
+bool test_close_accepts_full_capacity_queue(struct ipc_close_test_context *fixture)
+{
+    struct micros_thread_handle senders[MICROS_THREAD_CAPACITY];
+    struct micros_ipc_message message =
+        ipc_close_test_message_pattern(UINT32_C(0x2002), UINT8_C(0x71));
+    struct micros_thread_handle closing;
+
+    EXPECT_TRUE(ipc_close_test_setup_fixture(fixture, 2, MICROS_THREAD_CAPACITY));
+    closing = fixture->primary_threads[CLOSE_PROCESS_CLOSING];
+    EXPECT_OBJECT_ERROR(MICROS_KERNEL_OBJECT_OK, micros_thread_scheduler_remove(
+        &fixture->objects, closing
+    ));
+    EXPECT_OBJECT_ERROR(MICROS_KERNEL_OBJECT_OK, micros_thread_detach_execution_context(
+        &fixture->objects, closing
+    ));
+    EXPECT_OBJECT_ERROR(MICROS_KERNEL_OBJECT_OK, micros_thread_release(
+        &fixture->objects, closing
+    ));
+    senders[0] = fixture->primary_threads[CLOSE_PROCESS_FOREIGN_SEND];
+    for (size_t index = 1; index < MICROS_THREAD_CAPACITY; ++index) {
+        EXPECT_TRUE(ipc_close_test_prepare_thread(
+            fixture, CLOSE_PROCESS_FOREIGN_SEND,
+            MICROS_SCHEDULER_PRIORITY_DEFAULT_USER, &senders[index]
+        ));
+    }
+    for (size_t index = 0; index < MICROS_THREAD_CAPACITY; ++index) {
+        EXPECT_IPC_ERROR(MICROS_IPC_OK, micros_ipc_sender_enqueue(
+            &fixture->registry, &fixture->objects, senders[index],
+            fixture->endpoints[CLOSE_PROCESS_CLOSING], &message, 0, 0
+        ));
+    }
+    EXPECT_TRUE(micros_endpoint_registry_validate_objects(
+        &fixture->registry, &fixture->objects
+    ) == MICROS_ENDPOINT_OK);
+    EXPECT_IPC_ERROR(MICROS_IPC_OK, micros_ipc_endpoint_close(
+        &fixture->registry, &fixture->objects,
+        fixture->endpoints[CLOSE_PROCESS_CLOSING]
+    ));
+    for (size_t index = 0; index < MICROS_THREAD_CAPACITY; ++index) {
+        EXPECT_TRUE(ipc_close_test_thread_has_dead_endpoint_result(fixture, senders[index]));
+    }
+    EXPECT_TRUE(micros_endpoint_registry_validate_objects(
+        &fixture->registry, &fixture->objects
+    ) == MICROS_ENDPOINT_OK);
+    return true;
+}

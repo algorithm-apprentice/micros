@@ -63,6 +63,10 @@ def _validate_current_evidence(scope, result, kernel):
         from tests.host.common_scheduler_return_evidence import parse_target_output, target_failures
 
         failures = target_failures(parse_target_output(reported, "current", result.return_code))
+    elif scope == "selected-ipc":
+        from tests.host.selected_ipc_validation_evidence import parse_target_output, target_failures
+
+        failures = target_failures(parse_target_output(reported, result.return_code))
     elif scope in ("user-address-space", "address-space-handoff"):
         from tests.host.selected_release_handoff_evidence import parse_target_output, target_failures
         from tests.host.work_count_types import Stage

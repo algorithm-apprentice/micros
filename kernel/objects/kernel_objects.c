@@ -1,4 +1,5 @@
 #include "micros/kernel_objects.h"
+#include "micros/work_observation.h"
 
 #include <stdint.h>
 
@@ -46,5 +47,9 @@ enum micros_kernel_object_error micros_kernel_objects_validate(
     const struct micros_kernel_objects *objects
 )
 {
+#ifdef MICROS_BUILD_IPC_SYSCALL_TEST
+    MICROS_TEST_WORK_HIT("ipc01-target-objects", MICROS_WORK_OWNER_KERNEL_OBJECTS,
+                         MICROS_WORK_KIND_COMPLETE_VALIDATOR_CALL, 1);
+#endif
     return micros_scheduler_core_validate(objects);
 }

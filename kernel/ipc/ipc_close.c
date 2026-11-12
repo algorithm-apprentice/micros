@@ -23,6 +23,19 @@ struct ipc_endpoint_close_plan {
     size_t transition_count;
 };
 
+static bool thread_mentions_closing_slot(
+    const struct micros_thread *thread,
+    uint16_t slot
+)
+{
+    return thread->owner.slot == slot
+        || micros_endpoint_names_slot(thread->ipc_send_destination, slot)
+        || micros_endpoint_names_slot(thread->ipc_receive_source, slot)
+        || micros_endpoint_names_slot(thread->ipc_reply_callee, slot)
+        || micros_endpoint_names_slot(thread->ipc_outbound_message.source, slot)
+        || micros_endpoint_names_slot(thread->ipc_inbound_message.source, slot);
+}
+
 static bool thread_has_staged_reference(
     const struct micros_thread *thread,
     micros_endpoint_t endpoint
@@ -70,11 +83,13 @@ static enum micros_ipc_error add_close_transition(
 }
 
 static enum micros_ipc_error preflight_close_threads(
+    const struct micros_endpoint_registry *registry,
     const struct micros_kernel_objects *objects,
     struct ipc_endpoint_close_plan *plan
 )
 {
     size_t index;
+    size_t owned_count = 0;
 
     for (index = 0; index < MICROS_THREAD_CAPACITY; ++index) {
         const struct micros_thread *thread =
@@ -96,7 +111,16 @@ static enum micros_ipc_error preflight_close_threads(
         }
         handle.slot = (uint16_t)index;
         handle.generation = thread->generation;
+        if (!thread_mentions_closing_slot(thread, plan->owner.slot)) {
+            continue;
+        }
+        if (!micros_endpoint_thread_ipc_state_is_valid(registry, objects, handle)) {
+            return MICROS_IPC_ERROR_INVARIANT;
+        }
         owned = ipc_process_handles_equal(thread->owner, plan->owner);
+        if (owned) {
+            ++owned_count;
+        }
         queued_sender =
             (
                 thread->ipc_queue_kind
@@ -172,34 +196,54 @@ static enum micros_ipc_error preflight_close_threads(
             return error;
         }
     }
-    return MICROS_IPC_OK;
+    return owned_count == objects->processes[plan->owner.slot].live_thread_count
+        ? MICROS_IPC_OK
+        : MICROS_IPC_ERROR_INVARIANT;
 }
 
 static enum micros_ipc_error preflight_close_queue(
+    const struct micros_endpoint_registry *registry,
     const struct micros_kernel_objects *objects,
+    const struct micros_endpoint_record *endpoint,
     struct micros_thread_handle head,
+    struct micros_thread_handle tail,
+    enum micros_ipc_queue_kind kind,
     bool seen[MICROS_THREAD_CAPACITY]
 )
 {
+    struct micros_endpoint_selection destination;
     struct micros_thread_handle current = head;
     size_t steps;
 
+    if (ipc_thread_handle_is_zero(head)) {
+        return ipc_thread_handle_is_zero(tail)
+            ? MICROS_IPC_OK : MICROS_IPC_ERROR_INVARIANT;
+    }
+    if (
+        micros_endpoint_select(registry, objects, endpoint->value, &destination)
+            != MICROS_ENDPOINT_OK
+        || destination.record != endpoint
+    ) {
+        return MICROS_IPC_ERROR_INVARIANT;
+    }
     for (steps = 0; steps < MICROS_THREAD_CAPACITY; ++steps) {
         const struct micros_thread *thread;
 
-        if (ipc_thread_handle_is_zero(current)) {
-            return MICROS_IPC_OK;
-        }
         if (
             current.slot >= MICROS_THREAD_CAPACITY
             || current.generation == 0
             || seen[current.slot]
-            || micros_thread_resolve(objects, current, &thread)
-                != MICROS_KERNEL_OBJECT_OK
+            || !micros_endpoint_queue_member_is_valid(
+                registry, objects, &destination, current, kind, &thread
+            )
         ) {
             return MICROS_IPC_ERROR_INVARIANT;
         }
         seen[current.slot] = true;
+        if (ipc_thread_handles_equal(current, tail)) {
+            return ipc_thread_handle_is_zero(thread->ipc_next)
+                ? MICROS_IPC_OK : MICROS_IPC_ERROR_INVARIANT;
+        }
         current = thread->ipc_next;
     }
     return MICROS_IPC_ERROR_INVARIANT;
@@ -221,16 +265,24 @@ static enum micros_ipc_error preflight_close_queues(
         enum micros_ipc_error error;
 
         error = preflight_close_queue(
+            registry,
             objects,
+            &registry->endpoints[index],
             registry->endpoints[index].sender_head,
+            registry->endpoints[index].sender_tail,
+            MICROS_IPC_QUEUE_SENDER,
             seen
         );
         if (error != MICROS_IPC_OK) {
             return error;
         }
         error = preflight_close_queue(
+            registry,
             objects,
+            &registry->endpoints[index],
             registry->endpoints[index].receiver_head,
+            registry->endpoints[index].receiver_tail,
+            MICROS_IPC_QUEUE_RECEIVER,
             seen
         );
         if (error != MICROS_IPC_OK) {
@@ -250,6 +302,7 @@ static enum micros_ipc_error preflight_close_queues(
 
 static enum micros_ipc_error preflight_close_notifications(
     const struct micros_endpoint_registry *registry,
+    const struct micros_kernel_objects *objects,
     const struct ipc_endpoint_close_plan *plan
 )
 {
@@ -257,20 +310,30 @@ static enum micros_ipc_error preflight_close_notifications(
         UINT64_C(1) << plan->owner.slot;
     size_t index;
 
+    if (!endpoint_pending_notification_state_is_valid(
+        registry, objects, &registry->endpoints[plan->owner.slot]
+    )) {
+        return MICROS_IPC_ERROR_INVARIANT;
+    }
     for (index = 0; index < MICROS_PROCESS_CAPACITY; ++index) {
         const struct micros_endpoint_record *destination =
             &registry->endpoints[index];
+        struct micros_endpoint_selection selected;
+        bool pending = (destination->pending_notification_sources & source_bit) != 0;
 
         if (
-            (
-                destination->pending_notification_sources
-                & source_bit
-            ) != 0
-            && (
-                destination->pending_events[plan->owner.slot] == 0
-                || registry->endpoints[plan->owner.slot].value
-                    != plan->endpoint
-            )
+            pending != (destination->pending_events[plan->owner.slot] != 0)
+            || (pending
+                && (micros_endpoint_select(
+                    registry, objects, destination->value, &selected
+                ) != MICROS_ENDPOINT_OK
+                    || selected.record != destination
+                    || (destination->state != MICROS_ENDPOINT_STATE_ACTIVE
+                        && destination->state != MICROS_ENDPOINT_STATE_SOURCE_ONLY)
+                    || (registry->endpoints[plan->owner.slot].state
+                            != MICROS_ENDPOINT_STATE_ACTIVE
+                        && registry->endpoints[plan->owner.slot].state
+                            != MICROS_ENDPOINT_STATE_SOURCE_ONLY)))
         ) {
             return MICROS_IPC_ERROR_INVARIANT;
         }
@@ -306,7 +369,7 @@ static enum micros_ipc_error preflight_endpoint_close(
     }
     plan->owner = record->owner;
     plan->endpoint = endpoint;
-    error = preflight_close_threads(objects, plan);
+    error = preflight_close_threads(registry, objects, plan);
     if (error != MICROS_IPC_OK) {
         return error;
     }
@@ -314,7 +377,7 @@ static enum micros_ipc_error preflight_endpoint_close(
     if (error != MICROS_IPC_OK) {
         return error;
     }
-    return preflight_close_notifications(registry, plan);
+    return preflight_close_notifications(registry, objects, plan);
 }
 
 static void commit_close_queue(

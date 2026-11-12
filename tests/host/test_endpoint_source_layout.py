@@ -64,9 +64,9 @@ PRIVATE_HEADERS = (
 )
 
 CORE_DAG = {
-    0: {2, 4, 7}, 1: set(), 2: set(), 3: {1, 2}, 4: {3},
-    5: {1, 2}, 6: {1, 2, 5}, 7: {3, 4, 5, 6},
-    8: {1, 2, 4, 7}, 9: {1, 2, 7},
+    0: {2, 4}, 1: set(), 2: {1}, 3: {1, 2}, 4: {1, 2},
+    5: {1, 2}, 6: {1, 2, 5}, 7: {2, 3, 4, 5, 6},
+    8: {1, 2, 4, 6, 7}, 9: {1, 2, 6, 7},
 }
 
 def source(path):
@@ -198,7 +198,8 @@ class EndpointSourceLayoutTest(unittest.TestCase):
                         exports.add(callee)
             self.assertEqual(set(CORE_SOURCES), set(topological_order(set(CORE_SOURCES), edges)))
             declarations = re.findall(
-                rf"\b({PRIVATE_PREFIX}\w+)\s*\([^;{{}}]*\)\s*;", c_lexical_text(source(PRIVATE_HEADERS[0])),
+                rf"\b({PRIVATE_PREFIX}\w+)\s*\([^;{{}}]*\)\s*;",
+                c_lexical_text(source(PRIVATE_HEADERS[0]) + source("kernel/endpoint/endpoint_internal.h")),
             )
             self.assertEqual(len(declarations), len(set(declarations)))
             self.assertEqual(exports, set(declarations))

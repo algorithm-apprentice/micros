@@ -217,6 +217,8 @@ static bool tty_handoff_live_binding_matches(
             context->tty_handoff_state.thread,
             &work.thread
         ) != MICROS_KERNEL_OBJECT_OK
+        || micros_endpoint_registry_validate_objects(registry, objects)
+            != MICROS_ENDPOINT_OK
         || micros_endpoint_resolve_internal(
             registry,
             objects,

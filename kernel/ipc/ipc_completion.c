@@ -1,6 +1,7 @@
 #include "kernel/ipc/ipc_internal.h"
 
 #include "kernel/endpoint/endpoint_internal.h"
+#include "kernel/scheduler/scheduler_core_internal.h"
 
 void ipc_stage_no_message_completion(
     struct micros_thread *thread,
@@ -62,17 +63,19 @@ enum micros_ipc_error micros_ipc_stage_no_message_completion(
     ) {
         return MICROS_IPC_ERROR_ARGUMENT;
     }
-    endpoint_error =
-        micros_endpoint_registry_validate_objects(registry, objects);
+    endpoint_error = endpoint_preflight_registry(registry);
     if (endpoint_error != MICROS_ENDPOINT_OK) {
         return ipc_endpoint_error_to_ipc(endpoint_error);
     }
     object_error =
-        micros_thread_resolve(objects, thread_handle, &resolved);
+        scheduler_core_preflight_thread(objects, thread_handle, &resolved);
     if (object_error == MICROS_KERNEL_OBJECT_ERROR_STALE) {
         return MICROS_IPC_ERROR_DEAD_ENDPOINT;
     }
     if (object_error != MICROS_KERNEL_OBJECT_OK) {
+        return MICROS_IPC_ERROR_INVARIANT;
+    }
+    if (!micros_endpoint_thread_ipc_state_is_valid(registry, objects, thread_handle)) {
         return MICROS_IPC_ERROR_INVARIANT;
     }
     owner = &registry->endpoints[resolved->owner.slot];

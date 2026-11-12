@@ -1,7 +1,11 @@
 #include "kernel/scheduler/scheduler_runtime_internal.h"
+#include "tests/qemu/selected_ipc_work.h"
 
 #include "micros/ipc_abi.h"
 #include "micros/ipc_runtime.h"
+#include "kernel/endpoint/endpoint_internal.h"
+
+_Static_assert(sizeof(struct scheduler_completion_commit) <= 256, "selected completion storage is bounded");
 
 static enum scheduler_completion_error
 preflight_selected_completion(
@@ -28,18 +32,17 @@ preflight_selected_completion(
             ? SCHEDULER_COMPLETION_OK
             : SCHEDULER_COMPLETION_INVARIANT;
     }
+    MICROS_IPC01_COMPLETION_BEGIN(selected);
     registry = micros_ipc_runtime_registry();
     if (
         registry == NULL
-        || micros_endpoint_registry_validate_objects(
-            registry,
-            objects
-        ) != MICROS_ENDPOINT_OK
+        || !micros_endpoint_thread_ipc_state_is_valid(registry, objects, selected)
         || !micros_ipc_abi_map_error(
             resolved->ipc_staged_result,
             &completion->abi_result
         )
     ) {
+        MICROS_IPC01_COMPLETION_END(false, 0, 0, 0);
         return SCHEDULER_COMPLETION_INVARIANT;
     }
     completion->pending = true;
@@ -48,6 +51,7 @@ preflight_selected_completion(
     completion->receive_buffer = resolved->ipc_receive_buffer;
     completion->message = resolved->ipc_inbound_message;
     if (completion->receive_buffer == 0) {
+        MICROS_IPC01_COMPLETION_END(true, completion->abi_result, 0, completion->message.reply_token);
         return SCHEDULER_COMPLETION_OK;
     }
     buffer_error = micros_ipc_buffer_prepare_write(
@@ -56,8 +60,13 @@ preflight_selected_completion(
         &completion->buffer_plan
     );
     if (buffer_error == MICROS_IPC_BUFFER_ERROR_MESSAGE_FAULT) {
+        MICROS_IPC01_COMPLETION_END(false, 0, 0, 0);
         return SCHEDULER_COMPLETION_INVALID_BUFFER;
     }
+    MICROS_IPC01_COMPLETION_END(
+        buffer_error == MICROS_IPC_BUFFER_OK, completion->abi_result,
+        completion->buffer_plan.chunk_count, completion->message.reply_token
+    );
     return buffer_error == MICROS_IPC_BUFFER_OK
         ? SCHEDULER_COMPLETION_OK
         : SCHEDULER_COMPLETION_INVARIANT;

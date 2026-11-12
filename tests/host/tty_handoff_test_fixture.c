@@ -80,6 +80,15 @@ enum micros_endpoint_error micros_endpoint_resolve_internal(
     return MICROS_ENDPOINT_OK;
 }
 
+enum micros_endpoint_error micros_endpoint_registry_validate_objects(
+    const struct micros_endpoint_registry *registry,
+    const struct micros_kernel_objects *objects
+)
+{
+    return registry == NULL || objects == NULL
+        ? MICROS_ENDPOINT_ERROR_ARGUMENT : MICROS_ENDPOINT_OK;
+}
+
 enum micros_endpoint_error
 micros_privilege_profile_allows_kernel_operation(
     const struct micros_endpoint_registry *registry,

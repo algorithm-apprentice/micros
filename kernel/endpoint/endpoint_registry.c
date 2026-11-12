@@ -1,4 +1,5 @@
 #include "kernel/endpoint/endpoint_private.h"
+#include "micros/work_observation.h"
 
 static bool prepare_profile_candidates(
     const struct micros_privilege_profile *profiles,
@@ -278,6 +279,10 @@ enum micros_endpoint_error micros_endpoint_registry_validate(
     const struct micros_endpoint_registry *registry
 )
 {
+#ifdef MICROS_BUILD_IPC_SYSCALL_TEST
+    MICROS_TEST_WORK_HIT("ipc01-target-registry", MICROS_WORK_OWNER_KERNEL_ENDPOINT,
+                         MICROS_WORK_KIND_COMPLETE_VALIDATOR_CALL, 1);
+#endif
     enum micros_endpoint_error error;
 
     error = endpoint_require_initialized(registry);

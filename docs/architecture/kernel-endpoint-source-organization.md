@@ -1,5 +1,13 @@
 # Kernel Endpoint Source Organization
 
+The [selected IPC contract](selected-ipc-validation.md), Accepted under
+ADR-0124, refines the original extraction boundary below. Selected metadata
+and identity use the existing codec and identity leaves; profile queries use
+those leaves rather than the complete registry audit. Selected thread and
+owned-thread relationships stay in the object-validation owner, above queue,
+completion and identity predicates. Cross-family read-only selections use
+`endpoint_internal.h`; complete diagnostics retain their original predicates.
+
 ## Status, base, and goal
 
 This is the Accepted design contract for

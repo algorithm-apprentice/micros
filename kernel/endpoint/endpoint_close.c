@@ -1,97 +1,137 @@
 #include "kernel/endpoint/endpoint_private.h"
-#include "kernel/endpoint/endpoint_internal.h"
 
-static bool endpoint_is_pending_notification_source(
-    const struct micros_endpoint_registry *registry,
-    const struct micros_endpoint_record *source
-);
-
-enum micros_endpoint_error
-micros_endpoint_preflight_source_only_for_teardown(
+static enum micros_endpoint_error preflight_pending_source_references(
     const struct micros_endpoint_registry *registry,
     const struct micros_kernel_objects *objects,
-    micros_endpoint_t endpoint
+    const struct micros_endpoint_record *source
 )
 {
-    const struct micros_endpoint_record *record;
-    enum micros_endpoint_error error;
-    if (registry == NULL || objects == NULL) {
-        return MICROS_ENDPOINT_ERROR_ARGUMENT;
-    }
-    error = micros_endpoint_registry_validate_objects(registry, objects);
-    if (error != MICROS_ENDPOINT_OK) {
-        return error;
-    }
-    error = endpoint_record_resolve_validated(
-        registry,
-        endpoint,
-        &record
-    );
-    if (error != MICROS_ENDPOINT_OK) {
-        return error;
-    }
-    if (
-        record->state != MICROS_ENDPOINT_STATE_ACTIVE
-    ) {
+    uint64_t bit = UINT64_C(1) << source->owner.slot;
+
+    for (size_t index = 0; index < MICROS_PROCESS_CAPACITY; ++index) {
+        const struct micros_endpoint_record *destination = &registry->endpoints[index];
+        struct micros_endpoint_selection selected;
+        bool pending = (destination->pending_notification_sources & bit) != 0;
+
+        if (pending != (destination->pending_events[source->owner.slot] != 0)) {
+            return MICROS_ENDPOINT_ERROR_INVARIANT;
+        }
+        if (!pending) {
+            continue;
+        }
+        if (
+            micros_endpoint_select(registry, objects, destination->value, &selected)
+                != MICROS_ENDPOINT_OK
+            || selected.record != destination
+            || (destination->state != MICROS_ENDPOINT_STATE_ACTIVE
+                && destination->state != MICROS_ENDPOINT_STATE_SOURCE_ONLY)
+            || (source->state != MICROS_ENDPOINT_STATE_ACTIVE
+                && source->state != MICROS_ENDPOINT_STATE_SOURCE_ONLY)
+        ) {
+            return MICROS_ENDPOINT_ERROR_INVARIANT;
+        }
         return MICROS_ENDPOINT_ERROR_STATE;
     }
     return MICROS_ENDPOINT_OK;
 }
 
-enum micros_endpoint_error
-micros_endpoint_preflight_source_only(
+static enum micros_endpoint_error preflight_foreign_references(
+    const struct micros_endpoint_registry *registry,
+    const struct micros_kernel_objects *objects,
+    const struct micros_endpoint_record *endpoint,
+    bool include_staged
+)
+{
+    for (size_t index = 0; index < MICROS_THREAD_CAPACITY; ++index) {
+        const struct micros_thread *thread = &objects->threads[index];
+        struct micros_thread_handle handle;
+        bool sender;
+
+        if (thread->slot_state != MICROS_KERNEL_OBJECT_SLOT_LIVE) {
+            continue;
+        }
+        sender = micros_endpoint_names_slot(thread->ipc_send_destination, endpoint->owner.slot);
+        if (
+            !sender
+            && !micros_endpoint_names_slot(thread->ipc_receive_source, endpoint->owner.slot)
+            && !micros_endpoint_names_slot(thread->ipc_reply_callee, endpoint->owner.slot)
+            && !(include_staged
+                && micros_endpoint_names_slot(thread->ipc_inbound_message.source, endpoint->owner.slot))
+        ) {
+            continue;
+        }
+        handle.slot = (uint16_t)index;
+        handle.generation = thread->generation;
+        if (sender || !micros_endpoint_thread_ipc_state_is_valid(registry, objects, handle)) {
+            return MICROS_ENDPOINT_ERROR_INVARIANT;
+        }
+        return MICROS_ENDPOINT_ERROR_STATE;
+    }
+    return MICROS_ENDPOINT_OK;
+}
+
+static enum micros_endpoint_error resolve_teardown_endpoint(
+    const struct micros_endpoint_registry *registry,
+    const struct micros_kernel_objects *objects,
+    micros_endpoint_t endpoint,
+    struct micros_endpoint_selection *selection
+)
+{
+    enum micros_endpoint_error error = micros_endpoint_select(registry, objects, endpoint, selection);
+
+    if (error != MICROS_ENDPOINT_OK) {
+        return error;
+    }
+    error = endpoint_preflight_record(registry, objects, selection);
+    if (error != MICROS_ENDPOINT_OK) {
+        return error;
+    }
+    return selection->record->state == MICROS_ENDPOINT_STATE_ACTIVE
+        ? MICROS_ENDPOINT_OK : MICROS_ENDPOINT_ERROR_STATE;
+}
+
+enum micros_endpoint_error micros_endpoint_preflight_source_only_for_teardown(
     const struct micros_endpoint_registry *registry,
     const struct micros_kernel_objects *objects,
     micros_endpoint_t endpoint
 )
 {
-    const struct micros_endpoint_record *record;
-    enum micros_endpoint_error error;
-    size_t index;
+    struct micros_endpoint_selection selection;
 
-    error = micros_endpoint_preflight_source_only_for_teardown(
-        registry,
-        objects,
-        endpoint
-    );
+    return resolve_teardown_endpoint(registry, objects, endpoint, &selection);
+}
+
+static enum micros_endpoint_error preflight_plain_source_only(
+    const struct micros_endpoint_registry *registry,
+    const struct micros_kernel_objects *objects,
+    micros_endpoint_t endpoint,
+    struct micros_endpoint_selection *selection
+)
+{
+    enum micros_endpoint_error error = resolve_teardown_endpoint(registry, objects, endpoint, selection);
+
     if (error != MICROS_ENDPOINT_OK) {
         return error;
     }
-    error = endpoint_record_resolve_validated(
-        registry,
-        endpoint,
-        &record
-    );
-    if (error != MICROS_ENDPOINT_OK) {
-        return error;
-    }
-    if (
-        !endpoint_ipc_state_is_zero(record)
-        || endpoint_is_pending_notification_source(registry, record)
-    ) {
+    if (!endpoint_ipc_state_is_zero(selection->record)) {
         return MICROS_ENDPOINT_ERROR_STATE;
     }
-    for (index = 0; index < MICROS_THREAD_CAPACITY; ++index) {
-        const struct micros_thread *thread = &objects->threads[index];
-
-        if (
-            thread->slot_state == MICROS_KERNEL_OBJECT_SLOT_LIVE
-            && (
-                (
-                    thread->ipc_queue_kind
-                        == MICROS_IPC_QUEUE_RECEIVER
-                    && thread->ipc_receive_source == endpoint
-                )
-                || (
-                    thread->ipc_reply_token != 0
-                    && thread->ipc_reply_callee == endpoint
-                )
-            )
-        ) {
-            return MICROS_ENDPOINT_ERROR_STATE;
-        }
+    error = preflight_pending_source_references(registry, objects, selection->record);
+    if (error != MICROS_ENDPOINT_OK) {
+        return error;
     }
-    return MICROS_ENDPOINT_OK;
+    return preflight_foreign_references(registry, objects, selection->record, false);
+}
+
+enum micros_endpoint_error micros_endpoint_preflight_source_only(
+    const struct micros_endpoint_registry *registry,
+    const struct micros_kernel_objects *objects,
+    micros_endpoint_t endpoint
+)
+{
+    struct micros_endpoint_selection selection;
+
+    return preflight_plain_source_only(registry, objects, endpoint, &selection);
 }
 
 void micros_endpoint_commit_source_only_prevalidated(
@@ -102,8 +142,7 @@ void micros_endpoint_commit_source_only_prevalidated(
     struct micros_process_handle owner;
 
     (void)micros_endpoint_unpack(endpoint, &owner);
-    registry->endpoints[owner.slot].state =
-        MICROS_ENDPOINT_STATE_SOURCE_ONLY;
+    registry->endpoints[owner.slot].state = MICROS_ENDPOINT_STATE_SOURCE_ONLY;
 }
 
 enum micros_endpoint_error micros_endpoint_seal_source_only(
@@ -112,104 +151,18 @@ enum micros_endpoint_error micros_endpoint_seal_source_only(
     micros_endpoint_t endpoint
 )
 {
-    const struct micros_endpoint_record *record;
-    enum micros_endpoint_error error;
+    struct micros_endpoint_selection selection;
+    enum micros_endpoint_error error = preflight_plain_source_only(registry, objects, endpoint, &selection);
 
-    if (registry == NULL || objects == NULL) {
-        return MICROS_ENDPOINT_ERROR_ARGUMENT;
-    }
-    error = micros_endpoint_preflight_source_only(
-        registry,
-        objects,
-        endpoint
-    );
     if (error != MICROS_ENDPOINT_OK) {
         return error;
     }
-    error = endpoint_record_resolve_validated(
-        registry,
-        endpoint,
-        &record
-    );
+    error = endpoint_preflight_owned_threads(registry, objects, selection.record->owner, false);
     if (error != MICROS_ENDPOINT_OK) {
         return error;
     }
-    if (
-        !endpoint_process_threads_are_held(objects, record->owner, false)
-        || !endpoint_process_threads_have_clear_ipc_state(objects, record->owner)
-    ) {
-        return MICROS_ENDPOINT_ERROR_STATE;
-    }
-    micros_endpoint_commit_source_only_prevalidated(
-        registry,
-        endpoint
-    );
+    micros_endpoint_commit_source_only_prevalidated(registry, endpoint);
     return MICROS_ENDPOINT_OK;
-}
-
-static bool endpoint_has_foreign_waiters(
-    const struct micros_kernel_objects *objects,
-    micros_endpoint_t endpoint
-)
-{
-    size_t index;
-
-    for (index = 0; index < MICROS_THREAD_CAPACITY; ++index) {
-        const struct micros_thread *thread = &objects->threads[index];
-
-        if (thread->slot_state != MICROS_KERNEL_OBJECT_SLOT_LIVE) {
-            continue;
-        }
-        if (
-            (
-                thread->ipc_queue_kind
-                    == MICROS_IPC_QUEUE_RECEIVER
-                && thread->ipc_receive_source == endpoint
-            )
-            || (
-                thread->ipc_reply_token != 0
-                && thread->ipc_reply_callee == endpoint
-            )
-            || (
-                thread->ipc_delivery_pending
-                && thread->ipc_staged_result == MICROS_IPC_OK
-                && thread->ipc_inbound_message.source == endpoint
-            )
-        ) {
-            return true;
-        }
-    }
-    return false;
-}
-
-static bool endpoint_is_pending_notification_source(
-    const struct micros_endpoint_registry *registry,
-    const struct micros_endpoint_record *source
-)
-{
-    uint64_t source_bit = UINT64_C(1) << source->owner.slot;
-    size_t index;
-
-    for (index = 0; index < MICROS_PROCESS_CAPACITY; ++index) {
-        const struct micros_endpoint_record *destination =
-            &registry->endpoints[index];
-
-        if (
-            (
-                destination->state
-                    == MICROS_ENDPOINT_STATE_ACTIVE
-                || destination->state
-                    == MICROS_ENDPOINT_STATE_SOURCE_ONLY
-            )
-            && (
-                destination->pending_notification_sources
-                & source_bit
-            ) != 0
-        ) {
-            return true;
-        }
-    }
-    return false;
 }
 
 void micros_endpoint_close_commit_prevalidated(
@@ -218,14 +171,9 @@ void micros_endpoint_close_commit_prevalidated(
     struct micros_process_handle owner
 )
 {
-    struct micros_endpoint_record *record =
-        &registry->endpoints[owner.slot];
-    struct micros_process *process =
-        &objects->processes[owner.slot];
-
-    endpoint_clear_endpoint_record(record);
-    process->primary_endpoint = MICROS_PROCESS_ENDPOINT_NONE;
-    process->privilege_profile = 0;
+    endpoint_clear_endpoint_record(&registry->endpoints[owner.slot]);
+    objects->processes[owner.slot].primary_endpoint = MICROS_PROCESS_ENDPOINT_NONE;
+    objects->processes[owner.slot].privilege_profile = 0;
 }
 
 enum micros_endpoint_error micros_endpoint_close(
@@ -234,51 +182,31 @@ enum micros_endpoint_error micros_endpoint_close(
     micros_endpoint_t endpoint
 )
 {
-    const struct micros_endpoint_record *resolved_record;
-    struct micros_process_handle owner;
-    enum micros_endpoint_error error;
+    struct micros_endpoint_selection selection;
+    enum micros_endpoint_error error = micros_endpoint_select(registry, objects, endpoint, &selection);
 
-    if (registry == NULL || objects == NULL) {
-        return MICROS_ENDPOINT_ERROR_ARGUMENT;
-    }
-    error = micros_endpoint_registry_validate_objects(registry, objects);
     if (error != MICROS_ENDPOINT_OK) {
         return error;
     }
-    error = endpoint_record_resolve_validated(
-        registry,
-        endpoint,
-        &resolved_record
-    );
+    error = endpoint_preflight_record(registry, objects, &selection);
     if (error != MICROS_ENDPOINT_OK) {
         return error;
     }
-    if (!endpoint_ipc_state_is_zero(resolved_record)) {
+    if (!endpoint_ipc_state_is_zero(selection.record)) {
         return MICROS_ENDPOINT_ERROR_STATE;
     }
-    if (
-        endpoint_is_pending_notification_source(
-            registry,
-            resolved_record
-        )
-    ) {
-        return MICROS_ENDPOINT_ERROR_STATE;
+    error = preflight_pending_source_references(registry, objects, selection.record);
+    if (error != MICROS_ENDPOINT_OK) {
+        return error;
     }
-    if (endpoint_has_foreign_waiters(objects, endpoint)) {
-        return MICROS_ENDPOINT_ERROR_STATE;
+    error = preflight_foreign_references(registry, objects, selection.record, true);
+    if (error != MICROS_ENDPOINT_OK) {
+        return error;
     }
-    owner = resolved_record->owner;
-    if (
-        !endpoint_process_threads_are_held(objects, owner, false)
-        || !endpoint_process_threads_have_clear_ipc_state(objects, owner)
-    ) {
-        return MICROS_ENDPOINT_ERROR_STATE;
+    error = endpoint_preflight_owned_threads(registry, objects, selection.record->owner, false);
+    if (error != MICROS_ENDPOINT_OK) {
+        return error;
     }
-
-    micros_endpoint_close_commit_prevalidated(
-        registry,
-        objects,
-        owner
-    );
+    micros_endpoint_close_commit_prevalidated(registry, objects, selection.record->owner);
     return MICROS_ENDPOINT_OK;
 }

@@ -2,6 +2,7 @@
 #define MICROS_ENDPOINT_PRIVATE_H
 
 #include "micros/endpoint.h"
+#include "kernel/endpoint/endpoint_internal.h"
 
 #define MICROS_ENDPOINT_REGISTRY_MAGIC UINT64_C(0x4d4943524f534550)
 
@@ -78,8 +79,24 @@ enum micros_endpoint_error endpoint_require_initialized(
     const struct micros_endpoint_registry *registry
 );
 
-enum micros_endpoint_error endpoint_process_resolve_error(
-    enum micros_kernel_object_error error
+enum micros_endpoint_error endpoint_preflight_process(
+    const struct micros_endpoint_registry *registry,
+    const struct micros_kernel_objects *objects,
+    struct micros_process_handle handle,
+    const struct micros_process **process
+);
+
+enum micros_endpoint_error endpoint_preflight_owned_threads(
+    const struct micros_endpoint_registry *registry,
+    const struct micros_kernel_objects *objects,
+    struct micros_process_handle process,
+    bool require_unassigned
+);
+
+enum micros_endpoint_error endpoint_preflight_record(
+    const struct micros_endpoint_registry *registry,
+    const struct micros_kernel_objects *objects,
+    const struct micros_endpoint_selection *selection
 );
 
 enum micros_endpoint_error endpoint_record_resolve_validated(
@@ -89,17 +106,6 @@ enum micros_endpoint_error endpoint_record_resolve_validated(
 );
 
 bool endpoint_process_has_current_thread(
-    const struct micros_kernel_objects *objects,
-    struct micros_process_handle process
-);
-
-bool endpoint_process_threads_are_held(
-    const struct micros_kernel_objects *objects,
-    struct micros_process_handle process,
-    bool require_unassigned
-);
-
-bool endpoint_process_threads_have_clear_ipc_state(
     const struct micros_kernel_objects *objects,
     struct micros_process_handle process
 );
@@ -125,6 +131,13 @@ bool endpoint_staged_delivery_state_is_valid(
     const struct micros_thread *thread
 );
 
+bool endpoint_staged_delivery_selected_is_valid(
+    const struct micros_endpoint_registry *registry,
+    const struct micros_kernel_objects *objects,
+    const struct micros_thread *thread,
+    const struct micros_endpoint_selection *owner
+);
+
 bool endpoint_staged_error_state_is_valid(
     const struct micros_endpoint_registry *registry,
     const struct micros_thread *thread
@@ -143,12 +156,6 @@ bool endpoint_queue_is_valid(
     struct micros_thread_handle tail,
     enum micros_ipc_queue_kind kind,
     bool seen[MICROS_THREAD_CAPACITY]
-);
-
-bool endpoint_pending_notification_state_is_valid(
-    const struct micros_endpoint_registry *registry,
-    const struct micros_kernel_objects *objects,
-    const struct micros_endpoint_record *endpoint
 );
 
 bool endpoint_has_matchable_work(

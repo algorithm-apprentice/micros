@@ -84,6 +84,7 @@ def _add_execution_arguments(
         choices=(
             "kernel-mapping", "user-address-space", "address-space-handoff", "scheduler-return",
             "runtime-memory", "diagnostic-history",
+            "selected-ipc",
         ),
         help="Require the current semantic/work witnesses from this same guest execution",
     )

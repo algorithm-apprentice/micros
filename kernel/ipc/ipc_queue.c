@@ -1,81 +1,148 @@
 #include "kernel/ipc/ipc_internal.h"
 
-enum micros_ipc_error ipc_resolve_queue_tail(
-    struct micros_kernel_objects *objects,
-    struct micros_thread_handle tail,
-    struct micros_thread **thread
+static enum micros_ipc_error preflight_queue_endpoints(
+    const struct micros_endpoint_registry *registry,
+    const struct micros_kernel_objects *objects,
+    const struct micros_endpoint_selection *destination,
+    enum micros_ipc_queue_kind kind,
+    const struct micros_thread **head,
+    const struct micros_thread **tail
 )
 {
-    const struct micros_thread *resolved;
+    struct micros_thread_handle first = kind == MICROS_IPC_QUEUE_SENDER
+        ? destination->record->sender_head : destination->record->receiver_head;
+    struct micros_thread_handle last = kind == MICROS_IPC_QUEUE_SENDER
+        ? destination->record->sender_tail : destination->record->receiver_tail;
 
-    if (ipc_thread_handle_is_zero(tail)) {
-        *thread = NULL;
+    if (ipc_thread_handle_is_zero(first)) {
+        if (!ipc_thread_handle_is_zero(last)) {
+            return MICROS_IPC_ERROR_INVARIANT;
+        }
+        *head = NULL;
+        *tail = NULL;
         return MICROS_IPC_OK;
     }
     if (
-        micros_thread_resolve(objects, tail, &resolved)
-            != MICROS_KERNEL_OBJECT_OK
-        || !ipc_thread_handle_is_zero(resolved->ipc_next)
+        !micros_endpoint_queue_member_is_valid(registry, objects, destination, first, kind, head)
+        || (!ipc_thread_handles_equal(first, last)
+            && !micros_endpoint_queue_member_is_valid(registry, objects, destination, last, kind, tail))
     ) {
         return MICROS_IPC_ERROR_INVARIANT;
     }
-    *thread = &objects->threads[tail.slot];
+    if (ipc_thread_handles_equal(first, last)) {
+        *tail = *head;
+    }
+    return ipc_thread_handle_is_zero((*tail)->ipc_next)
+        ? MICROS_IPC_OK : MICROS_IPC_ERROR_INVARIANT;
+}
+
+enum micros_ipc_error ipc_prepare_queue_append(
+    const struct micros_endpoint_registry *registry,
+    struct micros_kernel_objects *objects,
+    const struct micros_endpoint_selection *destination,
+    enum micros_ipc_queue_kind kind,
+    struct micros_thread **tail
+)
+{
+    const struct micros_thread *first;
+    const struct micros_thread *last;
+    struct micros_thread_handle handle = kind == MICROS_IPC_QUEUE_SENDER
+        ? destination->record->sender_tail : destination->record->receiver_tail;
+    enum micros_ipc_error error =
+        preflight_queue_endpoints(registry, objects, destination, kind, &first, &last);
+
+    if (error != MICROS_IPC_OK) {
+        return error;
+    }
+    *tail = last == NULL ? NULL : &objects->threads[handle.slot];
     return MICROS_IPC_OK;
 }
 
-bool ipc_receiver_is_ready_for(
-    const struct micros_endpoint_record *destination,
+static bool successor_reenters_prefix(
     const struct micros_kernel_objects *objects,
-    micros_endpoint_t source
+    struct micros_thread_handle first,
+    struct micros_thread_handle successor,
+    size_t count
 )
 {
-    struct micros_thread_handle current = destination->receiver_head;
-    size_t steps;
+    struct micros_thread_handle current = first;
 
-    for (steps = 0; steps < MICROS_THREAD_CAPACITY; ++steps) {
-        const struct micros_thread *receiver;
-
-        if (ipc_thread_handle_is_zero(current)) {
-            return false;
-        }
-        receiver = &objects->threads[current.slot];
-        if (
-            receiver->ipc_receive_source == MICROS_ENDPOINT_ANY
-            || receiver->ipc_receive_source == source
-        ) {
+    for (size_t index = 0; index < count; ++index) {
+        if (ipc_thread_handles_equal(current, successor)) {
             return true;
         }
-        current = receiver->ipc_next;
+        current = objects->threads[current.slot].ipc_next;
     }
     return false;
 }
 
-bool ipc_sender_is_ready_for(
-    const struct micros_endpoint_record *receiver_endpoint,
+enum micros_ipc_error ipc_select_queue(
+    const struct micros_endpoint_registry *registry,
     const struct micros_kernel_objects *objects,
-    micros_endpoint_t source
+    const struct micros_endpoint_selection *destination,
+    enum micros_ipc_queue_kind kind,
+    micros_endpoint_t source,
+    struct ipc_queue_selection *selection
 )
 {
-    struct micros_thread_handle current =
-        receiver_endpoint->sender_head;
-    size_t steps;
+    struct micros_thread_handle first = kind == MICROS_IPC_QUEUE_SENDER
+        ? destination->record->sender_head : destination->record->receiver_head;
+    struct micros_thread_handle last = kind == MICROS_IPC_QUEUE_SENDER
+        ? destination->record->sender_tail : destination->record->receiver_tail;
+    struct micros_thread_handle current = first;
+    struct micros_thread_handle previous = {0, 0};
+    const struct micros_thread *head;
+    const struct micros_thread *tail;
+    enum micros_ipc_error error =
+        preflight_queue_endpoints(registry, objects, destination, kind, &head, &tail);
 
-    for (steps = 0; steps < MICROS_THREAD_CAPACITY; ++steps) {
-        const struct micros_thread *sender;
-
-        if (ipc_thread_handle_is_zero(current)) {
-            return false;
-        }
-        sender = &objects->threads[current.slot];
-        if (
-            source == MICROS_ENDPOINT_ANY
-            || sender->ipc_outbound_message.source == source
-        ) {
-            return true;
-        }
-        current = sender->ipc_next;
+    if (error != MICROS_IPC_OK || head == NULL) {
+        return error != MICROS_IPC_OK ? error : MICROS_IPC_ERROR_NOT_READY;
     }
-    return false;
+    for (size_t steps = 0; steps < MICROS_THREAD_CAPACITY; ++steps) {
+        const struct micros_thread *thread;
+        bool matches;
+
+        if (steps == 0) {
+            thread = head;
+        } else if (ipc_thread_handles_equal(current, first)) {
+            return MICROS_IPC_ERROR_INVARIANT;
+        } else if (ipc_thread_handles_equal(current, last)) {
+            thread = tail;
+        } else if (!micros_endpoint_queue_member_is_valid(
+            registry, objects, destination, current, kind, &thread
+        )) {
+            return MICROS_IPC_ERROR_INVARIANT;
+        }
+        matches = kind == MICROS_IPC_QUEUE_SENDER
+            ? source == MICROS_ENDPOINT_ANY || thread->ipc_outbound_message.source == source
+            : thread->ipc_receive_source == MICROS_ENDPOINT_ANY || thread->ipc_receive_source == source;
+        if (matches) {
+            const struct micros_thread *successor;
+
+            if (!ipc_thread_handles_equal(current, last)) {
+                if (
+                    ipc_thread_handle_is_zero(thread->ipc_next)
+                    || successor_reenters_prefix(objects, first, thread->ipc_next, steps + 1)
+                    || !micros_endpoint_queue_member_is_valid(
+                        registry, objects, destination, thread->ipc_next, kind, &successor
+                    )
+                ) {
+                    return MICROS_IPC_ERROR_INVARIANT;
+                }
+            }
+            selection->previous = previous;
+            selection->handle = current;
+            selection->thread = thread;
+            return MICROS_IPC_OK;
+        }
+        if (ipc_thread_handles_equal(current, last)) {
+            return MICROS_IPC_ERROR_NOT_READY;
+        }
+        previous = current;
+        current = thread->ipc_next;
+    }
+    return MICROS_IPC_ERROR_INVARIANT;
 }
 
 void ipc_append_thread(
@@ -91,103 +158,6 @@ void ipc_append_thread(
         previous_tail->ipc_next = thread_handle;
     }
     *tail = thread_handle;
-}
-
-bool ipc_find_matching_sender(
-    const struct micros_endpoint_record *endpoint,
-    struct micros_kernel_objects *objects,
-    micros_endpoint_t source,
-    struct micros_thread_handle *previous,
-    struct micros_thread_handle *matched,
-    struct micros_thread **sender
-)
-{
-    struct micros_thread_handle current = endpoint->sender_head;
-    struct micros_thread_handle prior = {0, 0};
-    size_t steps;
-
-    for (steps = 0; steps < MICROS_THREAD_CAPACITY; ++steps) {
-        struct micros_thread *candidate;
-
-        if (ipc_thread_handle_is_zero(current)) {
-            return false;
-        }
-        candidate = &objects->threads[current.slot];
-        if (
-            source == MICROS_ENDPOINT_ANY
-            || candidate->ipc_outbound_message.source == source
-        ) {
-            *previous = prior;
-            *matched = current;
-            *sender = candidate;
-            return true;
-        }
-        prior = current;
-        current = candidate->ipc_next;
-    }
-    return false;
-}
-
-bool ipc_find_matching_receiver_const(
-    const struct micros_endpoint_record *endpoint,
-    const struct micros_kernel_objects *objects,
-    micros_endpoint_t source,
-    struct micros_thread_handle *previous,
-    struct micros_thread_handle *matched,
-    const struct micros_thread **receiver
-)
-{
-    struct micros_thread_handle current = endpoint->receiver_head;
-    struct micros_thread_handle prior = {0, 0};
-    size_t steps;
-
-    for (steps = 0; steps < MICROS_THREAD_CAPACITY; ++steps) {
-        const struct micros_thread *candidate;
-
-        if (ipc_thread_handle_is_zero(current)) {
-            return false;
-        }
-        candidate = &objects->threads[current.slot];
-        if (
-            candidate->ipc_receive_source == MICROS_ENDPOINT_ANY
-            || candidate->ipc_receive_source == source
-        ) {
-            *previous = prior;
-            *matched = current;
-            *receiver = candidate;
-            return true;
-        }
-        prior = current;
-        current = candidate->ipc_next;
-    }
-    return false;
-}
-
-bool ipc_find_matching_receiver(
-    const struct micros_endpoint_record *endpoint,
-    struct micros_kernel_objects *objects,
-    micros_endpoint_t source,
-    struct micros_thread_handle *previous,
-    struct micros_thread_handle *matched,
-    struct micros_thread **receiver
-)
-{
-    const struct micros_thread *resolved;
-
-    if (
-        !ipc_find_matching_receiver_const(
-            endpoint,
-            objects,
-            source,
-            previous,
-            matched,
-            &resolved
-        )
-    ) {
-        return false;
-    }
-    *receiver = &objects->threads[matched->slot];
-    return true;
 }
 
 void ipc_unlink_thread(

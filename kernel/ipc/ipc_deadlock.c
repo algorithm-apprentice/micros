@@ -1,5 +1,7 @@
 #include "kernel/ipc/ipc_internal.h"
 
+#include "kernel/scheduler/scheduler_core_internal.h"
+
 static enum micros_ipc_error resolve_dependency_endpoint(
     const struct micros_endpoint_registry *registry,
     const struct micros_kernel_objects *objects,
@@ -7,40 +9,28 @@ static enum micros_ipc_error resolve_dependency_endpoint(
     struct micros_process_handle *owner
 )
 {
-    const struct micros_endpoint_record *record;
-    const struct micros_process *process;
-    struct micros_process_handle unpacked;
+    struct micros_endpoint_selection selected;
 
     if (
         endpoint == MICROS_ENDPOINT_NONE
         || endpoint == MICROS_ENDPOINT_ANY
-        || micros_endpoint_unpack(endpoint, &unpacked)
+        || micros_endpoint_select(registry, objects, endpoint, &selected)
             != MICROS_ENDPOINT_OK
-        || unpacked.slot >= MICROS_PROCESS_CAPACITY
     ) {
         return MICROS_IPC_ERROR_INVARIANT;
     }
-    record = &registry->endpoints[unpacked.slot];
-    process = &objects->processes[unpacked.slot];
     if (
-        (
-            record->state != MICROS_ENDPOINT_STATE_ACTIVE
-            && record->state
-                != MICROS_ENDPOINT_STATE_SOURCE_ONLY
-        )
-        || record->value != endpoint
-        || !ipc_process_handles_equal(record->owner, unpacked)
-        || process->slot_state != MICROS_KERNEL_OBJECT_SLOT_LIVE
-        || process->generation != unpacked.generation
-        || process->primary_endpoint != endpoint
+        selected.record->state != MICROS_ENDPOINT_STATE_ACTIVE
+        && selected.record->state != MICROS_ENDPOINT_STATE_SOURCE_ONLY
     ) {
         return MICROS_IPC_ERROR_INVARIANT;
     }
-    *owner = unpacked;
+    *owner = selected.record->owner;
     return MICROS_IPC_OK;
 }
 
 static enum micros_ipc_error resolve_sole_live_thread(
+    const struct micros_endpoint_registry *registry,
     const struct micros_kernel_objects *objects,
     struct micros_process_handle owner,
     struct micros_thread_handle *thread_handle,
@@ -84,7 +74,13 @@ static enum micros_ipc_error resolve_sole_live_thread(
         matched_handle.slot = (uint16_t)index;
         matched_handle.generation = candidate->generation;
     }
-    if (matched == NULL || matched_handle.generation == 0) {
+    if (
+        matched == NULL
+        || scheduler_core_preflight_thread(objects, matched_handle, &matched)
+            != MICROS_KERNEL_OBJECT_OK
+        || ((matched->runtime_flags & MICROS_THREAD_RTS_IPC_MASK) != 0
+            && !micros_endpoint_thread_ipc_state_is_valid(registry, objects, matched_handle))
+    ) {
         return MICROS_IPC_ERROR_INVARIANT;
     }
     *thread_handle = matched_handle;
@@ -206,6 +202,7 @@ enum micros_ipc_error ipc_preflight_deadlock(
             return error;
         }
         error = resolve_sole_live_thread(
+            registry,
             objects,
             owner,
             &thread_handle,

@@ -2,6 +2,53 @@
 #define MICROS_KERNEL_IPC_INTERNAL_H
 
 #include "micros/ipc_core.h"
+#include "kernel/endpoint/endpoint_internal.h"
+
+struct ipc_participant {
+    struct micros_thread_handle handle;
+    struct micros_thread *thread;
+    struct micros_endpoint_selection endpoint;
+};
+
+struct ipc_queue_selection {
+    struct micros_thread_handle previous;
+    struct micros_thread_handle handle;
+    const struct micros_thread *thread;
+};
+
+enum micros_ipc_error ipc_admit_held_thread(
+    const struct micros_endpoint_registry *registry,
+    struct micros_kernel_objects *objects,
+    struct micros_thread_handle handle,
+    struct ipc_participant *participant
+);
+enum micros_ipc_error ipc_admit_operation_thread(
+    const struct micros_endpoint_registry *registry,
+    struct micros_kernel_objects *objects,
+    struct micros_thread_handle handle,
+    struct ipc_participant *participant
+);
+enum micros_ipc_error ipc_admit_active_endpoint(
+    const struct micros_endpoint_registry *registry,
+    const struct micros_kernel_objects *objects,
+    micros_endpoint_t endpoint,
+    struct micros_endpoint_selection *selection
+);
+enum micros_ipc_error ipc_select_queue(
+    const struct micros_endpoint_registry *registry,
+    const struct micros_kernel_objects *objects,
+    const struct micros_endpoint_selection *destination,
+    enum micros_ipc_queue_kind kind,
+    micros_endpoint_t source,
+    struct ipc_queue_selection *selection
+);
+enum micros_ipc_error ipc_prepare_queue_append(
+    const struct micros_endpoint_registry *registry,
+    struct micros_kernel_objects *objects,
+    const struct micros_endpoint_selection *destination,
+    enum micros_ipc_queue_kind kind,
+    struct micros_thread **tail
+);
 
 void ipc_copy_bytes(void *destination, const void *source, size_t size);
 void ipc_clear_bytes(void *storage, size_t size);
@@ -27,61 +74,11 @@ void ipc_canonicalize_message(
     uint64_t reply_token
 );
 void ipc_clear_message(struct micros_ipc_message *message);
-enum micros_ipc_error ipc_resolve_held_thread(
-    struct micros_kernel_objects *objects,
-    struct micros_thread_handle handle,
-    struct micros_thread **thread
-);
-enum micros_ipc_error ipc_resolve_operation_thread(
-    struct micros_kernel_objects *objects,
-    struct micros_thread_handle handle,
-    micros_endpoint_t *source_endpoint
-);
-
-enum micros_ipc_error ipc_resolve_queue_tail(
-    struct micros_kernel_objects *objects,
-    struct micros_thread_handle tail,
-    struct micros_thread **thread
-);
-bool ipc_receiver_is_ready_for(
-    const struct micros_endpoint_record *destination,
-    const struct micros_kernel_objects *objects,
-    micros_endpoint_t source
-);
-bool ipc_sender_is_ready_for(
-    const struct micros_endpoint_record *receiver_endpoint,
-    const struct micros_kernel_objects *objects,
-    micros_endpoint_t source
-);
 void ipc_append_thread(
     struct micros_thread_handle thread_handle,
     struct micros_thread *previous_tail,
     struct micros_thread_handle *head,
     struct micros_thread_handle *tail
-);
-bool ipc_find_matching_sender(
-    const struct micros_endpoint_record *endpoint,
-    struct micros_kernel_objects *objects,
-    micros_endpoint_t source,
-    struct micros_thread_handle *previous,
-    struct micros_thread_handle *matched,
-    struct micros_thread **sender
-);
-bool ipc_find_matching_receiver_const(
-    const struct micros_endpoint_record *endpoint,
-    const struct micros_kernel_objects *objects,
-    micros_endpoint_t source,
-    struct micros_thread_handle *previous,
-    struct micros_thread_handle *matched,
-    const struct micros_thread **receiver
-);
-bool ipc_find_matching_receiver(
-    const struct micros_endpoint_record *endpoint,
-    struct micros_kernel_objects *objects,
-    micros_endpoint_t source,
-    struct micros_thread_handle *previous,
-    struct micros_thread_handle *matched,
-    struct micros_thread **receiver
 );
 void ipc_unlink_thread(
     struct micros_kernel_objects *objects,
@@ -109,6 +106,61 @@ struct ipc_pending_notification_plan {
     struct micros_ipc_message message;
 };
 
+enum ipc_receive_choice {
+    IPC_RECEIVE_WAIT = 0,
+    IPC_RECEIVE_NOTIFICATION,
+    IPC_RECEIVE_SENDER,
+};
+
+struct ipc_receive_selection {
+    struct ipc_participant receiver;
+    micros_endpoint_t source;
+    uintptr_t receive_buffer;
+    enum ipc_receive_choice choice;
+    struct ipc_pending_notification_plan notification;
+    struct ipc_queue_selection sender;
+};
+
+_Static_assert(sizeof(struct ipc_receive_selection) <= 256, "selected receive storage is bounded");
+
+enum micros_ipc_error ipc_select_receive(
+    const struct micros_endpoint_registry *registry,
+    const struct micros_kernel_objects *objects,
+    const struct ipc_participant *receiver,
+    micros_endpoint_t source,
+    uintptr_t receive_buffer,
+    struct ipc_receive_selection *selection
+);
+enum micros_ipc_error ipc_deliver_selected_receive(
+    struct micros_endpoint_registry *registry,
+    struct micros_kernel_objects *objects,
+    const struct ipc_receive_selection *selection
+);
+void ipc_publish_receive_wait(
+    struct micros_endpoint_registry *registry,
+    const struct ipc_receive_selection *selection,
+    struct micros_thread *tail
+);
+enum micros_ipc_error ipc_deliver_selected_sender(
+    struct micros_endpoint_registry *registry,
+    struct micros_kernel_objects *objects,
+    const struct ipc_participant *sender,
+    const struct micros_endpoint_selection *destination,
+    const struct ipc_queue_selection *receiver,
+    const struct micros_ipc_message *message,
+    uint64_t reply_token,
+    uintptr_t reply_buffer
+);
+void ipc_publish_sender_wait(
+    struct micros_endpoint_registry *registry,
+    const struct ipc_participant *sender,
+    const struct micros_endpoint_selection *destination,
+    struct micros_thread *tail,
+    const struct micros_ipc_message *message,
+    uint64_t reply_token,
+    uintptr_t reply_buffer
+);
+
 enum micros_ipc_error ipc_find_pending_notification(
     const struct micros_endpoint_registry *registry,
     const struct micros_kernel_objects *objects,
@@ -122,10 +174,10 @@ void ipc_consume_pending_notification(
 );
 
 struct ipc_reply_preflight {
+    struct ipc_participant replier;
     struct micros_thread_handle caller_handle;
     struct micros_thread *caller;
     struct micros_ipc_message message;
-    micros_endpoint_t replying_endpoint;
     uintptr_t reply_buffer;
 };
 
@@ -150,27 +202,6 @@ enum micros_ipc_error ipc_preflight_deadlock(
     struct micros_thread_handle candidate,
     micros_endpoint_t dependency,
     struct micros_thread_handle cleared_dependency
-);
-
-enum micros_ipc_error ipc_sender_enqueue(
-    struct micros_endpoint_registry *registry,
-    struct micros_kernel_objects *objects,
-    struct micros_thread_handle sender_handle,
-    micros_endpoint_t destination_endpoint,
-    const struct micros_ipc_message *message,
-    uint64_t reply_token,
-    uintptr_t reply_buffer,
-    bool allocates_reply_token
-);
-enum micros_ipc_error ipc_sender_commit_delivery(
-    struct micros_endpoint_registry *registry,
-    struct micros_kernel_objects *objects,
-    struct micros_thread_handle sender_handle,
-    micros_endpoint_t destination_endpoint,
-    const struct micros_ipc_message *message,
-    uint64_t reply_token,
-    uintptr_t reply_buffer,
-    struct micros_thread_handle *matched_receiver
 );
 
 #endif

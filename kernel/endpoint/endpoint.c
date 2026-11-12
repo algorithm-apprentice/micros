@@ -2,6 +2,7 @@
 
 #include <stdint.h>
 
+#include "kernel/endpoint/endpoint_internal.h"
 #include "kernel/endpoint/endpoint_private.h"
 
 enum micros_endpoint_error micros_endpoint_resolve_internal(
@@ -11,16 +12,18 @@ enum micros_endpoint_error micros_endpoint_resolve_internal(
     const struct micros_endpoint_record **record
 )
 {
+    struct micros_endpoint_selection selection;
     enum micros_endpoint_error error;
 
     if (registry == NULL || objects == NULL || record == NULL) {
         return MICROS_ENDPOINT_ERROR_ARGUMENT;
     }
-    error = micros_endpoint_registry_validate_objects(registry, objects);
+    error = micros_endpoint_select(registry, objects, endpoint, &selection);
     if (error != MICROS_ENDPOINT_OK) {
         return error;
     }
-    return endpoint_record_resolve_validated(registry, endpoint, record);
+    *record = selection.record;
+    return MICROS_ENDPOINT_OK;
 }
 
 enum micros_endpoint_error micros_endpoint_resolve_active(

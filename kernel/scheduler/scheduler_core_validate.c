@@ -1,4 +1,5 @@
 #include "kernel/scheduler/scheduler_core_private.h"
+#include "micros/work_observation.h"
 
 static void initialize_validation_witnesses(
     bool *seen,
@@ -334,6 +335,10 @@ enum micros_kernel_object_error micros_scheduler_core_validate(
     bool current_seen[MICROS_THREAD_CAPACITY];
     enum micros_kernel_object_error error;
 
+#ifdef MICROS_BUILD_IPC_SYSCALL_TEST
+    MICROS_TEST_WORK_HIT("ipc01-target-scheduler", MICROS_WORK_OWNER_KERNEL_SCHEDULER,
+                         MICROS_WORK_KIND_COMPLETE_VALIDATOR_CALL, 1);
+#endif
     error = micros_kernel_objects_validate_base(objects);
     if (error != MICROS_KERNEL_OBJECT_OK) {
         return error;

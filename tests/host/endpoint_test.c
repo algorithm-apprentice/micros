@@ -120,6 +120,10 @@ static const struct {
         "atomic IPC endpoint close cancellation",
         micros_ipc_close_test_run,
     },
+    {
+        "selected endpoint queries retain local authority",
+        endpoint_test_selected_queries_retain_local_authority,
+    },
 };
 
 int main(void)
