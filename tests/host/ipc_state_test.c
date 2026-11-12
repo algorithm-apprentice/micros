@@ -191,7 +191,6 @@ static bool test_dormant_state_is_zero(void)
     );
     EXPECT_TRUE(
         record->sender_head.generation == 0
-        && record->sender_tail.generation == 0
         && record->receiver_head.generation == 0
         && record->receiver_tail.generation == 0
         && record->pending_notification_sources == 0

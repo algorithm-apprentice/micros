@@ -229,8 +229,8 @@ static bool test_sender_and_receiver_enqueue(void)
     EXPECT_TRUE(
         registry.endpoints[processes[2].slot].sender_head.slot
             == threads[0].slot
-        && registry.endpoints[processes[2].slot].sender_tail.slot
-            == threads[1].slot
+        && second->ipc_next.slot == 0
+        && second->ipc_next.generation == 0
         && first->ipc_next.slot == threads[1].slot
         && first->ipc_outbound_message.source == endpoints[0]
         && first->ipc_outbound_message.reply_token == 0

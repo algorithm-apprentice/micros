@@ -181,10 +181,10 @@ static bool selected_queue_is_valid(
     struct micros_thread_handle current = kind == MICROS_IPC_QUEUE_SENDER
         ? selection->record->sender_head : selection->record->receiver_head;
     struct micros_thread_handle tail = kind == MICROS_IPC_QUEUE_SENDER
-        ? selection->record->sender_tail : selection->record->receiver_tail;
+        ? (struct micros_thread_handle){0, 0} : selection->record->receiver_tail;
 
     if (endpoint_thread_handle_is_zero(current)) {
-        return endpoint_thread_handle_is_zero(tail);
+        return kind == MICROS_IPC_QUEUE_SENDER || endpoint_thread_handle_is_zero(tail);
     }
     for (size_t steps = 0; steps < MICROS_THREAD_CAPACITY; ++steps) {
         const struct micros_thread *thread;
@@ -192,7 +192,9 @@ static bool selected_queue_is_valid(
         if (!micros_endpoint_queue_member_is_valid(registry, objects, selection, current, kind, &thread)) {
             return false;
         }
-        if (endpoint_thread_handles_equal(current, tail)) {
+        if (kind == MICROS_IPC_QUEUE_SENDER
+            ? endpoint_thread_handle_is_zero(thread->ipc_next)
+            : endpoint_thread_handles_equal(current, tail)) {
             return endpoint_thread_handle_is_zero(thread->ipc_next);
         }
         current = thread->ipc_next;
@@ -230,7 +232,7 @@ bool endpoint_queue_is_valid(
     size_t steps;
 
     if (endpoint_thread_handle_is_zero(head)) {
-        return endpoint_thread_handle_is_zero(tail);
+        return kind == MICROS_IPC_QUEUE_SENDER || endpoint_thread_handle_is_zero(tail);
     }
     for (steps = 0; steps < MICROS_THREAD_CAPACITY; ++steps) {
         const struct micros_thread *thread;
@@ -260,7 +262,9 @@ bool endpoint_queue_is_valid(
         ) {
             return false;
         }
-        if (endpoint_thread_handles_equal(current, tail)) {
+        if (kind == MICROS_IPC_QUEUE_SENDER
+            ? endpoint_thread_handle_is_zero(thread->ipc_next)
+            : endpoint_thread_handles_equal(current, tail)) {
             return endpoint_thread_handle_is_zero(thread->ipc_next);
         }
         if (endpoint_thread_handle_is_zero(thread->ipc_next)) {
@@ -401,10 +405,7 @@ bool endpoint_has_matchable_work(
                 ) {
                     return true;
                 }
-                if (endpoint_thread_handles_equal(
-                    sender_handle,
-                    endpoint->sender_tail
-                )) {
+                if (endpoint_thread_handle_is_zero(sender->ipc_next)) {
                     break;
                 }
                 sender_handle = sender->ipc_next;

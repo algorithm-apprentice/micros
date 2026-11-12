@@ -114,7 +114,7 @@ void ipc_model_dump_state(struct ipc_model_test_context *fixture, const struct m
             stderr,
             "  endpoint=%zu model-state=%d actual-state=%d "
             "model-value=0x%08x actual-value=0x%08x "
-            "model-sender=%u/%u actual-sender=%u/%u "
+            "model-sender=%u/%u actual-sender-head=%u "
             "model-receiver=%u/%u actual-receiver=%u/%u "
             "model-pending=0x%016llx actual-pending=0x%016llx "
             "model-kernel=0x%016llx actual-kernel=0x%016llx\n",
@@ -126,7 +126,6 @@ void ipc_model_dump_state(struct ipc_model_test_context *fixture, const struct m
             expected->sender_head.slot,
             expected->sender_tail.slot,
             actual->sender_head.slot,
-            actual->sender_tail.slot,
             expected->receiver_head.slot,
             expected->receiver_tail.slot,
             actual->receiver_head.slot,

@@ -117,8 +117,6 @@ bool endpoint_record_is_zero(
         || endpoint->value != 0
         || endpoint->sender_head.slot != 0
         || endpoint->sender_head.generation != 0
-        || endpoint->sender_tail.slot != 0
-        || endpoint->sender_tail.generation != 0
         || endpoint->receiver_head.slot != 0
         || endpoint->receiver_head.generation != 0
         || endpoint->receiver_tail.slot != 0
@@ -145,8 +143,6 @@ bool endpoint_ipc_state_is_zero(
     if (
         endpoint->sender_head.slot != 0
         || endpoint->sender_head.generation != 0
-        || endpoint->sender_tail.slot != 0
-        || endpoint->sender_tail.generation != 0
         || endpoint->receiver_head.slot != 0
         || endpoint->receiver_head.generation != 0
         || endpoint->receiver_tail.slot != 0
@@ -227,8 +223,6 @@ void endpoint_clear_endpoint_record(
     endpoint->value = 0;
     endpoint->sender_head.slot = 0;
     endpoint->sender_head.generation = 0;
-    endpoint->sender_tail.slot = 0;
-    endpoint->sender_tail.generation = 0;
     endpoint->receiver_head.slot = 0;
     endpoint->receiver_head.generation = 0;
     endpoint->receiver_tail.slot = 0;

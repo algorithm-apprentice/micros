@@ -191,6 +191,9 @@ bitmap, index and cold-repair summaries; no second producer is required.
 `MICROS_IPC03_WORK` in that same output reports direct token-related table
 visits and selected indexed reads. It uses the same native pair, not a new
 workflow.
+`MICROS_IPC04_WORK` reports actual head-only sender append, bounded malformed
+walk, selected receive and full-capacity close work, with scheduler request
+records shown separately from endpoint/IPC records.
 
 ## Validation planning
 

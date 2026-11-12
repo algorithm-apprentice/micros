@@ -113,6 +113,19 @@ TOKEN_CASES = (
     ("token-reply-returned-index", 128, 11, 1, 1, 0, 0),
     ("token-reply-foreign-index", 128, 11, 1, 1, 0, 0),
 )
+QUEUE_CASES = (
+    ("sender-append-empty", 0), ("sender-append-single", 1),
+    ("sender-append-short", 7), ("sender-append-long", 63),
+    ("sender-append-full", 127), ("sender-append-permuted", 7),
+)
+QUEUE_SCOPE_CASES = (
+    ("sender-middle-corrupt", 7, 11, 1, 4),
+    ("sender-suffix-unconsumed", 7, 0, 0, 2),
+    ("sender-stale-link", 7, 11, 1, 4),
+    ("sender-range-link", 7, 11, 1, 4),
+    ("sender-nonhead-cycle", 7, 11, 1, 128),
+    ("sender-no-match", 7, 5, 1, 7),
+)
 
 def completion_cases():
     rows = []
@@ -165,10 +178,22 @@ def expected_cases():
         "version": 1, "case": index, "name": name, "result": result,
         "value": count, "preserved": int(result != 0), "lookups": 0, "translations": 0,
     } for index, (name, count, result, _) in enumerate(INDEX_CASES, len(dependencies) + 1))
-    return indexed + tuple({
+    tokens = indexed + tuple({
         "version": 1, "case": index, "name": name, "result": result,
         "value": token, "preserved": preserved, "lookups": 0, "translations": 0,
     } for index, (name, token, result, preserved, _, _, _) in enumerate(TOKEN_CASES, len(indexed) + 1))
+    queued = tokens + tuple({
+        "version": 1, "case": index, "name": name, "result": 0,
+        "value": length, "preserved": 0, "lookups": 0, "translations": 0,
+    } for index, (name, length) in enumerate(QUEUE_CASES, len(tokens) + 1))
+    checked = queued + tuple({
+        "version": 1, "case": index, "name": name, "result": result,
+        "value": length, "preserved": preserved, "lookups": 0, "translations": 0,
+    } for index, (name, length, result, preserved, _) in enumerate(QUEUE_SCOPE_CASES, len(queued) + 1))
+    return checked + ({
+        "version": 1, "case": len(checked) + 1, "name": "sender-close-full", "result": 0,
+        "value": 128, "preserved": 0, "lookups": 0, "translations": 0,
+    },)
 
 
 def case_identities(records):
@@ -245,10 +270,15 @@ def work_failures(records, work):
              + tuple((name, hops, 0, 0, 0) for name, hops, _ in DEPENDENCY_CASES)
              + tuple((name, count, 0, 0, 0) for name, count, _, _ in INDEX_CASES)
              + tuple((name, token, profiles, searches, 0)
-                     for name, token, _, _, profiles, searches, _ in TOKEN_CASES))
+                     for name, token, _, _, profiles, searches, _ in TOKEN_CASES)
+             + tuple((name, length, 0, 1, 0) for name, length in QUEUE_CASES)
+             + tuple((name, length, 0, 1, 0) for name, length, _, _, _ in QUEUE_SCOPE_CASES)
+             + (("sender-close-full", 128, 0, 0, 0),))
     lifecycle = {spec[0] for spec in LIFECYCLE_CASES}
     index_visits = {row[0]: row[3] for row in INDEX_CASES}
     token_links = {row[0]: row[6] for row in TOKEN_CASES}
+    queue_links = dict(QUEUE_CASES)
+    queue_scope_links = {row[0]: row[4] for row in QUEUE_SCOPE_CASES}
     for row, snapshot, spec in zip(records, work, specs, strict=True):
         if row["case"] != snapshot["case"]:
             raise ValueError("IPC01 work oracle borrowed a different case")
@@ -270,7 +300,7 @@ def work_failures(records, work):
         endpoint_rows = totals.per_owner[Owner.KERNEL_ENDPOINT][Kind.RECORD_VISIT]
         endpoint_bound = (
             4 * 64 + 3 * 128 + 8 if row["name"] in lifecycle else
-            2 * 64 if row["name"] == "cancel-close" else 0
+            2 * 64 if row["name"] in ("cancel-close", "sender-close-full") else 0
         )
         if endpoint_rows > endpoint_bound:
             failures.append((row["name"], "endpoint-table-visits", endpoint_rows, endpoint_bound))
@@ -283,6 +313,23 @@ def work_failures(records, work):
         links = totals.per_owner[Owner.KERNEL_IPC][Kind.LINK_TRAVERSE]
         link_bound = 2 * 64 + 3 if row["name"] == "cancel-close" else 2 * prefix
         link_bound += OPERATION_DEPENDENCY_HOPS.get(row["name"], 0)
+        if row["name"] in queue_links or row["name"] in queue_scope_links:
+            link_bound = queue_links.get(row["name"], queue_scope_links.get(row["name"]))
+            if (row["name"] in queue_links or row["name"] == "sender-no-match") and links != link_bound:
+                failures.append((row["name"], "sender-append-links", links, link_bound))
+            visits = totals.per_kind[Kind.RECORD_VISIT]
+            scheduler_visits = totals.per_owner[Owner.KERNEL_SCHEDULER][Kind.RECORD_VISIT]
+            # Two fixed wake requests: two stamp passes, candidate preflight and commit.
+            scheduler_bound = 4 * 2 if row["name"] == "sender-suffix-unconsumed" else 0
+            if scheduler_visits > scheduler_bound or visits != scheduler_visits:
+                failures.append((row["name"], "sender-queue-record-visits", visits, scheduler_bound))
+        if row["name"] == "sender-close-full":
+            link_bound = 2 * row["value"] + 2 * 64
+            scheduler_visits = totals.per_owner[Owner.KERNEL_SCHEDULER][Kind.RECORD_VISIT]
+            object_visits = totals.per_owner[Owner.KERNEL_OBJECTS][Kind.RECORD_VISIT]
+            if scheduler_visits > 4 * row["value"] or object_visits:
+                failures.append((row["name"], "close-transition-records",
+                                 scheduler_visits + object_visits, 4 * row["value"]))
         if row["name"] in token_links:
             link_bound = token_links[row["name"]]
             # At most twelve selected thread/endpoint/hart/profile admissions,
@@ -320,7 +367,7 @@ def work_failures(records, work):
         if links > link_bound:
             failures.append((row["name"], "queue-prefix-replay-and-dependency-hops", links, link_bound))
         token_rows = totals.per_owner[Owner.KERNEL_IPC][Kind.RECORD_VISIT]
-        token_bound = 4 * 128 + 5 * 64 if row["name"] == "cancel-close" else spec[4]
+        token_bound = 4 * 128 + 5 * 64 if row["name"] in ("cancel-close", "sender-close-full") else spec[4]
         if token_rows > token_bound:
             failures.append((row["name"], "token-or-close-visits", token_rows, token_bound))
         bits = totals.per_owner[Owner.KERNEL_IPC][Kind.BITMAP_WORD_LOAD]

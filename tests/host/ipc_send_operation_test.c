@@ -44,8 +44,8 @@ bool test_authorized_send_blocks_with_snapshot(struct ipc_operation_test_context
             fixture->primary_threads[OPERATION_PROCESS_SOURCE_A]
         )
         && ipc_operation_test_thread_handles_equal(
-            destination->sender_tail,
-            fixture->primary_threads[OPERATION_PROCESS_SOURCE_A]
+            sender->ipc_next,
+            (struct micros_thread_handle){0, 0}
         )
         && memcmp(
             &sender->ipc_outbound_message,
@@ -154,8 +154,6 @@ bool test_authorized_send_matches_first_receiver(struct ipc_operation_test_conte
         && sender->ready_linked
         && destination->sender_head.slot == 0
         && destination->sender_head.generation == 0
-        && destination->sender_tail.slot == 0
-        && destination->sender_tail.generation == 0
         && micros_endpoint_registry_validate_objects(
             &fixture->registry,
             &fixture->objects

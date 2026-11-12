@@ -37,6 +37,8 @@ def transcript(channel="work", mutate=None):
             work["counts"][Owner.KERNEL_OBJECTS][Kind.RECORD_VISIT] = next(
                 spec[3] for spec in INDEX_CASES if spec[0] == row["name"]
             )
+        if row["name"].startswith("sender-append-") or row["name"] == "sender-no-match":
+            work["counts"][Owner.KERNEL_IPC][Kind.LINK_TRAVERSE] = row["value"]
         if mutate is not None and row["case"] == 1:
             mutate(row, work)
         lines.append("MICROS_IPC01_CASE " + json.dumps(row))
@@ -171,6 +173,36 @@ class SelectedIpcValidationEvidenceTest(unittest.TestCase):
         changed = copy.deepcopy(work)
         changed[index]["counts"][Owner.KERNEL_OBJECTS][Kind.INDEX_PROBE] = 97
         self.assertTrue(work_failures(records, changed))
+
+    def test_sender_append_requires_the_actual_head_walk_without_table_scans(self):
+        records, work = parse_native_output(transcript(), "work")
+        index = next(index for index, row in enumerate(records) if row["name"] == "sender-append-long")
+        for owner, kind, value in (
+            (Owner.KERNEL_IPC, Kind.LINK_TRAVERSE, 0),
+            (Owner.KERNEL_IPC, Kind.LINK_TRAVERSE, 62),
+            (Owner.KERNEL_IPC, Kind.LINK_TRAVERSE, 64),
+            (Owner.KERNEL_OBJECTS, Kind.RECORD_VISIT, 1),
+        ):
+            changed = copy.deepcopy(work)
+            changed[index]["counts"][owner][kind] = value
+            with self.subTest(owner=owner, kind=kind, value=value):
+                self.assertTrue(work_failures(records, changed))
+        index = next(index for index, row in enumerate(records) if row["name"] == "sender-suffix-unconsumed")
+        for owner, value in ((Owner.KERNEL_SCHEDULER, 9), (Owner.KERNEL_OBJECTS, 1)):
+            changed = copy.deepcopy(work)
+            changed[index]["counts"][owner][Kind.RECORD_VISIT] = value
+            with self.subTest(owner=owner):
+                self.assertTrue(work_failures(records, changed))
+        for name, owner, kind, value in (
+            ("sender-no-match", Owner.KERNEL_IPC, Kind.LINK_TRAVERSE, 6),
+            ("sender-close-full", Owner.KERNEL_IPC, Kind.LINK_TRAVERSE, 385),
+            ("sender-close-full", Owner.KERNEL_SCHEDULER, Kind.RECORD_VISIT, 513),
+        ):
+            changed = copy.deepcopy(work)
+            index = next(index for index, row in enumerate(records) if row["name"] == name)
+            changed[index]["counts"][owner][kind] = value
+            with self.subTest(name=name, owner=owner, kind=kind):
+                self.assertTrue(work_failures(records, changed))
 
 
 class SelectedIpcObservationTest(unittest.TestCase):

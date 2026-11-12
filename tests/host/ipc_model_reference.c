@@ -95,10 +95,6 @@ static bool compare_acceptance_endpoints_and_events(
                 actual->sender_head
             )
             || !ipc_model_thread_handles_equal(
-                expected->sender_tail,
-                actual->sender_tail
-            )
-            || !ipc_model_thread_handles_equal(
                 expected->receiver_head,
                 actual->receiver_head
             )

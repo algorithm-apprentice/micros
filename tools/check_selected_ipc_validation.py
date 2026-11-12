@@ -46,6 +46,13 @@ def main(argv=None):
                   f" ipc-records={counts.per_owner[Owner.KERNEL_IPC][Kind.RECORD_VISIT]}"
                   f" endpoint-records={counts.per_owner[Owner.KERNEL_ENDPOINT][Kind.RECORD_VISIT]}"
                   f" index={counts.per_kind[Kind.INDEX_PROBE]}")
+        elif row["name"].startswith("sender-"):
+            print(f"MICROS_IPC04_WORK case={row['name']} length={row['value']}"
+                  f" links={counts.per_owner[Owner.KERNEL_IPC][Kind.LINK_TRAVERSE]}"
+                  f" ipc-records={counts.per_owner[Owner.KERNEL_IPC][Kind.RECORD_VISIT]}"
+                  f" endpoint-records={counts.per_owner[Owner.KERNEL_ENDPOINT][Kind.RECORD_VISIT]}"
+                  f" scheduler-records={counts.per_owner[Owner.KERNEL_SCHEDULER][Kind.RECORD_VISIT]}"
+                  f" index={counts.per_kind[Kind.INDEX_PROBE]}")
     print("MICROS_IPC01_CURRENT_PASS products=2")
     return 0
 

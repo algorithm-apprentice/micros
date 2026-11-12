@@ -116,8 +116,8 @@ bool test_receive_specific_and_any_fifo(struct ipc_operation_test_context *fixtu
             fixture->primary_threads[OPERATION_PROCESS_SOURCE_B]
         )
         && ipc_operation_test_thread_handles_equal(
-            destination->sender_tail,
-            fixture->primary_threads[OPERATION_PROCESS_SOURCE_B]
+            fixture->objects.threads[fixture->primary_threads[OPERATION_PROCESS_SOURCE_B].slot].ipc_next,
+            (struct micros_thread_handle){0, 0}
         )
         && receiver->ipc_delivery_pending
         && memcmp(
@@ -156,8 +156,8 @@ bool test_receive_specific_and_any_fifo(struct ipc_operation_test_context *fixtu
             fixture->primary_threads[OPERATION_PROCESS_SOURCE_A]
         )
         && ipc_operation_test_thread_handles_equal(
-            destination->sender_tail,
-            fixture->primary_threads[OPERATION_PROCESS_SOURCE_A]
+            fixture->objects.threads[fixture->primary_threads[OPERATION_PROCESS_SOURCE_A].slot].ipc_next,
+            (struct micros_thread_handle){0, 0}
         )
         && receiver->ipc_delivery_pending
         && memcmp(
@@ -276,9 +276,6 @@ static bool reject_receive_current_and_corruption(struct ipc_operation_test_cont
     fixture->registry.endpoints[
         fixture->processes[OPERATION_PROCESS_DESTINATION].slot
     ].sender_head = corrupt;
-    fixture->registry.endpoints[
-        fixture->processes[OPERATION_PROCESS_DESTINATION].slot
-    ].sender_tail = corrupt;
     EXPECT_TRUE(ipc_operation_test_expect_receive_failure_unchanged(
         fixture,
         MICROS_IPC_ERROR_INVARIANT,

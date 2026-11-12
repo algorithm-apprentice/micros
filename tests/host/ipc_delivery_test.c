@@ -307,10 +307,7 @@ static bool sender_queue_equals(
     size_t index;
 
     if (count == 0) {
-        return (
-            thread_handle_is_zero(current)
-            && thread_handle_is_zero(endpoint->sender_tail)
-        );
+        return thread_handle_is_zero(current);
     }
     for (index = 0; index < count; ++index) {
         struct micros_thread_handle expected =
@@ -321,13 +318,7 @@ static bool sender_queue_equals(
         }
         current = objects.threads[current.slot].ipc_next;
     }
-    return (
-        thread_handle_is_zero(current)
-        && thread_handles_equal(
-            endpoint->sender_tail,
-            source_threads[source_indices[count - 1]]
-        )
-    );
+    return thread_handle_is_zero(current);
 }
 
 static bool receiver_queue_equals(
@@ -379,6 +370,8 @@ static bool enqueue_sender(size_t index, bool call)
         struct micros_thread *sender =
             &objects.threads[source_threads[index].slot];
         uint64_t reply_token = ipc_fixture_next_token(registry.last_reply_token, source_threads[index].slot);
+        struct micros_thread_handle *link = &destination->sender_head;
+        size_t steps = 0;
 
         if (
             reply_token == 0
@@ -386,6 +379,15 @@ static bool enqueue_sender(size_t index, bool call)
             || sender->ipc_queue_kind != MICROS_IPC_QUEUE_NONE
         ) {
             return false;
+        }
+        while (!thread_handle_is_zero(*link)) {
+            const struct micros_thread *queued;
+
+            if (steps++ == MICROS_THREAD_CAPACITY
+                || micros_thread_resolve(&objects, *link, &queued) != MICROS_KERNEL_OBJECT_OK) {
+                return false;
+            }
+            link = &objects.threads[link->slot].ipc_next;
         }
         source_messages[index] = message;
         message.source = endpoints[index];
@@ -403,13 +405,7 @@ static bool enqueue_sender(size_t index, bool call)
         sender->ipc_reply_callee =
             endpoints[DELIVERY_PROCESS_DESTINATION];
         sender->ipc_reply_phase = MICROS_IPC_REPLY_PHASE_QUEUED;
-        if (thread_handle_is_zero(destination->sender_tail)) {
-            destination->sender_head = source_threads[index];
-        } else {
-            objects.threads[destination->sender_tail.slot].ipc_next =
-                source_threads[index];
-        }
-        destination->sender_tail = source_threads[index];
+        *link = source_threads[index];
         registry.last_reply_token = reply_token;
         return micros_endpoint_registry_validate_objects(
             &registry,

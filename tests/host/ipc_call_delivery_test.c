@@ -282,10 +282,6 @@ static bool queue_calls_and_check_bindings(
             fixture->primary_threads[CALL_PROCESS_CLIENT]
         )
         && ipc_call_test_thread_handles_equal(
-            server->sender_tail,
-            fixture->client_extra_thread
-        )
-        && ipc_call_test_thread_handles_equal(
             first_caller->ipc_next,
             fixture->client_extra_thread
         )
@@ -393,9 +389,8 @@ static bool deliver_first_call_and_check_fifo(
             server->sender_head,
             fixture->client_extra_thread
         )
-        && ipc_call_test_thread_handles_equal(
-            server->sender_tail,
-            fixture->client_extra_thread
+        && ipc_call_test_thread_handle_is_zero(
+            fixture->objects.threads[fixture->client_extra_thread.slot].ipc_next
         )
         && receiver->runtime_flags == 0
         && receiver->ipc_delivery_pending

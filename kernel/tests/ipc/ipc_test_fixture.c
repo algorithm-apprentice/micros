@@ -442,7 +442,6 @@ bool ipc_test_endpoint_records_are_clear(struct ipc_test_context *fixture)
             || record->owner.generation != 0
             || record->value != 0
             || !ipc_test_thread_handle_is_zero(record->sender_head)
-            || !ipc_test_thread_handle_is_zero(record->sender_tail)
             || !ipc_test_thread_handle_is_zero(record->receiver_head)
             || !ipc_test_thread_handle_is_zero(record->receiver_tail)
             || record->pending_notification_sources != 0

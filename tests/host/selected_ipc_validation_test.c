@@ -278,7 +278,6 @@ static uint64_t state_digest(
         MIX_HANDLE(endpoint->owner);
         MIX_FIELD(endpoint->value);
         MIX_HANDLE(endpoint->sender_head);
-        MIX_HANDLE(endpoint->sender_tail);
         MIX_HANDLE(endpoint->receiver_head);
         MIX_HANDLE(endpoint->receiver_tail);
         MIX_FIELD(endpoint->pending_notification_sources);
@@ -815,8 +814,14 @@ int main(int argc, char **argv)
                                  + selected_ipc_deadlock_case_count())) {
         return 1;
     }
+    if (!selected_ipc_queue_cases(query_count + IPC_CASE_COUNT + lifecycle_count
+                                 + selected_ipc_completion_case_count()
+                                 + selected_ipc_deadlock_case_count()
+                                 + selected_ipc_token_case_count())) {
+        return 1;
+    }
     printf("MICROS_IPC01_NATIVE_PASS cases=%zu\n", query_count + IPC_CASE_COUNT + lifecycle_count
            + selected_ipc_completion_case_count() + selected_ipc_deadlock_case_count()
-           + selected_ipc_token_case_count());
+           + selected_ipc_token_case_count() + selected_ipc_queue_case_count());
     return 0;
 }

@@ -329,7 +329,6 @@ bool ipc_close_test_endpoint_queue_is_empty(
 {
     return (
         ipc_close_test_thread_handle_is_zero(endpoint->sender_head)
-        && ipc_close_test_thread_handle_is_zero(endpoint->sender_tail)
         && ipc_close_test_thread_handle_is_zero(endpoint->receiver_head)
         && ipc_close_test_thread_handle_is_zero(endpoint->receiver_tail)
     );
@@ -401,7 +400,6 @@ bool ipc_close_test_make_single_sender_current_blocked(
     if (
         destination != fixture->endpoints[CLOSE_PROCESS_CLOSING]
         || !thread_handles_equal(endpoint->sender_head, sender)
-        || !thread_handles_equal(endpoint->sender_tail, sender)
         || thread->runtime_flags != MICROS_THREAD_RTS_IPC_SEND
         || thread->ipc_queue_kind != MICROS_IPC_QUEUE_SENDER
         || !ipc_close_test_thread_handle_is_zero(thread->ipc_next)
@@ -410,7 +408,6 @@ bool ipc_close_test_make_single_sender_current_blocked(
     }
     saved = *thread;
     endpoint->sender_head = (struct micros_thread_handle){0, 0};
-    endpoint->sender_tail = (struct micros_thread_handle){0, 0};
     thread->runtime_flags = MICROS_THREAD_RTS_INACTIVE;
     thread->ipc_queue_kind = MICROS_IPC_QUEUE_NONE;
     thread->ipc_next = (struct micros_thread_handle){0, 0};
@@ -431,7 +428,6 @@ bool ipc_close_test_make_single_sender_current_blocked(
     }
     *thread = saved;
     endpoint->sender_head = sender;
-    endpoint->sender_tail = sender;
     return micros_endpoint_registry_validate_objects(
         &fixture->registry,
         &fixture->objects

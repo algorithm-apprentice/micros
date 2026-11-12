@@ -4,7 +4,8 @@
 
 This is the independently reviewed IPC04 contract Accepted by
 [ADR-0127](../adr/0127-head-only-ipc-sender-queues.md).
-Its implementation remains pending the separate design merge.
+Design #256 is separately merged; its paired implementation proceeds from
+that main. The design alone does not close B04-F006.
 The [fixed study](../research/minix-head-only-ipc-sender-queues.md)
 pins local MINIX and current `micros` after IPC03 #255.
 
@@ -243,3 +244,37 @@ receipt acceptance applies only if that feature's recipe is changed.
 Independent design review precedes the design commit. Independent
 implementation review precedes its first permanent commit. Only accepted
 implementation and exact-tree merge close B04-F006.
+
+## Current implementation and evidence owners
+
+The endpoint record now retains only the sender head. The existing IPC queue
+owner walks and admits the actual sender chain before append, retains its
+terminal locally and publishes without another walk. Sender selection,
+complete diagnosis and close use null termination; receiver-tail behavior
+is unchanged. Shared mutation helpers write a tail only for receiver queues.
+
+The existing ordinary/observed native pair has 111 cases: all 98 predecessor
+cases and thirteen sender cases in `selected_ipc_queue_test.c`. Actual append
+visits are exactly 0, 1, 7, 63 and 127; the permuted seven-member case also
+visits seven links. Each append has zero capacity-record visits.
+Additional cases cover a corrupt middle, stale/out-of-range successor,
+non-head cycle, unconsumed suffix, preserved no-match output and all-128
+sender close. The full close records 383 queue visits within the independent
+384 bound. Its existing scheduler request passes remain separately counted;
+the receive-splice control likewise retains four passes over two requests.
+
+Original semantic fixtures now compare actual head/link order and terminal
+null, including their temporary singleton detach/restore operations.
+The independent model retains its private queue-end representation and
+compares every remaining production head, link, role and message without
+calling production selectors. Its transition count and seed are unchanged.
+
+Actual native and RV64 compiler artifacts report a 568-byte endpoint record
+and 38,424-byte registry: 512 fewer persistent bytes in the admitted 64-slot
+registry. There is no replacement index or process/thread/hart layout change.
+Current primitive bindings cover the added append loop and all changed
+owners; no new execution workflow or historical source transport is added.
+
+Exact final author, stack, review and publication evidence belongs to the
+implementation PR. Focused native or target success alone is not finding
+closure.
