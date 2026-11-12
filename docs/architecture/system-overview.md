@@ -2,6 +2,10 @@
 
 ## Purpose
 
+This document explains the system, not its delivery history.
+[The roadmap](../roadmap.md#current-status) owns current status; the linked
+subsystem contracts own exact interfaces and acceptance.
+
 `micros` is an educational operating system that uses a small privileged
 kernel and isolated user-space services. It independently reimplements the
 verified logical structures, algorithms, and behavior of MINIX 3 without
@@ -49,7 +53,7 @@ The source-organization rules and current VFS module map are defined by
 
 ## Target environment
 
-The proposed initial target is:
+The accepted v0.1 target is:
 
 - RISC-V 64-bit, little-endian.
 - QEMU `virt`.
@@ -121,414 +125,97 @@ native models exercise larger policies.
 
 ### Phase 1: firmware and platform entry
 
-OpenSBI initializes the machine and enters the kernel in supervisor mode with
-the boot hart ID and FDT address. The kernel establishes a stack, clears
-uninitialized data, initializes the kernel-object registry, registers the boot
-hart, installs that hart's primary and emergency trap stacks, installs the trap
-vector, and then begins serial output.
+OpenSBI enters supervisor mode with the boot hart ID and FDT address.
+The kernel establishes its boot stack, clears BSS, initializes the object
+registry, registers the boot hart, installs primary/emergency trap stacks
+and the direct-mode vector, then begins serial output.
 
 ### Phase 2: kernel bootstrap
 
-The kernel validates the FDT, reads physical memory and reserved ranges,
-reserves firmware and every physical address through its linker-defined end,
-reclaims the parsed FDT blob, initializes the bootstrap frame allocator,
-binds a static typed ownership ledger to that allocator's exact geometry,
-creates kernel page tables through the `KERNEL_PAGE_TABLE` class, selecting
-the largest legal 4 KiB, 2 MiB or 1 GiB leaf within each mapping domain,
-verifies agreement among the reachable table tree, allocator bitmap, and
-ledger, verifies exact supervisor-only RX, R, and RW/NX mappings, enables Sv39
-through an ordered translation fence, and starts timer interrupts. Managed RAM
-is identity-mapped RW/NX, while UART and PLIC device addresses remain fixed
-platform constants in v0.1. The kernel maps the UART page and only the three
-PLIC pages required for source-10 priority, hart-0 supervisor enable, and
-hart-0 supervisor claim/complete.
+The kernel validates the complete FDT memory/reservation map, excludes
+firmware and all memory through `__kernel_end`, and reclaims the consumed FDT
+blob. A bitmap allocator and typed ledger own every managed frame.
+[Bootstrap allocation](bootstrap-allocation.md) uses retained search progress;
+[kernel mapping](kernel-mapping-topology.md) selects the largest legal Sv39
+leaf while preserving exact supervisor RX, R and RW/NX domains.
+Only the required UART and PLIC pages are mapped.
 
-MEM01's cursor/range correction is merged. The kernel now follows the
-separately reviewed [MEM02 kernel-map contract](kernel-mapping-topology.md):
-largest legal Sv39 leaves and checked parent-indexed table identities retain
-the exact mapping domains and permissions. Shared kernel root entries may
-be supervisor leaves or pointers to immutable subtrees. Private user leaves
-remain 4 KiB.
+Selected memory/object/scheduler operations retain operation-local checks;
+complete diagnostics remain at their explicit owning boundaries. The exact
+contracts are [frame ownership](selected-frame-ownership.md),
+[address spaces](selected-user-address-space.md),
+[release/handoff](selected-release-and-wired-handoff.md),
+[objects/harts](selected-object-and-hart-validation.md) and
+[common return](common-scheduler-return.md).
 
-MEM03's [Accepted selected-ownership contract](selected-frame-ownership.md)
-separates operation-local metadata/record checks from explicit complete
-diagnostics. Its evidence-key prerequisite #213/#214 and design #215 are
-merged. The first uncommitted implementation was archived after B14 exposed
-the [complete-validator token-scope defect](../research/complete-validator-token-scope-gap.md).
-Corrective design #216 is separately merged. Its later uncommitted candidate
-was preserved for the user-prioritized
-[validation feedback prerequisite](validation-feedback.md). Its separately
-reviewed implementation #218 enabled a fresh MEM03 restart with one checked
-source view and full-only native orchestration. That restart is now merged
-as #219 after renewed native Red/Green, thirteen-unit recertification,
-complete acceptance and independent review. Selected ownership operations
-use active metadata and selected records; all eight complete-audit boundaries
-and complete diagnostic bodies remain.
-
-At the fixed MEM04 baseline, user lookup, translation and activation perform
-complete root checks. MEM04 owns their selected-operation replacement.
-Its design found the separate
-[selected-ownership native authority gap](../research/selected-ownership-native-source-authority-gap.md).
-Accepted [EV01-C05](selected-ownership-native-source-authority.md) names existing
-source clauses without changing admission or runtime behavior; its
-independently reviewed implementation #221 is now merged.
-The Accepted [MEM04 contract](selected-user-address-space.md) defines checked
-selected paths, bounded controller-binding inspection and root preparation,
-including bootstrap allocation's selected preflight and exact cursor
-compensation. It explicitly separates scoped results from complete diagnosis.
-Design #222 is merged; its fixed runtime had the complete-root cadence
-described above. An uncommitted implementation was archived when the
-successful QEMU runner withheld its semantic witnesses. The separate
-[MEM04-C01 reporting prerequisite](qemu-runner-source-organization.md#mem04-c01-accepted-transcript-reporting)
-is independently reviewed and merged as #223/#224. The fresh restart exposed
-a handoff error dependency on the old global PC/SP lookup audit. Its
-[Accepted caller-owned correction](../adr/0109-handoff-preflight-error-ownership.md)
-keeps full diagnosis at the existing handoff boundary without restoring
-global hot-path checks. That candidate is also archived; no MEM04 Green or
-retirement was claimed for it. Corrective design #225 then merged and a fresh
-candidate completed actual Green and recertification. Its full stack gate
-rejected the unrelated new root-preparation prototype at the existing
-whole-header callback check. The candidate is archived without final
-acceptance or publication. The
-[Accepted exact visitor-group extension](../adr/0110-kernel-visitor-extension-admission.md)
-admits that declaration and five qualified callback-free helpers while
-preserving every existing callback and stack obligation before a fresh restart.
-That design separately merged as #226. Its fresh candidate passed actual
-native/target Green and current visitor binding, then the early
-ordinary/metadata stack proof found a separate whole-header conflict in
-the fatal TTY source register. The candidate is archived; the
-[Accepted exact fatal-header extension](../adr/0111-fatal-tty-header-extension.md)
-retains all fatal-state, source/machine and stack obligations.
-That correction separately merged as #227. The fresh
-[implementation map](selected-user-address-space.md#implementation-and-evidence-map)
-binds all three immutable stack adapters and the explicit handoff dependency;
-no archived native, target or stack result substitutes for renewed evidence.
-The implementation uses checked selected paths and protected root preparation
-for those ordinary operations. Complete diagnostics and the twenty explicit
-residual audit boundaries remain in their owning operations.
-The complete implementation is independently reviewed and merged as #228,
-with actual native/target/stack acceptance and journal-free main authority.
-The next release/handoff design found a distinct
-[MEM04 source-authority naming gap](../research/selected-address-space-native-source-authority-gap.md).
-The [Accepted EV01-C06 metadata prerequisite](selected-address-space-native-source-authority.md)
-preserves the implemented mechanisms and all existing checks. Its
-independently reviewed implementation #230 is merged.
-Resumed MEM05 research found a separate
-[MEM03 observation-authority gap](../research/selected-ownership-observation-authority-gap.md).
-The [Accepted EV01-C07 contract](selected-ownership-observation-authority.md) names
-existing primitive/coverage predicates only. MEM05 remains a blocked
-design; no release/handoff algorithm is accepted by this metadata work.
-That metadata implementation is now independently reviewed and merged as
-#232. MEM05's [selected release/handoff design](selected-release-and-wired-handoff.md)
-is Accepted after clean independent design/correction review.
-Design #233 is separately merged. Pre-Red implementation preparation found
-the [same-slot count-evidence conflict](selected-release-and-wired-handoff.md#mem05-c01-count-evidence-scope).
-The unaccepted scaffold is archived before production changes or a formal
-Red event. The separate Accepted ADR-0115 correction merged as #234.
-Its fresh implementation subsequently reached the
-[handed-off fixture conflict](selected-release-and-wired-handoff.md#mem05-c02-handed-off-corruption-fixture-coherence):
-one old valid-ledger test mutation leaves the new index stale.
-That candidate is archived without Green or retirement.
-Accepted ADR-0116 has clean independent design review and defines the
-separate test-input/source-scope correction;
-the runtime algorithm and complete-index obligations are not relaxed.
-Design #235 is now separately merged. The fresh
-[implementation/evidence map](selected-release-and-wired-handoff.md#implementation-and-evidence-map)
-binds its corrected base and both immutable targets before renewed
-runtime evidence.
-
-MEM05 implementation #236 has now completed actual native/target
-Red/Green, thirteen-unit recertification, all fifty fresh author commands
-and clean independent review. Exact publication trees and fresh journal-free
-committed/main authority passed. The implemented index and selected plans
-close only B02-F006/F007.
-The next preferred OBJ01 design found missing individual names for
-MEM05's existing current-source comparisons.
-[Accepted EV01-C08](selected-release-handoff-native-source-authority.md)
-is a metadata-only prerequisite; it changes no object, hart, scheduler or
-memory behavior. OBJ01 design is blocked until that separately reviewed
-design/implementation pair merges.
-
-EV01-C08's design has now independently merged as #237.
-Its [metadata implementation map](selected-release-handoff-native-source-authority.md#implementation-map)
-records fixed-reference declaration, real missing-key Red and focused
-Green while preserving all seven claims and runtime guards.
-Full current acceptance and independent implementation review still
-precede its separate merge and OBJ01 design resumption.
-
-EV01-C08 implementation #238 has now passed those gates and independently
-merged. Fresh committed/main checks preserve all seven claims without
-author journals. Resumed OBJ01 research found a separate
-[object and panic source-authority gap](../research/object-and-panic-source-authority-gap.md):
-fifty object identities bind unrelated files, and eleven existing panic
-source policies lack individual names.
-[Accepted EV01-C09](object-and-panic-source-authority.md) is the sole active
-metadata prerequisite. OBJ01 design is blocked until that reviewed pair
-merges; no object, hart, stack or scheduler correction is yet accepted.
-
-EV01-C09's independently reviewed design has separately merged as #239.
-Its [metadata implementation map](object-and-panic-source-authority.md#implementation-map)
-records the independently frozen fifty repairs and eleven additions,
-genuine missing-coverage Red and focused Green. The implementation is
-the sole active outcome; complete acceptance and independent review still
-precede its merge and OBJ01 design resumption.
-
-EV01-C09 implementation #240 has now completed those gates and separately
-merged without a runtime change or new retirement. The
-[Accepted OBJ01 contract](selected-object-and-hart-validation.md) is the
-sole active design. It replaces sixteen scheduler entry audits with
-selected checks, direct current identity and a geometric complete stack
-proof, while retaining the other twenty-six direct audit boundaries.
-No OBJ01 implementation begins before its own review, Acceptance and merge.
-
-That design separately merged as #241. The uncommitted implementation is now
-archived after full native acceptance found an omitted active validator-file
-identity and historical/current fixture conflicts.
-[Accepted ADR-0120](../adr/0120-obj01-complete-source-authority.md) defines the
-sole active [OBJ01-C01 correction](selected-object-and-hart-validation.md#obj01-c01-complete-source-authority).
-Its accepted ninety-five-key selection retains the same runtime contract and
-thirty-eight-path domain. Implementation stays blocked until separate review,
-Acceptance and merge; no OBJ01 runtime finding or hosted-CI result closes here.
-
-Corrective design #242 has now separately merged after clean independent
-review. The fresh OBJ01 [implementation map](selected-object-and-hart-validation.md#implementation-and-evidence-map)
-binds both Accepted decisions, the independently frozen new base and all
-ninety-five identities. Complete renewed runtime, target and stack evidence
-and independent implementation review remain required before finding closure.
-
-Those gates have now passed and OBJ01 implementation #243 is independently
-reviewed and merged. Its [acceptance record](selected-object-and-hart-validation.md#implementation-acceptance)
-preserves complete diagnostics and the outside audit boundaries.
-The next preferred [common-return study](../research/minix-common-scheduler-return.md)
-owns only B03-F002/F005. Its design is active and independently reviewed;
-implementation remains pending the separate design merge.
-
-The [Accepted common-return contract](common-scheduler-return.md) under
-[ADR-0121](../adr/0121-bounded-common-scheduler-return.md) removes the remaining
-queue projection while retaining checked portable commit and the target's
-existing prevalidated apply. Same-thread context reuse is confined to one
-protected return; completion authority and memory APIs remain unchanged.
-
-Design #244 is separately merged. Its uncommitted implementation reached
-actual runtime Green but is archived after historical-consumer failures in
-B14. [Accepted ADR-0122](../adr/0122-obj02-evidence-consumer-scope.md) fixes only
-the [evidence-consumer scope](common-scheduler-return.md#obj02-c01-complete-evidence-consumer-scope).
-No runtime finding closes before its separate design merge, fresh
-implementation acceptance and independent review.
-
-That corrective design separately merged as #245. The fresh
-[implementation map](common-scheduler-return.md#implementation-and-evidence-map)
-binds its actual new base and exact historical-consumer owners before renewed
-runtime evidence. Implementation #246 has now completed that renewed evidence,
-independent review and exact-tree publication; its
-[acceptance record](common-scheduler-return.md#implementation-acceptance)
-closes only B03-F002/F005. The next separate
-[current-contract validation outcome](current-contract-validation.md), following
-separately merged design #247, removes historical tooling admission without
-changing operating-system behavior. Its implementation/evidence map is the
-current validation reference; the earlier correction chronology above is
-historical, not an instruction to repeat those author ceremonies.
-
-Every delivered trap frame carries the registered hart context. Outside
-dispatch, `sscratch` points to the hart's trap anchor; during dispatch it is
-zero as the nested-trap sentinel and kernel `tp` identifies the same hart. A
-nested fault therefore selects that hart's emergency stack without a global
-hart ID. The OpenSBI timer's initialized, active, interval, deadline, and tick
-state are embedded in the hart object.
+Every trap frame carries its registered hart. Outside dispatch `sscratch`
+names that hart's stack anchor; during dispatch it is the nested-trap sentinel
+and kernel `tp` identifies the same hart. Nested faults use the emergency
+stack. OpenSBI timer state is embedded in the hart, not standalone globals.
 
 ### Phase 3: process, IPC, and static image preparation
 
-The kernel validates one pointer-free immutable bootstrap manifest and its
-generated catalog of already linked service images. It computes a
-lowest-service-ID topological order and rejects unknown versions, missing
-profiles or images, duplicate identities, invalid device fields, missing
-prerequisites, and cycles before any manifest-directed service mutation.
+Before mutation, the kernel validates the pointer-free manifest, profiles,
+resource bounds, generated checked images and lowest-ID topological order.
+It prepares every static process/root/image/stack/thread/context/endpoint
+before VM handoff. Only the launcher starts active and runnable; other
+endpoints remain reserved, profiles uninstalled and threads held.
 
-For every active manifest entry, the kernel reserves the exact process slot,
-creates a generation-bound private Sv39 root, loads the checked RX, R, and
-RW/NX image, creates the external zeroed stack, prepares the sole initial
-thread context, reserves the endpoint, installs bootstrap scheduling policy,
-and leaves the thread held. Each root shares the immutable supervisor-only
-kernel entries and owns a private user subtree at root index 1. Bootstrap user
-pages are fully zeroed and typed to the exact process generation.
-
-Only the launcher receives its exact immutable profile, active endpoint, and
-runnable thread. Every other endpoint remains `RESERVED`, every other profile
-remains uninstalled, and every other thread retains `INACTIVE`. The launcher
-reads a read-only copy of the validated manifest and may select only
-kernel-prepared manifest entries.
-
-One thread per process, saved contexts, and U-mode entry remain explicit: each
-thread owns a saved integer context and one slot-derived 16 KiB supervisor
-stack. Independent run-time flags, 16 priority queues, a queue-reachable
-current thread, separate accounting, repeated timer-driven switching, and the
-race-free idle return remain the common execution mechanism.
-
-The implemented exact contract is
-[ADR-0043](../adr/0043-static-bootstrap-launcher.md).
+The production manifest contains launcher, VM, PM, TTY, RAMFS and VFS.
+Its seventh storage slot is for dependency-closed fixtures, not a seventh
+production service. Readiness uses exact endpoint generations and one-shot
+reply tokens; see [ADR-0043](../adr/0043-static-bootstrap-launcher.md).
 
 ### Phase 4: VM handoff
 
-The VM server starts with one kernel-patched, fixed-capacity boot-information
-and frame-database object. It contains the canonical physical-memory,
-reservation, managed-range, address-space, mapping, per-frame-state, count,
-and digest snapshot with no pointer authority. Its code, data, stack,
-database, IPC buffers, and grant buffers are wired before it completes a
-one-way handoff.
+VM independently validates its fixed pointer-free boot database before
+requesting the one-way ownership commit. The kernel completely preflights
+the summary, roots, allocator and typed ownership while mutation is quiesced,
+then commits the planned wired owners without partial publication.
+VM readiness is accepted only after `HANDED_OFF`.
 
-Every static `PROCESS_USER` frame is atomically staged `VM_WIRED` before the
-launcher runs. VM independently validates the complete snapshot, then invokes
-one exact VM-only summary operation. The kernel revalidates the scalar summary,
-all roots, the allocator, and typed ownership while mutation is quiesced, then
-installs every wired owner and the irreversible handed-off phase in one
-non-failing pass. After that point, VM owns ordinary frame-allocation policy
-while the kernel retains the allocator, typed-owner, and page-table mechanisms
-as privileged validation mirrors.
+Static user mappings retain exact process-generation `VM_WIRED` ownership.
+Only VM owns subsequent frame policy; privileged mechanisms remain checked
+kernel mirrors. The sole device exception is the exact TTY UART leaf.
+The separate token-bound executable-loading protocol owns VM's temporary
+scratch mapping; handoff does not reopen generic bootstrap mutation or
+execution-context preparation. VM-originated faults are fatal.
 
-Before the ownership commit, the address-space handoff path validates every
-live private root and requires every reachable bootstrap user leaf to be
-planned `VM_WIRED` for the same process generation. After commit, read-only
-root validation, lookup, translation, and activation use exact `VM_WIRED`
-leaf ownership, so the launcher and initial services retain IPC-buffer and
-checked-grant access. `VM_TRANSFERABLE` carries no process identity and cannot
-appear in a live user PTE until the later VM mapping protocol installs an
-exact mapping authority. This read boundary does not reopen bootstrap
-execution-context preparation: every live thread is already prepared at
-handoff, and only the later PM transaction may prepare a new executable
-context.
-
-The launcher releases VM first. VM's bootstrap ready call is accepted only
-after the separate `VM_READY` summary has been validated and the ownership
-phase has irreversibly changed to `HANDED_OFF`. Only then may the launcher
-acknowledge VM readiness and release PM. The launcher does not perform or
-infer the ownership commit.
-
-Step 9 exposes no general post-handoff map, unmap, allocation, or page-fault
-protocol. Step 11 adds one nonrepeatable exception: exact VM authority may
-install the fixed UART device page into the held TTY root without allocating a
-frame or page table. The device leaf is outside managed RAM, is tracked
-separately from VM's handoff snapshot, and is rejected by managed-memory
-lookup, IPC-buffer, grant, and inventory paths. Every ordinary static mapping
-remains wired.
-
-A VM-originated fault is fatal; non-VM fault delivery remains disabled until a
-later reviewed mapping protocol defines suspension, exact mapping authority,
-mutation rollback, and retry. The exact handoff contract is
-[ADR-0045](../adr/0045-static-vm-bootstrap-and-handoff.md).
+See [ADR-0045](../adr/0045-static-vm-bootstrap-and-handoff.md),
+[the wired read boundary](../adr/0040-post-handoff-wired-address-space-resolution.md)
+and [ADR-0050](../adr/0050-post-handoff-elf-spawn.md).
 
 ### Phase 5: core user services
 
-The launcher releases PM, TTY, RAMFS, and VFS one at a time in the explicit
-manifest order. Release atomically installs only the named profile, activates
-the reserved endpoint, records one readiness deadline, and makes the prepared
-thread runnable. Each service performs one versioned readiness `call`; the
-launcher validates its exact endpoint generation and the kernel atomically
-records the ready transition with the token-bound acknowledgment before any
-dependent is released.
+The launcher releases PM, TTY, RAMFS and VFS sequentially. Release publishes
+the exact profile, endpoint, guest-owned deadline and runnable state together.
+Ready acknowledgment is generation- and token-bound. Malformed, foreign,
+early, duplicate, missing or expired readiness is fatal, not recoverable
+through a skipped dependency or alternative profile.
 
-Before TTY release, the launcher invokes exact `console_handoff_begin`.
-The kernel disables ordinary early-console output and notifies VM. VM invokes
-one exact operation-12 command that writes the fixed UART PTE at
-`0x7fffe000`, then the kernel notifies the launcher that mapping committed.
-Only then may the launcher release TTY.
+TTY release follows console begin and VM's exact UART mapping; readiness
+follows console commit. One unextended deadline covers that whole sequence.
+RAMFS validates its seed before readiness; VFS mounts it once and binds the
+synthetic console. After the final acknowledgment the launcher is held,
+its controller binding is cleared and bootstrap authority is irreversibly
+sealed. The retained launcher endpoint/profile do not restore authority.
 
-TTY initializes the NS16550A while PLIC source 10 remains disabled, drains
-stale device state, and commits ownership through operation 14. The kernel
-then installs the exact source route and enables supervisor-external delivery.
-One manifest-bounded absolute deadline is armed at console begin and covers
-mapping, release, initialization, commit, and readiness without being extended
-at release. TTY's ordinary bootstrap readiness is accepted only after commit
-and clears that deadline. The exact contract is
-[ADR-0047](../adr/0047-tty-console-handoff-and-serial-protocol.md).
-
-RAMFS validates one reproducible build-generated seed into a fixed writable
-node table and sparse data-block arena before reporting ready. After exact VFS
-is released, one `MOUNT` returns the referenced root and enables versioned
-lookup, create, mkdir, read, write, getdents, and putnode calls. Whole-path
-lookup remains confined to that root; generation-safe node handles and
-separate link/reference counts reject stale or excessive ownership changes.
-One-page exact-direction grants carry every path, name, file transfer, and
-directory listing. The retained seed, writable arena, metadata, code, and
-stack remain within one fail-closed 192-page RAMFS service budget. The exact
-contract is
-[ADR-0048](../adr/0048-ramfs-service-and-vfs-filesystem-protocol.md).
-
-VFS mounts that root once before readiness and owns fixed process records,
-descriptor tables, shared open-file descriptions, vnode/backend-reference
-aggregation, root and working-directory routing, and one synthetic console
-object. Applications use versioned open, close, read, write, getdents, mkdir,
-and chdir calls. VFS terminates each application grant in one of two resident
-bounce pages, then creates a separate exact RAMFS or TTY grant. A non-copying
-grant-range preflight validates a consuming read destination before TTY can
-remove input. RAMFS directory records are translated into a fixed
-application-facing record that exposes no backend handle. The exact contract
-is [ADR-0049](../adr/0049-vfs-service-and-application-io-protocol.md).
-
-Malformed, foreign, early, duplicate, missing, or expired readiness is fatal.
-There is no restart, alternate profile, skipped dependency, or recovery
-fallback. After the last static service is ready, the launcher seals bootstrap
-state, clears the exact controller binding, and holds its own thread. Its
-endpoint and immutable profile remain attached but confer no bootstrap
-authority in the sealed phase. Its wired process and root remain dormant until
-later PM/VM teardown exists.
-
-PM initializes a separate bounded application-lifecycle table before reporting
-ready. Static manifest services remain an immutable bootstrap inventory rather
-than ordinary PM children: they have no application PID, wait parent, zombie
-state, or ordinary exit path before RS exists. The sealed profile table
-contains exact `APPLICATION` profile ID 7, but no process receives it before
-the later executable-preparation transition. When launcher completion seals
-bootstrap, the kernel injects one exact `BOOTSTRAP_SEALED` event into the
-manifest PM endpoint. That event enables PM's runtime process policy without
-transferring or reviving launcher authority.
-
-The PM kernel lifecycle can reserve one hidden empty process, bind a VM-frozen
-mapping to one held application thread and unpublished endpoint, roll that
-prepared state back, or atomically publish it. Normal exit first seals the
-application endpoint source-only while retaining its exact reply-blocked call,
-then detaches IPC, grants, thread, context, and scheduler state before VM
-releases the root and frames and PM retires the empty process. An isolated QEMU
-fixture proves this complete kernel lifecycle with a checked application;
-the production PM/VFS/VM coordinator now composes ordinary spawn, rollback,
-exit, and wait through checked service protocols. Its
-[implementation map](pm-spawn-coordinator.md) records the mixed native
-lifecycle proof and real runtime adapters. The separately reviewed
-[application runtime](application-runtime.md) now supplies argv/env startup,
-checked images, and normal-return PM exit. The final
-[PID-1 integration](elf-spawn-integration.md) now composes all six production
-services with dynamic parent/child applications, post-freeze rollback,
-inherited I/O, normal exit/wait, and complete post-init resource equality.
-Implementation #128 records the current author and independent-review gate;
-production init and shell remain node Q.
-
-The PM model contract is
-[ADR-0046](../adr/0046-pm-process-lifecycle-and-spawn-metadata.md), and the
-post-handoff kernel lifecycle is fixed by
-[ADR-0050](../adr/0050-post-handoff-elf-spawn.md).
+PM consumes the kernel-origin `BOOTSTRAP_SEALED` event before application
+lifecycle work. Static services remain outside the application PID/parent/
+zombie tree. [The coordinator](pm-spawn-coordinator.md),
+[application runtime](application-runtime.md) and
+[ELF-spawn integration](elf-spawn-integration.md) define the ordinary
+post-seal spawn, rollback, exit and wait path.
 
 ### Phase 6: first user environment
 
-After launcher authority is sealed, PM, VFS, and VM cooperate through the
-ordinary spawn transaction to load `init`. VFS creates one synthetic console
-object bound to the fixed TTY endpoint and installs it as init descriptors 0,
-1, and 2. Init is not a static manifest entry and its activation does not
-restore launcher authority. Init starts the shell, and later spawn descriptor
-actions duplicate the parent's console descriptors. The shell can run a small
-built-in userland including at least `echo`, `cat`, `ls`, and `ps`.
-
-The first successful internal PM transaction creates init as PID 1 with no
-parent and designates it as the application reaper. Static services remain
-outside that application parent tree.
-
-Accepted
-[ADR-0079](../adr/0079-production-init-shell-and-basic-commands.md) fixes the
-exact node-Q boundary. PM starts init once after the sealed event; init
-persists and restarts one foreground console shell. The shell uses direct
-spawn/wait rather than fork, supports only bounded simple commands and `exit`,
-and runs separate checked `echo`, `cat`, `ls`, and `ps` applications. `ps`
-observes only PM-owned applications through a versioned read-only snapshot;
-static services remain outside its output until a later discovery/inspection
-authority.
+Production node Q is still a later gated outcome, not the existing test PID 1.
+Its [Accepted contract](init-shell.md) has PM create parentless init through
+ordinary spawn, VFS supply console descriptors 0/1/2, and init persist as the
+application reaper while restarting one foreground shell. The shell uses
+bounded simple-command parsing and direct spawn/wait, not fork.
+Separate `echo`, `cat`, `ls` and `ps` applications do not gain bootstrap
+authority; `ps` observes PM-owned applications only.
 
 ## Runtime interactions
 
@@ -578,49 +265,11 @@ owns no lifecycle or protocol authority.
 
 ### Static bootstrap launcher
 
-[ADR-0043](../adr/0043-static-bootstrap-launcher.md) defines the implemented
-Step 8 contract.
-
-The immutable manifest stores at most seven entries. The production image uses
-exactly six for launcher, VM, PM, TTY, RAMFS, and VFS; the seventh storage slot
-exists only for dependency-closed fixtures such as the isolated VFS
-application probe. Each active entry carries an exact service ID and name,
-process slot, generated embedded-image ID, profile ID and name, user-page and
-stack limits, explicit prerequisite mask, readiness timeout, and one narrowly
-defined bootstrap role. Only the TTY role may carry the fixed UART page and
-PLIC source required by ADR-0012.
-
-The version-1 service configuration remains exactly 128 bytes by storing seven
-endpoint records and five reserved words; its manifest-view field is at offset
-80. The version-1 VM boot object stores seven 32-byte address-space records and
-is exactly 364,704 bytes. Production reports six active records and the VFS
-fixture reports seven.
-
-The manifest never contains a pointer or mutable privilege mask. The kernel
-resolves each image through an immutable checked image catalog and each
-profile through the sealed profile table. No privilege or prerequisite is
-inferred from service names, roles, source order, images, devices, or IRQs.
-Each static image exports one fixed writable bootstrap-configuration object;
-before context preparation, the kernel patches its exact service ID, own
-endpoint generation, launcher endpoint, manifest version, and the bounded
-static service-ID/endpoint table. The object is startup data, not authority;
-reserved endpoints remain unresolved until release. Prepared non-launcher
-threads remain inactive and scheduler-unassigned; their immutable intended
-policy is stored in bootstrap state and scheduler admission occurs only in the
-same commit that installs the profile and publishes the endpoint.
-
-RISC-V syscall operation 11 is implemented for launcher-only
-bootstrap control. It releases the exact next service, atomically accepts one
-token-bound ready call, reports a fatal launcher-detected protocol failure, or
-irreversibly completes bootstrap. The generic freestanding runtime exposes
-operations 1 through 10 plus operation 15; launcher code owns a private
-bootstrap-control wrapper.
-
-The readiness request and acknowledgment are fixed 64-byte IPC messages. The
-request's kernel-written source and reply token, not its payload, prove the
-exact service generation. The kernel owns one absolute `time`-counter
-deadline, so a missing response fails inside the guest without sleeps or
-reliance on the host harness timeout.
+The phase-3/5 sequence above is the bootstrap lifecycle.
+[ADR-0043](../adr/0043-static-bootstrap-launcher.md) owns the exact manifest,
+operation-11 and readiness formats. Configuration records are startup data,
+not authority: the kernel resolves every image/profile and never derives
+privileges from names, payload pointers or source order.
 
 ### Bulk data
 
@@ -914,9 +563,9 @@ before replaying diagnostic history; it never follows user or older trap epochs.
   not initialize service readiness, process lifecycle, heap, TLS, arguments,
   or environment state.
 
-## Proposed source layout
+## Source layout
 
-The layout is descriptive until the toolchain ADRs are accepted:
+The current responsibility-oriented hierarchy is:
 
 ```text
 arch/riscv64/       RISC-V entry, traps, context switch, and platform code

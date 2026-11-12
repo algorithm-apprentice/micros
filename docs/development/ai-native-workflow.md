@@ -61,7 +61,7 @@ fast/full selection, current-source snapshots and live per-test feedback.
 Focused success is not a replacement for the minimum PR gate.
 
 [Current-contract validation](../architecture/current-contract-validation.md),
-Accepted under ADR-0123 and separately merged as design #247, removes
+Accepted under ADR-0123, removes
 historical source catalogs, metadata-only naming prerequisites and duplicate
 recertification executions. Preserve real Red, independent expectations,
 current input/observation checks and the required native, target, integration
@@ -84,6 +84,13 @@ and pull request without needing private prompt history.
 An agent begins with [AGENTS.md](../../AGENTS.md), then follows its required
 context order. Path-specific files under `.github/instructions` add local
 constraints when relevant.
+
+The [documentation reading map](../README.md#reading-map-and-ownership)
+identifies each fact's canonical owner. Keep current delivery status in the
+roadmap, finding closure in the correction register, architecture in its
+contract, runnable commands in the build guide, and exact execution/review
+history in the task PR. Link to those owners instead of appending the same
+PR chronology to every document.
 
 The repository uses:
 
@@ -138,6 +145,10 @@ If these fields cannot be stated, the task is not ready to implement.
 ## Documentation-first and test-first sequence
 
 Every implementation-bearing outcome uses two separately reviewed phases.
+Pure documentation corrections that introduce no new decision or behavior
+need only one documentation PR under
+[ADR-0033](../adr/0033-reviewed-design-before-implementation.md#documentation-only-work);
+do not create a fictitious implementation task or runtime Red for them.
 
 ### Design phase
 
@@ -270,8 +281,9 @@ the author's suite. Review ends only when no substantive issue remains.
 
 ## Pull request and merge
 
-The pull request template is the durable phase record. Every PR identifies
-`Phase: Design` or `Phase: Implementation`.
+The pull request template is the durable phase record. Implementation-bearing
+outcomes identify `Phase: Design` or `Phase: Implementation`; a pure
+documentation correction states that scope explicitly.
 
 A design PR records baseline evidence, completed contracts, ADR status,
 non-goals, acceptance evidence, and independent design review. It does not
@@ -297,22 +309,12 @@ the design outcome is on `main`.
 - Prefer one stable verification command per intent over agent-specific command
   sequences.
 
-The Accepted
-[validation-evidence design](../architecture/validation-evidence.md) preserves
-this rule while distinguishing actual command execution from explicitly
-attributed reuse of exact current-candidate evidence. Separate implementation
-#132 is merged. Default and full execution remain fresh; opt-in reuse follows
-the closed-profile contract and never narrows the required plan or substitutes
-for independent review.
-
-Accepted
-[ADR-0074](../adr/0074-fail-fast-validation-producer-readiness.md) adds a
-separate author intent for tasks that require same-run reusable receipts.
-Such a task uses authoritative producer mode for its final fresh plan rather
-than first running an ordinary full plan and discovering receipt ineligibility
-afterward. Producer readiness occurs before any planned command or ledger
-mutation; failure keeps the plan `NOT_RUN`. Reviewers still inspect the
-author's resulting producer/reuse evidence and do not rerun it routinely.
+Default and full execution remain fresh. Optional exact-candidate receipt
+reuse and producer readiness follow the
+[validation contract](../architecture/validation-evidence.md) and
+[build guide](building.md#optional-exact-context-receipts). They never narrow
+the required plan or replace independent review. Routine runtime work does
+not acquire another receipt ceremony merely because that feature exists.
 
 ## Evolution
 
@@ -322,27 +324,14 @@ validation outcome and an explicit CI-publication review boundary.
 Implementation requires separate design merge and follows those review
 checkpoints. Ordinary runtime author-validation obligations are unchanged.
 
-As implementation begins, the repository will add deterministic build presets,
-test targets, CI checks, and machine-readable test output. Those executable
-interfaces become the preferred agent tools, but they remain governed by the
-same Accepted ADRs and task contract.
+Existing deterministic presets, test targets and machine-readable results
+remain governed by the same Accepted ADRs and task contract. Hosted-CI status
+is in [the roadmap](../roadmap.md#current-status); an accepted design is not
+operational acceptance.
 
-The initial reproducible documentation gate is:
-
-```bash
-"${MICROS_PYTHON}" -E -S -B -m unittest discover -s tests/host -p 'test_*.py'
-"${MICROS_PYTHON}" -E -S -B tools/check_docs.py
-git add <intended-files>
-git diff --quiet
-git diff --check
-git diff --cached --check
-git ls-files --others --exclude-standard
-git write-tree
-git diff --check origin/main...HEAD
-```
-
-After staging, `git diff --quiet` must prove the tracked worktree is clean.
-Then run the worktree and cached whitespace checks before review. Untracked task
-output must be empty, and the tree ID binds the evidence to the staged change.
-Run the range check after committing to validate the complete pull-request
-diff.
+Use the [documented planner](building.md#validation-planning) for the applicable
+gate, including its [documentation-only form](building.md#documentation-only-checks).
+Before review, staged content must match the clean tracked worktree,
+untracked task-file output must be empty, and the evidence must identify
+`HEAD` and `git write-tree`. Whitespace checks are separate from cleanliness.
+After committing, run the branch-range check against the complete PR diff.
