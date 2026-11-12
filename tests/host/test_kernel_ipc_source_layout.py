@@ -516,6 +516,8 @@ PRIVATE_HEADERS = {
     "MICROS_IPC_SYSCALL_QEMU_TEST_SOURCES": 'kernel/tests/ipc/ipc_syscall_test_internal.h',
 }
 
+FIXTURE_SUPPORT_HEADERS = ("tests/host/ipc_fixture_tokens.h",)
+
 FINAL_OWNER_GROUPS = {
     'kernel/ipc/ipc_common.c': ("micros_ipc_thread_has_staged_kernel_notification",),
     'kernel/ipc/ipc_completion.c': ("micros_ipc_stage_no_message_completion",),
@@ -794,7 +796,7 @@ def all_sources() -> tuple[str, ...]:
     return tuple(path for paths in SOURCE_SETS.values() for path in paths)
 
 def accepted_family_paths() -> tuple[str, ...]:
-    return tuple(sorted({*all_sources(), *PRIVATE_HEADERS.values(), *PUBLIC_PATHS}))
+    return tuple(sorted({*all_sources(), *PRIVATE_HEADERS.values(), *FIXTURE_SUPPORT_HEADERS, *PUBLIC_PATHS}))
 
 def discovered_family_paths() -> tuple[str, ...]:
     return tuple(sorted({
@@ -885,7 +887,7 @@ class KernelIpcSourceLayoutTest(unittest.TestCase):
         self.assertEqual(11, len(PRIVATE_HEADERS))
         self.assertEqual(
             [],
-            [path for path in (*all_sources(), *PRIVATE_HEADERS.values())
+            [path for path in (*all_sources(), *PRIVATE_HEADERS.values(), *FIXTURE_SUPPORT_HEADERS)
              if not (REPOSITORY_ROOT / path).is_file()],
         )
         self.assertEqual(accepted_family_paths(), discovered_family_paths())
@@ -898,6 +900,12 @@ class KernelIpcSourceLayoutTest(unittest.TestCase):
             self.assertEqual({}, c_function_definitions(text), path)
             self.assertEqual((), file_scope_objects(text), path)
             self.assertNotRegex(c_declaration_text(text), r"\bstatic\b", path)
+        for path in FIXTURE_SUPPORT_HEADERS:
+            text = current_text(REPOSITORY_ROOT / path)
+            self.assertEqual((), file_scope_objects(text), path)
+            self.assertEqual(
+                {"ipc_fixture_next_token", "ipc_fixture_return_request"}, set(c_function_definitions(text)), path
+            )
 
 
 
@@ -949,11 +957,13 @@ class KernelIpcSourceLayoutTest(unittest.TestCase):
                     self.assertNotRegex(text, rf"\b{re.escape(name)}\b", (path, name))
             if path.startswith("kernel/") and "_test" not in path:
                 self.assertFalse(
-                    set(closure) & (set(PRIVATE_HEADERS.values()) - {
+                    set(closure) & ((set(PRIVATE_HEADERS.values()) | set(FIXTURE_SUPPORT_HEADERS)) - {
                         'kernel/ipc/ipc_internal.h', 'kernel/ipc/ipc_syscall_internal.h',
                     }),
                     path,
                 )
+            if path in {MODEL_COMMON, MODEL_REFERENCE, *MODEL_PRIMITIVES, *MODEL_OPERATIONS}:
+                self.assertFalse(set(closure) & set(FIXTURE_SUPPORT_HEADERS), path)
         for path in compiled_source_header_closure():
             self.assertNotRegex(
                 current_text(REPOSITORY_ROOT / path),

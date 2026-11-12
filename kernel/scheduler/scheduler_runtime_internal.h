@@ -34,6 +34,7 @@ enum scheduler_completion_error {
 struct scheduler_completion_commit {
     bool pending;
     struct micros_thread *thread;
+    struct micros_thread *request_caller;
     struct micros_process_handle owner;
     uintptr_t receive_buffer;
     struct micros_ipc_message message;

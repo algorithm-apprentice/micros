@@ -4188,6 +4188,7 @@ if(MICROS_BUILD_HOST_TESTS)
             tests/host/selected_ipc_validation_test.h
             tests/host/selected_ipc_completion_test.c
             tests/host/selected_ipc_deadlock_test.c
+            tests/host/selected_ipc_token_test.c
             tests/host/selected_ipc_validation_evidence.py
             tests/host/selected_ipc_validation_source.py
             tests/host/native_observations.py
@@ -4203,10 +4204,11 @@ if(MICROS_BUILD_HOST_TESTS)
     )
     add_executable(selected_ipc_validation_ordinary ${IPC01_SOURCES_ordinary}
         tests/host/selected_ipc_validation_test.c tests/host/selected_ipc_completion_test.c
-        tests/host/selected_ipc_deadlock_test.c)
+        tests/host/selected_ipc_deadlock_test.c tests/host/selected_ipc_token_test.c)
     add_executable(selected_ipc_validation_test ${IPC01_SOURCES_work}
         tests/host/selected_ipc_validation_test.c tests/host/selected_ipc_completion_test.c
         tests/host/selected_ipc_deadlock_test.c
+        tests/host/selected_ipc_token_test.c
         tests/work/work_counts.c)
     foreach(ipc01_channel IN ITEMS ordinary work)
         if(ipc01_channel STREQUAL ordinary)

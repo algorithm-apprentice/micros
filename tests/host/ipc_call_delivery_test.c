@@ -1,5 +1,28 @@
 #include "ipc_call_test_internal.h"
 
+static bool staged_index_rejects_unrelated_close(struct ipc_call_test_context *fixture)
+{
+    struct micros_thread *caller =
+        &fixture->objects.threads[fixture->primary_threads[CALL_PROCESS_CLIENT].slot];
+    struct micros_thread_handle receiver = caller->ipc_request_receiver;
+    struct micros_endpoint_registry registry_snapshot;
+    struct micros_kernel_objects objects_snapshot;
+
+    ++caller->ipc_request_receiver.generation;
+    registry_snapshot = fixture->registry;
+    objects_snapshot = fixture->objects;
+    EXPECT_IPC_ERROR(
+        MICROS_IPC_ERROR_INVARIANT,
+        micros_ipc_endpoint_close(
+            &fixture->registry, &fixture->objects, fixture->endpoints[CALL_PROCESS_NO_CALL]
+        )
+    );
+    EXPECT_TRUE(ipc_call_test_complete_state_is_unchanged(fixture, &registry_snapshot, &objects_snapshot));
+    caller->ipc_request_receiver = receiver;
+    return micros_endpoint_registry_validate_objects(&fixture->registry, &fixture->objects)
+        == MICROS_ENDPOINT_OK;
+}
+
 bool test_call_delivers_to_waiting_receiver(struct ipc_call_test_context *fixture)
 {
     struct micros_ipc_message request = ipc_call_test_message_pattern(
@@ -15,8 +38,10 @@ bool test_call_delivers_to_waiting_receiver(struct ipc_call_test_context *fixtur
     const struct micros_thread *receiver;
     const struct micros_endpoint_record *server;
     uint32_t saved_callee;
+    uint64_t token;
 
     EXPECT_TRUE(ipc_call_test_setup_call_fixture(fixture));
+    token = ipc_fixture_next_token(0, fixture->primary_threads[CALL_PROCESS_CLIENT].slot);
     EXPECT_IPC_ERROR(
         MICROS_IPC_OK,
         micros_ipc_receiver_enqueue(
@@ -41,7 +66,7 @@ bool test_call_delivers_to_waiting_receiver(struct ipc_call_test_context *fixtur
     expected = ipc_call_test_canonical_request(
         &request_snapshot,
         fixture->endpoints[CALL_PROCESS_CLIENT],
-        1
+        token
     );
     caller = &fixture->objects.threads[
         fixture->primary_threads[CALL_PROCESS_CLIENT].slot
@@ -52,7 +77,7 @@ bool test_call_delivers_to_waiting_receiver(struct ipc_call_test_context *fixtur
     server = &fixture->registry.endpoints[CALL_PROCESS_SERVER];
 
     EXPECT_TRUE(
-        fixture->registry.last_reply_token == 1
+        fixture->registry.last_reply_token == token
         && caller->runtime_flags == MICROS_THREAD_RTS_IPC_REPLY
         && caller->ipc_queue_kind == MICROS_IPC_QUEUE_NONE
         && ipc_call_test_thread_handle_is_zero(caller->ipc_next)
@@ -63,7 +88,11 @@ bool test_call_delivers_to_waiting_receiver(struct ipc_call_test_context *fixtur
         )
         && caller->ipc_send_destination == 0
         && caller->ipc_receive_buffer == (uintptr_t)&request
-        && caller->ipc_reply_token == 1
+        && caller->ipc_reply_token == token
+        && caller->ipc_reply_phase == MICROS_IPC_REPLY_PHASE_STAGED
+        && ipc_call_test_thread_handles_equal(
+            caller->ipc_request_receiver, fixture->primary_threads[CALL_PROCESS_SERVER]
+        )
         && caller->ipc_reply_callee
             == fixture->endpoints[CALL_PROCESS_SERVER]
         && fixture->objects.threads[fixture->client_extra_thread.slot]
@@ -109,7 +138,7 @@ bool test_call_delivers_to_waiting_receiver(struct ipc_call_test_context *fixtur
     fixture->objects.threads[
         fixture->primary_threads[CALL_PROCESS_CLIENT].slot
     ].ipc_reply_callee = saved_callee;
-    return true;
+    return staged_index_rejects_unrelated_close(fixture);
 }
 
 bool test_call_preserves_independent_receiver_flags(struct ipc_call_test_context *fixture)
@@ -125,8 +154,10 @@ bool test_call_preserves_independent_receiver_flags(struct ipc_call_test_context
     const uintptr_t receive_buffer = UINT64_C(0x60000800);
     const struct micros_thread *caller;
     struct micros_thread *receiver;
+    uint64_t token;
 
     EXPECT_TRUE(ipc_call_test_setup_call_fixture(fixture));
+    token = ipc_fixture_next_token(0, fixture->primary_threads[CALL_PROCESS_CLIENT].slot);
     EXPECT_IPC_ERROR(
         MICROS_IPC_OK,
         micros_ipc_receiver_enqueue(
@@ -161,7 +192,7 @@ bool test_call_preserves_independent_receiver_flags(struct ipc_call_test_context
     expected = ipc_call_test_canonical_request(
         &request_snapshot,
         fixture->endpoints[CALL_PROCESS_CLIENT],
-        1
+        token
     );
     caller = &fixture->objects.threads[
         fixture->primary_threads[CALL_PROCESS_CLIENT].slot
@@ -170,9 +201,9 @@ bool test_call_preserves_independent_receiver_flags(struct ipc_call_test_context
         fixture->primary_threads[CALL_PROCESS_SERVER].slot
     ];
     EXPECT_TRUE(
-        fixture->registry.last_reply_token == 1
+        fixture->registry.last_reply_token == token
         && caller->runtime_flags == MICROS_THREAD_RTS_IPC_REPLY
-        && caller->ipc_reply_token == 1
+        && caller->ipc_reply_token == token
         && receiver->runtime_flags == MICROS_THREAD_RTS_INACTIVE
         && !receiver->ready_linked
         && receiver->ipc_queue_kind == MICROS_IPC_QUEUE_NONE
@@ -210,8 +241,12 @@ static bool queue_calls_and_check_bindings(
     const struct micros_endpoint_record *server;
     const struct micros_thread *first_caller;
     const struct micros_thread *second_caller;
+    uint64_t first_token;
+    uint64_t second_token;
 
     EXPECT_TRUE(ipc_call_test_setup_call_fixture(fixture));
+    first_token = ipc_fixture_next_token(0, fixture->primary_threads[CALL_PROCESS_CLIENT].slot);
+    second_token = ipc_fixture_next_token(first_token, fixture->client_extra_thread.slot);
     EXPECT_IPC_ERROR(
         MICROS_IPC_OK,
         micros_ipc_call(
@@ -241,7 +276,7 @@ static bool queue_calls_and_check_bindings(
     ];
     second_caller = &fixture->objects.threads[fixture->client_extra_thread.slot];
     EXPECT_TRUE(
-        fixture->registry.last_reply_token == 2
+        fixture->registry.last_reply_token == second_token
         && ipc_call_test_thread_handles_equal(
             server->sender_head,
             fixture->primary_threads[CALL_PROCESS_CLIENT]
@@ -265,8 +300,10 @@ static bool queue_calls_and_check_bindings(
                 MICROS_THREAD_RTS_IPC_SEND
                 | MICROS_THREAD_RTS_IPC_REPLY
             )
-        && first_caller->ipc_reply_token == 1
-        && second_caller->ipc_reply_token == 2
+        && first_caller->ipc_reply_token == first_token
+        && second_caller->ipc_reply_token == second_token
+        && first_caller->ipc_reply_phase == MICROS_IPC_REPLY_PHASE_QUEUED
+        && second_caller->ipc_reply_phase == MICROS_IPC_REPLY_PHASE_QUEUED
         && first_caller->ipc_receive_buffer
             == (uintptr_t)first_request
         && second_caller->ipc_receive_buffer
@@ -277,10 +314,10 @@ static bool queue_calls_and_check_bindings(
             == fixture->endpoints[CALL_PROCESS_SERVER]
         && first_caller->ipc_outbound_message.source
             == fixture->endpoints[CALL_PROCESS_CLIENT]
-        && first_caller->ipc_outbound_message.reply_token == 1
+        && first_caller->ipc_outbound_message.reply_token == first_token
         && second_caller->ipc_outbound_message.source
             == fixture->endpoints[CALL_PROCESS_CLIENT]
-        && second_caller->ipc_outbound_message.reply_token == 2
+        && second_caller->ipc_outbound_message.reply_token == second_token
         && memcmp(
             first_request,
             first_snapshot,
@@ -308,6 +345,7 @@ static bool deliver_first_call_and_check_fifo(
     const struct micros_endpoint_record *server;
     const struct micros_thread *first_caller;
     const struct micros_thread *second_caller;
+    uint64_t first_token = ipc_fixture_next_token(0, fixture->primary_threads[CALL_PROCESS_CLIENT].slot);
 
     EXPECT_IPC_ERROR(
         MICROS_IPC_OK,
@@ -322,7 +360,7 @@ static bool deliver_first_call_and_check_fifo(
     expected = ipc_call_test_canonical_request(
         first_snapshot,
         fixture->endpoints[CALL_PROCESS_CLIENT],
-        1
+        first_token
     );
     server = &fixture->registry.endpoints[CALL_PROCESS_SERVER];
     first_caller = &fixture->objects.threads[
@@ -338,7 +376,7 @@ static bool deliver_first_call_and_check_fifo(
         && ipc_call_test_thread_handle_is_zero(first_caller->ipc_next)
         && first_caller->ipc_receive_buffer
             == (uintptr_t)first_request
-        && first_caller->ipc_reply_token == 1
+        && first_caller->ipc_reply_token == first_token
         && first_caller->ipc_reply_callee
             == fixture->endpoints[CALL_PROCESS_SERVER]
         && ipc_call_test_bytes_are_zero(

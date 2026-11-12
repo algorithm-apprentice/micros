@@ -41,6 +41,11 @@ def main(argv=None):
             objects = counts.per_owner[Owner.KERNEL_OBJECTS]
             print(f"MICROS_IPC02_WORK case={row['name']} visits={objects[Kind.RECORD_VISIT]}"
                   f" index={objects[Kind.INDEX_PROBE]}")
+        elif row["name"].startswith("token-"):
+            print(f"MICROS_IPC03_WORK case={row['name']}"
+                  f" ipc-records={counts.per_owner[Owner.KERNEL_IPC][Kind.RECORD_VISIT]}"
+                  f" endpoint-records={counts.per_owner[Owner.KERNEL_ENDPOINT][Kind.RECORD_VISIT]}"
+                  f" index={counts.per_kind[Kind.INDEX_PROBE]}")
     print("MICROS_IPC01_CURRENT_PASS products=2")
     return 0
 

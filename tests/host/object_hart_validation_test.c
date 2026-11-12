@@ -97,25 +97,33 @@ static uint64_t bytes_digest(const void *source, size_t size)
     return extend_digest(UINT64_C(14695981039346656037), source, size);
 }
 
-/* Preserve the fixed reference's 40-byte process view, not a second implementation. */
+/* Preserve the fixed common record bytes; current indexes are observed separately. */
 static uint64_t reference_state_digest(const struct micros_kernel_objects *objects)
 {
     const uint32_t old_padding = 0;
-    size_t tail = offsetof(struct micros_kernel_objects, threads);
+    size_t tail = offsetof(struct micros_kernel_objects, harts);
     uint64_t value = extend_digest(
         UINT64_C(14695981039346656037), objects, offsetof(struct micros_kernel_objects, processes)
     );
 
     _Static_assert(offsetof(struct micros_process, sole_thread) == 36 && sizeof(struct micros_process) == 48,
                    "the reference view admits only the appended sole-thread handle");
+    _Static_assert(offsetof(struct micros_thread, ipc_reply_phase) == 532
+                   && offsetof(struct micros_thread, ipc_request_receiver) == 536
+                   && sizeof(struct micros_thread) == 544,
+                   "the reference view admits only the appended request phase and receiver");
     for (size_t index = 0; index < MICROS_PROCESS_CAPACITY; ++index) {
         value = extend_digest(value, &objects->processes[index], offsetof(struct micros_process, sole_thread));
+        value = extend_digest(value, &old_padding, sizeof(old_padding));
+    }
+    for (size_t index = 0; index < MICROS_THREAD_CAPACITY; ++index) {
+        value = extend_digest(value, &objects->threads[index], offsetof(struct micros_thread, ipc_reply_phase));
         value = extend_digest(value, &old_padding, sizeof(old_padding));
     }
     return extend_digest(value, (const unsigned char *)objects + tail, sizeof(*objects) - tail);
 }
 
-static uint64_t sole_index_digest(const struct micros_kernel_objects *objects)
+static uint64_t binding_index_digest(const struct micros_kernel_objects *objects)
 {
     uint64_t value = UINT64_C(14695981039346656037);
 
@@ -124,6 +132,14 @@ static uint64_t sole_index_digest(const struct micros_kernel_objects *objects)
 
         value = extend_digest(value, &handle->slot, sizeof(handle->slot));
         value = extend_digest(value, &handle->generation, sizeof(handle->generation));
+    }
+    for (size_t index = 0; index < MICROS_THREAD_CAPACITY; ++index) {
+        const struct micros_thread *thread = &objects->threads[index];
+
+        value = extend_digest(value, &thread->ipc_reply_phase, sizeof(thread->ipc_reply_phase));
+        value = extend_digest(value, &thread->ipc_request_receiver.slot, sizeof(thread->ipc_request_receiver.slot));
+        value = extend_digest(value, &thread->ipc_request_receiver.generation,
+                              sizeof(thread->ipc_request_receiver.generation));
     }
     return value;
 }
@@ -497,7 +513,7 @@ static bool measure_operation(enum object_operation operation, const char *varia
     before_output = output_digest();
     before_state = bytes_digest(&fixture.before, sizeof(fixture.before));
     reference_before_state = reference_state_digest(&fixture.before);
-    before_index = sole_index_digest(&fixture.before);
+    before_index = binding_index_digest(&fixture.before);
     before_plan = bytes_digest(&fixture.plan, sizeof(fixture.plan));
     ++capture_label;
 #if defined(MICROS_TEST_WORK_COUNTS)
@@ -561,7 +577,7 @@ static bool measure_operation(enum object_operation operation, const char *varia
         (unsigned int)outputs_preserved, before_state,
         bytes_digest(&fixture.objects, sizeof(fixture.objects)),
         reference_before_state, reference_state_digest(&fixture.objects),
-        before_index, sole_index_digest(&fixture.objects),
+        before_index, binding_index_digest(&fixture.objects),
         before_output, output_digest(), fixture.value
     );
     printf(

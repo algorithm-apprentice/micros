@@ -14,6 +14,9 @@ enum micros_endpoint_error endpoint_preflight_registry(
 
 bool micros_endpoint_names_slot(micros_endpoint_t endpoint, uint16_t slot);
 
+bool micros_endpoint_reply_token_slot(uint64_t token, uint16_t *slot);
+bool micros_endpoint_next_reply_token(uint64_t previous, uint16_t slot, uint64_t *token);
+
 enum micros_endpoint_error micros_endpoint_select(
     const struct micros_endpoint_registry *registry,
     const struct micros_kernel_objects *objects,
@@ -42,6 +45,13 @@ bool micros_endpoint_staged_request_matches(
     struct micros_thread_handle receiver_handle,
     const struct micros_thread *caller,
     const struct micros_endpoint_record *caller_endpoint
+);
+
+bool micros_endpoint_select_staged_request(
+    const struct micros_endpoint_registry *registry,
+    const struct micros_kernel_objects *objects,
+    struct micros_thread_handle receiver_handle,
+    struct micros_thread_handle *caller_handle
 );
 
 bool endpoint_pending_notification_state_is_valid(

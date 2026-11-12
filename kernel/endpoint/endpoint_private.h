@@ -128,12 +128,14 @@ bool endpoint_source_only_process_threads_are_valid(
 bool endpoint_staged_delivery_state_is_valid(
     const struct micros_endpoint_registry *registry,
     const struct micros_kernel_objects *objects,
+    struct micros_thread_handle handle,
     const struct micros_thread *thread
 );
 
 bool endpoint_staged_delivery_selected_is_valid(
     const struct micros_endpoint_registry *registry,
     const struct micros_kernel_objects *objects,
+    struct micros_thread_handle handle,
     const struct micros_thread *thread,
     const struct micros_endpoint_selection *owner
 );

@@ -299,7 +299,10 @@ static bool stage_exact_calls_and_reject_foreign_rights(
             &scenario->second_token
         )
     );
-    EXPECT_TRUE(scenario->first_token == 1 && scenario->second_token == 2);
+    EXPECT_TRUE(
+        scenario->first_token == ipc_fixture_next_token(0, fixture->primary_threads[REPLY_PROCESS_CLIENT].slot)
+        && scenario->second_token == ipc_fixture_next_token(scenario->first_token, fixture->client_extra_thread.slot)
+    );
     EXPECT_TRUE(ipc_reply_test_expect_send_failure_unchanged(
         fixture,
         MICROS_IPC_ERROR_UNAUTHORIZED,
@@ -376,7 +379,10 @@ static bool reply_to_second_exact_caller(
         fixture->primary_threads[REPLY_PROCESS_OTHER_SERVER].slot
     ];
     EXPECT_TRUE(
-        fixture->registry.last_reply_token == 2
+        fixture->registry.last_reply_token == ipc_fixture_next_token(
+            ipc_fixture_next_token(0, fixture->primary_threads[REPLY_PROCESS_CLIENT].slot),
+            fixture->client_extra_thread.slot
+        )
         && scenario->first_caller->runtime_flags
             == MICROS_THREAD_RTS_IPC_REPLY
         && scenario->first_caller->ipc_reply_token == scenario->first_token

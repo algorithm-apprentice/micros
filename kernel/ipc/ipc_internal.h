@@ -181,10 +181,6 @@ struct ipc_reply_preflight {
     uintptr_t reply_buffer;
 };
 
-bool ipc_reply_token_is_available(
-    const struct micros_kernel_objects *objects,
-    uint64_t reply_token
-);
 enum micros_ipc_error ipc_preflight_reply(
     struct micros_endpoint_registry *registry,
     struct micros_kernel_objects *objects,

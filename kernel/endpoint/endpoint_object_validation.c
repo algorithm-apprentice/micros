@@ -23,6 +23,7 @@ bool micros_endpoint_thread_ipc_state_is_valid(
     const struct micros_process *process;
     struct micros_endpoint_selection owner;
     struct micros_endpoint_selection peer;
+    uint16_t token_slot;
 
     if (
         scheduler_core_preflight_thread(objects, handle, &thread)
@@ -50,6 +51,12 @@ bool micros_endpoint_thread_ipc_state_is_valid(
     if (micros_thread_ipc_state_is_clear(thread)) {
         return thread_has_no_ipc_flags(thread);
     }
+    if (thread->ipc_reply_token != 0
+        && (thread->ipc_reply_token > registry->last_reply_token
+            || !micros_endpoint_reply_token_slot(thread->ipc_reply_token, &token_slot)
+            || token_slot != handle.slot)) {
+        return false;
+    }
     if (thread->ipc_queue_kind == MICROS_IPC_QUEUE_SENDER) {
         return micros_endpoint_select(
             registry, objects, thread->ipc_send_destination, &peer
@@ -66,15 +73,18 @@ bool micros_endpoint_thread_ipc_state_is_valid(
         return false;
     }
     if (thread->ipc_reply_token != 0) {
-        return thread->ipc_reply_token <= registry->last_reply_token
-            && micros_endpoint_select(
+        return micros_endpoint_select(
                 registry, objects, thread->ipc_reply_callee, &peer
             ) == MICROS_ENDPOINT_OK
-            && endpoint_reply_wait_state_is_valid(registry, thread);
+            && endpoint_reply_wait_state_is_valid(registry, thread)
+            && (thread->ipc_reply_phase != MICROS_IPC_REPLY_PHASE_STAGED
+                || micros_endpoint_staged_request_matches(
+                    registry, objects, thread->ipc_request_receiver, thread, owner.record
+                ));
     }
     return endpoint_staged_error_state_is_valid(registry, thread)
         || endpoint_staged_no_message_success_state_is_valid(registry, thread)
-        || endpoint_staged_delivery_selected_is_valid(registry, objects, thread, &owner);
+        || endpoint_staged_delivery_selected_is_valid(registry, objects, handle, thread, &owner);
 }
 
 enum micros_endpoint_error endpoint_preflight_owned_threads(
@@ -251,7 +261,8 @@ static bool thread_relationships_are_canonical(
 
     for (index = 0; index < MICROS_THREAD_CAPACITY; ++index) {
         const struct micros_thread *thread = &objects->threads[index];
-        size_t other_index;
+        struct micros_thread_handle handle = {(uint16_t)index, thread->generation};
+        uint16_t token_slot;
 
         if (thread->slot_state != MICROS_KERNEL_OBJECT_SLOT_LIVE) {
             continue;
@@ -270,6 +281,7 @@ static bool thread_relationships_are_canonical(
                             && !endpoint_staged_delivery_state_is_valid(
                                 registry,
                                 objects,
+                                handle,
                                 thread
                             )
                             && !endpoint_staged_error_state_is_valid(
@@ -296,27 +308,25 @@ static bool thread_relationships_are_canonical(
             return false;
         }
         if (thread->ipc_reply_token == 0) {
+            if (thread->ipc_reply_phase != MICROS_IPC_REPLY_PHASE_NONE
+                || !endpoint_thread_handle_is_zero(thread->ipc_request_receiver)) {
+                return false;
+            }
             continue;
         }
         if (
             registry->last_reply_token == 0
             || thread->ipc_reply_token
                 > registry->last_reply_token
+            || !micros_endpoint_reply_token_slot(thread->ipc_reply_token, &token_slot)
+            || token_slot != index
+            || (thread->ipc_reply_phase == MICROS_IPC_REPLY_PHASE_STAGED
+                && !micros_endpoint_staged_request_matches(
+                    registry, objects, thread->ipc_request_receiver, thread,
+                    &registry->endpoints[thread->owner.slot]
+                ))
         ) {
             return false;
-        }
-        for (other_index = 0; other_index < index; ++other_index) {
-            const struct micros_thread *other =
-                &objects->threads[other_index];
-
-            if (
-                other->slot_state
-                    == MICROS_KERNEL_OBJECT_SLOT_LIVE
-                && other->ipc_reply_token
-                    == thread->ipc_reply_token
-            ) {
-                return false;
-            }
         }
     }
     return true;

@@ -101,6 +101,7 @@ static enum micros_ipc_error preflight_close_threads(
         bool queued_receiver;
         bool reply_wait;
         bool staged_reference;
+        bool pending_relation_checked;
         enum micros_ipc_error error;
 
         if (
@@ -111,10 +112,17 @@ static enum micros_ipc_error preflight_close_threads(
         }
         handle.slot = (uint16_t)index;
         handle.generation = thread->generation;
+        pending_relation_checked = thread->ipc_reply_phase == MICROS_IPC_REPLY_PHASE_STAGED
+            || !ipc_thread_handle_is_zero(thread->ipc_request_receiver);
+        if (pending_relation_checked
+            && !micros_endpoint_thread_ipc_state_is_valid(registry, objects, handle)) {
+            return MICROS_IPC_ERROR_INVARIANT;
+        }
         if (!thread_mentions_closing_slot(thread, plan->owner.slot)) {
             continue;
         }
-        if (!micros_endpoint_thread_ipc_state_is_valid(registry, objects, handle)) {
+        if (!pending_relation_checked
+            && !micros_endpoint_thread_ipc_state_is_valid(registry, objects, handle)) {
             return MICROS_IPC_ERROR_INVARIANT;
         }
         owned = ipc_process_handles_equal(thread->owner, plan->owner);
@@ -436,6 +444,8 @@ static void clear_thread_ipc_state_for_close(
     thread->ipc_staged_result = MICROS_IPC_OK;
     thread->ipc_reply_token = 0;
     thread->ipc_reply_callee = 0;
+    thread->ipc_reply_phase = MICROS_IPC_REPLY_PHASE_NONE;
+    thread->ipc_request_receiver = (struct micros_thread_handle){0, 0};
 }
 
 static void stage_dead_endpoint_for_close(

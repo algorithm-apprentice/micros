@@ -139,6 +139,36 @@ static bool compare_acceptance_endpoints_and_events(
     return true;
 }
 
+static void expected_request_state(
+    const struct model_state *model,
+    const struct model_thread *caller,
+    uint32_t *phase,
+    struct micros_thread_handle *receiver
+)
+{
+    *phase = MICROS_IPC_REPLY_PHASE_NONE;
+    *receiver = ipc_model_null_thread_handle();
+    if (caller->ipc_reply_token == 0) {
+        return;
+    }
+    if ((caller->runtime_flags & MICROS_THREAD_RTS_IPC_SEND) != 0) {
+        *phase = MICROS_IPC_REPLY_PHASE_QUEUED;
+        return;
+    }
+    *phase = MICROS_IPC_REPLY_PHASE_RETURNED;
+    for (size_t slot = 0; slot < MICROS_THREAD_CAPACITY; ++slot) {
+        const struct model_thread *candidate = &model->threads[slot];
+
+        if (candidate->slot_state == MICROS_KERNEL_OBJECT_SLOT_LIVE
+            && candidate->ipc_delivery_pending
+            && candidate->ipc_inbound_message.reply_token == caller->ipc_reply_token) {
+            *phase = MICROS_IPC_REPLY_PHASE_STAGED;
+            *receiver = (struct micros_thread_handle){(uint16_t)slot, candidate->generation};
+            return;
+        }
+    }
+}
+
 static bool compare_acceptance_threads(
     const struct ipc_model_test_context *fixture,
     const struct model_state *model,
@@ -150,6 +180,10 @@ static bool compare_acceptance_threads(
     for (index = 0; index < MICROS_THREAD_CAPACITY; ++index) {
         const struct model_thread *expected = &model->threads[index];
         const struct micros_thread *actual = &fixture->objects.threads[index];
+        uint32_t phase;
+        struct micros_thread_handle receiver;
+
+        expected_request_state(model, expected, &phase, &receiver);
 
         if (
             expected->slot_state != actual->slot_state
@@ -206,6 +240,8 @@ static bool compare_acceptance_threads(
                 != actual->ipc_reply_token
             || expected->ipc_reply_callee
                 != actual->ipc_reply_callee
+            || actual->ipc_reply_phase != phase
+            || !ipc_model_thread_handles_equal(actual->ipc_request_receiver, receiver)
         ) {
             fprintf(
                 stderr,

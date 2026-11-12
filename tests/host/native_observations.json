@@ -109,8 +109,11 @@
           "endpoint_staged_no_message_success_state_is_valid": [
             [["work"],["ipc01/kernel/endpoint/endpoint_completion_validation.c/endpoint_staged_no_message_success_state_is_valid/index-10","wrap","KERNEL_ENDPOINT","INDEX_PROBE",1,"value","thread -> owner . slot",[],0,1]]
           ],
+          "micros_endpoint_select_staged_request": [
+            [["work"],["ipc01/kernel/endpoint/endpoint_completion_validation.c/micros_endpoint_select_staged_request/index-49","wrap","KERNEL_ENDPOINT","INDEX_PROBE",1,"value","receiver -> owner . slot",[],0,1]]
+          ],
           "micros_endpoint_staged_request_matches": [
-            [["work"],["ipc01/kernel/endpoint/endpoint_completion_validation.c/micros_endpoint_staged_request_matches/index-33","wrap","KERNEL_ENDPOINT","INDEX_PROBE",1,"value","receiver -> owner . slot",[],0,1]]
+            [["work"],["ipc01/kernel/endpoint/endpoint_completion_validation.c/micros_endpoint_staged_request_matches/index-57","wrap","KERNEL_ENDPOINT","INDEX_PROBE",1,"value","receiver -> owner . slot",[],0,1]]
           ],
           "notification_message_is_valid": [
             [["work"],["ipc01/kernel/endpoint/endpoint_completion_validation.c/notification_message_is_valid/loop-43","insert","KERNEL_ENDPOINT","COMPARISON",1,"entry","",[["for ( index = 0 ; index < sizeof ( uint64_t ) ; ++ index ) {",0]],0,0]],
@@ -122,8 +125,7 @@
           ],
           "staged_delivery_fields_are_valid": [],
           "staged_reply_token_binding_is_valid": [
-            [["work"],["ipc01/kernel/endpoint/endpoint_completion_validation.c/staged_reply_token_binding_is_valid/loop-77","insert","KERNEL_ENDPOINT","RECORD_VISIT",1,"entry","",[["for ( index = 0 ; index < MICROS_THREAD_CAPACITY ; ++ index ) {",0]],0,0]],
-            [["work"],["ipc01/kernel/endpoint/endpoint_completion_validation.c/staged_reply_token_binding_is_valid/index-88","wrap","KERNEL_ENDPOINT","INDEX_PROBE",1,"value","index",[["for ( index = 0 ; index < MICROS_THREAD_CAPACITY ; ++ index ) {",0]],0,2]]
+            [["work"],["ipc01/kernel/endpoint/endpoint_completion_validation.c/staged_reply_token_binding_is_valid/index-77","wrap","KERNEL_ENDPOINT","INDEX_PROBE",1,"value","slot",[["{",2]],1,2]]
           ]
         },
         "kernel/endpoint/endpoint_identity.c": {
@@ -144,7 +146,9 @@
           "endpoint_require_initialized": [],
           "endpoint_thread_handles_equal": [],
           "micros_endpoint_names_slot": [],
+          "micros_endpoint_next_reply_token": [],
           "micros_endpoint_pack": [],
+          "micros_endpoint_reply_token_slot": [],
           "micros_endpoint_select": [
             [["work"],["ipc01/kernel/endpoint/endpoint_identity.c/micros_endpoint_select/index-101","wrap","KERNEL_ENDPOINT","INDEX_PROBE",1,"value","requested . slot",[],1,3]]
           ],
@@ -167,7 +171,7 @@
             [["work"],["ipc01/kernel/endpoint/endpoint_object_validation.c/micros_endpoint_registry_validate_objects/loop-89","insert","KERNEL_ENDPOINT","RECORD_VISIT",1,"entry","",[["for ( index = 0 ; index < MICROS_THREAD_CAPACITY ; ++ index ) {",0]],0,0]]
           ],
           "micros_endpoint_thread_ipc_state_is_valid": [
-            [["work"],["ipc01/kernel/endpoint/endpoint_object_validation.c/micros_endpoint_thread_ipc_state_is_valid/index-45","wrap","KERNEL_ENDPOINT","INDEX_PROBE",1,"value","thread -> owner . slot",[],0,1]]
+            [["work"],["ipc01/kernel/endpoint/endpoint_object_validation.c/micros_endpoint_thread_ipc_state_is_valid/index-48","wrap","KERNEL_ENDPOINT","INDEX_PROBE",1,"value","thread -> owner . slot",[],0,1]]
           ],
           "process_relationships_are_canonical": [
             [["work"],["ipc01/kernel/endpoint/endpoint_object_validation.c/process_relationships_are_canonical/loop-16","insert","KERNEL_ENDPOINT","RECORD_VISIT",1,"entry","",[["for ( index = 0 ; index < MICROS_PROCESS_CAPACITY ; ++ index ) {",0]],0,0]],
@@ -178,8 +182,7 @@
           "thread_relationships_are_canonical": [
             [["work"],["ipc01/kernel/endpoint/endpoint_object_validation.c/thread_relationships_are_canonical/loop-16","insert","KERNEL_ENDPOINT","RECORD_VISIT",1,"entry","",[["for ( index = 0 ; index < MICROS_THREAD_CAPACITY ; ++ index ) {",0]],0,0]],
             [["work"],["ipc01/kernel/endpoint/endpoint_object_validation.c/thread_relationships_are_canonical/index-27","wrap","KERNEL_ENDPOINT","INDEX_PROBE",1,"value","index",[["for ( index = 0 ; index < MICROS_THREAD_CAPACITY ; ++ index ) {",0]],0,3]],
-            [["work"],["ipc01/kernel/endpoint/endpoint_object_validation.c/thread_relationships_are_canonical/loop-191","insert","KERNEL_ENDPOINT","RECORD_VISIT",1,"entry","",[["for ( index = 0 ; index < MICROS_THREAD_CAPACITY ; ++ index ) {",0],["for ( other_index = 0 ; other_index < index ; ++ other_index ) {",0]],0,0]],
-            [["work"],["ipc01/kernel/endpoint/endpoint_object_validation.c/thread_relationships_are_canonical/index-202","wrap","KERNEL_ENDPOINT","INDEX_PROBE",1,"value","other_index",[["for ( index = 0 ; index < MICROS_THREAD_CAPACITY ; ++ index ) {",0],["for ( other_index = 0 ; other_index < index ; ++ other_index ) {",0]],0,1]]
+            [["work"],["ipc01/kernel/endpoint/endpoint_object_validation.c/thread_relationships_are_canonical/index-250","wrap","KERNEL_ENDPOINT","INDEX_PROBE",1,"value","thread -> owner . slot",[["for ( index = 0 ; index < MICROS_THREAD_CAPACITY ; ++ index ) {",0]],0,1]]
           ]
         },
         "kernel/endpoint/endpoint_privilege.c": {
@@ -224,7 +227,7 @@
             [["work"],["ipc01/kernel/endpoint/endpoint_queue_validation.c/endpoint_queue_is_valid/loop-37","insert","KERNEL_ENDPOINT","RECORD_VISIT",1,"entry","",[["for ( steps = 0 ; steps < MICROS_THREAD_CAPACITY ; ++ steps ) {",0]],0,0]]
           ],
           "micros_endpoint_queue_member_is_valid": [
-            [["work"],["ipc01/kernel/endpoint/endpoint_queue_validation.c/micros_endpoint_queue_member_is_valid/index-146","wrap","KERNEL_ENDPOINT","INDEX_PROBE",1,"value","thread -> owner . slot",[["if ( kind == MICROS_IPC_QUEUE_SENDER ) {",0]],0,1]]
+            [["work"],["ipc01/kernel/endpoint/endpoint_queue_validation.c/micros_endpoint_queue_member_is_valid/index-168","wrap","KERNEL_ENDPOINT","INDEX_PROBE",1,"value","thread -> owner . slot",[["if ( kind == MICROS_IPC_QUEUE_SENDER ) {",0]],0,1]]
           ],
           "receiver_matches_pending_notification": [
             [["work"],["ipc01/kernel/endpoint/endpoint_queue_validation.c/receiver_matches_pending_notification/index-94","wrap","KERNEL_ENDPOINT","INDEX_PROBE",1,"value","source . slot",[],2,3]]
@@ -350,13 +353,13 @@
           "preflight_close_threads": [
             [["work"],["ipc01/kernel/ipc/ipc_close.c/preflight_close_threads/loop-21","insert","KERNEL_IPC","RECORD_VISIT",1,"entry","",[["for ( index = 0 ; index < MICROS_THREAD_CAPACITY ; ++ index ) {",0]],0,0]],
             [["work"],["ipc01/kernel/ipc/ipc_close.c/preflight_close_threads/index-32","wrap","KERNEL_IPC","INDEX_PROBE",1,"value","index",[["for ( index = 0 ; index < MICROS_THREAD_CAPACITY ; ++ index ) {",0]],0,4]],
-            [["work"],["ipc01/kernel/ipc/ipc_close.c/preflight_close_threads/index-283","wrap","KERNEL_IPC","INDEX_PROBE",1,"value","index",[["for ( index = 0 ; index < MICROS_THREAD_CAPACITY ; ++ index ) {",0],["if ( owned ) {",1],["if ( ! micros_thread_ipc_state_is_clear ( thread ) ) {",0]],0,1]],
-            [["work"],["ipc01/kernel/ipc/ipc_close.c/preflight_close_threads/index-295","wrap","KERNEL_IPC","INDEX_PROBE",1,"value","index",[["for ( index = 0 ; index < MICROS_THREAD_CAPACITY ; ++ index ) {",0],["if ( owned ) {",1]],0,1]],
-            [["work"],["ipc01/kernel/ipc/ipc_close.c/preflight_close_threads/index-321","wrap","KERNEL_IPC","INDEX_PROBE",1,"value","index",[["for ( index = 0 ; index < MICROS_THREAD_CAPACITY ; ++ index ) {",0],["if ( queued_sender || queued_receiver || reply_wait ) {",0]],0,2]],
-            [["work"],["ipc01/kernel/ipc/ipc_close.c/preflight_close_threads/index-332","wrap","KERNEL_IPC","INDEX_PROBE",1,"value","index",[["for ( index = 0 ; index < MICROS_THREAD_CAPACITY ; ++ index ) {",0],["if ( queued_sender || queued_receiver || reply_wait ) {",0]],1,2]],
-            [["work"],["ipc01/kernel/ipc/ipc_close.c/preflight_close_threads/index-367","wrap","KERNEL_IPC","INDEX_PROBE",1,"value","index",[["for ( index = 0 ; index < MICROS_THREAD_CAPACITY ; ++ index ) {",0]],2,4]],
-            [["work"],["ipc01/kernel/ipc/ipc_close.c/preflight_close_threads/index-385","wrap","KERNEL_IPC","INDEX_PROBE",1,"value","index",[["for ( index = 0 ; index < MICROS_THREAD_CAPACITY ; ++ index ) {",0]],3,4]],
-            [["work"],["ipc01/kernel/ipc/ipc_close.c/preflight_close_threads/index-430","wrap","KERNEL_IPC","INDEX_PROBE",1,"value","plan -> owner . slot",[],0,1]]
+            [["work"],["ipc01/kernel/ipc/ipc_close.c/preflight_close_threads/index-324","wrap","KERNEL_IPC","INDEX_PROBE",1,"value","index",[["for ( index = 0 ; index < MICROS_THREAD_CAPACITY ; ++ index ) {",0],["if ( owned ) {",1],["if ( ! micros_thread_ipc_state_is_clear ( thread ) ) {",0]],0,1]],
+            [["work"],["ipc01/kernel/ipc/ipc_close.c/preflight_close_threads/index-336","wrap","KERNEL_IPC","INDEX_PROBE",1,"value","index",[["for ( index = 0 ; index < MICROS_THREAD_CAPACITY ; ++ index ) {",0],["if ( owned ) {",1]],0,1]],
+            [["work"],["ipc01/kernel/ipc/ipc_close.c/preflight_close_threads/index-362","wrap","KERNEL_IPC","INDEX_PROBE",1,"value","index",[["for ( index = 0 ; index < MICROS_THREAD_CAPACITY ; ++ index ) {",0],["if ( queued_sender || queued_receiver || reply_wait ) {",0]],0,2]],
+            [["work"],["ipc01/kernel/ipc/ipc_close.c/preflight_close_threads/index-373","wrap","KERNEL_IPC","INDEX_PROBE",1,"value","index",[["for ( index = 0 ; index < MICROS_THREAD_CAPACITY ; ++ index ) {",0],["if ( queued_sender || queued_receiver || reply_wait ) {",0]],1,2]],
+            [["work"],["ipc01/kernel/ipc/ipc_close.c/preflight_close_threads/index-408","wrap","KERNEL_IPC","INDEX_PROBE",1,"value","index",[["for ( index = 0 ; index < MICROS_THREAD_CAPACITY ; ++ index ) {",0]],2,4]],
+            [["work"],["ipc01/kernel/ipc/ipc_close.c/preflight_close_threads/index-426","wrap","KERNEL_IPC","INDEX_PROBE",1,"value","index",[["for ( index = 0 ; index < MICROS_THREAD_CAPACITY ; ++ index ) {",0]],3,4]],
+            [["work"],["ipc01/kernel/ipc/ipc_close.c/preflight_close_threads/index-471","wrap","KERNEL_IPC","INDEX_PROBE",1,"value","plan -> owner . slot",[],0,1]]
           ],
           "preflight_endpoint_close": [
             [["work"],["ipc01/kernel/ipc/ipc_close.c/preflight_endpoint_close/loop-76","insert","KERNEL_IPC","CLEARED_BYTE",1,"entry","",[["for ( index = 0 ; index < sizeof ( * plan ) ; ++ index ) {",0]],0,0]]
@@ -504,18 +507,9 @@
         "kernel/ipc/ipc_tokens.c": {
           "ipc_commit_reply_delivery": [],
           "ipc_preflight_reply": [],
-          "ipc_reply_token_is_available": [
-            [["work"],["ipc01/kernel/ipc/ipc_tokens.c/ipc_reply_token_is_available/loop-25","insert","KERNEL_IPC","RECORD_VISIT",1,"entry","",[["for ( size_t index = 0 ; index < MICROS_THREAD_CAPACITY ; ++ index ) {",0]],0,0]],
-            [["work"],["ipc01/kernel/ipc/ipc_tokens.c/ipc_reply_token_is_available/index-36","wrap","KERNEL_IPC","INDEX_PROBE",1,"value","index",[["for ( size_t index = 0 ; index < MICROS_THREAD_CAPACITY ; ++ index ) {",0]],0,1]]
-          ],
-          "reply_request_is_pending": [
-            [["work"],["ipc01/kernel/ipc/ipc_tokens.c/reply_request_is_pending/loop-19","insert","KERNEL_IPC","RECORD_VISIT",1,"entry","",[["for ( size_t index = 0 ; index < MICROS_THREAD_CAPACITY ; ++ index ) {",0]],0,0]],
-            [["work"],["ipc01/kernel/ipc/ipc_tokens.c/reply_request_is_pending/index-30","wrap","KERNEL_IPC","INDEX_PROBE",1,"value","index",[["for ( size_t index = 0 ; index < MICROS_THREAD_CAPACITY ; ++ index ) {",0]],0,2]]
-          ],
           "resolve_reply_waiter": [
-            [["work"],["ipc01/kernel/ipc/ipc_tokens.c/resolve_reply_waiter/loop-31","insert","KERNEL_IPC","RECORD_VISIT",1,"entry","",[["for ( size_t index = 0 ; index < MICROS_THREAD_CAPACITY ; ++ index ) {",0]],0,0]],
-            [["work"],["ipc01/kernel/ipc/ipc_tokens.c/resolve_reply_waiter/index-41","wrap","KERNEL_IPC","INDEX_PROBE",1,"value","index",[["for ( size_t index = 0 ; index < MICROS_THREAD_CAPACITY ; ++ index ) {",0]],0,2]],
-            [["work"],["ipc01/kernel/ipc/ipc_tokens.c/resolve_reply_waiter/index-140","wrap","KERNEL_IPC","INDEX_PROBE",1,"value","matched -> owner . slot",[],0,1]]
+            [["work"],["ipc01/kernel/ipc/ipc_tokens.c/resolve_reply_waiter/index-40","wrap","KERNEL_IPC","INDEX_PROBE",1,"value","slot",[["if ( micros_endpoint_reply_token_slot ( reply_token , & slot ) ) {",0]],0,1]],
+            [["work"],["ipc01/kernel/ipc/ipc_tokens.c/resolve_reply_waiter/index-123","wrap","KERNEL_IPC","INDEX_PROBE",1,"value","matched -> owner . slot",[],0,1]]
           ]
         },
         "kernel/objects/kernel_object_context.c": {
@@ -714,7 +708,8 @@
           "micros_scheduler_test_rejects_malformed_completion": [],
           "panic_completion": [],
           "preflight_selected_completion": [
-            [["work"],["ipc01/kernel/scheduler/scheduler_completion.c/preflight_selected_completion/index-143","wrap","KERNEL_SCHEDULER","INDEX_PROBE",1,"value","selected . slot",[],0,1]]
+            [["work"],["ipc01/kernel/scheduler/scheduler_completion.c/preflight_selected_completion/index-175","wrap","KERNEL_SCHEDULER","INDEX_PROBE",1,"value","selected . slot",[],0,1]],
+            [["work"],["ipc01/kernel/scheduler/scheduler_completion.c/preflight_selected_completion/index-197","wrap","KERNEL_SCHEDULER","INDEX_PROBE",1,"value","request_caller . slot",[],0,1]]
           ],
           "scheduler_runtime_commit_completion_or_panic": [],
           "scheduler_runtime_preflight_completion_or_panic": []
@@ -2284,6 +2279,7 @@
           "endpoint_staged_delivery_state_is_valid": [],
           "endpoint_staged_error_state_is_valid": [],
           "endpoint_staged_no_message_success_state_is_valid": [],
+          "micros_endpoint_select_staged_request": [],
           "micros_endpoint_staged_request_matches": [],
           "notification_message_is_valid": [],
           "read_u32_le": [],
@@ -2301,7 +2297,9 @@
           "endpoint_require_initialized": [],
           "endpoint_thread_handles_equal": [],
           "micros_endpoint_names_slot": [],
+          "micros_endpoint_next_reply_token": [],
           "micros_endpoint_pack": [],
+          "micros_endpoint_reply_token_slot": [],
           "micros_endpoint_select": [],
           "micros_endpoint_unpack": [],
           "selected_process_is_valid": [],
@@ -2444,8 +2442,6 @@
         "kernel/ipc/ipc_tokens.c": {
           "ipc_commit_reply_delivery": [],
           "ipc_preflight_reply": [],
-          "ipc_reply_token_is_available": [],
-          "reply_request_is_pending": [],
           "resolve_reply_waiter": []
         },
         "kernel/memory/bootstrap_memory.c": {
@@ -3407,8 +3403,11 @@
           "endpoint_staged_delivery_state_is_valid": [],
           "endpoint_staged_error_state_is_valid": [],
           "endpoint_staged_no_message_success_state_is_valid": [],
+          "micros_endpoint_select_staged_request": [
+            [["aggregate","context"],["ipc01-shared-mem04/ipc01/kernel/endpoint/endpoint_completion_validation.c/micros_endpoint_select_staged_request/index-49","wrap","KERNEL_ENDPOINT","INDEX_PROBE",1,"value","receiver -> owner . slot",[],0,1]]
+          ],
           "micros_endpoint_staged_request_matches": [
-            [["aggregate","context"],["ipc01-shared-mem04/ipc01/kernel/endpoint/endpoint_completion_validation.c/micros_endpoint_staged_request_matches/index-33","wrap","KERNEL_ENDPOINT","INDEX_PROBE",1,"value","receiver -> owner . slot",[],0,1]]
+            [["aggregate","context"],["ipc01-shared-mem04/ipc01/kernel/endpoint/endpoint_completion_validation.c/micros_endpoint_staged_request_matches/index-57","wrap","KERNEL_ENDPOINT","INDEX_PROBE",1,"value","receiver -> owner . slot",[],0,1]]
           ],
           "notification_message_is_valid": [
             [["aggregate","context"],["mem04-8ee0cca626f80af93b72","insert","KERNEL_ENDPOINT","INDEX_PROBE",1,"entry","",[["for ( index = 0 ; index < sizeof ( uint64_t ) ; ++ index ) {",0]],0,0]],
@@ -3420,7 +3419,7 @@
           ],
           "staged_delivery_fields_are_valid": [],
           "staged_reply_token_binding_is_valid": [
-            [["aggregate","context"],["mem04-1799c01cf41d8cababf4","insert","KERNEL_ENDPOINT","INDEX_PROBE",1,"entry","",[["for ( index = 0 ; index < MICROS_THREAD_CAPACITY ; ++ index ) {",0]],0,0]]
+            [["aggregate","context"],["ipc01-shared-mem04/ipc01/kernel/endpoint/endpoint_completion_validation.c/staged_reply_token_binding_is_valid/index-77","wrap","KERNEL_ENDPOINT","INDEX_PROBE",1,"value","slot",[["{",2]],1,2]]
           ]
         },
         "kernel/endpoint/endpoint_identity.c": {
@@ -3437,7 +3436,9 @@
           "endpoint_require_initialized": [],
           "endpoint_thread_handles_equal": [],
           "micros_endpoint_names_slot": [],
+          "micros_endpoint_next_reply_token": [],
           "micros_endpoint_pack": [],
+          "micros_endpoint_reply_token_slot": [],
           "micros_endpoint_select": [
             [["aggregate","context"],["ipc01-shared-mem04/ipc01/kernel/endpoint/endpoint_identity.c/micros_endpoint_select/index-101","wrap","KERNEL_ENDPOINT","INDEX_PROBE",1,"value","requested . slot",[],1,3]]
           ],
@@ -3460,15 +3461,14 @@
             [["aggregate","context"],["mem04-08a2dd73390c87e551c3","insert","KERNEL_ENDPOINT","INDEX_PROBE",1,"entry","",[["for ( index = 0 ; index < MICROS_THREAD_CAPACITY ; ++ index ) {",0]],0,0]]
           ],
           "micros_endpoint_thread_ipc_state_is_valid": [
-            [["aggregate","context"],["ipc01-shared-mem04/ipc01/kernel/endpoint/endpoint_object_validation.c/micros_endpoint_thread_ipc_state_is_valid/index-45","wrap","KERNEL_ENDPOINT","INDEX_PROBE",1,"value","thread -> owner . slot",[],0,1]]
+            [["aggregate","context"],["ipc01-shared-mem04/ipc01/kernel/endpoint/endpoint_object_validation.c/micros_endpoint_thread_ipc_state_is_valid/index-48","wrap","KERNEL_ENDPOINT","INDEX_PROBE",1,"value","thread -> owner . slot",[],0,1]]
           ],
           "process_relationships_are_canonical": [
             [["aggregate","context"],["mem04-b220503b12f5adb8c204","insert","KERNEL_ENDPOINT","INDEX_PROBE",1,"entry","",[["for ( index = 0 ; index < MICROS_PROCESS_CAPACITY ; ++ index ) {",0]],0,0]]
           ],
           "thread_has_no_ipc_flags": [],
           "thread_relationships_are_canonical": [
-            [["aggregate","context"],["mem04-919a285bea151972800a","insert","KERNEL_ENDPOINT","INDEX_PROBE",1,"entry","",[["for ( index = 0 ; index < MICROS_THREAD_CAPACITY ; ++ index ) {",0]],0,0]],
-            [["aggregate","context"],["mem04-2e4561c2cbd0151226ea","insert","KERNEL_ENDPOINT","INDEX_PROBE",1,"entry","",[["for ( index = 0 ; index < MICROS_THREAD_CAPACITY ; ++ index ) {",0],["for ( other_index = 0 ; other_index < index ; ++ other_index ) {",0]],0,0]]
+            [["aggregate","context"],["ipc01-shared-mem04/ipc01/kernel/endpoint/endpoint_object_validation.c/thread_relationships_are_canonical/loop-16","insert","KERNEL_ENDPOINT","INDEX_PROBE",1,"entry","",[["for ( index = 0 ; index < MICROS_THREAD_CAPACITY ; ++ index ) {",0]],0,0]]
           ]
         },
         "kernel/endpoint/endpoint_privilege.c": {
@@ -3497,7 +3497,7 @@
             [["aggregate","context"],["mem04-e34d73f34557b5a6c605","insert","KERNEL_ENDPOINT","INDEX_PROBE",1,"entry","",[["for ( steps = 0 ; steps < MICROS_THREAD_CAPACITY ; ++ steps ) {",0]],0,0]]
           ],
           "micros_endpoint_queue_member_is_valid": [
-            [["aggregate","context"],["ipc01-shared-mem04/ipc01/kernel/endpoint/endpoint_queue_validation.c/micros_endpoint_queue_member_is_valid/index-146","wrap","KERNEL_ENDPOINT","INDEX_PROBE",1,"value","thread -> owner . slot",[["if ( kind == MICROS_IPC_QUEUE_SENDER ) {",0]],0,1]]
+            [["aggregate","context"],["ipc01-shared-mem04/ipc01/kernel/endpoint/endpoint_queue_validation.c/micros_endpoint_queue_member_is_valid/index-168","wrap","KERNEL_ENDPOINT","INDEX_PROBE",1,"value","thread -> owner . slot",[["if ( kind == MICROS_IPC_QUEUE_SENDER ) {",0]],0,1]]
           ],
           "receiver_matches_pending_notification": [],
           "receiver_queue_state_is_valid": [],
@@ -4950,8 +4950,11 @@
           "endpoint_staged_no_message_success_state_is_valid": [
             [["aggregate","context"],["mem05-current-5428fb1b59237520fb7a","wrap","KERNEL_ENDPOINT","RECORD_VISIT",1,"value","thread -> owner . slot",[],0,1]]
           ],
+          "micros_endpoint_select_staged_request": [
+            [["aggregate","context"],["ipc01-shared-mem05/ipc01/kernel/endpoint/endpoint_completion_validation.c/micros_endpoint_select_staged_request/index-49","wrap","KERNEL_ENDPOINT","RECORD_VISIT",1,"value","receiver -> owner . slot",[],0,1]]
+          ],
           "micros_endpoint_staged_request_matches": [
-            [["aggregate","context"],["ipc01-shared-mem05/ipc01/kernel/endpoint/endpoint_completion_validation.c/micros_endpoint_staged_request_matches/index-33","wrap","KERNEL_ENDPOINT","RECORD_VISIT",1,"value","receiver -> owner . slot",[],0,1]]
+            [["aggregate","context"],["ipc01-shared-mem05/ipc01/kernel/endpoint/endpoint_completion_validation.c/micros_endpoint_staged_request_matches/index-57","wrap","KERNEL_ENDPOINT","RECORD_VISIT",1,"value","receiver -> owner . slot",[],0,1]]
           ],
           "notification_message_is_valid": [
             [["aggregate","context"],["mem05-current-131e643550821509e70b","insert","KERNEL_ENDPOINT","INDEX_PROBE",1,"entry","",[["for ( index = 0 ; index < sizeof ( uint64_t ) ; ++ index ) {",0]],0,0]],
@@ -4963,8 +4966,7 @@
           ],
           "staged_delivery_fields_are_valid": [],
           "staged_reply_token_binding_is_valid": [
-            [["aggregate","context"],["ipc01-shared-mem05/ipc01/kernel/endpoint/endpoint_completion_validation.c/staged_reply_token_binding_is_valid/loop-77","insert","KERNEL_ENDPOINT","INDEX_PROBE",1,"entry","",[["for ( index = 0 ; index < MICROS_THREAD_CAPACITY ; ++ index ) {",0]],0,0]],
-            [["aggregate","context"],["ipc01-shared-mem05/ipc01/kernel/endpoint/endpoint_completion_validation.c/staged_reply_token_binding_is_valid/index-88","wrap","KERNEL_ENDPOINT","RECORD_VISIT",1,"value","index",[["for ( index = 0 ; index < MICROS_THREAD_CAPACITY ; ++ index ) {",0]],0,2]]
+            [["aggregate","context"],["ipc01-shared-mem05/ipc01/kernel/endpoint/endpoint_completion_validation.c/staged_reply_token_binding_is_valid/index-77","wrap","KERNEL_ENDPOINT","RECORD_VISIT",1,"value","slot",[["{",2]],1,2]]
           ]
         },
         "kernel/endpoint/endpoint_identity.c": {
@@ -4985,7 +4987,9 @@
           "endpoint_require_initialized": [],
           "endpoint_thread_handles_equal": [],
           "micros_endpoint_names_slot": [],
+          "micros_endpoint_next_reply_token": [],
           "micros_endpoint_pack": [],
+          "micros_endpoint_reply_token_slot": [],
           "micros_endpoint_select": [
             [["aggregate","context"],["ipc01-shared-mem05/ipc01/kernel/endpoint/endpoint_identity.c/micros_endpoint_select/index-101","wrap","KERNEL_ENDPOINT","RECORD_VISIT",1,"value","requested . slot",[],1,3]]
           ],
@@ -5008,7 +5012,7 @@
             [["aggregate","context"],["mem05-current-1b6f954efd0d484469fc","insert","KERNEL_ENDPOINT","INDEX_PROBE",1,"entry","",[["for ( index = 0 ; index < MICROS_THREAD_CAPACITY ; ++ index ) {",0]],0,0]]
           ],
           "micros_endpoint_thread_ipc_state_is_valid": [
-            [["aggregate","context"],["ipc01-shared-mem05/ipc01/kernel/endpoint/endpoint_object_validation.c/micros_endpoint_thread_ipc_state_is_valid/index-45","wrap","KERNEL_ENDPOINT","RECORD_VISIT",1,"value","thread -> owner . slot",[],0,1]]
+            [["aggregate","context"],["ipc01-shared-mem05/ipc01/kernel/endpoint/endpoint_object_validation.c/micros_endpoint_thread_ipc_state_is_valid/index-48","wrap","KERNEL_ENDPOINT","RECORD_VISIT",1,"value","thread -> owner . slot",[],0,1]]
           ],
           "process_relationships_are_canonical": [
             [["aggregate","context"],["mem05-current-5fe1be2b5220ab3d8080","insert","KERNEL_ENDPOINT","INDEX_PROBE",1,"entry","",[["for ( index = 0 ; index < MICROS_PROCESS_CAPACITY ; ++ index ) {",0]],0,0]],
@@ -5017,10 +5021,9 @@
           ],
           "thread_has_no_ipc_flags": [],
           "thread_relationships_are_canonical": [
-            [["aggregate","context"],["mem05-current-8b623074dd18d9814c7f","insert","KERNEL_ENDPOINT","INDEX_PROBE",1,"entry","",[["for ( index = 0 ; index < MICROS_THREAD_CAPACITY ; ++ index ) {",0]],0,0]],
-            [["aggregate","context"],["mem05-current-39c72ef77c5b48880d01","wrap","KERNEL_ENDPOINT","RECORD_VISIT",1,"value","index",[["for ( index = 0 ; index < MICROS_THREAD_CAPACITY ; ++ index ) {",0]],0,3]],
-            [["aggregate","context"],["mem05-current-8569b573c76810a5f61a","insert","KERNEL_ENDPOINT","INDEX_PROBE",1,"entry","",[["for ( index = 0 ; index < MICROS_THREAD_CAPACITY ; ++ index ) {",0],["for ( other_index = 0 ; other_index < index ; ++ other_index ) {",0]],0,0]],
-            [["aggregate","context"],["mem05-current-f929c4596bfed8c938f2","wrap","KERNEL_ENDPOINT","RECORD_VISIT",1,"value","other_index",[["for ( index = 0 ; index < MICROS_THREAD_CAPACITY ; ++ index ) {",0],["for ( other_index = 0 ; other_index < index ; ++ other_index ) {",0]],0,1]]
+            [["aggregate","context"],["ipc01-shared-mem05/ipc01/kernel/endpoint/endpoint_object_validation.c/thread_relationships_are_canonical/loop-16","insert","KERNEL_ENDPOINT","INDEX_PROBE",1,"entry","",[["for ( index = 0 ; index < MICROS_THREAD_CAPACITY ; ++ index ) {",0]],0,0]],
+            [["aggregate","context"],["ipc01-shared-mem05/ipc01/kernel/endpoint/endpoint_object_validation.c/thread_relationships_are_canonical/index-27","wrap","KERNEL_ENDPOINT","RECORD_VISIT",1,"value","index",[["for ( index = 0 ; index < MICROS_THREAD_CAPACITY ; ++ index ) {",0]],0,3]],
+            [["aggregate","context"],["ipc01-shared-mem05/ipc01/kernel/endpoint/endpoint_object_validation.c/thread_relationships_are_canonical/index-250","wrap","KERNEL_ENDPOINT","RECORD_VISIT",1,"value","thread -> owner . slot",[["for ( index = 0 ; index < MICROS_THREAD_CAPACITY ; ++ index ) {",0]],0,1]]
           ]
         },
         "kernel/endpoint/endpoint_privilege.c": {
@@ -5062,7 +5065,7 @@
             [["aggregate","context"],["mem05-current-8fea57235e1231e19e60","insert","KERNEL_ENDPOINT","INDEX_PROBE",1,"entry","",[["for ( steps = 0 ; steps < MICROS_THREAD_CAPACITY ; ++ steps ) {",0]],0,0]]
           ],
           "micros_endpoint_queue_member_is_valid": [
-            [["aggregate","context"],["ipc01-shared-mem05/ipc01/kernel/endpoint/endpoint_queue_validation.c/micros_endpoint_queue_member_is_valid/index-146","wrap","KERNEL_ENDPOINT","RECORD_VISIT",1,"value","thread -> owner . slot",[["if ( kind == MICROS_IPC_QUEUE_SENDER ) {",0]],0,1]]
+            [["aggregate","context"],["ipc01-shared-mem05/ipc01/kernel/endpoint/endpoint_queue_validation.c/micros_endpoint_queue_member_is_valid/index-168","wrap","KERNEL_ENDPOINT","RECORD_VISIT",1,"value","thread -> owner . slot",[["if ( kind == MICROS_IPC_QUEUE_SENDER ) {",0]],0,1]]
           ],
           "receiver_matches_pending_notification": [
             [["aggregate","context"],["mem05-current-f7163946000555cfea0a","wrap","KERNEL_ENDPOINT","RECORD_VISIT",1,"value","source . slot",[],2,3]]
@@ -8209,7 +8212,7 @@
           "directives": [],
           "guards": [],
           "loops": [],
-          "signature": "bool endpoint_staged_delivery_selected_is_valid ( const struct micros_endpoint_registry * registry , const struct micros_kernel_objects * objects , const struct micros_thread * thread , const struct micros_endpoint_selection * owner )",
+          "signature": "bool endpoint_staged_delivery_selected_is_valid ( const struct micros_endpoint_registry * registry , const struct micros_kernel_objects * objects , struct micros_thread_handle handle , const struct micros_thread * thread , const struct micros_endpoint_selection * owner )",
           "storage": []
         },
         "endpoint_staged_delivery_state_is_valid": {
@@ -8225,7 +8228,7 @@
           "directives": [],
           "guards": [],
           "loops": [],
-          "signature": "bool endpoint_staged_delivery_state_is_valid ( const struct micros_endpoint_registry * registry , const struct micros_kernel_objects * objects , const struct micros_thread * thread )",
+          "signature": "bool endpoint_staged_delivery_state_is_valid ( const struct micros_endpoint_registry * registry , const struct micros_kernel_objects * objects , struct micros_thread_handle handle , const struct micros_thread * thread )",
           "storage": []
         },
         "endpoint_staged_error_state_is_valid": {
@@ -8256,6 +8259,20 @@
           "signature": "bool endpoint_staged_no_message_success_state_is_valid ( const struct micros_endpoint_registry * registry , const struct micros_thread * thread )",
           "storage": []
         },
+        "micros_endpoint_select_staged_request": {
+          "accesses": [
+            ["processes [ receiver -> owner . slot ]",[]]
+          ],
+          "aliases": [
+            ["processes",["["]]
+          ],
+          "calls": ["micros_endpoint_select","scheduler_core_preflight_thread","staged_delivery_fields_are_valid","staged_reply_token_binding_is_valid"],
+          "directives": [],
+          "guards": [],
+          "loops": [],
+          "signature": "bool micros_endpoint_select_staged_request ( const struct micros_endpoint_registry * registry , const struct micros_kernel_objects * objects , struct micros_thread_handle receiver_handle , struct micros_thread_handle * caller_handle )",
+          "storage": []
+        },
         "micros_endpoint_staged_request_matches": {
           "accesses": [
             ["processes [ receiver -> owner . slot ]",[]]
@@ -8263,7 +8280,7 @@
           "aliases": [
             ["processes",["["]]
           ],
-          "calls": ["micros_endpoint_select","scheduler_core_preflight_thread","staged_delivery_fields_are_valid"],
+          "calls": ["endpoint_thread_handles_equal","micros_endpoint_select","scheduler_core_preflight_thread","staged_delivery_fields_are_valid"],
           "directives": [],
           "guards": [],
           "loops": [],
@@ -8333,18 +8350,16 @@
         },
         "staged_reply_token_binding_is_valid": {
           "accesses": [
-            ["threads [ index ]",[["for ( index = 0 ; index < MICROS_THREAD_CAPACITY ; ++ index ) {",0]]]
+            ["threads [ slot ]",[["{",2]]]
           ],
           "aliases": [
             ["threads",["["]]
           ],
-          "calls": ["endpoint_process_handles_equal","endpoint_reply_wait_state_is_valid","scheduler_core_preflight_thread"],
+          "calls": ["endpoint_process_handles_equal","endpoint_reply_wait_state_is_valid","endpoint_thread_handles_equal","micros_endpoint_reply_token_slot","scheduler_core_preflight_thread"],
           "directives": [],
           "guards": [],
-          "loops": [
-            ["for ( index = 0 ; index < MICROS_THREAD_CAPACITY ; ++ index ) {",[]]
-          ],
-          "signature": "static bool staged_reply_token_binding_is_valid ( const struct micros_endpoint_registry * registry , const struct micros_kernel_objects * objects , const struct micros_thread * receiver , const struct micros_endpoint_record * receiver_endpoint , const struct micros_endpoint_record * source )",
+          "loops": [],
+          "signature": "static bool staged_reply_token_binding_is_valid ( const struct micros_endpoint_registry * registry , const struct micros_kernel_objects * objects , struct micros_thread_handle receiver_handle , const struct micros_thread * receiver , const struct micros_endpoint_record * receiver_endpoint , const struct micros_endpoint_record * source , struct micros_thread_handle * selected_caller )",
           "storage": []
         }
       },
@@ -8457,6 +8472,16 @@
           "signature": "bool micros_endpoint_names_slot ( micros_endpoint_t endpoint , uint16_t slot )",
           "storage": []
         },
+        "micros_endpoint_next_reply_token": {
+          "accesses": [],
+          "aliases": [],
+          "calls": [],
+          "directives": [],
+          "guards": [],
+          "loops": [],
+          "signature": "bool micros_endpoint_next_reply_token ( uint64_t previous , uint16_t slot , uint64_t * token )",
+          "storage": []
+        },
         "micros_endpoint_pack": {
           "accesses": [],
           "aliases": [],
@@ -8465,6 +8490,16 @@
           "guards": [],
           "loops": [],
           "signature": "enum micros_endpoint_error micros_endpoint_pack ( struct micros_process_handle process , micros_endpoint_t * endpoint )",
+          "storage": []
+        },
+        "micros_endpoint_reply_token_slot": {
+          "accesses": [],
+          "aliases": [],
+          "calls": [],
+          "directives": [],
+          "guards": [],
+          "loops": [],
+          "signature": "bool micros_endpoint_reply_token_slot ( uint64_t token , uint16_t * slot )",
           "storage": []
         },
         "micros_endpoint_select": {
@@ -8562,7 +8597,7 @@
           "aliases": [
             ["processes",["["]]
           ],
-          "calls": ["endpoint_reply_wait_state_is_valid","endpoint_staged_delivery_selected_is_valid","endpoint_staged_error_state_is_valid","endpoint_staged_no_message_success_state_is_valid","micros_endpoint_queue_member_is_valid","micros_endpoint_select","micros_thread_ipc_state_is_clear","scheduler_core_preflight_thread","scheduler_core_thread_is_current","thread_has_no_ipc_flags"],
+          "calls": ["endpoint_reply_wait_state_is_valid","endpoint_staged_delivery_selected_is_valid","endpoint_staged_error_state_is_valid","endpoint_staged_no_message_success_state_is_valid","micros_endpoint_queue_member_is_valid","micros_endpoint_reply_token_slot","micros_endpoint_select","micros_endpoint_staged_request_matches","micros_thread_ipc_state_is_clear","scheduler_core_preflight_thread","scheduler_core_thread_is_current","thread_has_no_ipc_flags"],
           "directives": [],
           "guards": [],
           "loops": [],
@@ -8602,18 +8637,17 @@
             ["threads [ index ]",[["for ( index = 0 ; index < MICROS_THREAD_CAPACITY ; ++ index ) {",0]]],
             ["queued_threads [ index ]",[["for ( index = 0 ; index < MICROS_THREAD_CAPACITY ; ++ index ) {",0],["if ( thread -> ipc_queue_kind == MICROS_IPC_QUEUE_NONE ) {",0]]],
             ["queued_threads [ index ]",[["for ( index = 0 ; index < MICROS_THREAD_CAPACITY ; ++ index ) {",0]]],
-            ["threads [ other_index ]",[["for ( index = 0 ; index < MICROS_THREAD_CAPACITY ; ++ index ) {",0],["for ( other_index = 0 ; other_index < index ; ++ other_index ) {",0]]]
+            ["endpoints [ thread -> owner . slot ]",[["for ( index = 0 ; index < MICROS_THREAD_CAPACITY ; ++ index ) {",0]]]
           ],
           "aliases": [
             ["threads",["["]],
-            ["threads",["["]]
+            ["endpoints",["["]]
           ],
-          "calls": ["endpoint_reply_wait_state_is_valid","endpoint_staged_delivery_state_is_valid","endpoint_staged_error_state_is_valid","endpoint_staged_no_message_success_state_is_valid","micros_thread_ipc_state_is_clear","thread_has_no_ipc_flags"],
+          "calls": ["endpoint_reply_wait_state_is_valid","endpoint_staged_delivery_state_is_valid","endpoint_staged_error_state_is_valid","endpoint_staged_no_message_success_state_is_valid","endpoint_thread_handle_is_zero","micros_endpoint_reply_token_slot","micros_endpoint_staged_request_matches","micros_thread_ipc_state_is_clear","thread_has_no_ipc_flags"],
           "directives": [],
           "guards": [],
           "loops": [
-            ["for ( index = 0 ; index < MICROS_THREAD_CAPACITY ; ++ index ) {",[]],
-            ["for ( other_index = 0 ; other_index < index ; ++ other_index ) {",[["for ( index = 0 ; index < MICROS_THREAD_CAPACITY ; ++ index ) {",0]]]
+            ["for ( index = 0 ; index < MICROS_THREAD_CAPACITY ; ++ index ) {",[]]
           ],
           "signature": "static bool thread_relationships_are_canonical ( const struct micros_endpoint_registry * registry , const struct micros_kernel_objects * objects , const bool queued_threads [ MICROS_THREAD_CAPACITY ] )",
           "storage": []
@@ -8815,7 +8849,7 @@
           "aliases": [
             ["processes",["["]]
           ],
-          "calls": ["endpoint_thread_handle_is_zero","endpoint_thread_handles_equal","micros_endpoint_select","micros_thread_resolve","receiver_queue_state_is_valid","scheduler_core_preflight_thread","sender_queue_state_is_valid"],
+          "calls": ["endpoint_thread_handle_is_zero","endpoint_thread_handles_equal","micros_endpoint_reply_token_slot","micros_endpoint_select","micros_thread_resolve","receiver_queue_state_is_valid","scheduler_core_preflight_thread","sender_queue_state_is_valid"],
           "directives": [],
           "guards": [],
           "loops": [],
@@ -8839,7 +8873,7 @@
         "receiver_queue_state_is_valid": {
           "accesses": [],
           "aliases": [],
-          "calls": ["endpoint_bytes_are_zero","endpoint_delivery_state_is_clear","endpoint_process_handles_equal","endpoint_record_resolve_validated"],
+          "calls": ["endpoint_bytes_are_zero","endpoint_delivery_state_is_clear","endpoint_process_handles_equal","endpoint_record_resolve_validated","endpoint_thread_handle_is_zero"],
           "directives": [],
           "guards": [],
           "loops": [],
@@ -8865,7 +8899,7 @@
           "aliases": [
             ["endpoints",["["]]
           ],
-          "calls": ["endpoint_delivery_state_is_clear","endpoint_process_handles_equal"],
+          "calls": ["endpoint_delivery_state_is_clear","endpoint_process_handles_equal","endpoint_thread_handle_is_zero"],
           "directives": [],
           "guards": [],
           "loops": [],
@@ -9053,7 +9087,7 @@
         "micros_ipc_call": {
           "accesses": [],
           "aliases": [],
-          "calls": ["ipc_canonicalize_message","ipc_reply_token_is_available","prepare_authorized_sender","send_selected"],
+          "calls": ["ipc_canonicalize_message","micros_endpoint_next_reply_token","prepare_authorized_sender","send_selected"],
           "directives": [],
           "guards": [],
           "loops": [],
@@ -9430,7 +9464,7 @@
             ["threads",["["]],
             ["processes",["["]]
           ],
-          "calls": ["add_close_transition","ipc_process_handles_equal","ipc_thread_is_current","micros_endpoint_thread_ipc_state_is_valid","micros_thread_ipc_state_is_clear","thread_has_endpoint_reference","thread_has_staged_reference","thread_mentions_closing_slot"],
+          "calls": ["add_close_transition","ipc_process_handles_equal","ipc_thread_handle_is_zero","ipc_thread_is_current","micros_endpoint_thread_ipc_state_is_valid","micros_thread_ipc_state_is_clear","thread_has_endpoint_reference","thread_has_staged_reference","thread_mentions_closing_slot"],
           "directives": [],
           "guards": [],
           "loops": [
@@ -10365,60 +10399,26 @@
         "ipc_preflight_reply": {
           "accesses": [],
           "aliases": [],
-          "calls": ["ipc_admit_operation_thread","ipc_canonicalize_message","ipc_endpoint_error_to_ipc","micros_privilege_profile_allows_operation","reply_request_is_pending","resolve_reply_waiter"],
+          "calls": ["ipc_admit_operation_thread","ipc_canonicalize_message","ipc_endpoint_error_to_ipc","micros_privilege_profile_allows_operation","resolve_reply_waiter"],
           "directives": [],
           "guards": [],
           "loops": [],
           "signature": "enum micros_ipc_error ipc_preflight_reply ( struct micros_endpoint_registry * registry , struct micros_kernel_objects * objects , struct micros_thread_handle replier_handle , uint64_t reply_token , micros_endpoint_t expected_caller_endpoint , const struct micros_ipc_message * message , uint32_t required_operation , struct ipc_reply_preflight * plan )",
           "storage": []
         },
-        "ipc_reply_token_is_available": {
-          "accesses": [
-            ["threads [ index ]",[["for ( size_t index = 0 ; index < MICROS_THREAD_CAPACITY ; ++ index ) {",0]]]
-          ],
-          "aliases": [
-            ["threads",["["]]
-          ],
-          "calls": [],
-          "directives": [],
-          "guards": [],
-          "loops": [
-            ["for ( size_t index = 0 ; index < MICROS_THREAD_CAPACITY ; ++ index ) {",[]]
-          ],
-          "signature": "bool ipc_reply_token_is_available ( const struct micros_kernel_objects * objects , uint64_t reply_token )",
-          "storage": []
-        },
-        "reply_request_is_pending": {
-          "accesses": [
-            ["threads [ index ]",[["for ( size_t index = 0 ; index < MICROS_THREAD_CAPACITY ; ++ index ) {",0]]]
-          ],
-          "aliases": [
-            ["threads",["["]]
-          ],
-          "calls": ["micros_endpoint_staged_request_matches"],
-          "directives": [],
-          "guards": [],
-          "loops": [
-            ["for ( size_t index = 0 ; index < MICROS_THREAD_CAPACITY ; ++ index ) {",[]]
-          ],
-          "signature": "static enum micros_ipc_error reply_request_is_pending ( const struct micros_endpoint_registry * registry , const struct micros_kernel_objects * objects , uint64_t reply_token , const struct micros_thread * caller , const struct micros_endpoint_record * caller_endpoint , bool * pending )",
-          "storage": []
-        },
         "resolve_reply_waiter": {
           "accesses": [
-            ["threads [ index ]",[["for ( size_t index = 0 ; index < MICROS_THREAD_CAPACITY ; ++ index ) {",0]]],
+            ["threads [ slot ]",[["if ( micros_endpoint_reply_token_slot ( reply_token , & slot ) ) {",0]]],
             ["endpoints [ matched -> owner . slot ]",[]]
           ],
           "aliases": [
             ["threads",["["]],
             ["endpoints",["["]]
           ],
-          "calls": ["micros_endpoint_thread_ipc_state_is_valid"],
+          "calls": ["micros_endpoint_reply_token_slot","micros_endpoint_thread_ipc_state_is_valid"],
           "directives": [],
           "guards": [],
-          "loops": [
-            ["for ( size_t index = 0 ; index < MICROS_THREAD_CAPACITY ; ++ index ) {",[]]
-          ],
+          "loops": [],
           "signature": "static enum micros_ipc_error resolve_reply_waiter ( const struct micros_endpoint_registry * registry , struct micros_kernel_objects * objects , uint64_t reply_token , struct micros_thread_handle * caller_handle , struct micros_thread * * caller , const struct micros_endpoint_record * * caller_endpoint )",
           "storage": []
         }
@@ -16471,12 +16471,14 @@
         },
         "preflight_selected_completion": {
           "accesses": [
-            ["threads [ selected . slot ]",[]]
+            ["threads [ selected . slot ]",[]],
+            ["threads [ request_caller . slot ]",[]]
           ],
           "aliases": [
+            ["threads",["["]],
             ["threads",["["]]
           ],
-          "calls": ["MICROS_IPC01_COMPLETION_BEGIN","MICROS_IPC01_COMPLETION_END","micros_endpoint_thread_ipc_state_is_valid","micros_ipc_abi_map_error","micros_ipc_buffer_prepare_write","micros_ipc_runtime_registry","micros_thread_ipc_state_is_clear","micros_thread_resolve","scheduler_runtime_clear_bytes"],
+          "calls": ["MICROS_IPC01_COMPLETION_BEGIN","MICROS_IPC01_COMPLETION_END","micros_endpoint_select_staged_request","micros_endpoint_thread_ipc_state_is_valid","micros_ipc_abi_map_error","micros_ipc_buffer_prepare_write","micros_ipc_runtime_registry","micros_thread_ipc_state_is_clear","micros_thread_resolve","scheduler_runtime_clear_bytes"],
           "directives": [],
           "guards": [],
           "loops": [],

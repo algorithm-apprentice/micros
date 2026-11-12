@@ -59,17 +59,17 @@ IPC_CASES = (
     ("send-wait", 0, 2, 1, 0), ("send-delivery", 0, 2, 1, 0),
     ("send-last", 0, 2, 1, 0), ("send-unmatched", 0, 2, 1, 0),
     ("receive-wait", 0, 1, 1, 0), ("receive-delivery", 0, 1, 1, 0),
-    ("receive-last", 0, 1, 1, 0), ("call-wait", 1, 2, 1, 128),
-    ("call-delivery", 1, 2, 1, 128), ("reply", 1, 1, 0, 256),
-    ("reply-receive-wait", 1, 1, 1, 256), ("reply-receive-sender", 1, 1, 1, 256),
+    ("receive-last", 0, 1, 1, 0), ("call-wait", 128, 2, 1, 0),
+    ("call-delivery", 128, 2, 1, 0), ("reply", 128, 1, 0, 0),
+    ("reply-receive-wait", 128, 1, 1, 0), ("reply-receive-sender", 128, 1, 1, 0),
     ("notify-coalesce", 0, 2, 1, 0), ("notify-delivery", 0, 2, 1, 0),
     ("kernel-coalesce", 0, 0, 1, 0), ("kernel-delivery", 0, 0, 1, 0),
     ("kernel-last", 0, 0, 1, 0), ("stage-no-message", 0, 0, 0, 0),
     ("cancel-close", 0, 0, 0, 0),
     ("kernel-backedge", 0, 0, 1, 0, 11),
     ("receive-pending-corrupt", 0, 1, 0, 0, 11),
-    ("reply-pending-corrupt", 1, 1, 0, 256, 11),
-    ("call-token-collision", 0, 2, 0, 128, 11),
+    ("reply-pending-corrupt", 128, 1, 0, 0, 11),
+    ("call-token-collision", 0, 2, 1, 0, 11),
 )
 LIFECYCLE_CASES = (
     ("reserve", 0x103e, 0, 0, 0),
@@ -99,6 +99,20 @@ INDEX_CASES = (
     ("index-release-pair-high", 1, 0, 8 + 128), ("index-release-many", 2, 0, 8),
     ("index-repair-missing", 2, 15, 8 + 128), ("index-repair-duplicate", 2, 15, 8 + 128),
 )
+TOKEN_CASES = (
+    ("token-call-first", 128, 0, 0, 2, 1, 1),
+    ("token-call-middle", 64, 0, 0, 2, 1, 1),
+    ("token-call-high", 127, 0, 0, 2, 1, 1),
+    ("token-reply", 128, 0, 0, 1, 0, 0),
+    ("token-reply-sibling", 128, 0, 0, 1, 0, 0),
+    ("token-reply-early", 128, 8, 1, 1, 0, 0),
+    ("token-reply-receive", 128, 0, 0, 1, 1, 0),
+    ("token-reply-missing", 128, 8, 1, 1, 0, 0),
+    ("token-staged-request", 128, 0, 1, 0, 0, 0),
+    ("token-reply-stale-index", 128, 11, 1, 1, 0, 0),
+    ("token-reply-returned-index", 128, 11, 1, 1, 0, 0),
+    ("token-reply-foreign-index", 128, 11, 1, 1, 0, 0),
+)
 
 def completion_cases():
     rows = []
@@ -115,10 +129,12 @@ def completion_cases():
             })
     for name, lookups, translations in (
         ("malformed", 0, 0), ("buffer-fault", 1, 2), ("duplicate-token", 1, 0),
+        ("unindexed-request", 1, 0), ("missing-request-index", 1, 0), ("token-buffer-fault", 1, 2),
     ):
         rows.append({
-            "name": "completion-" + name, "result": 1, "value": 0, "preserved": 1,
-            "lookups": lookups, "translations": translations,
+            "name": "completion-" + name, "result": int(name != "duplicate-token"),
+            "value": int(name == "duplicate-token"), "preserved": 1,
+            "lookups": lookups, "translations": 1 if name == "duplicate-token" else translations,
         })
     return tuple(rows)
 
@@ -145,10 +161,14 @@ def expected_cases():
         "version": 1, "case": index, "name": name, "result": result,
         "value": hops, "preserved": 1, "lookups": 0, "translations": 0,
     } for index, (name, hops, result) in enumerate(DEPENDENCY_CASES, len(completed) + 1))
-    return dependencies + tuple({
+    indexed = dependencies + tuple({
         "version": 1, "case": index, "name": name, "result": result,
         "value": count, "preserved": int(result != 0), "lookups": 0, "translations": 0,
     } for index, (name, count, result, _) in enumerate(INDEX_CASES, len(dependencies) + 1))
+    return indexed + tuple({
+        "version": 1, "case": index, "name": name, "result": result,
+        "value": token, "preserved": preserved, "lookups": 0, "translations": 0,
+    } for index, (name, token, result, preserved, _, _, _) in enumerate(TOKEN_CASES, len(indexed) + 1))
 
 
 def case_identities(records):
@@ -223,9 +243,12 @@ def work_failures(records, work):
              + tuple((*spec[:3], 0, 0) for spec in LIFECYCLE_CASES)
              + tuple((row["name"], row["value"], 0, 0, 2) for row in completion_cases())
              + tuple((name, hops, 0, 0, 0) for name, hops, _ in DEPENDENCY_CASES)
-             + tuple((name, count, 0, 0, 0) for name, count, _, _ in INDEX_CASES))
+             + tuple((name, count, 0, 0, 0) for name, count, _, _ in INDEX_CASES)
+             + tuple((name, token, profiles, searches, 0)
+                     for name, token, _, _, profiles, searches, _ in TOKEN_CASES))
     lifecycle = {spec[0] for spec in LIFECYCLE_CASES}
     index_visits = {row[0]: row[3] for row in INDEX_CASES}
+    token_links = {row[0]: row[6] for row in TOKEN_CASES}
     for row, snapshot, spec in zip(records, work, specs, strict=True):
         if row["case"] != snapshot["case"]:
             raise ValueError("IPC01 work oracle borrowed a different case")
@@ -247,7 +270,6 @@ def work_failures(records, work):
         endpoint_rows = totals.per_owner[Owner.KERNEL_ENDPOINT][Kind.RECORD_VISIT]
         endpoint_bound = (
             4 * 64 + 3 * 128 + 8 if row["name"] in lifecycle else
-            128 if row["name"] in ("completion-token-plan", "completion-duplicate-token") else
             2 * 64 if row["name"] == "cancel-close" else 0
         )
         if endpoint_rows > endpoint_bound:
@@ -261,6 +283,12 @@ def work_failures(records, work):
         links = totals.per_owner[Owner.KERNEL_IPC][Kind.LINK_TRAVERSE]
         link_bound = 2 * 64 + 3 if row["name"] == "cancel-close" else 2 * prefix
         link_bound += OPERATION_DEPENDENCY_HOPS.get(row["name"], 0)
+        if row["name"] in token_links:
+            link_bound = token_links[row["name"]]
+            # At most twelve selected thread/endpoint/hart/profile admissions,
+            # each bounded by eight indexed reads; no capacity-dependent term.
+            if totals.per_kind[Kind.INDEX_PROBE] > 96:
+                failures.append((row["name"], "selected-token-index-probes", totals.per_kind[Kind.INDEX_PROBE], 96))
         if row["name"].startswith("dependency-"):
             link_bound = row["value"]
             probes = totals.per_owner[Owner.KERNEL_IPC][Kind.INDEX_PROBE]

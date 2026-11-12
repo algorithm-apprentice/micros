@@ -81,6 +81,9 @@ static bool same_thread(
         && a->ipc_staged_result == b->ipc_staged_result
         && a->ipc_reply_token == b->ipc_reply_token
         && a->ipc_reply_callee == b->ipc_reply_callee
+        && a->ipc_reply_phase == b->ipc_reply_phase
+        && a->ipc_request_receiver.slot == b->ipc_request_receiver.slot
+        && a->ipc_request_receiver.generation == b->ipc_request_receiver.generation
     );
 }
 

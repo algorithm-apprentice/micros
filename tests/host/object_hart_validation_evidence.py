@@ -235,6 +235,8 @@ def expected_index_digest(threads):
         generation = int(process == 0 and threads == 1)
         for byte in bytes(2) + generation.to_bytes(4, "little"):
             value = ((value ^ byte) * 1099511628211) & ((1 << 64) - 1)
+    for byte in bytes(128 * (4 + 2 + 4)):
+        value = ((value ^ byte) * 1099511628211) & ((1 << 64) - 1)
     return value
 
 

@@ -1,4 +1,5 @@
 #include "kernel/tests/ipc/ipc_test_internal.h"
+#include "kernel/endpoint/endpoint_internal.h"
 
 static struct ipc_test_context test_context;
 static const struct micros_ipc_message zero_message;
@@ -352,6 +353,15 @@ bool ipc_test_consume_staged(
         )
     ) {
         return false;
+    }
+    if (resolved->ipc_inbound_message.reply_token != 0) {
+        struct micros_thread_handle caller;
+
+        if (!micros_endpoint_select_staged_request(test_context.registry, objects, thread, &caller)) {
+            return false;
+        }
+        objects->threads[caller.slot].ipc_reply_phase = MICROS_IPC_REPLY_PHASE_RETURNED;
+        objects->threads[caller.slot].ipc_request_receiver = (struct micros_thread_handle){0, 0};
     }
     resolved->ipc_receive_buffer = 0;
     resolved->ipc_delivery_pending = false;

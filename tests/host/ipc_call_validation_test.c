@@ -1,4 +1,5 @@
 #include "ipc_call_test_internal.h"
+#include "kernel/endpoint/endpoint_internal.h"
 
 bool test_low_level_enqueue_rejects_reply_tokens(struct ipc_call_test_context *fixture)
 {
@@ -54,6 +55,10 @@ bool test_low_level_enqueue_rejects_reply_tokens(struct ipc_call_test_context *f
 
 bool test_token_exhaustion_is_preflighted(struct ipc_call_test_context *fixture)
 {
+    const uint64_t high_water[] = {
+        0, 1, 126, 127, 128, 255,
+        UINT64_MAX - 129, UINT64_MAX - 128, UINT64_MAX - 127, UINT64_MAX - 1, UINT64_MAX,
+    };
     struct micros_ipc_message first_request = ipc_call_test_message_pattern(
         0,
         UINT32_C(0x3001),
@@ -67,9 +72,30 @@ bool test_token_exhaustion_is_preflighted(struct ipc_call_test_context *fixture)
         UINT8_C(0x60)
     );
     const struct micros_thread *first_caller;
+    uint64_t final_token;
+
+    for (uint16_t slot = 0; slot < MICROS_THREAD_CAPACITY; ++slot) {
+        for (size_t index = 0; index < sizeof(high_water) / sizeof(high_water[0]); ++index) {
+            uint64_t expected = ipc_fixture_next_token(high_water[index], slot);
+            uint64_t actual = UINT64_C(0xa5a5a5a5a5a5a5a5);
+            uint16_t decoded = UINT16_MAX;
+
+            EXPECT_TRUE(micros_endpoint_next_reply_token(high_water[index], slot, &actual)
+                        == (expected != 0));
+            if (expected == 0) {
+                EXPECT_TRUE(actual == UINT64_C(0xa5a5a5a5a5a5a5a5));
+            } else {
+                EXPECT_TRUE(actual == expected && actual > high_water[index]);
+                EXPECT_TRUE(micros_endpoint_reply_token_slot(actual, &decoded) && decoded == slot);
+            }
+        }
+    }
 
     EXPECT_TRUE(ipc_call_test_setup_call_fixture(fixture));
-    fixture->registry.last_reply_token = UINT64_MAX - 1;
+    fixture->registry.last_reply_token = UINT64_MAX - 128;
+    final_token = ipc_fixture_next_token(
+        fixture->registry.last_reply_token, fixture->primary_threads[CALL_PROCESS_CLIENT].slot
+    );
     EXPECT_IPC_ERROR(
         MICROS_IPC_OK,
         micros_ipc_call(
@@ -85,22 +111,25 @@ bool test_token_exhaustion_is_preflighted(struct ipc_call_test_context *fixture)
         fixture->primary_threads[CALL_PROCESS_CLIENT].slot
     ];
     EXPECT_TRUE(
-        fixture->registry.last_reply_token == UINT64_MAX
-        && first_caller->ipc_reply_token == UINT64_MAX
+        fixture->registry.last_reply_token == final_token
+        && first_caller->ipc_reply_token == final_token
         && first_caller->ipc_outbound_message.reply_token
-            == UINT64_MAX
+            == final_token
         && micros_endpoint_registry_validate_objects(
             &fixture->registry,
             &fixture->objects
         ) == MICROS_ENDPOINT_OK
     );
-    EXPECT_TRUE(ipc_call_test_expect_call_failure_unchanged(
-        fixture,
-        MICROS_IPC_ERROR_REPLY_TOKEN_EXHAUSTED,
-        fixture->client_extra_thread,
-        fixture->endpoints[CALL_PROCESS_SERVER],
-        &second_request
-    ));
+    EXPECT_TRUE(ipc_call_test_setup_call_fixture(fixture));
+    for (size_t index = 0; index < 3; ++index) {
+        fixture->registry.last_reply_token = index == 0 ? final_token
+            : index == 1 ? UINT64_MAX - 1 : UINT64_MAX;
+        EXPECT_TRUE(ipc_call_test_expect_call_failure_unchanged(
+            fixture, MICROS_IPC_ERROR_REPLY_TOKEN_EXHAUSTED,
+            fixture->primary_threads[CALL_PROCESS_CLIENT],
+            fixture->endpoints[CALL_PROCESS_SERVER], &second_request
+        ));
+    }
     return true;
 }
 

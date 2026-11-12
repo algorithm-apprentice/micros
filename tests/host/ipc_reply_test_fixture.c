@@ -285,6 +285,9 @@ bool ipc_reply_test_clear_staged_request(
     ) {
         return false;
     }
+    if (!ipc_fixture_return_request(&fixture->objects, receiver_handle)) {
+        return false;
+    }
     receiver->ipc_receive_buffer = 0;
     receiver->ipc_delivery_pending = false;
     memset(
@@ -515,11 +518,15 @@ bool ipc_reply_test_make_reply_wait_current(
     uintptr_t reply_buffer = caller->ipc_receive_buffer;
     uint64_t reply_token = caller->ipc_reply_token;
     micros_endpoint_t reply_callee = caller->ipc_reply_callee;
+    uint32_t reply_phase = caller->ipc_reply_phase;
+    struct micros_thread_handle request_receiver = caller->ipc_request_receiver;
 
     caller->runtime_flags = MICROS_THREAD_RTS_INACTIVE;
     caller->ipc_receive_buffer = 0;
     caller->ipc_reply_token = 0;
     caller->ipc_reply_callee = 0;
+    caller->ipc_reply_phase = MICROS_IPC_REPLY_PHASE_NONE;
+    caller->ipc_request_receiver = (struct micros_thread_handle){0, 0};
     if (
         micros_endpoint_registry_validate_objects(
             &fixture->registry,
@@ -548,6 +555,8 @@ bool ipc_reply_test_make_reply_wait_current(
     caller->ipc_receive_buffer = reply_buffer;
     caller->ipc_reply_token = reply_token;
     caller->ipc_reply_callee = reply_callee;
+    caller->ipc_reply_phase = reply_phase;
+    caller->ipc_request_receiver = request_receiver;
     return micros_endpoint_registry_validate_objects(
         &fixture->registry,
         &fixture->objects

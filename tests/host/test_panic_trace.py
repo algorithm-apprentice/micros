@@ -947,6 +947,12 @@ class PanicTraceMachineTest(unittest.TestCase):
             source.replace("struct micros_thread_handle sole_thread;", "struct micros_thread_handle sole_thread[2];", 1),
             source.replace("bool endpoint_lifecycle_consumed;", "bool endpoint_lifecycle_consumed; uint64_t hidden;", 1),
             source.replace("uint32_t generation;", "uint64_t generation;", 1),
+            source.replace("uint32_t ipc_reply_phase;", "uint64_t ipc_reply_phase;", 1),
+            source.replace("struct micros_thread_handle ipc_request_receiver;",
+                           "struct micros_process_handle ipc_request_receiver;", 1),
+            source.replace("struct micros_thread_handle ipc_request_receiver;",
+                           "struct micros_thread_handle ipc_request_receiver[2];", 1),
+            source.replace("MICROS_IPC_REPLY_PHASE_RETURNED,", "MICROS_IPC_REPLY_PHASE_RETURNED = 4,", 1),
             source.replace("    struct micros_thread_handle sole_thread;\n", "", 1).replace(
                 "struct micros_thread {", "struct micros_thread { struct micros_thread_handle sole_thread;", 1,
             ),
@@ -964,6 +970,8 @@ class PanicTraceMachineTest(unittest.TestCase):
 
         layout = trace_object_layout(ROOT)
         self.assertEqual(48, layout["process_bytes"])
+        self.assertEqual(544, layout["thread_bytes"])
+        self.assertEqual(76400, layout["registry_bytes"])
         self.assertEqual(
             layout["process_table"] + layout["process_capacity"] * layout["process_bytes"],
             layout["thread_table"],

@@ -16,6 +16,40 @@ _Static_assert(
     "pending notification bitmap requires one bit per endpoint slot"
 );
 
+enum { REPLY_TOKEN_SLOT_COUNT = 128 };
+
+_Static_assert(MICROS_THREAD_CAPACITY > 0 && MICROS_THREAD_CAPACITY <= REPLY_TOKEN_SLOT_COUNT,
+               "reply token tags must cover every thread slot");
+
+bool micros_endpoint_reply_token_slot(uint64_t token, uint16_t *slot)
+{
+    uint16_t selected = (uint16_t)(token & (REPLY_TOKEN_SLOT_COUNT - 1));
+
+    if (token == 0 || slot == NULL || selected >= MICROS_THREAD_CAPACITY) {
+        return false;
+    }
+    *slot = selected;
+    return true;
+}
+
+bool micros_endpoint_next_reply_token(uint64_t previous, uint16_t slot, uint64_t *token)
+{
+    uint64_t selected;
+
+    if (slot >= MICROS_THREAD_CAPACITY || token == NULL) {
+        return false;
+    }
+    selected = (previous & ~(uint64_t)(REPLY_TOKEN_SLOT_COUNT - 1)) | slot;
+    if (selected <= previous) {
+        if (selected > UINT64_MAX - REPLY_TOKEN_SLOT_COUNT) {
+            return false;
+        }
+        selected += REPLY_TOKEN_SLOT_COUNT;
+    }
+    *token = selected;
+    return true;
+}
+
 bool endpoint_process_handles_equal(
     struct micros_process_handle left,
     struct micros_process_handle right

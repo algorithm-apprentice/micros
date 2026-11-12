@@ -736,9 +736,23 @@ def require_trace_object_header(name, source):
         if len(starts) == 1:
             closing = matching_tokens(expected, starts[0] + 2)
             extension = tokens("struct micros_thread_handle sole_thread;")
-            if actual == expected[:closing] + extension + expected[closing:]:
+            process = expected[:closing] + extension + expected[closing:]
+            if actual == process:
                 return
-    raise StackEvidenceError("trace ownership header exceeds its exact sole-index boundary: " + name)
+            phase = tokens(
+                "enum micros_ipc_reply_phase { MICROS_IPC_REPLY_PHASE_NONE = 0,"
+                "MICROS_IPC_REPLY_PHASE_QUEUED, MICROS_IPC_REPLY_PHASE_STAGED,"
+                "MICROS_IPC_REPLY_PHASE_RETURNED, };"
+            )
+            current = process[:starts[0]] + phase + process[starts[0]:]
+            threads = tuple(index for index in range(len(current))
+                            if current[index:index + 3] == ("struct", "micros_thread", "{"))
+            if len(threads) == 1:
+                closing = matching_tokens(current, threads[0] + 2)
+                extension = tokens("uint32_t ipc_reply_phase; struct micros_thread_handle ipc_request_receiver;")
+                if actual == current[:closing] + extension + current[closing:]:
+                    return
+    raise StackEvidenceError("trace ownership header exceeds its exact ownership-index boundary: " + name)
 
 
 def trace_object_layout(root):

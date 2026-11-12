@@ -75,6 +75,13 @@ enum micros_scheduler_accounting_owner {
     MICROS_SCHEDULER_ACCOUNTING_IDLE,
 };
 
+enum micros_ipc_reply_phase {
+    MICROS_IPC_REPLY_PHASE_NONE = 0,
+    MICROS_IPC_REPLY_PHASE_QUEUED,
+    MICROS_IPC_REPLY_PHASE_STAGED,
+    MICROS_IPC_REPLY_PHASE_RETURNED,
+};
+
 struct micros_process {
     enum micros_kernel_object_slot_state slot_state;
     uint32_t generation;
@@ -114,6 +121,8 @@ struct micros_thread {
     enum micros_ipc_error ipc_staged_result;
     uint64_t ipc_reply_token;
     uint32_t ipc_reply_callee;
+    uint32_t ipc_reply_phase;
+    struct micros_thread_handle ipc_request_receiver;
 };
 
 struct micros_hart_trap_anchor {

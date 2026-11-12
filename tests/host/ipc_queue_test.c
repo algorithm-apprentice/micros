@@ -1,4 +1,5 @@
 #include "micros/endpoint.h"
+#include "ipc_fixture_tokens.h"
 
 #include <stdbool.h>
 #include <stdint.h>
@@ -171,8 +172,10 @@ static void construct_valid_queues(void)
         &registry.endpoints[processes[2].slot];
     struct micros_endpoint_record *receiver_queue =
         &registry.endpoints[processes[3].slot];
+    uint64_t first_token = ipc_fixture_next_token(0, threads[0].slot);
+    uint64_t second_token = ipc_fixture_next_token(first_token, threads[2].slot);
 
-    registry.last_reply_token = 102;
+    registry.last_reply_token = second_token;
     first_sender->runtime_flags =
         MICROS_THREAD_RTS_IPC_SEND
         | MICROS_THREAD_RTS_IPC_REPLY;
@@ -181,11 +184,12 @@ static void construct_valid_queues(void)
     first_sender->ipc_send_destination = endpoints[2];
     first_sender->ipc_outbound_message.source = endpoints[0];
     first_sender->ipc_outbound_message.type = 10;
-    first_sender->ipc_outbound_message.reply_token = 101;
+    first_sender->ipc_outbound_message.reply_token = first_token;
     first_sender->ipc_outbound_message.payload[0] = 1;
     first_sender->ipc_receive_buffer = UINT64_C(0x40001000);
-    first_sender->ipc_reply_token = 101;
+    first_sender->ipc_reply_token = first_token;
     first_sender->ipc_reply_callee = endpoints[2];
+    first_sender->ipc_reply_phase = MICROS_IPC_REPLY_PHASE_QUEUED;
 
     second_sender->runtime_flags = MICROS_THREAD_RTS_IPC_SEND;
     second_sender->ipc_queue_kind = MICROS_IPC_QUEUE_SENDER;
@@ -209,8 +213,9 @@ static void construct_valid_queues(void)
         MICROS_THREAD_RTS_IPC_REPLY;
     objects.threads[threads[2].slot].ipc_receive_buffer =
         UINT64_C(0x40002000);
-    objects.threads[threads[2].slot].ipc_reply_token = 102;
+    objects.threads[threads[2].slot].ipc_reply_token = second_token;
     objects.threads[threads[2].slot].ipc_reply_callee = endpoints[0];
+    objects.threads[threads[2].slot].ipc_reply_phase = MICROS_IPC_REPLY_PHASE_RETURNED;
 }
 
 static bool test_valid_queue_topology(void)
@@ -341,6 +346,7 @@ static bool test_queue_validator_rejects_corruption(void)
         objects.threads[threads[2].slot].ipc_receive_buffer = 0;
         objects.threads[threads[2].slot].ipc_reply_token = 0;
         objects.threads[threads[2].slot].ipc_reply_callee = 0;
+        objects.threads[threads[2].slot].ipc_reply_phase = MICROS_IPC_REPLY_PHASE_NONE;
         objects.threads[threads[2].slot].ipc_queue_kind =
             MICROS_IPC_QUEUE_SENDER;
         objects.threads[threads[2].slot].ipc_send_destination =
@@ -353,7 +359,8 @@ static bool test_queue_validator_rejects_corruption(void)
             MICROS_THREAD_RTS_IPC_SEND;
         objects.threads[threads[2].slot].ipc_receive_buffer = 0;
         objects.threads[threads[2].slot].ipc_reply_token = 0;
-        objects.threads[threads[2].slot].ipc_reply_callee = 0
+        objects.threads[threads[2].slot].ipc_reply_callee = 0;
+        objects.threads[threads[2].slot].ipc_reply_phase = MICROS_IPC_REPLY_PHASE_NONE
     );
     EXPECT_QUEUE_CORRUPTION(
         registry.endpoints[processes[3].slot].receiver_head =
@@ -365,12 +372,13 @@ static bool test_queue_validator_rejects_corruption(void)
         objects.threads[threads[1].slot].runtime_flags |=
             MICROS_THREAD_RTS_IPC_REPLY;
         objects.threads[threads[1].slot]
-            .ipc_outbound_message.reply_token = 101;
+            .ipc_outbound_message.reply_token = objects.threads[threads[0].slot].ipc_reply_token;
         objects.threads[threads[1].slot].ipc_receive_buffer =
             UINT64_C(0x40003000);
-        objects.threads[threads[1].slot].ipc_reply_token = 101;
+        objects.threads[threads[1].slot].ipc_reply_token = objects.threads[threads[0].slot].ipc_reply_token;
         objects.threads[threads[1].slot].ipc_reply_callee =
-            endpoints[2]
+            endpoints[2];
+        objects.threads[threads[1].slot].ipc_reply_phase = MICROS_IPC_REPLY_PHASE_QUEUED
     );
     EXPECT_QUEUE_CORRUPTION(
         objects.threads[threads[2].slot].runtime_flags =
@@ -381,6 +389,7 @@ static bool test_queue_validator_rejects_corruption(void)
             MICROS_ENDPOINT_ANY;
         objects.threads[threads[2].slot].ipc_reply_token = 0;
         objects.threads[threads[2].slot].ipc_reply_callee = 0;
+        objects.threads[threads[2].slot].ipc_reply_phase = MICROS_IPC_REPLY_PHASE_NONE;
         objects.threads[threads[2].slot].ipc_queue_kind =
             MICROS_IPC_QUEUE_RECEIVER;
         registry.endpoints[processes[2].slot].receiver_head =

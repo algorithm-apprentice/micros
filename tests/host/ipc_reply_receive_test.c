@@ -234,7 +234,10 @@ static bool prepare_specific_sender_and_unmatched_fifo(
     );
     scenario->second_token =
         fixture->objects.threads[fixture->client_extra_thread.slot].ipc_reply_token;
-    EXPECT_TRUE(scenario->first_token == 1 && scenario->second_token == 2);
+    EXPECT_TRUE(
+        scenario->first_token == ipc_fixture_next_token(0, fixture->primary_threads[REPLY_PROCESS_CLIENT].slot)
+        && scenario->second_token == ipc_fixture_next_token(scenario->first_token, fixture->client_extra_thread.slot)
+    );
     scenario->expected_request =
         fixture->objects.threads[
             fixture->client_extra_thread.slot

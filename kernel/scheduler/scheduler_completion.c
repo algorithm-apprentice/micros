@@ -16,6 +16,7 @@ preflight_selected_completion(
 {
     const struct micros_endpoint_registry *registry;
     const struct micros_thread *resolved;
+    struct micros_thread_handle request_caller = {0, 0};
     enum micros_ipc_buffer_error buffer_error;
 
     if (
@@ -36,7 +37,9 @@ preflight_selected_completion(
     registry = micros_ipc_runtime_registry();
     if (
         registry == NULL
-        || !micros_endpoint_thread_ipc_state_is_valid(registry, objects, selected)
+        || !(resolved->ipc_inbound_message.reply_token == 0
+            ? micros_endpoint_thread_ipc_state_is_valid(registry, objects, selected)
+            : micros_endpoint_select_staged_request(registry, objects, selected, &request_caller))
         || !micros_ipc_abi_map_error(
             resolved->ipc_staged_result,
             &completion->abi_result
@@ -47,6 +50,8 @@ preflight_selected_completion(
     }
     completion->pending = true;
     completion->thread = &objects->threads[selected.slot];
+    completion->request_caller = request_caller.generation == 0
+        ? NULL : &objects->threads[request_caller.slot];
     completion->owner = resolved->owner;
     completion->receive_buffer = resolved->ipc_receive_buffer;
     completion->message = resolved->ipc_inbound_message;
@@ -88,6 +93,10 @@ static enum scheduler_completion_error commit_selected_completion(
             &completion->buffer_plan,
             &completion->message
         );
+    }
+    if (completion->request_caller != NULL) {
+        completion->request_caller->ipc_reply_phase = MICROS_IPC_REPLY_PHASE_RETURNED;
+        completion->request_caller->ipc_request_receiver = (struct micros_thread_handle){0, 0};
     }
     runtime->selected_context.a0 = completion->abi_result;
     scheduler_runtime_copy_user_context(

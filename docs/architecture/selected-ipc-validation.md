@@ -633,7 +633,9 @@ completion, buffer and ABI sources into ordinary and observed native products.
 Its original sixty cases cover queries, operations, malformed selected state,
 lifecycle and actual completion planning/commit; the
 [linear dependency contract](linear-ipc-deadlock.md) adds its own cases without
-replacing them. The completion fixture substitutes only
+replacing them. [Direct reply binding](direct-reply-token-binding.md) adds its
+token/return cases and explicitly specified opaque-value and corruption-scope
+refinements. The completion fixture substitutes only
 runtime-registry access, address translation and fatal reporting, and checks
 exact physical writes, register preservation and zero commit lookups.
 Hardware authority remains with the real QEMU image.

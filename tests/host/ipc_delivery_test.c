@@ -1,4 +1,5 @@
 #include "micros/ipc_core.h"
+#include "ipc_fixture_tokens.h"
 
 #include <stdbool.h>
 #include <stdint.h>
@@ -377,10 +378,10 @@ static bool enqueue_sender(size_t index, bool call)
             &registry.endpoints[DELIVERY_PROCESS_DESTINATION];
         struct micros_thread *sender =
             &objects.threads[source_threads[index].slot];
-        uint64_t reply_token = registry.last_reply_token + 1;
+        uint64_t reply_token = ipc_fixture_next_token(registry.last_reply_token, source_threads[index].slot);
 
         if (
-            registry.last_reply_token == UINT64_MAX
+            reply_token == 0
             || sender->runtime_flags != MICROS_THREAD_RTS_INACTIVE
             || sender->ipc_queue_kind != MICROS_IPC_QUEUE_NONE
         ) {
@@ -401,6 +402,7 @@ static bool enqueue_sender(size_t index, bool call)
         sender->ipc_reply_token = reply_token;
         sender->ipc_reply_callee =
             endpoints[DELIVERY_PROCESS_DESTINATION];
+        sender->ipc_reply_phase = MICROS_IPC_REPLY_PHASE_QUEUED;
         if (thread_handle_is_zero(destination->sender_tail)) {
             destination->sender_head = source_threads[index];
         } else {

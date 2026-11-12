@@ -293,6 +293,9 @@ bool micros_thread_ipc_state_is_clear(
         && thread->ipc_staged_result == MICROS_IPC_OK
         && thread->ipc_reply_token == 0
         && thread->ipc_reply_callee == 0
+        && thread->ipc_reply_phase == MICROS_IPC_REPLY_PHASE_NONE
+        && thread->ipc_request_receiver.slot == 0
+        && thread->ipc_request_receiver.generation == 0
     );
 }
 

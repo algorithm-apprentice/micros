@@ -2,6 +2,7 @@
 #define MICROS_TESTS_HOST_IPC_NOTIFY_TEST_INTERNAL_H
 
 #include "micros/ipc_core.h"
+#include "ipc_fixture_tokens.h"
 
 #include <stdio.h>
 #include <string.h>
