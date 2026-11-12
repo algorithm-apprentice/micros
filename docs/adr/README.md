@@ -141,3 +141,4 @@ to make the project appear more consistent than it was.
 | [0123](0123-current-contract-validation.md) | Current-contract validation | Accepted |
 | [0124](0124-selected-ipc-validation.md) | Selected IPC validation | Accepted |
 | [0125](0125-linear-ipc-deadlock.md) | Linear IPC deadlock projection | Accepted |
+| [0126](0126-direct-reply-token-binding.md) | Direct reply-token binding | Accepted |
