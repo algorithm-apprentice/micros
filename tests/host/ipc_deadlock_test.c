@@ -376,7 +376,6 @@ static bool direct_block_send(size_t sender_index, size_t destination_index)
         || sender->ready_linked
         || sender->ipc_queue_kind != MICROS_IPC_QUEUE_NONE
         || !thread_handle_is_zero(destination->sender_head)
-        || !thread_handle_is_zero(destination->sender_tail)
     ) {
         return false;
     }
@@ -389,7 +388,6 @@ static bool direct_block_send(size_t sender_index, size_t destination_index)
     sender->ipc_outbound_message = message;
     sender->ipc_send_destination = endpoints[destination_index];
     destination->sender_head = primary_threads[sender_index];
-    destination->sender_tail = primary_threads[sender_index];
     return true;
 }
 

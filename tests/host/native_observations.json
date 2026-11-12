@@ -57,16 +57,16 @@
             [["work"],["ipc01/kernel/endpoint/endpoint_codec.c/endpoint_clear_bytes/loop-23","insert","KERNEL_ENDPOINT","CLEARED_BYTE",1,"entry","",[["for ( index = 0 ; index < size ; ++ index ) {",0]],0,0]]
           ],
           "endpoint_clear_endpoint_record": [
-            [["work"],["ipc01/kernel/endpoint/endpoint_codec.c/endpoint_clear_endpoint_record/clear-unit-120","insert","KERNEL_ENDPOINT","CLEAR_UNIT",1,"entry","",[["for ( index = 0 ; index < MICROS_PROCESS_CAPACITY ; ++ index ) {",0]],0,0]],
-            [["work"],["ipc01/kernel/endpoint/endpoint_codec.c/endpoint_clear_endpoint_record/clear-bytes-120","insert","KERNEL_ENDPOINT","CLEARED_BYTE",8,"entry","",[["for ( index = 0 ; index < MICROS_PROCESS_CAPACITY ; ++ index ) {",0]],0,0]],
-            [["work"],["ipc01/kernel/endpoint/endpoint_codec.c/endpoint_clear_endpoint_record/index-124","wrap","KERNEL_ENDPOINT","INDEX_PROBE",1,"value","index",[["for ( index = 0 ; index < MICROS_PROCESS_CAPACITY ; ++ index ) {",0]],0,1]]
+            [["work"],["ipc01/kernel/endpoint/endpoint_codec.c/endpoint_clear_endpoint_record/clear-unit-104","insert","KERNEL_ENDPOINT","CLEAR_UNIT",1,"entry","",[["for ( index = 0 ; index < MICROS_PROCESS_CAPACITY ; ++ index ) {",0]],0,0]],
+            [["work"],["ipc01/kernel/endpoint/endpoint_codec.c/endpoint_clear_endpoint_record/clear-bytes-104","insert","KERNEL_ENDPOINT","CLEARED_BYTE",8,"entry","",[["for ( index = 0 ; index < MICROS_PROCESS_CAPACITY ; ++ index ) {",0]],0,0]],
+            [["work"],["ipc01/kernel/endpoint/endpoint_codec.c/endpoint_clear_endpoint_record/index-108","wrap","KERNEL_ENDPOINT","INDEX_PROBE",1,"value","index",[["for ( index = 0 ; index < MICROS_PROCESS_CAPACITY ; ++ index ) {",0]],0,1]]
           ],
           "endpoint_copy_bytes": [
             [["work"],["ipc01/kernel/endpoint/endpoint_codec.c/endpoint_copy_bytes/loop-31","insert","KERNEL_ENDPOINT","COPIED_BYTE",1,"entry","",[["for ( index = 0 ; index < size ; ++ index ) {",0]],0,0]]
           ],
           "endpoint_ipc_state_is_zero": [
-            [["work"],["ipc01/kernel/endpoint/endpoint_codec.c/endpoint_ipc_state_is_zero/loop-99","insert","KERNEL_ENDPOINT","RECORD_VISIT",1,"entry","",[["for ( index = 0 ; index < MICROS_PROCESS_CAPACITY ; ++ index ) {",0]],0,0]],
-            [["work"],["ipc01/kernel/endpoint/endpoint_codec.c/endpoint_ipc_state_is_zero/index-105","wrap","KERNEL_ENDPOINT","INDEX_PROBE",1,"value","index",[["for ( index = 0 ; index < MICROS_PROCESS_CAPACITY ; ++ index ) {",0]],0,1]]
+            [["work"],["ipc01/kernel/endpoint/endpoint_codec.c/endpoint_ipc_state_is_zero/loop-83","insert","KERNEL_ENDPOINT","RECORD_VISIT",1,"entry","",[["for ( index = 0 ; index < MICROS_PROCESS_CAPACITY ; ++ index ) {",0]],0,0]],
+            [["work"],["ipc01/kernel/endpoint/endpoint_codec.c/endpoint_ipc_state_is_zero/index-89","wrap","KERNEL_ENDPOINT","INDEX_PROBE",1,"value","index",[["for ( index = 0 ; index < MICROS_PROCESS_CAPACITY ; ++ index ) {",0]],0,1]]
           ],
           "endpoint_names_equal": [
             [["work"],["ipc01/kernel/endpoint/endpoint_codec.c/endpoint_names_equal/loop-16","insert","KERNEL_ENDPOINT","COMPARISON",1,"entry","",[["for ( index = 0 ; index < MICROS_PRIVILEGE_PROFILE_NAME_SIZE ; ++ index ) {",0]],0,0]]
@@ -80,8 +80,8 @@
           ],
           "endpoint_queue_pair_is_shallow_valid": [],
           "endpoint_record_is_zero": [
-            [["work"],["ipc01/kernel/endpoint/endpoint_codec.c/endpoint_record_is_zero/loop-127","insert","KERNEL_ENDPOINT","RECORD_VISIT",1,"entry","",[["for ( index = 0 ; index < MICROS_PROCESS_CAPACITY ; ++ index ) {",0]],0,0]],
-            [["work"],["ipc01/kernel/endpoint/endpoint_codec.c/endpoint_record_is_zero/index-133","wrap","KERNEL_ENDPOINT","INDEX_PROBE",1,"value","index",[["for ( index = 0 ; index < MICROS_PROCESS_CAPACITY ; ++ index ) {",0]],0,1]]
+            [["work"],["ipc01/kernel/endpoint/endpoint_codec.c/endpoint_record_is_zero/loop-111","insert","KERNEL_ENDPOINT","RECORD_VISIT",1,"entry","",[["for ( index = 0 ; index < MICROS_PROCESS_CAPACITY ; ++ index ) {",0]],0,0]],
+            [["work"],["ipc01/kernel/endpoint/endpoint_codec.c/endpoint_record_is_zero/index-117","wrap","KERNEL_ENDPOINT","INDEX_PROBE",1,"value","index",[["for ( index = 0 ; index < MICROS_PROCESS_CAPACITY ; ++ index ) {",0]],0,1]]
           ],
           "endpoint_storage_is_zero": [
             [["work"],["ipc01/kernel/endpoint/endpoint_codec.c/endpoint_storage_is_zero/loop-34","insert","KERNEL_ENDPOINT","COMPARISON",1,"entry","",[["for ( index = 0 ; index < sizeof ( * registry ) ; ++ index ) {",0]],0,0]]
@@ -224,7 +224,7 @@
           ],
           "endpoint_preflight_record": [],
           "endpoint_queue_is_valid": [
-            [["work"],["ipc01/kernel/endpoint/endpoint_queue_validation.c/endpoint_queue_is_valid/loop-37","insert","KERNEL_ENDPOINT","RECORD_VISIT",1,"entry","",[["for ( steps = 0 ; steps < MICROS_THREAD_CAPACITY ; ++ steps ) {",0]],0,0]]
+            [["work"],["ipc01/kernel/endpoint/endpoint_queue_validation.c/endpoint_queue_is_valid/loop-41","insert","KERNEL_ENDPOINT","RECORD_VISIT",1,"entry","",[["for ( steps = 0 ; steps < MICROS_THREAD_CAPACITY ; ++ steps ) {",0]],0,0]]
           ],
           "micros_endpoint_queue_member_is_valid": [
             [["work"],["ipc01/kernel/endpoint/endpoint_queue_validation.c/micros_endpoint_queue_member_is_valid/index-168","wrap","KERNEL_ENDPOINT","INDEX_PROBE",1,"value","thread -> owner . slot",[["if ( kind == MICROS_IPC_QUEUE_SENDER ) {",0]],0,1]]
@@ -234,7 +234,7 @@
           ],
           "receiver_queue_state_is_valid": [],
           "selected_queue_is_valid": [
-            [["work"],["ipc01/kernel/endpoint/endpoint_queue_validation.c/selected_queue_is_valid/loop-69","insert","KERNEL_ENDPOINT","RECORD_VISIT",1,"entry","",[["for ( size_t steps = 0 ; steps < MICROS_THREAD_CAPACITY ; ++ steps ) {",0]],0,0]]
+            [["work"],["ipc01/kernel/endpoint/endpoint_queue_validation.c/selected_queue_is_valid/loop-77","insert","KERNEL_ENDPOINT","RECORD_VISIT",1,"entry","",[["for ( size_t steps = 0 ; steps < MICROS_THREAD_CAPACITY ; ++ steps ) {",0]],0,0]]
           ],
           "sender_queue_state_is_valid": [
             [["work"],["ipc01/kernel/endpoint/endpoint_queue_validation.c/sender_queue_state_is_valid/index-10","wrap","KERNEL_ENDPOINT","INDEX_PROBE",1,"value","thread -> owner . slot",[],0,1]]
@@ -313,18 +313,18 @@
           "commit_endpoint_close": [
             [["work"],["ipc01/kernel/ipc/ipc_close.c/commit_endpoint_close/loop-30","insert","KERNEL_IPC","RECORD_VISIT",1,"entry","",[["for ( index = 0 ; index < MICROS_PROCESS_CAPACITY ; ++ index ) {",0]],0,0]],
             [["work"],["ipc01/kernel/ipc/ipc_close.c/commit_endpoint_close/index-40","wrap","KERNEL_IPC","INDEX_PROBE",1,"value","index",[["for ( index = 0 ; index < MICROS_PROCESS_CAPACITY ; ++ index ) {",0]],0,1]],
-            [["work"],["ipc01/kernel/ipc/ipc_close.c/commit_endpoint_close/loop-92","insert","KERNEL_IPC","RECORD_VISIT",1,"entry","",[["for ( index = 0 ; index < MICROS_THREAD_CAPACITY ; ++ index ) {",0]],0,0]],
-            [["work"],["ipc01/kernel/ipc/ipc_close.c/commit_endpoint_close/index-102","wrap","KERNEL_IPC","INDEX_PROBE",1,"value","index",[["for ( index = 0 ; index < MICROS_THREAD_CAPACITY ; ++ index ) {",0]],0,3]],
-            [["work"],["ipc01/kernel/ipc/ipc_close.c/commit_endpoint_close/index-111","wrap","KERNEL_IPC","INDEX_PROBE",1,"value","index",[["for ( index = 0 ; index < MICROS_THREAD_CAPACITY ; ++ index ) {",0]],1,3]],
-            [["work"],["ipc01/kernel/ipc/ipc_close.c/commit_endpoint_close/index-132","wrap","KERNEL_IPC","INDEX_PROBE",1,"value","index",[["for ( index = 0 ; index < MICROS_THREAD_CAPACITY ; ++ index ) {",0]],2,3]],
-            [["work"],["ipc01/kernel/ipc/ipc_close.c/commit_endpoint_close/loop-161","insert","KERNEL_IPC","RECORD_VISIT",1,"entry","",[["for ( index = 0 ; index < MICROS_PROCESS_CAPACITY ; ++ index ) {",1]],0,0]],
-            [["work"],["ipc01/kernel/ipc/ipc_close.c/commit_endpoint_close/index-171","wrap","KERNEL_IPC","INDEX_PROBE",1,"value","index",[["for ( index = 0 ; index < MICROS_PROCESS_CAPACITY ; ++ index ) {",1]],0,1]],
-            [["work"],["ipc01/kernel/ipc/ipc_close.c/commit_endpoint_close/index-185","wrap","KERNEL_IPC","INDEX_PROBE",1,"value","plan -> owner . slot",[["for ( index = 0 ; index < MICROS_PROCESS_CAPACITY ; ++ index ) {",1]],0,1]],
-            [["work"],["ipc01/kernel/ipc/ipc_close.c/commit_endpoint_close/index-199","wrap","KERNEL_IPC","INDEX_PROBE",1,"value","plan -> owner . slot",[],1,3]],
-            [["work"],["ipc01/kernel/ipc/ipc_close.c/commit_endpoint_close/index-214","wrap","KERNEL_IPC","INDEX_PROBE",1,"value","plan -> owner . slot",[],2,3]],
-            [["work"],["ipc01/kernel/ipc/ipc_close.c/commit_endpoint_close/loop-239","insert","KERNEL_IPC","RECORD_VISIT",1,"entry","",[["for ( index = 0 ; index < MICROS_PROCESS_CAPACITY ; ++ index ) {",2]],0,0]],
-            [["work"],["ipc01/kernel/ipc/ipc_close.c/commit_endpoint_close/index-243","wrap","KERNEL_IPC","INDEX_PROBE",1,"value","plan -> owner . slot",[["for ( index = 0 ; index < MICROS_PROCESS_CAPACITY ; ++ index ) {",2]],0,1]],
-            [["work"],["ipc01/kernel/ipc/ipc_close.c/commit_endpoint_close/index-252","wrap","KERNEL_IPC","INDEX_PROBE",1,"value","index",[["for ( index = 0 ; index < MICROS_PROCESS_CAPACITY ; ++ index ) {",2]],0,1]]
+            [["work"],["ipc01/kernel/ipc/ipc_close.c/commit_endpoint_close/loop-89","insert","KERNEL_IPC","RECORD_VISIT",1,"entry","",[["for ( index = 0 ; index < MICROS_THREAD_CAPACITY ; ++ index ) {",0]],0,0]],
+            [["work"],["ipc01/kernel/ipc/ipc_close.c/commit_endpoint_close/index-99","wrap","KERNEL_IPC","INDEX_PROBE",1,"value","index",[["for ( index = 0 ; index < MICROS_THREAD_CAPACITY ; ++ index ) {",0]],0,3]],
+            [["work"],["ipc01/kernel/ipc/ipc_close.c/commit_endpoint_close/index-108","wrap","KERNEL_IPC","INDEX_PROBE",1,"value","index",[["for ( index = 0 ; index < MICROS_THREAD_CAPACITY ; ++ index ) {",0]],1,3]],
+            [["work"],["ipc01/kernel/ipc/ipc_close.c/commit_endpoint_close/index-129","wrap","KERNEL_IPC","INDEX_PROBE",1,"value","index",[["for ( index = 0 ; index < MICROS_THREAD_CAPACITY ; ++ index ) {",0]],2,3]],
+            [["work"],["ipc01/kernel/ipc/ipc_close.c/commit_endpoint_close/loop-158","insert","KERNEL_IPC","RECORD_VISIT",1,"entry","",[["for ( index = 0 ; index < MICROS_PROCESS_CAPACITY ; ++ index ) {",1]],0,0]],
+            [["work"],["ipc01/kernel/ipc/ipc_close.c/commit_endpoint_close/index-168","wrap","KERNEL_IPC","INDEX_PROBE",1,"value","index",[["for ( index = 0 ; index < MICROS_PROCESS_CAPACITY ; ++ index ) {",1]],0,1]],
+            [["work"],["ipc01/kernel/ipc/ipc_close.c/commit_endpoint_close/index-182","wrap","KERNEL_IPC","INDEX_PROBE",1,"value","plan -> owner . slot",[["for ( index = 0 ; index < MICROS_PROCESS_CAPACITY ; ++ index ) {",1]],0,1]],
+            [["work"],["ipc01/kernel/ipc/ipc_close.c/commit_endpoint_close/index-196","wrap","KERNEL_IPC","INDEX_PROBE",1,"value","plan -> owner . slot",[],1,3]],
+            [["work"],["ipc01/kernel/ipc/ipc_close.c/commit_endpoint_close/index-211","wrap","KERNEL_IPC","INDEX_PROBE",1,"value","plan -> owner . slot",[],2,3]],
+            [["work"],["ipc01/kernel/ipc/ipc_close.c/commit_endpoint_close/loop-236","insert","KERNEL_IPC","RECORD_VISIT",1,"entry","",[["for ( index = 0 ; index < MICROS_PROCESS_CAPACITY ; ++ index ) {",2]],0,0]],
+            [["work"],["ipc01/kernel/ipc/ipc_close.c/commit_endpoint_close/index-240","wrap","KERNEL_IPC","INDEX_PROBE",1,"value","plan -> owner . slot",[["for ( index = 0 ; index < MICROS_PROCESS_CAPACITY ; ++ index ) {",2]],0,1]],
+            [["work"],["ipc01/kernel/ipc/ipc_close.c/commit_endpoint_close/index-249","wrap","KERNEL_IPC","INDEX_PROBE",1,"value","index",[["for ( index = 0 ; index < MICROS_PROCESS_CAPACITY ; ++ index ) {",2]],0,1]]
           ],
           "micros_ipc_endpoint_close": [],
           "preflight_close_notifications": [
@@ -336,19 +336,18 @@
             [["work"],["ipc01/kernel/ipc/ipc_close.c/preflight_close_notifications/index-167","wrap","KERNEL_IPC","INDEX_PROBE",1,"value","plan -> owner . slot",[["for ( index = 0 ; index < MICROS_PROCESS_CAPACITY ; ++ index ) {",0]],2,3]]
           ],
           "preflight_close_queue": [
-            [["work"],["ipc01/kernel/ipc/ipc_close.c/preflight_close_queue/loop-74","insert","KERNEL_IPC","LINK_TRAVERSE",1,"entry","",[["for ( steps = 0 ; steps < MICROS_THREAD_CAPACITY ; ++ steps ) {",0]],0,0]]
+            [["work"],["ipc01/kernel/ipc/ipc_close.c/preflight_close_queue/loop-78","insert","KERNEL_IPC","LINK_TRAVERSE",1,"entry","",[["for ( steps = 0 ; steps < MICROS_THREAD_CAPACITY ; ++ steps ) {",0]],0,0]]
           ],
           "preflight_close_queues": [
             [["work"],["ipc01/kernel/ipc/ipc_close.c/preflight_close_queues/loop-22","insert","KERNEL_IPC","RECORD_VISIT",1,"entry","",[["for ( index = 0 ; index < MICROS_THREAD_CAPACITY ; ++ index ) {",0]],0,0]],
             [["work"],["ipc01/kernel/ipc/ipc_close.c/preflight_close_queues/loop-44","insert","KERNEL_IPC","RECORD_VISIT",1,"entry","",[["for ( index = 0 ; index < MICROS_PROCESS_CAPACITY ; ++ index ) {",0]],0,0]],
-            [["work"],["ipc01/kernel/ipc/ipc_close.c/preflight_close_queues/index-61","wrap","KERNEL_IPC","INDEX_PROBE",1,"value","index",[["for ( index = 0 ; index < MICROS_PROCESS_CAPACITY ; ++ index ) {",0]],0,6]],
-            [["work"],["ipc01/kernel/ipc/ipc_close.c/preflight_close_queues/index-68","wrap","KERNEL_IPC","INDEX_PROBE",1,"value","index",[["for ( index = 0 ; index < MICROS_PROCESS_CAPACITY ; ++ index ) {",0]],1,6]],
-            [["work"],["ipc01/kernel/ipc/ipc_close.c/preflight_close_queues/index-77","wrap","KERNEL_IPC","INDEX_PROBE",1,"value","index",[["for ( index = 0 ; index < MICROS_PROCESS_CAPACITY ; ++ index ) {",0]],2,6]],
-            [["work"],["ipc01/kernel/ipc/ipc_close.c/preflight_close_queues/index-111","wrap","KERNEL_IPC","INDEX_PROBE",1,"value","index",[["for ( index = 0 ; index < MICROS_PROCESS_CAPACITY ; ++ index ) {",0]],3,6]],
-            [["work"],["ipc01/kernel/ipc/ipc_close.c/preflight_close_queues/index-118","wrap","KERNEL_IPC","INDEX_PROBE",1,"value","index",[["for ( index = 0 ; index < MICROS_PROCESS_CAPACITY ; ++ index ) {",0]],4,6]],
-            [["work"],["ipc01/kernel/ipc/ipc_close.c/preflight_close_queues/index-127","wrap","KERNEL_IPC","INDEX_PROBE",1,"value","index",[["for ( index = 0 ; index < MICROS_PROCESS_CAPACITY ; ++ index ) {",0]],5,6]],
-            [["work"],["ipc01/kernel/ipc/ipc_close.c/preflight_close_queues/loop-163","insert","KERNEL_IPC","RECORD_VISIT",1,"entry","",[["for ( index = 0 ; index < MICROS_THREAD_CAPACITY ; ++ index ) {",1]],0,0]],
-            [["work"],["ipc01/kernel/ipc/ipc_close.c/preflight_close_queues/index-169","wrap","KERNEL_IPC","INDEX_PROBE",1,"value","index",[["for ( index = 0 ; index < MICROS_THREAD_CAPACITY ; ++ index ) {",1]],0,2]]
+            [["work"],["ipc01/kernel/ipc/ipc_close.c/preflight_close_queues/index-61","wrap","KERNEL_IPC","INDEX_PROBE",1,"value","index",[["for ( index = 0 ; index < MICROS_PROCESS_CAPACITY ; ++ index ) {",0]],0,5]],
+            [["work"],["ipc01/kernel/ipc/ipc_close.c/preflight_close_queues/index-68","wrap","KERNEL_IPC","INDEX_PROBE",1,"value","index",[["for ( index = 0 ; index < MICROS_PROCESS_CAPACITY ; ++ index ) {",0]],1,5]],
+            [["work"],["ipc01/kernel/ipc/ipc_close.c/preflight_close_queues/index-112","wrap","KERNEL_IPC","INDEX_PROBE",1,"value","index",[["for ( index = 0 ; index < MICROS_PROCESS_CAPACITY ; ++ index ) {",0]],2,5]],
+            [["work"],["ipc01/kernel/ipc/ipc_close.c/preflight_close_queues/index-119","wrap","KERNEL_IPC","INDEX_PROBE",1,"value","index",[["for ( index = 0 ; index < MICROS_PROCESS_CAPACITY ; ++ index ) {",0]],3,5]],
+            [["work"],["ipc01/kernel/ipc/ipc_close.c/preflight_close_queues/index-128","wrap","KERNEL_IPC","INDEX_PROBE",1,"value","index",[["for ( index = 0 ; index < MICROS_PROCESS_CAPACITY ; ++ index ) {",0]],4,5]],
+            [["work"],["ipc01/kernel/ipc/ipc_close.c/preflight_close_queues/loop-164","insert","KERNEL_IPC","RECORD_VISIT",1,"entry","",[["for ( index = 0 ; index < MICROS_THREAD_CAPACITY ; ++ index ) {",1]],0,0]],
+            [["work"],["ipc01/kernel/ipc/ipc_close.c/preflight_close_queues/index-170","wrap","KERNEL_IPC","INDEX_PROBE",1,"value","index",[["for ( index = 0 ; index < MICROS_THREAD_CAPACITY ; ++ index ) {",1]],0,2]]
           ],
           "preflight_close_threads": [
             [["work"],["ipc01/kernel/ipc/ipc_close.c/preflight_close_threads/loop-21","insert","KERNEL_IPC","RECORD_VISIT",1,"entry","",[["for ( index = 0 ; index < MICROS_THREAD_CAPACITY ; ++ index ) {",0]],0,0]],
@@ -455,11 +454,13 @@
         "kernel/ipc/ipc_queue.c": {
           "ipc_append_thread": [],
           "ipc_prepare_queue_append": [
-            [["work"],["ipc01/kernel/ipc/ipc_queue.c/ipc_prepare_queue_append/index-77","wrap","KERNEL_IPC","INDEX_PROBE",1,"value","handle . slot",[],0,1]]
+            [["work"],["ipc01/kernel/ipc/ipc_queue.c/ipc_prepare_queue_append/index-88","wrap","KERNEL_IPC","INDEX_PROBE",1,"value","handle . slot",[["if ( kind != MICROS_IPC_QUEUE_SENDER || first == NULL ) {",0]],0,1]],
+            [["work"],["ipc01/kernel/ipc/ipc_queue.c/ipc_prepare_queue_append/loop-112","insert","KERNEL_IPC","LINK_TRAVERSE",1,"entry","",[["for ( size_t steps = 0 ; steps < MICROS_THREAD_CAPACITY ; ++ steps ) {",0]],0,0]],
+            [["work"],["ipc01/kernel/ipc/ipc_queue.c/ipc_prepare_queue_append/index-166","wrap","KERNEL_IPC","INDEX_PROBE",1,"value","handle . slot",[["for ( size_t steps = 0 ; steps < MICROS_THREAD_CAPACITY ; ++ steps ) {",0],["if ( ipc_thread_handle_is_zero ( thread -> ipc_next ) ) {",0]],0,1]]
           ],
           "ipc_select_queue": [
             [["work"],["ipc01/kernel/ipc/ipc_queue.c/ipc_select_queue/queue-search","insert","KERNEL_IPC","RANGE_VISIT",1,"entry","",[],0,0]],
-            [["work"],["ipc01/kernel/ipc/ipc_queue.c/ipc_select_queue/loop-124","insert","KERNEL_IPC","LINK_TRAVERSE",1,"entry","",[["for ( size_t steps = 0 ; steps < MICROS_THREAD_CAPACITY ; ++ steps ) {",0]],0,0]]
+            [["work"],["ipc01/kernel/ipc/ipc_queue.c/ipc_select_queue/loop-128","insert","KERNEL_IPC","LINK_TRAVERSE",1,"entry","",[["for ( size_t steps = 0 ; steps < MICROS_THREAD_CAPACITY ; ++ steps ) {",0]],0,0]]
           ],
           "ipc_unlink_thread": [
             [["work"],["ipc01/kernel/ipc/ipc_queue.c/ipc_unlink_thread/index-9","wrap","KERNEL_IPC","INDEX_PROBE",1,"value","matched . slot",[],0,1]],
@@ -3502,7 +3503,7 @@
           "receiver_matches_pending_notification": [],
           "receiver_queue_state_is_valid": [],
           "selected_queue_is_valid": [
-            [["aggregate","context"],["ipc01-shared-mem04/ipc01/kernel/endpoint/endpoint_queue_validation.c/selected_queue_is_valid/loop-69","insert","KERNEL_ENDPOINT","INDEX_PROBE",1,"entry","",[["for ( size_t steps = 0 ; steps < MICROS_THREAD_CAPACITY ; ++ steps ) {",0]],0,0]]
+            [["aggregate","context"],["ipc01-shared-mem04/ipc01/kernel/endpoint/endpoint_queue_validation.c/selected_queue_is_valid/loop-77","insert","KERNEL_ENDPOINT","INDEX_PROBE",1,"entry","",[["for ( size_t steps = 0 ; steps < MICROS_THREAD_CAPACITY ; ++ steps ) {",0]],0,0]]
           ],
           "sender_queue_state_is_valid": []
         },
@@ -5072,7 +5073,7 @@
           ],
           "receiver_queue_state_is_valid": [],
           "selected_queue_is_valid": [
-            [["aggregate","context"],["ipc01-shared-mem05/ipc01/kernel/endpoint/endpoint_queue_validation.c/selected_queue_is_valid/loop-69","insert","KERNEL_ENDPOINT","INDEX_PROBE",1,"entry","",[["for ( size_t steps = 0 ; steps < MICROS_THREAD_CAPACITY ; ++ steps ) {",0]],0,0]]
+            [["aggregate","context"],["ipc01-shared-mem05/ipc01/kernel/endpoint/endpoint_queue_validation.c/selected_queue_is_valid/loop-77","insert","KERNEL_ENDPOINT","INDEX_PROBE",1,"entry","",[["for ( size_t steps = 0 ; steps < MICROS_THREAD_CAPACITY ; ++ steps ) {",0]],0,0]]
           ],
           "sender_queue_state_is_valid": [
             [["aggregate","context"],["mem05-current-bdd8d159871ae16fda1e","wrap","KERNEL_ENDPOINT","RECORD_VISIT",1,"value","thread -> owner . slot",[],0,1]]
@@ -8933,7 +8934,7 @@
           "aliases": [
             ["endpoints",["["]]
           ],
-          "calls": ["endpoint_ipc_state_is_zero","endpoint_pending_notification_state_is_shallow_valid","endpoint_queue_pair_is_shallow_valid","endpoint_record_is_zero","micros_endpoint_pack"],
+          "calls": ["endpoint_ipc_state_is_zero","endpoint_pending_notification_state_is_shallow_valid","endpoint_queue_pair_is_shallow_valid","endpoint_record_is_zero","endpoint_thread_handle_is_zero","micros_endpoint_pack"],
           "directives": [],
           "guards": [],
           "loops": [
@@ -9419,12 +9420,10 @@
             ["endpoints [ index ]",[["for ( index = 0 ; index < MICROS_PROCESS_CAPACITY ; ++ index ) {",0]]],
             ["endpoints [ index ]",[["for ( index = 0 ; index < MICROS_PROCESS_CAPACITY ; ++ index ) {",0]]],
             ["endpoints [ index ]",[["for ( index = 0 ; index < MICROS_PROCESS_CAPACITY ; ++ index ) {",0]]],
-            ["endpoints [ index ]",[["for ( index = 0 ; index < MICROS_PROCESS_CAPACITY ; ++ index ) {",0]]],
             ["threads [ index ]",[["for ( index = 0 ; index < MICROS_THREAD_CAPACITY ; ++ index ) {",1]]],
             ["seen [ index ]",[["for ( index = 0 ; index < MICROS_THREAD_CAPACITY ; ++ index ) {",1]]]
           ],
           "aliases": [
-            ["endpoints",["["]],
             ["endpoints",["["]],
             ["endpoints",["["]],
             ["endpoints",["["]],
@@ -9975,15 +9974,19 @@
         },
         "ipc_prepare_queue_append": {
           "accesses": [
-            ["threads [ handle . slot ]",[]]
+            ["threads [ handle . slot ]",[["if ( kind != MICROS_IPC_QUEUE_SENDER || first == NULL ) {",0]]],
+            ["threads [ handle . slot ]",[["for ( size_t steps = 0 ; steps < MICROS_THREAD_CAPACITY ; ++ steps ) {",0],["if ( ipc_thread_handle_is_zero ( thread -> ipc_next ) ) {",0]]]
           ],
           "aliases": [
+            ["threads",["["]],
             ["threads",["["]]
           ],
-          "calls": ["preflight_queue_endpoints"],
+          "calls": ["ipc_thread_handle_is_zero","micros_endpoint_queue_member_is_valid","preflight_queue_endpoints"],
           "directives": [],
           "guards": [],
-          "loops": [],
+          "loops": [
+            ["for ( size_t steps = 0 ; steps < MICROS_THREAD_CAPACITY ; ++ steps ) {",[]]
+          ],
           "signature": "enum micros_ipc_error ipc_prepare_queue_append ( const struct micros_endpoint_registry * registry , struct micros_kernel_objects * objects , const struct micros_endpoint_selection * destination , enum micros_ipc_queue_kind kind , struct micros_thread * * tail )",
           "storage": []
         },

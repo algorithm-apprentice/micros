@@ -332,8 +332,6 @@ static bool reject_call_corruption_and_null_registry(
             MICROS_THREAD_CAPACITY - 1,
             UINT32_C(0x55aa55aa),
         };
-    fixture->registry.endpoints[CALL_PROCESS_SERVER].sender_tail =
-        fixture->registry.endpoints[CALL_PROCESS_SERVER].sender_head;
     EXPECT_TRUE(ipc_call_test_expect_call_failure_unchanged(
         fixture,
         MICROS_IPC_ERROR_INVARIANT,
@@ -468,7 +466,6 @@ bool test_staged_call_token_binding_is_validated(struct ipc_call_test_context *f
     caller->ipc_outbound_message = receiver->ipc_inbound_message;
     caller->ipc_send_destination = fixture->endpoints[CALL_PROCESS_SERVER];
     server->sender_head = fixture->primary_threads[CALL_PROCESS_CLIENT];
-    server->sender_tail = fixture->primary_threads[CALL_PROCESS_CLIENT];
     EXPECT_TRUE(
         micros_endpoint_registry_validate_objects(
             &fixture->registry,

@@ -321,12 +321,6 @@ static bool reply_and_consume_only_specific_sender(
             == fixture->primary_threads[
                 REPLY_PROCESS_NO_REPLY_SERVER
             ].generation
-        && scenario->server_endpoint->sender_tail.slot
-            == fixture->primary_threads[REPLY_PROCESS_NO_REPLY_SERVER].slot
-        && scenario->server_endpoint->sender_tail.generation
-            == fixture->primary_threads[
-                REPLY_PROCESS_NO_REPLY_SERVER
-            ].generation
         && memcmp(&scenario->reply, &scenario->reply_snapshot, sizeof(scenario->reply)) == 0
         && micros_endpoint_registry_validate_objects(
             &fixture->registry,

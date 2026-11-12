@@ -583,9 +583,6 @@ bool ipc_reply_test_make_single_queued_sender_current(
         destination->sender_head.slot != sender_handle.slot
         || destination->sender_head.generation
             != sender_handle.generation
-        || destination->sender_tail.slot != sender_handle.slot
-        || destination->sender_tail.generation
-            != sender_handle.generation
         || sender->runtime_flags != MICROS_THREAD_RTS_IPC_SEND
         || sender->ipc_queue_kind != MICROS_IPC_QUEUE_SENDER
         || !ipc_reply_test_thread_handle_is_zero(sender->ipc_next)
@@ -594,8 +591,6 @@ bool ipc_reply_test_make_single_queued_sender_current(
     }
     destination->sender_head.slot = 0;
     destination->sender_head.generation = 0;
-    destination->sender_tail.slot = 0;
-    destination->sender_tail.generation = 0;
     sender->runtime_flags = MICROS_THREAD_RTS_INACTIVE;
     sender->ipc_queue_kind = MICROS_IPC_QUEUE_NONE;
     memset(
@@ -633,7 +628,6 @@ bool ipc_reply_test_make_single_queued_sender_current(
     sender->ipc_outbound_message = outbound;
     sender->ipc_send_destination = send_destination;
     destination->sender_head = sender_handle;
-    destination->sender_tail = sender_handle;
     return micros_endpoint_registry_validate_objects(
         &fixture->registry,
         &fixture->objects

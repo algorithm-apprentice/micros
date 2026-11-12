@@ -167,6 +167,11 @@ until IPC04; ordinary append does not acquire a new all-queue reachability
 certificate. Unconsumed cross-queue reachability/duplicate-membership
 invariants remain complete-diagnostic obligations.
 
+The [IPC04 sender contract](head-only-ipc-sender-queues.md) now replaces the
+sender-tail-specific portion: append walks the sender head chain once, and
+sender selection/diagnosis terminate at exact null. The receiver tail and
+all other retained-splice and consumed-scope obligations above remain.
+
 The fixed `preflight_close_queue` currently checks null only before each of
 its `T` iterations and then returns `INVARIANT` unconditionally. Its checked
 replacement must accept null immediately after the final permitted member.

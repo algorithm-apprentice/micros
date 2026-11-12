@@ -63,8 +63,8 @@ operation's work bound or the future B13 stack.
 The next preferred runtime outcome is **IPC04**, whose IPC01 predecessor is
 merged. Its [head-only sender contract](../architecture/head-only-ipc-sender-queues.md)
 and [ADR-0127](../adr/0127-head-only-ipc-sender-queues.md) have clean independent
-design review and are Accepted. Implementation remains pending the separate
-design merge. The design does not close B04-F006.
+design review and are Accepted, separately merged as #256. Implementation is
+in progress. The design does not close B04-F006.
 
 Validation simplification #248 follows separate design #247 / ADR-0123.
 It changes no runtime finding, node or edge. Current contracts replace the
@@ -234,7 +234,7 @@ blocking queue.
 | `IPC01` | Runtime correction | `B03-F006`, `B04-F001`, `B04-F002` | `OBJ01`, `OBJ02`, `MEM04` | Independently reviewed implementation #251 follows the [selected IPC contract](../architecture/selected-ipc-validation.md). | Actual native and same-guest zero-audit/translation evidence, complete diagnostics, full current acceptance and independent review passed. |
 | `IPC02` | Runtime correction | `B04-F003` | `IPC01` | Independently reviewed implementation #253 follows the [linear projection contract](../architecture/linear-ipc-deadlock.md). | Actual linear hop/index/bitmap work, complete portable/PM index lifetime, explicit cold repair, current layout/stack and full acceptance passed. |
 | `IPC03` | Runtime correction | `B04-F004` | `IPC01` | Independently reviewed implementation #255 follows the [direct reply binding contract](../architecture/direct-reply-token-binding.md). | Zero token-table visits, exact phase/receiver lifetime, actual return/close authority, independent models, current layout/stack and full acceptance passed. |
-| `IPC04` | Runtime correction | `B04-F006` | `IPC01` | [Accepted head-only sender contract](../architecture/head-only-ipc-sender-queues.md): remove the persistent sender tail and restore checked linear append, retaining receiver queues. | Actual append/receive/close link work, ordered membership, failure preservation and complete current acceptance; implementation remains pending separate design merge. |
+| `IPC04` | Runtime correction | `B04-F006` | `IPC01` | [Accepted head-only sender contract](../architecture/head-only-ipc-sender-queues.md): remove the persistent sender tail and restore checked linear append, retaining receiver queues; implementation follows merged design #256. | Actual append/receive/close link work, ordered membership, failure preservation and complete current acceptance. |
 | `GRANT01` | Runtime correction | `B05-F001`, `B05-F002` | `IPC01` | Move complete grant/runtime audits off create/revoke/copy syscalls and retain one selected relation/range plan. | Exact Vgrant/Vep/TTY call counts and syscall failure atomicity. |
 | `GRANT02` | Runtime correction | `B05-F003`, `B05-F004` | `GRANT01`, `IPC03` | Use the MINIX free-list allocation family and endpoint-owned cancellation links instead of capacity scans. | Allocation/cancellation probe counts, reuse, stale identity, and close traces. |
 | `GRANT03` | Runtime correction | `B05-F005` | `GRANT01`, `COPY01`, `MEM04` | Plan translated spans once and move word/block runs without byte-at-a-time commits. | Cross-page aligned/unaligned transfer counts, faults, overlap policy, and atomic publication. |

@@ -220,7 +220,7 @@ static bool process_relationships_are_canonical(
                     objects,
                     endpoint,
                     endpoint->sender_head,
-                    endpoint->sender_tail,
+                    (struct micros_thread_handle){0, 0},
                     MICROS_IPC_QUEUE_SENDER,
                     queued_threads
                 )

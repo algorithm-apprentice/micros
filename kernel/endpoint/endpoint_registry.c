@@ -246,10 +246,9 @@ static bool endpoint_records_are_canonical(
                     == MICROS_ENDPOINT_STATE_SOURCE_ONLY
             )
             && (
-                !endpoint_queue_pair_is_shallow_valid(
-                    endpoint->sender_head,
-                    endpoint->sender_tail
-                )
+                (!endpoint_thread_handle_is_zero(endpoint->sender_head)
+                    && (endpoint->sender_head.slot >= MICROS_THREAD_CAPACITY
+                        || endpoint->sender_head.generation == 0))
                 || !endpoint_queue_pair_is_shallow_valid(
                     endpoint->receiver_head,
                     endpoint->receiver_tail

@@ -65,7 +65,7 @@ void ipc_publish_sender_wait(
     thread->ipc_reply_callee = reply_token == 0 ? 0 : destination->record->value;
     thread->ipc_reply_phase = reply_token == 0 ? MICROS_IPC_REPLY_PHASE_NONE : MICROS_IPC_REPLY_PHASE_QUEUED;
     thread->ipc_request_receiver = (struct micros_thread_handle){0, 0};
-    ipc_append_thread(sender->handle, tail, &target->sender_head, &target->sender_tail);
+    ipc_append_thread(sender->handle, tail, &target->sender_head, NULL);
 }
 
 enum micros_ipc_error ipc_deliver_selected_sender(
@@ -280,7 +280,7 @@ enum micros_ipc_error ipc_deliver_selected_receive(
         }
         ipc_unlink_thread(
             objects, selection->sender.previous, selection->sender.handle,
-            &endpoint->sender_head, &endpoint->sender_tail
+            &endpoint->sender_head, NULL
         );
         ipc_clear_delivered_sender(sender);
         ipc_stage_delivery(selection->receiver.thread, selection->receive_buffer, &message);

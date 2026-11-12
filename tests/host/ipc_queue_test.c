@@ -199,7 +199,6 @@ static void construct_valid_queues(void)
     second_sender->ipc_outbound_message.payload[0] = 2;
 
     sender_queue->sender_head = threads[0];
-    sender_queue->sender_tail = threads[1];
 
     receiver->runtime_flags = MICROS_THREAD_RTS_IPC_RECEIVE;
     receiver->ipc_queue_kind = MICROS_IPC_QUEUE_RECEIVER;
@@ -307,8 +306,8 @@ static bool test_queue_validator_rejects_corruption(void)
     } while (false)
 
     EXPECT_QUEUE_CORRUPTION(
-        registry.endpoints[processes[2].slot].sender_tail =
-            threads[0]
+        objects.threads[threads[0].slot].ipc_next =
+            ((struct micros_thread_handle){0, 0})
     );
     EXPECT_QUEUE_CORRUPTION(
         objects.threads[threads[1].slot].ipc_next = threads[0]

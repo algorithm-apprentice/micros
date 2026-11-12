@@ -224,7 +224,7 @@ static enum micros_ipc_error preflight_close_queue(
     size_t steps;
 
     if (ipc_thread_handle_is_zero(head)) {
-        return ipc_thread_handle_is_zero(tail)
+        return kind == MICROS_IPC_QUEUE_SENDER || ipc_thread_handle_is_zero(tail)
             ? MICROS_IPC_OK : MICROS_IPC_ERROR_INVARIANT;
     }
     if (
@@ -248,7 +248,9 @@ static enum micros_ipc_error preflight_close_queue(
             return MICROS_IPC_ERROR_INVARIANT;
         }
         seen[current.slot] = true;
-        if (ipc_thread_handles_equal(current, tail)) {
+        if (kind == MICROS_IPC_QUEUE_SENDER
+            ? ipc_thread_handle_is_zero(thread->ipc_next)
+            : ipc_thread_handles_equal(current, tail)) {
             return ipc_thread_handle_is_zero(thread->ipc_next)
                 ? MICROS_IPC_OK : MICROS_IPC_ERROR_INVARIANT;
         }
@@ -277,7 +279,7 @@ static enum micros_ipc_error preflight_close_queues(
             objects,
             &registry->endpoints[index],
             registry->endpoints[index].sender_head,
-            registry->endpoints[index].sender_tail,
+            (struct micros_thread_handle){0, 0},
             MICROS_IPC_QUEUE_SENDER,
             seen
         );
@@ -426,7 +428,9 @@ static void commit_close_queue(
             (struct micros_thread_handle){0, 0};
     }
     *head = retained_head;
-    *tail = retained_tail;
+    if (tail != NULL) {
+        *tail = retained_tail;
+    }
 }
 
 static void clear_thread_ipc_state_for_close(
@@ -474,7 +478,7 @@ static void commit_endpoint_close(
             objects,
             plan,
             &record->sender_head,
-            &record->sender_tail
+            NULL
         );
         commit_close_queue(
             objects,

@@ -394,8 +394,9 @@ bool test_source_only_close_cancels_queued_sender(struct ipc_close_test_context 
     EXPECT_TRUE(
         fixture->registry.endpoints[fixture->processes[0].slot].sender_head.slot
             == fixture->primary_threads[1].slot
-        && fixture->registry.endpoints[fixture->processes[0].slot].sender_tail.slot
-            == fixture->primary_threads[1].slot
+        && ipc_close_test_thread_handle_is_zero(
+            fixture->objects.threads[fixture->primary_threads[1].slot].ipc_next
+        )
     );
     fixture->registry.endpoints[fixture->processes[0].slot].state =
         MICROS_ENDPOINT_STATE_SOURCE_ONLY;

@@ -496,7 +496,6 @@ static bool consume_sender_after_every_pending_event(
         && scenario->sender->ready_linked
         && scenario->sender->ipc_queue_kind == MICROS_IPC_QUEUE_NONE
         && ipc_notify_test_thread_handle_is_zero(scenario->destination->sender_head)
-        && ipc_notify_test_thread_handle_is_zero(scenario->destination->sender_tail)
         && micros_endpoint_registry_validate_objects(
             &fixture->registry,
             &fixture->objects

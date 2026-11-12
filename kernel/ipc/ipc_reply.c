@@ -116,7 +116,7 @@ static void publish_reply_receive(
 
         ipc_unlink_thread(
             objects, receive->sender.previous, receive->sender.handle,
-            &endpoint->sender_head, &endpoint->sender_tail
+            &endpoint->sender_head, NULL
         );
         ipc_clear_delivered_sender(sender);
         ipc_stage_delivery(replier, receive->receive_buffer, &selection->incoming_message);
