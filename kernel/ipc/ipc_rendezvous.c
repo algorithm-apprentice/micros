@@ -63,6 +63,8 @@ void ipc_publish_sender_wait(
     thread->ipc_receive_buffer = reply_buffer;
     thread->ipc_reply_token = reply_token;
     thread->ipc_reply_callee = reply_token == 0 ? 0 : destination->record->value;
+    thread->ipc_reply_phase = reply_token == 0 ? MICROS_IPC_REPLY_PHASE_NONE : MICROS_IPC_REPLY_PHASE_QUEUED;
+    thread->ipc_request_receiver = (struct micros_thread_handle){0, 0};
     ipc_append_thread(sender->handle, tail, &target->sender_head, &target->sender_tail);
 }
 
@@ -102,6 +104,8 @@ enum micros_ipc_error ipc_deliver_selected_sender(
         sender->thread->ipc_receive_buffer = reply_buffer;
         sender->thread->ipc_reply_token = reply_token;
         sender->thread->ipc_reply_callee = destination->record->value;
+        sender->thread->ipc_reply_phase = MICROS_IPC_REPLY_PHASE_STAGED;
+        sender->thread->ipc_request_receiver = selected->handle;
     }
     return MICROS_IPC_OK;
 }
@@ -280,6 +284,10 @@ enum micros_ipc_error ipc_deliver_selected_receive(
         );
         ipc_clear_delivered_sender(sender);
         ipc_stage_delivery(selection->receiver.thread, selection->receive_buffer, &message);
+        if (message.reply_token != 0) {
+            sender->ipc_reply_phase = MICROS_IPC_REPLY_PHASE_STAGED;
+            sender->ipc_request_receiver = selection->receiver.handle;
+        }
     }
     return MICROS_IPC_OK;
 }

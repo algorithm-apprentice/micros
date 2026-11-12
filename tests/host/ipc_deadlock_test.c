@@ -1,4 +1,5 @@
 #include "micros/ipc_core.h"
+#include "ipc_fixture_tokens.h"
 
 #include <stdbool.h>
 #include <stdint.h>
@@ -414,6 +415,9 @@ static bool clear_staged_request(
     ) {
         return false;
     }
+    if (!ipc_fixture_return_request(&objects, receiver_handle)) {
+        return false;
+    }
     receiver->ipc_receive_buffer = 0;
     receiver->ipc_delivery_pending = false;
     memset(
@@ -649,7 +653,7 @@ static bool test_receive_and_call_cycles(void)
             (uintptr_t)&request
         )
     );
-    EXPECT_TRUE(registry.last_reply_token == 1);
+    EXPECT_TRUE(registry.last_reply_token == ipc_fixture_next_token(0, primary_threads[0].slot));
     EXPECT_TRUE(
         expect_call_failure_unchanged(
             MICROS_IPC_ERROR_DEADLOCK,
@@ -669,7 +673,7 @@ static bool test_dependency_precedence_and_any_termination(void)
 
     EXPECT_TRUE(setup_fixture(4, 1));
     EXPECT_TRUE(prepare_delivered_call(2, 3, &reply_token));
-    EXPECT_TRUE(reply_token == 1);
+    EXPECT_TRUE(reply_token == ipc_fixture_next_token(0, primary_threads[2].slot));
     EXPECT_IPC_ERROR(
         MICROS_IPC_OK,
         micros_ipc_receive(
@@ -835,7 +839,7 @@ static bool test_source_only_dependency_is_traversed(void)
             UINT64_C(0x55000000)
         ) == MICROS_IPC_OK
         && prepare_delivered_call(2, 3, &reply_token)
-        && reply_token == 1
+        && reply_token == ipc_fixture_next_token(0, primary_threads[2].slot)
     );
     exiting = &objects.threads[primary_threads[2].slot];
     registry.endpoints[processes[2].slot].state =

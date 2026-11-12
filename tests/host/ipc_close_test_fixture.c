@@ -275,6 +275,9 @@ bool ipc_close_test_thread_has_dead_endpoint_result(
             == MICROS_IPC_ERROR_DEAD_ENDPOINT
         && thread->ipc_reply_token == 0
         && thread->ipc_reply_callee == 0
+        && thread->ipc_reply_phase == MICROS_IPC_REPLY_PHASE_NONE
+        && thread->ipc_request_receiver.slot == 0
+        && thread->ipc_request_receiver.generation == 0
     );
 }
 
@@ -302,6 +305,7 @@ bool ipc_close_test_clear_staged_delivery(
     if (
         !thread->ipc_delivery_pending
         || thread->ipc_staged_result != MICROS_IPC_OK
+        || !ipc_fixture_return_request(&fixture->objects, handle)
     ) {
         return false;
     }

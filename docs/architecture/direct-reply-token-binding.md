@@ -4,7 +4,8 @@
 
 This is the independently reviewed IPC03 contract Accepted by
 [ADR-0126](../adr/0126-direct-reply-token-binding.md).
-The implementation remains pending separate design merge.
+Design #254 is separately merged; its paired implementation proceeds from
+that main. The design alone does not close B04-F004.
 The [fixed study](../research/minix-direct-reply-token-binding.md)
 pins current source to IPC02 #253 and the local MINIX reference.
 
@@ -302,6 +303,11 @@ remain a linear reference search. Preserve the IPC 8,192 transitions,
 notification 4,096 steps, close 512 cases, original seeds and operation coverage.
 Update exact opaque numeric expectations only from this contract.
 
+The current native fixtures share `ipc_fixture_tokens.h` for a bounded
+independent numeric expectation and simulated request return. It owns no
+storage and is unavailable to production or the independent reference-model
+owners; their logical token and staged-message decisions remain separate.
+
 Run the existing real IPC/ecall/syscall, selected completion, bootstrap,
 PM and composed spawn/rollback/exit workflows. No new trap, MMU or assembly
 mechanism is introduced; portable state/work and the existing actual-C
@@ -316,3 +322,42 @@ ADR-0123, not another metadata prerequisite or duplicate recertification run.
 Independent design review precedes the design commit. Independent
 implementation review precedes the first permanent implementation commit.
 Only accepted implementation and exact-tree merge close B04-F004.
+
+## Current implementation and evidence owners
+
+The endpoint identity leaf owns checked ticket planning and slot decoding.
+IPC publishes the current phase/receiver relation at its existing queued,
+immediate and combined commits; the selected return retains its caller
+pointer before buffer preparation and publishes `RETURNED` only after copying.
+Object and close clears include both new fields, and PM's stopped EXIT-call
+predicate requires returned authority. No global token table is introduced.
+
+The current native pair contains 98 cases: all 83 predecessor scenarios,
+twelve token-work/state cases and three additional actual-completion cases.
+The tests retain complete diagnosis of an unindexed duplicate request while
+allowing the indexed recipient's read-only plan; selecting the duplicate,
+losing the index or faulting the token-bearing buffer remains distinct.
+The original all-slot chain, mixed IPC, notification and close evidence stays
+in its existing executions.
+
+Token allocation now records zero token-table visits instead of 128, and
+reply paths zero instead of 256. Sparse slots 0/64/127 have the same measured
+allocation work. Independent numeric tests cover every slot and the initial,
+cross-round and terminal high-water boundaries; the reference model retains
+its own sequential numeric search and derives phases/receivers from its own
+logical queued/staged messages.
+
+Actual RV64 layout is 544 bytes per thread, up from 536, and 76,400 bytes for
+the registry, up from 75,376. The phase occupies prior tail padding; total
+registry growth is 1,024 bytes. The fixed OBJ01 reference still compares its
+original 40-byte process/536-byte thread common views. Full-current raw
+preservation remains, and independently expected binding digests include both
+the sole-thread process index and all current request phase/receiver fields.
+No reference JSON or current state is normalized to candidate success.
+
+The finite panic layout admission accepts only the exact current phase enum
+and typed thread additions alongside the existing sole-thread extension.
+Compiler-derived geometry, header-bound cache separation, current linked
+effects and all prior rejection controls remain. Exact final author, stack,
+independent-review and publication evidence belongs to the implementation PR,
+not another validation history in this contract.

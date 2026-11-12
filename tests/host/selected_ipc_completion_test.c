@@ -23,6 +23,9 @@ enum completion_case {
     COMPLETION_MALFORMED,
     COMPLETION_BUFFER_FAULT,
     COMPLETION_DUPLICATE_TOKEN,
+    COMPLETION_UNINDEXED_REQUEST,
+    COMPLETION_MISSING_REQUEST_INDEX,
+    COMPLETION_TOKEN_BUFFER_FAULT,
 };
 
 struct completion_fixture {
@@ -149,7 +152,8 @@ static bool setup_completion(enum completion_case kind, const char *name)
     completion.receiver = fixture->threads[1];
     receiver = &fixture->objects.threads[completion.receiver.slot];
     completion.owner = receiver->owner;
-    completion.offset = kind == COMPLETION_CROSS_PAGE || kind == COMPLETION_BUFFER_FAULT ? 4064 : 0;
+    completion.offset = kind == COMPLETION_CROSS_PAGE || kind == COMPLETION_BUFFER_FAULT
+        || kind == COMPLETION_TOKEN_BUFFER_FAULT ? 4064 : 0;
     if (kind <= COMPLETION_ERROR) {
         REQUIRE(micros_thread_runtime_flags_unset(
             &fixture->objects, completion.receiver, MICROS_THREAD_RTS_INACTIVE
@@ -177,7 +181,7 @@ static bool setup_completion(enum completion_case kind, const char *name)
             REQUIRE(micros_ipc_inject_kernel_notification(
                 &fixture->registry, &fixture->objects, fixture->endpoints[1], 1
             ) == MICROS_IPC_OK);
-        } else if (kind == COMPLETION_TOKEN || kind == COMPLETION_DUPLICATE_TOKEN) {
+        } else if (kind == COMPLETION_TOKEN || kind >= COMPLETION_DUPLICATE_TOKEN) {
             REQUIRE(micros_ipc_call(
                 &fixture->registry, &fixture->objects, fixture->threads[0],
                 fixture->endpoints[1], &message, UINT64_C(0x50000100)
@@ -209,9 +213,12 @@ static bool prepare_completion_mutation(enum completion_case kind)
         ) == MICROS_ENDPOINT_OK);
     } else if (kind == COMPLETION_MALFORMED) {
         receiver->ipc_delivery_pending = false;
-    } else if (kind == COMPLETION_BUFFER_FAULT) {
+    } else if (kind == COMPLETION_BUFFER_FAULT || kind == COMPLETION_TOKEN_BUFFER_FAULT) {
         completion.second_page_fault = true;
-    } else if (kind == COMPLETION_DUPLICATE_TOKEN) {
+    } else if (kind == COMPLETION_MISSING_REQUEST_INDEX) {
+        fixture->objects.threads[fixture->threads[0].slot].ipc_request_receiver =
+            (struct micros_thread_handle){0, 0};
+    } else if (kind == COMPLETION_DUPLICATE_TOKEN || kind == COMPLETION_UNINDEXED_REQUEST) {
         struct micros_thread *duplicate;
 
         REQUIRE(selected_ipc_prepare_thread(MICROS_PROCESS_CAPACITY - 1));
@@ -222,6 +229,11 @@ static bool prepare_completion_mutation(enum completion_case kind)
         duplicate->ipc_delivery_pending = true;
         duplicate->ipc_receive_buffer = UINT64_C(0x50000200);
         duplicate->ipc_inbound_message = completion.message;
+        if (kind == COMPLETION_UNINDEXED_REQUEST) {
+            completion.receiver = fixture->threads[2];
+            completion.runtime.selected_context = duplicate->user_context;
+            completion.expected_context = duplicate->user_context;
+        }
     }
     return true;
 }
@@ -239,9 +251,10 @@ static void preflight(void)
 static bool run_completion_case(size_t index, enum completion_case kind, bool commit, const char *name)
 {
     struct selected_ipc_fixture *fixture = selected_ipc_fixture_state();
-    bool invalid = kind >= COMPLETION_MALFORMED;
+    bool invalid = kind >= COMPLETION_MALFORMED && kind != COMPLETION_DUPLICATE_TOKEN;
     size_t chunks = kind <= COMPLETION_ERROR ? 0
-        : kind == COMPLETION_CROSS_PAGE || kind == COMPLETION_BUFFER_FAULT ? 2 : 1;
+        : kind == COMPLETION_CROSS_PAGE || kind == COMPLETION_BUFFER_FAULT
+            || kind == COMPLETION_TOKEN_BUFFER_FAULT ? 2 : 1;
     unsigned result = 0;
 
     REQUIRE(setup_completion(kind, name));
@@ -249,6 +262,7 @@ static bool run_completion_case(size_t index, enum completion_case kind, bool co
     REQUIRE(micros_endpoint_registry_validate_objects(
         &fixture->registry, &fixture->objects
     ) == (kind == COMPLETION_MALFORMED || kind == COMPLETION_DUPLICATE_TOKEN
+          || kind == COMPLETION_UNINDEXED_REQUEST || kind == COMPLETION_MISSING_REQUEST_INDEX
           ? MICROS_ENDPOINT_ERROR_INVARIANT : MICROS_ENDPOINT_OK));
     if (commit) {
         preflight();
@@ -282,6 +296,7 @@ static bool run_completion_case(size_t index, enum completion_case kind, bool co
     REQUIRE(selected_ipc_finish_capture());
     if (invalid) {
         REQUIRE(strcmp(completion.panic_reason, kind == COMPLETION_BUFFER_FAULT
+                       || kind == COMPLETION_TOKEN_BUFFER_FAULT
                        ? "invalid-bootstrap-ipc-buffer" : "scheduler-ipc-completion") == 0);
     } else if (commit) {
         const struct micros_thread *receiver = &fixture->objects.threads[completion.receiver.slot];
@@ -290,6 +305,13 @@ static bool run_completion_case(size_t index, enum completion_case kind, bool co
         REQUIRE(memcmp(&receiver->user_context, &completion.expected_context, sizeof(receiver->user_context)) == 0);
         REQUIRE(memcmp(&completion.runtime.selected_context, &completion.expected_context,
                        sizeof(completion.expected_context)) == 0);
+        if (kind == COMPLETION_TOKEN) {
+            const struct micros_thread *caller = &fixture->objects.threads[fixture->threads[0].slot];
+
+            REQUIRE(caller->ipc_reply_phase == MICROS_IPC_REPLY_PHASE_RETURNED
+                    && caller->ipc_request_receiver.slot == 0
+                    && caller->ipc_request_receiver.generation == 0);
+        }
     } else {
         REQUIRE(completion.plan.pending == (kind != COMPLETION_EMPTY));
         REQUIRE(completion.plan.buffer_plan.chunk_count == chunks);
@@ -298,13 +320,24 @@ static bool run_completion_case(size_t index, enum completion_case kind, bool co
         }
     }
     REQUIRE(memcmp(completion.memory, completion.expected_memory, sizeof(completion.memory)) == 0);
+    if (kind == COMPLETION_TOKEN_BUFFER_FAULT) {
+        const struct micros_thread *caller = &fixture->objects.threads[fixture->threads[0].slot];
+
+        REQUIRE(caller->ipc_reply_phase == MICROS_IPC_REPLY_PHASE_STAGED
+                && caller->ipc_request_receiver.slot == completion.receiver.slot
+                && caller->ipc_request_receiver.generation == completion.receiver.generation);
+    }
+    if (kind == COMPLETION_DUPLICATE_TOKEN) {
+        REQUIRE(micros_endpoint_registry_validate_objects(&fixture->registry, &fixture->objects)
+                == MICROS_ENDPOINT_ERROR_INVARIANT);
+    }
     return selected_ipc_report_case(index, name, result, invalid ? 0 : chunks,
                                     invalid || !commit || kind == COMPLETION_EMPTY);
 }
 
 size_t selected_ipc_completion_case_count(void)
 {
-    return 19;
+    return 22;
 }
 
 bool selected_ipc_completion_cases(size_t first_case)
@@ -321,6 +354,7 @@ bool selected_ipc_completion_cases(size_t first_case)
     };
     static const char *const failures[] = {
         "completion-malformed", "completion-buffer-fault", "completion-duplicate-token",
+        "completion-unindexed-request", "completion-missing-request-index", "completion-token-buffer-fault",
     };
 
     for (size_t kind = 0; kind < 8; ++kind) {
@@ -330,7 +364,7 @@ bool selected_ipc_completion_cases(size_t first_case)
             }
         }
     }
-    for (size_t index = 0; index < 3; ++index) {
+    for (size_t index = 0; index < sizeof(failures) / sizeof(failures[0]); ++index) {
         if (!run_completion_case(first_case++, (enum completion_case)(COMPLETION_MALFORMED + index),
                                  false, failures[index])) {
             return false;

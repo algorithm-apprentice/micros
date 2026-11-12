@@ -1,4 +1,5 @@
 #include "ipc_model_test_internal.h"
+#include "ipc_fixture_tokens.h"
 
 static enum micros_ipc_error production_drain_thread(struct ipc_model_test_context *fixture, size_t thread_slot)
 {
@@ -13,6 +14,11 @@ static enum micros_ipc_error production_drain_thread(struct ipc_model_test_conte
         || !thread->ipc_delivery_pending
     ) {
         return MICROS_IPC_ERROR_STATE;
+    }
+    if (!ipc_fixture_return_request(
+        &fixture->objects, (struct micros_thread_handle){(uint16_t)thread_slot, thread->generation}
+    )) {
+        return MICROS_IPC_ERROR_INVARIANT;
     }
     thread->ipc_receive_buffer = 0;
     thread->ipc_delivery_pending = false;

@@ -188,6 +188,9 @@ the independent IPC model or actual syscall/completion target evidence.
 The same pair includes IPC02 chain/index-lifetime cases. Add `--verbose` to
 that focused CTest command to see the validated `MICROS_IPC02_WORK` hop,
 bitmap, index and cold-repair summaries; no second producer is required.
+`MICROS_IPC03_WORK` in that same output reports direct token-related table
+visits and selected indexed reads. It uses the same native pair, not a new
+workflow.
 
 ## Validation planning
 

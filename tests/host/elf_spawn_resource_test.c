@@ -85,6 +85,12 @@ bool test_elf_spawn_kernel_resource_oracle(void)
     current->objects.threads[0].ipc_reply_token = 17;
     CHECK(!micros_elf_spawn_same_kernel_resources(baseline, current));
     reset_resources();
+    current->objects.threads[0].ipc_reply_phase = MICROS_IPC_REPLY_PHASE_RETURNED;
+    CHECK(!micros_elf_spawn_same_kernel_resources(baseline, current));
+    reset_resources();
+    current->objects.threads[0].ipc_request_receiver = (struct micros_thread_handle){7, 3};
+    CHECK(!micros_elf_spawn_same_kernel_resources(baseline, current));
+    reset_resources();
     current->endpoints.endpoints[6].pending_kernel_events = 1;
     CHECK(!micros_elf_spawn_same_kernel_resources(baseline, current));
     reset_resources();

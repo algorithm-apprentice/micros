@@ -154,6 +154,24 @@ class SelectedIpcValidationEvidenceTest(unittest.TestCase):
             with self.subTest(name=name):
                 self.assertTrue(work_failures(records, changed))
 
+    def test_direct_token_cases_cannot_hide_lookup_or_pending_table_visits(self):
+        records, work = parse_native_output(transcript(), "work")
+        for name, owner in (
+            ("token-call-first", Owner.KERNEL_IPC),
+            ("token-reply", Owner.KERNEL_IPC),
+            ("token-reply-early", Owner.KERNEL_IPC),
+            ("token-staged-request", Owner.KERNEL_ENDPOINT),
+        ):
+            changed = copy.deepcopy(work)
+            index = next(index for index, row in enumerate(records) if row["name"] == name)
+            changed[index]["counts"][owner][Kind.RECORD_VISIT] = 1
+            with self.subTest(name=name, owner=owner):
+                self.assertTrue(work_failures(records, changed))
+        index = next(index for index, row in enumerate(records) if row["name"] == "token-reply")
+        changed = copy.deepcopy(work)
+        changed[index]["counts"][Owner.KERNEL_OBJECTS][Kind.INDEX_PROBE] = 97
+        self.assertTrue(work_failures(records, changed))
+
 
 class SelectedIpcObservationTest(unittest.TestCase):
     def test_current_native_and_target_primitive_coverage(self):

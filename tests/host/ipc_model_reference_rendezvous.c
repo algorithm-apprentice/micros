@@ -435,10 +435,13 @@ enum micros_ipc_error ipc_model_call(
     if (error != MICROS_IPC_OK) {
         return error;
     }
-    if (model->last_reply_token == UINT64_MAX) {
-        return MICROS_IPC_ERROR_REPLY_TOKEN_EXHAUSTED;
-    }
-    reply_token = model->last_reply_token + 1;
+    reply_token = model->last_reply_token;
+    do {
+        if (reply_token == UINT64_MAX) {
+            return MICROS_IPC_ERROR_REPLY_TOKEN_EXHAUSTED;
+        }
+        ++reply_token;
+    } while (reply_token % 128 != caller_slot);
     (void)ipc_model_resolve_active_endpoint(
         model,
         destination_endpoint,

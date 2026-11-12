@@ -212,6 +212,8 @@ static uint64_t thread_digest(uint64_t digest, const struct micros_thread *threa
     MIX_FIELD(thread->ipc_staged_result);
     MIX_FIELD(thread->ipc_reply_token);
     MIX_FIELD(thread->ipc_reply_callee);
+    MIX_FIELD(thread->ipc_reply_phase);
+    MIX_HANDLE(thread->ipc_request_receiver);
     return digest;
 }
 
@@ -507,7 +509,7 @@ static bool prepare_ipc_case(enum ipc_case operation, const struct micros_ipc_me
             &fixture.registry, &fixture.objects, fixture.threads[0], fixture.endpoints[1],
             message, UINT64_C(0x50000100)
         ) == MICROS_IPC_OK);
-        REQUIRE(receiver->ipc_delivery_pending && receiver->ipc_inbound_message.reply_token == 1);
+        REQUIRE(receiver->ipc_delivery_pending && receiver->ipc_inbound_message.reply_token == 128);
         if (operation == REPLY_PENDING_CORRUPT) {
             REQUIRE(selected_ipc_prepare_thread(MICROS_PROCESS_CAPACITY - 1));
             receiver->ipc_delivery_pending = false;
@@ -516,6 +518,9 @@ static bool prepare_ipc_case(enum ipc_case operation, const struct micros_ipc_me
         receiver->ipc_delivery_pending = false;
         receiver->ipc_receive_buffer = 0;
         memset(&receiver->ipc_inbound_message, 0, sizeof(receiver->ipc_inbound_message));
+        fixture.objects.threads[fixture.threads[0].slot].ipc_reply_phase = MICROS_IPC_REPLY_PHASE_RETURNED;
+        fixture.objects.threads[fixture.threads[0].slot].ipc_request_receiver =
+            (struct micros_thread_handle){0, 0};
         REQUIRE(micros_thread_scheduler_hold(&fixture.objects, fixture.threads[1])
                 == MICROS_KERNEL_OBJECT_OK);
         if (operation == REPLY_RECEIVE_SENDER) {
@@ -564,16 +569,16 @@ static enum micros_ipc_error execute_ipc_case(
         );
     case REPLY:
         return micros_ipc_reply(
-            &fixture.registry, &fixture.objects, fixture.threads[1], 1, message
+            &fixture.registry, &fixture.objects, fixture.threads[1], 128, message
         );
     case REPLY_PENDING_CORRUPT:
         return micros_ipc_reply(
-            &fixture.registry, &fixture.objects, fixture.threads[2], 1, message
+            &fixture.registry, &fixture.objects, fixture.threads[2], 128, message
         );
     case REPLY_RECEIVE_WAIT:
     case REPLY_RECEIVE_SENDER:
         return micros_ipc_reply_receive(
-            &fixture.registry, &fixture.objects, fixture.threads[1], 1, message,
+            &fixture.registry, &fixture.objects, fixture.threads[1], 128, message,
             MICROS_ENDPOINT_ANY, UINT64_C(0x50000000)
         );
     case NOTIFY_COALESCE:
@@ -626,7 +631,7 @@ static bool run_ipc_case(size_t index, enum ipc_case operation, const char *name
         &fixture.registry, &fixture.objects
     ) == (invalid ? MICROS_ENDPOINT_ERROR_INVARIANT : MICROS_ENDPOINT_OK));
     if (operation == CALL_WAIT || operation == CALL_DELIVERY) {
-        REQUIRE(fixture.objects.threads[fixture.threads[0].slot].ipc_reply_token == 1);
+        REQUIRE(fixture.objects.threads[fixture.threads[0].slot].ipc_reply_token == 128);
     } else if (operation == REPLY || operation == REPLY_RECEIVE_WAIT || operation == REPLY_RECEIVE_SENDER) {
         const struct micros_thread *caller = &fixture.objects.threads[fixture.threads[0].slot];
 
@@ -805,7 +810,13 @@ int main(int argc, char **argv)
                                     + selected_ipc_completion_case_count())) {
         return 1;
     }
+    if (!selected_ipc_token_cases(query_count + IPC_CASE_COUNT + lifecycle_count
+                                 + selected_ipc_completion_case_count()
+                                 + selected_ipc_deadlock_case_count())) {
+        return 1;
+    }
     printf("MICROS_IPC01_NATIVE_PASS cases=%zu\n", query_count + IPC_CASE_COUNT + lifecycle_count
-           + selected_ipc_completion_case_count() + selected_ipc_deadlock_case_count());
+           + selected_ipc_completion_case_count() + selected_ipc_deadlock_case_count()
+           + selected_ipc_token_case_count());
     return 0;
 }

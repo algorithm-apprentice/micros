@@ -167,6 +167,9 @@ static bool test_dormant_state_is_zero(void)
         && resolved->ipc_staged_result == MICROS_IPC_OK
         && resolved->ipc_reply_token == 0
         && resolved->ipc_reply_callee == 0
+        && resolved->ipc_reply_phase == MICROS_IPC_REPLY_PHASE_NONE
+        && resolved->ipc_request_receiver.slot == 0
+        && resolved->ipc_request_receiver.generation == 0
     );
     EXPECT_ENDPOINT_ERROR(
         MICROS_ENDPOINT_OK,
@@ -269,6 +272,12 @@ static bool test_dormant_validator_rejects_corruption(void)
     );
     EXPECT_CORRUPTION(
         objects.threads[thread.slot].ipc_reply_callee = 1
+    );
+    EXPECT_CORRUPTION(
+        objects.threads[thread.slot].ipc_reply_phase = MICROS_IPC_REPLY_PHASE_RETURNED
+    );
+    EXPECT_CORRUPTION(
+        objects.threads[thread.slot].ipc_request_receiver.slot = 1
     );
     EXPECT_CORRUPTION(
         objects.threads[thread.slot].runtime_flags |=

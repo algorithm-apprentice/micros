@@ -36,6 +36,7 @@ static bool sender_queue_state_is_valid(
         ) != 0
         || thread->ipc_receive_source != 0
         || !endpoint_delivery_state_is_clear(thread)
+        || !endpoint_thread_handle_is_zero(thread->ipc_request_receiver)
     ) {
         return false;
     }
@@ -45,10 +46,12 @@ static bool sender_queue_state_is_valid(
             && thread->ipc_receive_buffer == 0
             && thread->ipc_reply_token == 0
             && thread->ipc_reply_callee == 0
+            && thread->ipc_reply_phase == MICROS_IPC_REPLY_PHASE_NONE
         );
     }
     return (
         thread->ipc_reply_token != 0
+        && thread->ipc_reply_phase == MICROS_IPC_REPLY_PHASE_QUEUED
         && thread->ipc_reply_callee == destination
         && thread->ipc_outbound_message.reply_token
             == thread->ipc_reply_token
@@ -82,6 +85,8 @@ static bool receiver_queue_state_is_valid(
         || !endpoint_delivery_state_is_clear(thread)
         || thread->ipc_reply_token != 0
         || thread->ipc_reply_callee != 0
+        || thread->ipc_reply_phase != MICROS_IPC_REPLY_PHASE_NONE
+        || !endpoint_thread_handle_is_zero(thread->ipc_request_receiver)
     ) {
         return false;
     }
@@ -115,6 +120,7 @@ bool micros_endpoint_queue_member_is_valid(
     const struct micros_thread *thread;
     const struct micros_thread *next;
     struct micros_endpoint_selection source;
+    uint16_t token_slot;
 
     if (
         registry == NULL || destination == NULL || result == NULL
@@ -124,7 +130,9 @@ bool micros_endpoint_queue_member_is_valid(
         || scheduler_core_preflight_thread(objects, handle, &thread)
             != MICROS_KERNEL_OBJECT_OK
         || (thread->ipc_reply_token != 0
-            && thread->ipc_reply_token > registry->last_reply_token)
+            && (thread->ipc_reply_token > registry->last_reply_token
+                || !micros_endpoint_reply_token_slot(thread->ipc_reply_token, &token_slot)
+                || token_slot != handle.slot))
         || (!endpoint_thread_handle_is_zero(thread->ipc_next)
             && (endpoint_thread_handles_equal(handle, thread->ipc_next)
                 || micros_thread_resolve(objects, thread->ipc_next, &next)

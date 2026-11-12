@@ -8,6 +8,12 @@ owned-thread relationships stay in the object-validation owner, above queue,
 completion and identity predicates. Cross-family read-only selections use
 `endpoint_internal.h`; complete diagnostics retain their original predicates.
 
+The [direct reply binding contract](direct-reply-token-binding.md) adds its
+small ticket codec to the identity leaf and reciprocal request checks to the
+completion owner. Complete object/endpoint diagnosis may directly consume
+the codec's null-handle predicate; this is a downward leaf edge, not an IPC
+operation or a recursive validator dependency.
+
 ## Status, base, and goal
 
 This is the Accepted design contract for

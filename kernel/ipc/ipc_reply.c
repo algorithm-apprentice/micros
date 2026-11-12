@@ -120,6 +120,10 @@ static void publish_reply_receive(
         );
         ipc_clear_delivered_sender(sender);
         ipc_stage_delivery(replier, receive->receive_buffer, &selection->incoming_message);
+        if (selection->incoming_message.reply_token != 0) {
+            sender->ipc_reply_phase = MICROS_IPC_REPLY_PHASE_STAGED;
+            sender->ipc_request_receiver = receive->receiver.handle;
+        }
     } else {
         replier->ipc_queue_kind = MICROS_IPC_QUEUE_RECEIVER;
         replier->ipc_next = (struct micros_thread_handle){0, 0};

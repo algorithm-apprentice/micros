@@ -62,8 +62,8 @@ operation's work bound or the future B13 stack.
 The next preferred runtime outcome is **IPC03**, whose IPC01 predecessor is
 merged. Its [direct reply binding contract](../architecture/direct-reply-token-binding.md)
 and [ADR-0126](../adr/0126-direct-reply-token-binding.md) have clean independent
-design review and are Accepted. Implementation remains pending separate
-design merge.
+design review and are Accepted, separately merged as #254. Implementation is
+in progress.
 The design does not close B04-F004.
 
 Validation simplification #248 follows separate design #247 / ADR-0123.
@@ -233,7 +233,7 @@ blocking queue.
 | `OBJ02` | Runtime correction | `B03-F002`, `B03-F005` | `OBJ01`, `MEM04` | Independently reviewed implementation #246 follows the [common-return contract](../architecture/common-scheduler-return.md) and [fixed-source study](minix-common-scheduler-return.md); bounded queue/link deltas and protected same-thread context reuse. | Queue-shift, zero-quantum, plan-compare, commit-store and actual target validation traces; complete current acceptance and independent review passed. |
 | `IPC01` | Runtime correction | `B03-F006`, `B04-F001`, `B04-F002` | `OBJ01`, `OBJ02`, `MEM04` | Independently reviewed implementation #251 follows the [selected IPC contract](../architecture/selected-ipc-validation.md). | Actual native and same-guest zero-audit/translation evidence, complete diagnostics, full current acceptance and independent review passed. |
 | `IPC02` | Runtime correction | `B04-F003` | `IPC01` | Independently reviewed implementation #253 follows the [linear projection contract](../architecture/linear-ipc-deadlock.md). | Actual linear hop/index/bitmap work, complete portable/PM index lifetime, explicit cold repair, current layout/stack and full acceptance passed. |
-| `IPC03` | Runtime correction | `B04-F004` | `IPC01` | [Accepted direct reply binding](../architecture/direct-reply-token-binding.md): opaque caller-slot routing and explicit current request phase/receiver ownership; implementation awaits separate design merge. | Allocation, lookup, stale, presentability, close, reuse and completion work with exact authority and failure preservation. |
+| `IPC03` | Runtime correction | `B04-F004` | `IPC01` | [Accepted direct reply binding](../architecture/direct-reply-token-binding.md): opaque caller-slot routing and explicit current request phase/receiver ownership; implementation follows separately merged design #254. | Allocation, lookup, stale, presentability, close, reuse and completion work with exact authority and failure preservation. |
 | `IPC04` | Runtime correction | `B04-F006` | `IPC01` | Remove the pre-baseline tail-index optimization and reproduce the audited reference queue mutation order. | Linear append/receive/close traces and queue-operation counts. |
 | `GRANT01` | Runtime correction | `B05-F001`, `B05-F002` | `IPC01` | Move complete grant/runtime audits off create/revoke/copy syscalls and retain one selected relation/range plan. | Exact Vgrant/Vep/TTY call counts and syscall failure atomicity. |
 | `GRANT02` | Runtime correction | `B05-F003`, `B05-F004` | `GRANT01`, `IPC03` | Use the MINIX free-list allocation family and endpoint-owned cancellation links instead of capacity scans. | Allocation/cancellation probe counts, reuse, stale identity, and close traces. |

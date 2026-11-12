@@ -284,6 +284,10 @@ static bool reject_reply_wait_launcher_dependency(struct launcher_dependency_fix
         fixture->launcher_thread->ipc_delivery_pending
         && fixture->pm_thread->ipc_reply_token != 0
         && fixture->pm_thread->ipc_reply_callee == fixture->bindings[1].endpoint
+        && fixture->launcher_thread->ipc_inbound_message.reply_token == fixture->pm_thread->ipc_reply_token
+        && fixture->pm_thread->ipc_reply_phase == MICROS_IPC_REPLY_PHASE_STAGED
+        && fixture->pm_thread->ipc_request_receiver.slot == fixture->bindings[1].thread.slot
+        && fixture->pm_thread->ipc_request_receiver.generation == fixture->bindings[1].thread.generation
     );
     fixture->launcher_thread->ipc_receive_buffer = 0;
     fixture->launcher_thread->ipc_delivery_pending = false;
@@ -293,6 +297,9 @@ static bool reject_reply_wait_launcher_dependency(struct launcher_dependency_fix
         sizeof(fixture->launcher_thread->ipc_inbound_message)
     );
     fixture->launcher_thread->ipc_staged_result = MICROS_IPC_OK;
+    fixture->objects.threads[fixture->bindings[2].thread.slot].ipc_reply_phase = MICROS_IPC_REPLY_PHASE_RETURNED;
+    fixture->objects.threads[fixture->bindings[2].thread.slot].ipc_request_receiver =
+        (struct micros_thread_handle){0, 0};
     EXPECT_TRUE(
         micros_endpoint_registry_validate_objects(
             &fixture->registry,

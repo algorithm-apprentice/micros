@@ -1,4 +1,5 @@
 #include "tests/host/pm_control_execution_test_internal.h"
+#include "ipc_fixture_tokens.h"
 
 #include <stdbool.h>
 #include <stdint.h>
@@ -579,9 +580,11 @@ bool pm_control_execution_test_block_child_in_exit_call(
     thread->ready_linked = false;
     thread->runtime_flags = MICROS_THREAD_RTS_IPC_REPLY;
     thread->ipc_receive_buffer = MICROS_APPLICATION_STACK_BASE;
-    thread->ipc_reply_token = 1;
+    thread->ipc_reply_token = ipc_fixture_next_token(context->endpoints.last_reply_token, thread_handle.slot);
     thread->ipc_reply_callee = context->pm_endpoint;
-    context->endpoints.last_reply_token = 1;
+    thread->ipc_reply_phase = MICROS_IPC_REPLY_PHASE_RETURNED;
+    thread->ipc_request_receiver = (struct micros_thread_handle){0, 0};
+    context->endpoints.last_reply_token = thread->ipc_reply_token;
     return (
         micros_kernel_objects_validate(&context->objects)
             == MICROS_KERNEL_OBJECT_OK

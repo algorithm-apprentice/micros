@@ -257,6 +257,8 @@ static enum micros_pm_control_error validate_stopped_objects(
         )
         || thread->ipc_queue_kind != MICROS_IPC_QUEUE_NONE
         || thread->ipc_reply_token == 0
+        || thread->ipc_reply_phase != MICROS_IPC_REPLY_PHASE_RETURNED
+        || !micros_pm_control_thread_handle_is_zero(thread->ipc_request_receiver)
         || thread->ipc_reply_callee != state->endpoint
         || thread->ipc_receive_buffer == 0
         || thread->ipc_receive_buffer % 8 != 0

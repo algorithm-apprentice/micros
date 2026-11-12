@@ -96,6 +96,13 @@ class StackFatalBindingsTest(unittest.TestCase):
             self.assertEqual(baseline["process_bytes"] + 8, current["process_bytes"])
             for name in ("thread_table", "hart_table", "registry_bytes"):
                 self.assertEqual(baseline[name] + 8 * baseline["process_capacity"], current[name], name)
+            header.write_text((ROOT / "include/micros/kernel_objects.h").read_text())
+            reply = trace_object_layout(self.root)
+            self.assertEqual(current["process_bytes"], reply["process_bytes"])
+            self.assertEqual(current["thread_bytes"] + 8, reply["thread_bytes"])
+            self.assertEqual(current["thread_table"], reply["thread_table"])
+            for name in ("hart_table", "registry_bytes"):
+                self.assertEqual(current[name] + 8 * current["thread_capacity"], reply[name], name)
         finally:
             header.write_text(original)
         self.assertEqual(baseline, trace_object_layout(self.root))

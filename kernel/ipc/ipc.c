@@ -166,12 +166,8 @@ enum micros_ipc_error micros_ipc_call(
     if (error != MICROS_IPC_OK) {
         return error;
     }
-    if (registry->last_reply_token == UINT64_MAX) {
+    if (!micros_endpoint_next_reply_token(registry->last_reply_token, caller.handle.slot, &reply_token)) {
         return MICROS_IPC_ERROR_REPLY_TOKEN_EXHAUSTED;
-    }
-    reply_token = registry->last_reply_token + 1;
-    if (!ipc_reply_token_is_available(objects, reply_token)) {
-        return MICROS_IPC_ERROR_INVARIANT;
     }
     ipc_canonicalize_message(&snapshot, request, caller.endpoint.record->value, reply_token);
     error = send_selected(registry, objects, &caller, &target, &snapshot, reply_token, reply_buffer);

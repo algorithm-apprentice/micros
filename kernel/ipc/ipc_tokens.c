@@ -1,24 +1,5 @@
 #include "kernel/ipc/ipc_internal.h"
 
-bool ipc_reply_token_is_available(
-    const struct micros_kernel_objects *objects,
-    uint64_t reply_token
-)
-{
-    if (reply_token == 0) {
-        return true;
-    }
-    for (size_t index = 0; index < MICROS_THREAD_CAPACITY; ++index) {
-        const struct micros_thread *thread = &objects->threads[index];
-
-        if (thread->slot_state == MICROS_KERNEL_OBJECT_SLOT_LIVE
-            && thread->ipc_reply_token == reply_token) {
-            return false;
-        }
-    }
-    return true;
-}
-
 static enum micros_ipc_error resolve_reply_waiter(
     const struct micros_endpoint_registry *registry,
     struct micros_kernel_objects *objects,
@@ -30,20 +11,16 @@ static enum micros_ipc_error resolve_reply_waiter(
 {
     struct micros_thread *matched = NULL;
     struct micros_thread_handle handle = {0, 0};
+    uint16_t slot;
 
-    for (size_t index = 0; index < MICROS_THREAD_CAPACITY; ++index) {
-        struct micros_thread *candidate = &objects->threads[index];
+    if (micros_endpoint_reply_token_slot(reply_token, &slot)) {
+        struct micros_thread *candidate = &objects->threads[slot];
 
-        if (candidate->slot_state != MICROS_KERNEL_OBJECT_SLOT_LIVE
-            || candidate->ipc_reply_token != reply_token) {
-            continue;
+        if (candidate->slot_state == MICROS_KERNEL_OBJECT_SLOT_LIVE
+            && candidate->ipc_reply_token == reply_token) {
+            matched = candidate;
+            handle = (struct micros_thread_handle){slot, candidate->generation};
         }
-        if (matched != NULL) {
-            return MICROS_IPC_ERROR_INVARIANT;
-        }
-        matched = candidate;
-        handle.slot = (uint16_t)index;
-        handle.generation = candidate->generation;
     }
     if (matched != NULL
         && !micros_endpoint_thread_ipc_state_is_valid(registry, objects, handle)) {
@@ -52,38 +29,6 @@ static enum micros_ipc_error resolve_reply_waiter(
     *caller = matched;
     *caller_handle = handle;
     *caller_endpoint = matched == NULL ? NULL : &registry->endpoints[matched->owner.slot];
-    return MICROS_IPC_OK;
-}
-
-static enum micros_ipc_error reply_request_is_pending(
-    const struct micros_endpoint_registry *registry,
-    const struct micros_kernel_objects *objects,
-    uint64_t reply_token,
-    const struct micros_thread *caller,
-    const struct micros_endpoint_record *caller_endpoint,
-    bool *pending
-)
-{
-    bool found = false;
-
-    for (size_t index = 0; index < MICROS_THREAD_CAPACITY; ++index) {
-        const struct micros_thread *thread = &objects->threads[index];
-        struct micros_thread_handle receiver;
-
-        if (thread->slot_state != MICROS_KERNEL_OBJECT_SLOT_LIVE
-            || thread->ipc_inbound_message.reply_token != reply_token) {
-            continue;
-        }
-        receiver.slot = (uint16_t)index;
-        receiver.generation = thread->generation;
-        if (caller == NULL || found || !micros_endpoint_staged_request_matches(
-            registry, objects, receiver, caller, caller_endpoint
-        )) {
-            return MICROS_IPC_ERROR_INVARIANT;
-        }
-        found = true;
-    }
-    *pending = found;
     return MICROS_IPC_OK;
 }
 
@@ -104,7 +49,6 @@ enum micros_ipc_error ipc_preflight_reply(
     const struct micros_endpoint_record *caller_endpoint;
     struct micros_ipc_message snapshot;
     enum micros_ipc_error error;
-    bool pending;
 
     if (
         registry == NULL || objects == NULL || message == NULL || plan == NULL
@@ -132,12 +76,8 @@ enum micros_ipc_error ipc_preflight_reply(
     if (error != MICROS_IPC_OK) {
         return error;
     }
-    error = reply_request_is_pending(registry, objects, reply_token, caller, caller_endpoint, &pending);
-    if (error != MICROS_IPC_OK) {
-        return error;
-    }
     if (
-        caller == NULL || pending
+        caller == NULL || caller->ipc_reply_phase != MICROS_IPC_REPLY_PHASE_RETURNED
         || caller->ipc_queue_kind != MICROS_IPC_QUEUE_NONE
         || (caller->runtime_flags & MICROS_THREAD_RTS_IPC_MASK) != MICROS_THREAD_RTS_IPC_REPLY
         || caller->ipc_reply_callee != replier.endpoint.record->value
@@ -161,4 +101,6 @@ void ipc_commit_reply_delivery(const struct ipc_reply_preflight *plan)
     ipc_stage_delivery(plan->caller, plan->reply_buffer, &plan->message);
     plan->caller->ipc_reply_token = 0;
     plan->caller->ipc_reply_callee = 0;
+    plan->caller->ipc_reply_phase = MICROS_IPC_REPLY_PHASE_NONE;
+    plan->caller->ipc_request_receiver = (struct micros_thread_handle){0, 0};
 }
