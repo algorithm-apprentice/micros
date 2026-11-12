@@ -4,8 +4,9 @@
 
 This is the independently reviewed IPC02 contract Accepted by
 [ADR-0125](../adr/0125-linear-ipc-deadlock.md).
-Design #252 is separately merged; its paired implementation proceeds from
-that main. This contract alone makes no runtime-finding closure claim.
+Design #252 and its independently reviewed implementation #253 are separately
+merged. The [correction register](../research/minix-complete-baseline-findings-and-correction-dag.md#current-correction-progress)
+records B04-F003 closure; exact execution/review/publication records are in #253.
 
 The prerequisite is merged IPC01 #251. The
 [fixed study](../research/minix-linear-ipc-deadlock.md) traces its exact current
