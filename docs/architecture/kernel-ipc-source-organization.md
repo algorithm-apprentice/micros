@@ -20,6 +20,11 @@ reuses the rendezvous owner's read-only receive selection while retaining
 its own single atomic scheduler/IPC commit. No reverse queue/notification/
 token dependency is introduced. Original model and target scripts remain.
 
+IPC04's [head-only sender contract](head-only-ipc-sender-queues.md) owns
+sender-tail removal in these existing queue, rendezvous, reply and close
+owners. Its phase barrier applies; it does not introduce another source
+family or change receiver-queue, notification or syscall ownership.
+
 ## Base, goal, and readiness
 
 ```text

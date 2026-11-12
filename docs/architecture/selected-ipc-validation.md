@@ -26,6 +26,10 @@ IPC02 deadlock projection, IPC03 token indexes, IPC04 sender-tail replacement,
 IPC05 filters, grant/VM/PM validator cadence, copy primitives, asynchronous
 IPC, VM-assisted faults, signals, SMP and hosted CI are non-goals.
 
+The later [head-only sender contract](head-only-ipc-sender-queues.md) owns
+IPC04's sender-tail replacement and its exact phase barrier. Receiver-tail
+behavior and the selected-splice/serialization obligations here remain.
+
 ## One serialized operation
 
 Portable callers retain external serialization; target callers hold SIE
