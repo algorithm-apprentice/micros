@@ -696,6 +696,12 @@ record distinguishes each actual supervisor stack slot. Before reuse,
 target evidence closes the old generation and starts a new producer label;
 it may not silently combine two generations into one live owner.
 
+Scenario producer identities remain independent expected data in
+`tools/stack_bound_scope.py`. They combine with current linked stack intervals
+and actual static bounds, not frozen whole-file lifetime implementations.
+Current attachment/detachment authentication and complete report comparison
+retain generation, reuse, missing/duplicate-owner and failure rejection.
+
 Each dynamic record binds scenario, executable identity, exact process or
 thread generation where applicable, stack interval, sample count, observed
 use, and the separately computed static bound. At least one sample is

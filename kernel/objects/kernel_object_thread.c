@@ -57,6 +57,9 @@ enum micros_kernel_object_error micros_thread_create(
     ) {
         return MICROS_KERNEL_OBJECT_ERROR_THREAD_LIMIT;
     }
+    if (!kernel_object_process_thread_index_is_valid(objects, process, owner)) {
+        return MICROS_KERNEL_OBJECT_ERROR_INVARIANT;
+    }
 
     for (index = 0; index < MICROS_THREAD_CAPACITY; ++index) {
         struct micros_thread *thread = &objects->threads[index];
@@ -81,6 +84,9 @@ enum micros_kernel_object_error micros_thread_create(
         if (error != MICROS_KERNEL_OBJECT_OK) {
             return MICROS_KERNEL_OBJECT_ERROR_INVARIANT;
         }
+        if (objects->live_thread_count >= MICROS_THREAD_CAPACITY) {
+            return MICROS_KERNEL_OBJECT_ERROR_INVARIANT;
+        }
 
         thread->slot_state = MICROS_KERNEL_OBJECT_SLOT_LIVE;
         thread->generation = generation;
@@ -90,11 +96,44 @@ enum micros_kernel_object_error micros_thread_create(
         thread->runtime_flags = MICROS_THREAD_RTS_INACTIVE;
         ++process->live_thread_count;
         ++objects->live_thread_count;
+        process->sole_thread = process->live_thread_count == 1
+            ? (struct micros_thread_handle){(uint16_t)index, generation}
+            : (struct micros_thread_handle){0, 0};
         handle->slot = (uint16_t)index;
         handle->generation = generation;
         return MICROS_KERNEL_OBJECT_OK;
     }
     return MICROS_KERNEL_OBJECT_ERROR_EXHAUSTED;
+}
+
+static bool select_release_survivor(
+    const struct micros_kernel_objects *objects,
+    struct micros_process_handle owner,
+    struct micros_thread_handle removed,
+    struct micros_thread_handle *survivor
+)
+{
+    struct micros_thread_handle selected = {0, 0};
+
+    for (size_t index = 0; index < MICROS_THREAD_CAPACITY; ++index) {
+        const struct micros_thread *thread = &objects->threads[index];
+
+        if (
+            index == removed.slot || thread->slot_state != MICROS_KERNEL_OBJECT_SLOT_LIVE
+            || thread->owner.slot != owner.slot || thread->owner.generation != owner.generation
+        ) {
+            continue;
+        }
+        if (thread->generation == 0 || selected.generation != 0) {
+            return false;
+        }
+        selected = (struct micros_thread_handle){(uint16_t)index, thread->generation};
+    }
+    if (selected.generation == 0) {
+        return false;
+    }
+    *survivor = selected;
+    return true;
 }
 
 enum micros_kernel_object_error micros_thread_release(
@@ -104,6 +143,7 @@ enum micros_kernel_object_error micros_thread_release(
 {
     struct micros_thread *thread;
     struct micros_process *owner;
+    struct micros_thread_handle survivor = {0, 0};
     enum micros_kernel_object_error error;
     uint32_t unused_generation;
     size_t index;
@@ -145,6 +185,15 @@ enum micros_kernel_object_error micros_thread_release(
     ) {
         return MICROS_KERNEL_OBJECT_ERROR_INVARIANT;
     }
+    if (
+        !kernel_object_process_thread_index_is_valid(objects, owner, thread->owner)
+        || (owner->live_thread_count == 1
+            && !kernel_object_thread_handles_equal(owner->sole_thread, handle))
+        || (owner->live_thread_count == 2
+            && !select_release_survivor(objects, thread->owner, handle, &survivor))
+    ) {
+        return MICROS_KERNEL_OBJECT_ERROR_INVARIANT;
+    }
 
     error = micros_thread_next_generation(
         thread->generation,
@@ -170,5 +219,6 @@ enum micros_kernel_object_error micros_thread_release(
     kernel_object_clear_user_context(&thread->user_context);
     --owner->live_thread_count;
     --objects->live_thread_count;
+    owner->sole_thread = survivor;
     return MICROS_KERNEL_OBJECT_OK;
 }

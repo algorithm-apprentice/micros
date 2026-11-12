@@ -102,6 +102,9 @@ enum micros_kernel_object_error micros_process_create_at(
     if (process->slot_state != MICROS_KERNEL_OBJECT_SLOT_FREE) {
         return MICROS_KERNEL_OBJECT_ERROR_STATE;
     }
+    if (process->sole_thread.slot != 0 || process->sole_thread.generation != 0) {
+        return MICROS_KERNEL_OBJECT_ERROR_INVARIANT;
+    }
     error = micros_process_next_generation(
         slot,
         process->generation,
@@ -118,6 +121,7 @@ enum micros_kernel_object_error micros_process_create_at(
     process->primary_endpoint = MICROS_PROCESS_ENDPOINT_NONE;
     process->privilege_profile = 0;
     process->endpoint_lifecycle_consumed = false;
+    process->sole_thread = (struct micros_thread_handle){0, 0};
     ++objects->live_process_count;
     handle->slot = slot;
     handle->generation = generation;
@@ -156,6 +160,9 @@ enum micros_kernel_object_error micros_process_release(
     if (objects->live_process_count == 0) {
         return MICROS_KERNEL_OBJECT_ERROR_INVARIANT;
     }
+    if (process->sole_thread.slot != 0 || process->sole_thread.generation != 0) {
+        return MICROS_KERNEL_OBJECT_ERROR_INVARIANT;
+    }
 
     error = micros_process_next_generation(
         handle.slot,
@@ -177,6 +184,7 @@ enum micros_kernel_object_error micros_process_release(
     process->primary_endpoint = MICROS_PROCESS_ENDPOINT_NONE;
     process->privilege_profile = 0;
     process->endpoint_lifecycle_consumed = false;
+    process->sole_thread = (struct micros_thread_handle){0, 0};
     --objects->live_process_count;
     return MICROS_KERNEL_OBJECT_OK;
 }

@@ -545,6 +545,8 @@ bool kernel_object_test_thread_ownership_and_production_limit(void)
         micros_thread_create(fixture, owner, &first)
     );
     EXPECT_TRUE(fixture->processes[owner.slot].live_thread_count == 1);
+    EXPECT_TRUE(fixture->processes[owner.slot].sole_thread.slot == first.slot
+                && fixture->processes[owner.slot].sole_thread.generation == first.generation);
     snapshot = *fixture;
     EXPECT_ERROR(
         MICROS_KERNEL_OBJECT_ERROR_THREAD_LIMIT,
@@ -569,6 +571,8 @@ bool kernel_object_test_thread_ownership_and_production_limit(void)
         micros_thread_release(fixture, first)
     );
     EXPECT_TRUE(fixture->processes[owner.slot].live_thread_count == 0);
+    EXPECT_TRUE(fixture->processes[owner.slot].sole_thread.slot == 0
+                && fixture->processes[owner.slot].sole_thread.generation == 0);
     EXPECT_ERROR(
         MICROS_KERNEL_OBJECT_OK,
         micros_process_release(fixture, owner)
@@ -607,6 +611,9 @@ bool kernel_object_test_model_policy_supports_multiple_threads(void)
             micros_thread_create(fixture, owner, &threads[index])
         );
         EXPECT_TRUE(threads[index].slot == index);
+        EXPECT_TRUE(fixture->processes[owner.slot].sole_thread.slot == (index == 0 ? threads[0].slot : 0));
+        EXPECT_TRUE(fixture->processes[owner.slot].sole_thread.generation
+                    == (index == 0 ? threads[0].generation : 0));
     }
     EXPECT_ERROR(
         MICROS_KERNEL_OBJECT_ERROR_THREAD_LIMIT,
@@ -617,5 +624,75 @@ bool kernel_object_test_model_policy_supports_multiple_threads(void)
         MICROS_KERNEL_OBJECT_OK,
         micros_kernel_objects_validate(fixture)
     );
+    EXPECT_ERROR(MICROS_KERNEL_OBJECT_OK, micros_thread_release(fixture, threads[1]));
+    EXPECT_ERROR(MICROS_KERNEL_OBJECT_OK, micros_thread_release(fixture, threads[3]));
+    EXPECT_TRUE(fixture->processes[owner.slot].sole_thread.slot == 0
+                && fixture->processes[owner.slot].sole_thread.generation == 0);
+    EXPECT_ERROR(MICROS_KERNEL_OBJECT_OK, micros_thread_release(fixture, threads[0]));
+    EXPECT_TRUE(fixture->processes[owner.slot].sole_thread.slot == threads[2].slot
+                && fixture->processes[owner.slot].sole_thread.generation == threads[2].generation);
+    EXPECT_ERROR(MICROS_KERNEL_OBJECT_OK, micros_kernel_objects_validate(fixture));
+    EXPECT_ERROR(MICROS_KERNEL_OBJECT_OK, micros_thread_release(fixture, threads[2]));
+    EXPECT_TRUE(fixture->processes[owner.slot].sole_thread.slot == 0
+                && fixture->processes[owner.slot].sole_thread.generation == 0);
+    EXPECT_ERROR(MICROS_KERNEL_OBJECT_OK, micros_kernel_objects_validate(fixture));
+    return true;
+}
+
+bool kernel_object_test_thread_index_corruption_is_atomic(void)
+{
+    struct micros_kernel_objects *fixture = kernel_object_test_registry();
+    struct micros_process_handle owner;
+    struct micros_process_handle other;
+    struct micros_thread_handle first;
+    struct micros_thread_handle second;
+    struct micros_thread_handle foreign;
+    struct micros_thread_handle output = {UINT16_MAX, UINT32_MAX};
+    struct micros_process_handle process_output = {UINT16_MAX, UINT32_MAX};
+
+    kernel_object_test_reset_objects(fixture);
+    EXPECT_ERROR(MICROS_KERNEL_OBJECT_OK, micros_kernel_objects_initialize(fixture, 3, 1));
+    EXPECT_ERROR(MICROS_KERNEL_OBJECT_OK, micros_process_create(fixture, &owner));
+    EXPECT_ERROR(MICROS_KERNEL_OBJECT_OK, micros_process_create(fixture, &other));
+    EXPECT_ERROR(MICROS_KERNEL_OBJECT_OK, micros_thread_create(fixture, owner, &first));
+    EXPECT_ERROR(MICROS_KERNEL_OBJECT_OK, micros_thread_create(fixture, other, &foreign));
+    const struct micros_thread_handle invalid[] = {
+        {0, 0}, {MICROS_THREAD_CAPACITY, 1}, {first.slot, 0},
+        {first.slot, first.generation + 1}, foreign,
+    };
+    for (size_t index = 0; index < sizeof(invalid) / sizeof(invalid[0]); ++index) {
+        fixture->processes[owner.slot].sole_thread = invalid[index];
+        EXPECT_ERROR(MICROS_KERNEL_OBJECT_ERROR_INVARIANT, micros_kernel_objects_validate(fixture));
+        EXPECT_ERROR_UNCHANGED(MICROS_KERNEL_OBJECT_ERROR_INVARIANT, micros_thread_release(fixture, first));
+        EXPECT_ERROR_UNCHANGED(MICROS_KERNEL_OBJECT_ERROR_INVARIANT, micros_thread_create(fixture, owner, &output));
+        EXPECT_TRUE(output.slot == UINT16_MAX && output.generation == UINT32_MAX);
+    }
+    fixture->processes[owner.slot].sole_thread = first;
+    EXPECT_ERROR(MICROS_KERNEL_OBJECT_OK, micros_thread_create(fixture, owner, &second));
+    fixture->processes[owner.slot].sole_thread = first;
+    EXPECT_ERROR_UNCHANGED(MICROS_KERNEL_OBJECT_ERROR_INVARIANT, micros_thread_release(fixture, first));
+    fixture->processes[owner.slot].sole_thread = (struct micros_thread_handle){0, 0};
+    fixture->threads[second.slot].owner = other;
+    EXPECT_ERROR_UNCHANGED(MICROS_KERNEL_OBJECT_ERROR_INVARIANT, micros_thread_release(fixture, first));
+    fixture->threads[second.slot].owner = owner;
+    fixture->threads[foreign.slot].owner = owner;
+    EXPECT_ERROR_UNCHANGED(MICROS_KERNEL_OBJECT_ERROR_INVARIANT, micros_thread_release(fixture, first));
+    fixture->threads[foreign.slot].owner = other;
+    EXPECT_ERROR(MICROS_KERNEL_OBJECT_OK, micros_kernel_objects_validate(fixture));
+    EXPECT_ERROR(MICROS_KERNEL_OBJECT_OK, micros_thread_release(fixture, first));
+    EXPECT_TRUE(fixture->processes[owner.slot].sole_thread.slot == second.slot
+                && fixture->processes[owner.slot].sole_thread.generation == second.generation);
+    EXPECT_ERROR(MICROS_KERNEL_OBJECT_OK, micros_thread_release(fixture, second));
+    fixture->processes[owner.slot].sole_thread = (struct micros_thread_handle){1, 0};
+    EXPECT_ERROR_UNCHANGED(MICROS_KERNEL_OBJECT_ERROR_INVARIANT, micros_process_release(fixture, owner));
+    EXPECT_ERROR_UNCHANGED(MICROS_KERNEL_OBJECT_ERROR_INVARIANT, micros_thread_create(fixture, owner, &output));
+    fixture->processes[owner.slot].sole_thread = (struct micros_thread_handle){0, 0};
+    fixture->processes[2].sole_thread = foreign;
+    EXPECT_ERROR_UNCHANGED(
+        MICROS_KERNEL_OBJECT_ERROR_INVARIANT, micros_process_create_at(fixture, 2, &process_output)
+    );
+    EXPECT_TRUE(process_output.slot == UINT16_MAX && process_output.generation == UINT32_MAX);
+    fixture->processes[2].sole_thread = (struct micros_thread_handle){0, 0};
+    EXPECT_ERROR(MICROS_KERNEL_OBJECT_OK, micros_kernel_objects_validate(fixture));
     return true;
 }

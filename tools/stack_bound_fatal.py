@@ -717,23 +717,41 @@ def trace_compile_policy(root, directory):
     return tuple(sorted(units)), required
 
 
-def trace_preservation(root, artifacts, protected):
+def trace_owner_source_admitted(root, unit, source):
     from tests.host.object_hart_validation_source import panic_hart_source_admitted
 
+    functions = (*TRACE_SELECTED, *TRACE_FAULT_FUNCTIONS)
+    selected = {name for path, name in functions if path == unit}
+    if not selected:
+        return False
+    try:
+        source = project_trace_runtime(unit, source)
+        reference = trace_reference_source(unit)
+        if source == reference or panic_hart_source_admitted(root, unit, source):
+            return True
+        protected = {name for _, name in functions}
+        actual_records = function_records(source)
+        expected_records = function_records(reference)
+        return (
+            selected <= actual_records.keys() & expected_records.keys()
+            and fatal_state_tokens(source, protected) == fatal_state_tokens(reference, protected)
+            and all(
+                actual_records[name].guards == expected_records[name].guards
+                and tokens(actual_records[name].signature) == tokens(expected_records[name].signature)
+                and tokens(actual_records[name].body) == tokens(expected_records[name].body)
+                for name in selected
+            )
+        )
+    except ValueError as error:
+        raise StackEvidenceError(str(error)) from error
+
+
+def trace_preservation(root, artifacts, protected):
     layout = trace_object_layout(root)
     for unit in sorted({unit for unit, _ in TRACE_SELECTED}):
         source = read_regular(owned_file(root, unit))[0].decode()
-        try:
-            source = project_trace_runtime(unit, source)
-        except ValueError as error:
-            raise StackEvidenceError(str(error)) from error
-        if source != trace_reference_source(unit):
-            try:
-                admitted = panic_hart_source_admitted(root, unit, source)
-            except ValueError as error:
-                raise StackEvidenceError(str(error)) from error
-            if not admitted:
-                raise StackEvidenceError("trace selected-owner provider changed its complete fixed predecessor source")
+        if not trace_owner_source_admitted(root, unit, source):
+            raise StackEvidenceError("trace selected-owner source or shared state changed its exact contract")
     runtime = "kernel/objects/kernel_object_runtime.c"
     ownership = []
     for name, size in (("kernel_objects", layout["registry_bytes"]), ("boot_hart_handle", 8), ("runtime_ready", 1)):
@@ -821,8 +839,6 @@ def trace_fixture_preservation(root, artifacts, ownership, test_objects, accesso
 
 
 def trace_fault_artifacts(root, directory, catalog, artifacts):
-    from tests.host.object_hart_validation_source import panic_hart_source_admitted
-
     objects, sections, sources = {}, {}, []
     frames = {row.function: row for row in catalog.frames}
     definitions = {row.function: row for row in catalog.definitions}
@@ -838,13 +854,9 @@ def trace_fault_artifacts(root, directory, catalog, artifacts):
         obj, origin = objects[unit], origins[key]
         symbol = function_symbols(obj).get(name)
         source = read_regular(owned_file(root, unit))[0].decode()
-        try:
-            prior = project_trace_runtime(unit, source)
-            source_matches = prior == trace_reference_source(unit) or panic_hart_source_admitted(root, unit, source)
-        except ValueError as error:
-            raise StackEvidenceError(str(error)) from error
         if (
-            not source_matches or origin.source != unit or origin.line != definition_line(source, name)
+            not trace_owner_source_admitted(root, unit, source)
+            or origin.source != unit or origin.line != definition_line(source, name)
             or symbol is None or object_frames(obj, function_symbols(obj)).get(name) != frames[key].bytes_used
             or frames[key].classification != "static" or definitions[key].size != symbol.size
         ):

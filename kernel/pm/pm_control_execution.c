@@ -63,6 +63,7 @@ static enum micros_pm_control_error validate_frozen_mapping(
         )
         && record->root_physical_address != 0
         && process->live_thread_count == 0
+        && micros_pm_control_thread_handle_is_zero(process->sole_thread)
         && process->address_space_root
             == record->root_physical_address
         && process->primary_endpoint == MICROS_PROCESS_ENDPOINT_NONE
@@ -307,6 +308,7 @@ void micros_pm_control_prepare_commit_prevalidated(
         MICROS_APPLICATION_SCHEDULER_QUANTUM;
     ++process->live_thread_count;
     ++objects->live_thread_count;
+    process->sole_thread = plan->thread;
 
     micros_pm_control_clear_bytes(endpoint, sizeof(*endpoint));
     endpoint->state = MICROS_ENDPOINT_STATE_RESERVED;
@@ -416,6 +418,7 @@ void micros_pm_control_abort_prepared_commit_prevalidated(
     thread->generation = generation;
     --process->live_thread_count;
     --objects->live_thread_count;
+    process->sole_thread = (struct micros_thread_handle){0, 0};
     micros_pm_control_clear_bytes(
         &registry->endpoints[plan->process.slot],
         sizeof(registry->endpoints[plan->process.slot])

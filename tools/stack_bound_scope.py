@@ -3,10 +3,7 @@
 from dataclasses import dataclass
 from pathlib import Path
 
-from tests.host.c_source_records import tokens
-from tests.host.stack_source_projection import project_stack_source
 from tools.stack_artifact_files import read_regular
-from tools.stack_bound_bindings import reference_source
 from tools.stack_bound_reports import Producer, producer_inventory
 from tools.stack_bound_types import StackEvidenceError
 from tools.stack_bound_user_images import STATIC_ONLY_USER_IMAGES, USER_IMAGE_SCOPES
@@ -94,15 +91,6 @@ OTHER_IMAGES = {
         "applications/micros-elf-spawn-child.elf",
     ),
 }
-GENERATION_SOURCES = (
-    "kernel/objects/kernel_object_thread.c", "kernel/objects/kernel_object_identity.c",
-    "kernel/boot/bootstrap_preparation.c", "kernel/pm/pm_control_execution.c",
-    "kernel/pm/pm_control_reservation.c", "kernel/pm/pm_control_exit.c",
-    "kernel/tests/pm/pm_service_test_report.c",
-    "tests/qemu/elf_spawn_init.c", "tests/qemu/elf_spawn_pm.c",
-    "tests/qemu/vm_server_pm.c",
-)
-
 
 def expected_images(configure):
     if configure in SCENARIOS:
@@ -144,14 +132,10 @@ def symbol_value(image, name):
 
 
 def declared_producers(root, directory, proofs):
-    root, directory = Path(root), Path(directory)
+    directory = Path(directory)
     configure = directory.parent.name
     if configure not in SCENARIOS:
         raise StackEvidenceError("no live-producer declaration for this configuration")
-    for unit in GENERATION_SOURCES:
-        actual = project_stack_source(unit, read_regular(root / unit)[0].decode())
-        if tokens(actual) != tokens(reference_source(str(root), unit)):
-            raise StackEvidenceError("producer-generation source contract changed")
     scenario = SCENARIOS[configure]
     image = load_elf(directory / "kernel/micros.elf")
     bounds = {}

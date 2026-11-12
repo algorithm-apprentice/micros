@@ -2,6 +2,8 @@
 
 #include "kernel/scheduler/scheduler_core_internal.h"
 
+_Static_assert(MICROS_THREAD_CAPACITY <= 128, "dependency bitmap must cover every thread slot");
+
 static enum micros_ipc_error resolve_dependency_endpoint(
     const struct micros_endpoint_registry *registry,
     const struct micros_kernel_objects *objects,
@@ -38,9 +40,8 @@ static enum micros_ipc_error resolve_sole_live_thread(
 )
 {
     const struct micros_process *process;
-    const struct micros_thread *matched = NULL;
-    struct micros_thread_handle matched_handle = {0, 0};
-    size_t index;
+    const struct micros_thread *matched;
+    struct micros_thread_handle matched_handle;
 
     if (
         owner.slot >= MICROS_PROCESS_CAPACITY
@@ -56,28 +57,11 @@ static enum micros_ipc_error resolve_sole_live_thread(
     ) {
         return MICROS_IPC_ERROR_INVARIANT;
     }
-    for (index = 0; index < MICROS_THREAD_CAPACITY; ++index) {
-        const struct micros_thread *candidate =
-            &objects->threads[index];
-
-        if (
-            candidate->slot_state
-                != MICROS_KERNEL_OBJECT_SLOT_LIVE
-            || !ipc_process_handles_equal(candidate->owner, owner)
-        ) {
-            continue;
-        }
-        if (matched != NULL) {
-            return MICROS_IPC_ERROR_INVARIANT;
-        }
-        matched = candidate;
-        matched_handle.slot = (uint16_t)index;
-        matched_handle.generation = candidate->generation;
-    }
+    matched_handle = process->sole_thread;
     if (
-        matched == NULL
-        || scheduler_core_preflight_thread(objects, matched_handle, &matched)
+        scheduler_core_preflight_thread(objects, matched_handle, &matched)
             != MICROS_KERNEL_OBJECT_OK
+        || !ipc_process_handles_equal(matched->owner, owner)
         || ((matched->runtime_flags & MICROS_THREAD_RTS_IPC_MASK) != 0
             && !micros_endpoint_thread_ipc_state_is_valid(registry, objects, matched_handle))
     ) {
@@ -86,6 +70,29 @@ static enum micros_ipc_error resolve_sole_live_thread(
     *thread_handle = matched_handle;
     *thread = matched;
     return MICROS_IPC_OK;
+}
+
+static bool root_thread_index_is_valid(
+    const struct micros_kernel_objects *objects,
+    struct micros_thread_handle handle
+)
+{
+    const struct micros_thread *thread;
+    const struct micros_process *process;
+
+    if (
+        scheduler_core_preflight_registry(objects) != MICROS_KERNEL_OBJECT_OK
+        || micros_thread_resolve(objects, handle, &thread) != MICROS_KERNEL_OBJECT_OK
+        || micros_process_resolve(objects, thread->owner, &process) != MICROS_KERNEL_OBJECT_OK
+        || process->live_thread_count == 0
+        || process->live_thread_count > objects->max_threads_per_process
+        || process->live_thread_count > objects->live_thread_count
+    ) {
+        return false;
+    }
+    return process->live_thread_count == 1
+        ? ipc_thread_handles_equal(process->sole_thread, handle)
+        : ipc_thread_handle_is_zero(process->sole_thread);
 }
 
 static enum micros_ipc_error blocked_dependency(
@@ -150,9 +157,8 @@ enum micros_ipc_error ipc_preflight_deadlock(
     struct micros_thread_handle cleared_dependency
 )
 {
-    struct micros_thread_handle visited[MICROS_THREAD_CAPACITY];
-    const struct micros_thread *unused_candidate;
-    size_t visited_count = 0;
+    uint64_t visited_low = 0;
+    uint64_t visited_high = 0;
     size_t steps;
 
     if (
@@ -163,24 +169,12 @@ enum micros_ipc_error ipc_preflight_deadlock(
             ? MICROS_IPC_OK
             : MICROS_IPC_ERROR_INVARIANT;
     }
-    if (
-        micros_thread_resolve(objects, candidate, &unused_candidate)
-            != MICROS_KERNEL_OBJECT_OK
-    ) {
+    if (!root_thread_index_is_valid(objects, candidate)) {
         return MICROS_IPC_ERROR_INVARIANT;
     }
-    if (!ipc_thread_handle_is_zero(cleared_dependency)) {
-        const struct micros_thread *unused_cleared;
-
-        if (
-            micros_thread_resolve(
-                objects,
-                cleared_dependency,
-                &unused_cleared
-            ) != MICROS_KERNEL_OBJECT_OK
-        ) {
-            return MICROS_IPC_ERROR_INVARIANT;
-        }
+    if (!ipc_thread_handle_is_zero(cleared_dependency)
+        && !root_thread_index_is_valid(objects, cleared_dependency)) {
+        return MICROS_IPC_ERROR_INVARIANT;
     }
 
     for (steps = 0; steps < MICROS_THREAD_CAPACITY; ++steps) {
@@ -190,7 +184,8 @@ enum micros_ipc_error ipc_preflight_deadlock(
         micros_endpoint_t next_dependency = MICROS_ENDPOINT_NONE;
         enum micros_ipc_error error;
         bool has_dependency;
-        size_t index;
+        uint64_t *visited;
+        uint64_t bit;
 
         error = resolve_dependency_endpoint(
             registry,
@@ -214,13 +209,12 @@ enum micros_ipc_error ipc_preflight_deadlock(
         if (ipc_thread_handles_equal(thread_handle, candidate)) {
             return MICROS_IPC_ERROR_DEADLOCK;
         }
-        for (index = 0; index < visited_count; ++index) {
-            if (ipc_thread_handles_equal(visited[index], thread_handle)) {
-                return MICROS_IPC_ERROR_INVARIANT;
-            }
+        visited = thread_handle.slot < 64 ? &visited_low : &visited_high;
+        bit = UINT64_C(1) << (thread_handle.slot % 64);
+        if ((*visited & bit) != 0) {
+            return MICROS_IPC_ERROR_INVARIANT;
         }
-        visited[visited_count] = thread_handle;
-        ++visited_count;
+        *visited |= bit;
 
         error = blocked_dependency(
             thread,

@@ -30,6 +30,24 @@ static bool compare_acceptance_processes(
             &model->processes[index];
         const struct micros_process *actual =
             &fixture->objects.processes[index];
+        struct micros_thread_handle sole = {0, 0};
+
+        if (expected->live_thread_count == 1) {
+            for (size_t slot = 0; slot < MICROS_THREAD_CAPACITY; ++slot) {
+                const struct model_thread *thread = &model->threads[slot];
+
+                if (
+                    thread->slot_state == MICROS_KERNEL_OBJECT_SLOT_LIVE
+                    && thread->owner.slot == index
+                    && thread->owner.generation == expected->generation
+                ) {
+                    sole = (struct micros_thread_handle){
+                        (uint16_t)slot, thread->generation
+                    };
+                    break;
+                }
+            }
+        }
 
         if (
             expected->slot_state != actual->slot_state
@@ -39,6 +57,7 @@ static bool compare_acceptance_processes(
             || expected->privilege_profile != actual->privilege_profile
             || expected->endpoint_lifecycle_consumed
                 != actual->endpoint_lifecycle_consumed
+            || !ipc_model_thread_handles_equal(sole, actual->sole_thread)
         ) {
             fprintf(
                 stderr,

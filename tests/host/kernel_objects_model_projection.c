@@ -11,6 +11,19 @@ static bool kernel_object_test_model_processes_match(
         const struct lifecycle_model_process *expected =
             &model->processes[index];
         const struct micros_process *actual = &fixture->processes[index];
+        struct micros_thread_handle sole = {0, 0};
+
+        if (expected->thread_count == 1) {
+            for (size_t slot = 0; slot < MICROS_THREAD_CAPACITY; ++slot) {
+                const struct lifecycle_model_thread *thread = &model->threads[slot];
+
+                if (thread->live && thread->owner.slot == index
+                    && thread->owner.generation == expected->generation) {
+                    sole = (struct micros_thread_handle){(uint16_t)slot, thread->generation};
+                    break;
+                }
+            }
+        }
 
         if (
             actual->slot_state
@@ -26,6 +39,8 @@ static bool kernel_object_test_model_processes_match(
             || actual->primary_endpoint
                 != MICROS_PROCESS_ENDPOINT_NONE
             || actual->privilege_profile != 0
+            || actual->sole_thread.slot != sole.slot
+            || actual->sole_thread.generation != sole.generation
         ) {
             return false;
         }

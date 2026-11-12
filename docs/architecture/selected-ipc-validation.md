@@ -625,13 +625,15 @@ The endpoint owners admit current identities, profiles and canonical selected
 queue/completion shapes. IPC owners retain the caller, destination, matching
 prefix or no-match, token and receive choice through the last fallible
 scheduler step. `scheduler_completion.c` retains the existing physical chunks
-and ABI result through its lookup-free commit. No public ABI or persistent
-object/registry layout changes.
+and ABI result through its lookup-free commit. IPC01 itself adds no public ABI
+or persistent object/registry layout change.
 
 `selected-ipc-validation` compiles the actual current portable owners plus
 completion, buffer and ABI sources into ordinary and observed native products.
-Its sixty cases cover queries, operations, malformed selected state, lifecycle
-and actual completion planning/commit. The completion fixture substitutes only
+Its original sixty cases cover queries, operations, malformed selected state,
+lifecycle and actual completion planning/commit; the
+[linear dependency contract](linear-ipc-deadlock.md) adds its own cases without
+replacing them. The completion fixture substitutes only
 runtime-registry access, address translation and fatal reporting, and checks
 exact physical writes, register preservation and zero commit lookups.
 Hardware authority remains with the real QEMU image.

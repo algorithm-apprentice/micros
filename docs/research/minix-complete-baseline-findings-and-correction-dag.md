@@ -61,7 +61,7 @@ operation's work bound or the future B13 stack.
 The next preferred runtime outcome is **IPC02**, whose IPC01 predecessor is
 merged. Its [linear deadlock contract](../architecture/linear-ipc-deadlock.md)
 and [ADR-0125](../adr/0125-linear-ipc-deadlock.md) have clean independent design
-review and are Accepted; implementation remains pending the separate design merge.
+review and are Accepted, separately merged as #252. Implementation is in progress.
 The design does not close B04-F003.
 
 Validation simplification #248 follows separate design #247 / ADR-0123.

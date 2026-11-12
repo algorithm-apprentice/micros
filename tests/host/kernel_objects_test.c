@@ -74,6 +74,10 @@ int main(void)
             "validator rejects corrupt relationships",
             kernel_object_test_validator_rejects_corrupt_relationships,
         },
+        {
+            "sole thread index preserves lifecycle and rejection state",
+            kernel_object_test_thread_index_corruption_is_atomic,
+        },
     };
     size_t index;
 

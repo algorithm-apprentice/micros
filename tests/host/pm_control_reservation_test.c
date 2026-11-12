@@ -123,6 +123,8 @@ static bool reserve_initial_process(
             &process
         ) == MICROS_KERNEL_OBJECT_OK
         && process->live_thread_count == 0
+        && process->sole_thread.slot == 0
+        && process->sole_thread.generation == 0
         && process->address_space_root == 0
         && process->primary_endpoint == MICROS_ENDPOINT_NONE
         && process->privilege_profile == 0

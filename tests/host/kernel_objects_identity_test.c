@@ -94,6 +94,7 @@ static bool kernel_object_test_thread_generation_quarantine(
     );
     fixture->threads[work->thread.slot].generation = UINT32_MAX - 1;
     work->thread.generation = UINT32_MAX - 1;
+    fixture->processes[work->process.slot].sole_thread = work->thread;
     work->stale_thread = work->thread;
     EXPECT_ERROR(
         MICROS_KERNEL_OBJECT_OK,

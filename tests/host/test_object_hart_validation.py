@@ -8,7 +8,7 @@ import unittest
 from unittest.mock import patch
 
 from tests.host.object_hart_validation_evidence import (
-    check_semantics, expected_cases, parse_native_output, producer_label,
+    check_semantics, expected_cases, expected_index_digest, parse_native_output, producer_label,
 )
 from tests.host.object_hart_validation_source import (
     observe_current_source, project_observations,
@@ -24,6 +24,9 @@ def semantic_rows():
     return tuple({
         **row, "version": 1, "preserved": 1, "outputs_preserved": 1,
         "before_state": 1, "after_state": 1, "before_output": 2, "after_output": 2,
+        "reference_before_state": 1, "reference_after_state": 1,
+        "before_index": expected_index_digest(row["threads"]),
+        "after_index": expected_index_digest(row["threads"]),
         "value": row["harts"] - 1 if row["variant"] == "last-hart"
         else int(row["variant"] == "assigned-current") if row["operation"] == "is-current"
         else (1 << 64) - 1,
@@ -68,13 +71,13 @@ class ObjectHartCurrentContractTest(unittest.TestCase):
         records, plans = [], []
         for case, before, after, before_output, after_output, value, has_effect, effect in expected["records"]:
             records.append({
-                "case": case, "before_state": before, "after_state": after,
+                "case": case, "reference_before_state": before, "reference_after_state": after,
                 "before_output": before_output ^ 17, "after_output": after_output ^ 17,
                 "value": value,
             })
             plans.append({"case": case, "before": 17, "after": 17, "has_effect": has_effect, "effect": effect})
         check_current_reference(ROOT, records, plans)
-        for field in ("before_state", "after_state", "before_output", "after_output", "value"):
+        for field in ("reference_before_state", "reference_after_state", "before_output", "after_output", "value"):
             changed = deepcopy(records)
             changed[0][field] ^= 1
             with self.subTest(field=field), self.assertRaises(ValueError):
@@ -187,7 +190,10 @@ class ObjectHartNativeProtocolTest(unittest.TestCase):
         check_semantics(rows, "current")
         with self.assertRaises(ValueError):
             check_semantics(rows[:-1], "current")
-        for field, value in (("after_state", 0), ("outputs_preserved", 0), ("result", 0)):
+        for field, value in (
+            ("after_state", 0), ("outputs_preserved", 0), ("result", 0),
+            ("before_index", 0), ("after_index", 0),
+        ):
             changed = deepcopy(rows)
             index = next(index for index, row in enumerate(changed) if row["result"] == 8)
             changed[index][field] = value

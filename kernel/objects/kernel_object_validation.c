@@ -231,6 +231,8 @@ static bool kernel_object_validation_process_slots_match(
         case MICROS_KERNEL_OBJECT_SLOT_FREE:
             if (
                 process->live_thread_count != 0
+                || process->sole_thread.slot != 0
+                || process->sole_thread.generation != 0
                 || process->address_space_root != 0
                 || process->primary_endpoint
                     != MICROS_PROCESS_ENDPOINT_NONE
@@ -259,6 +261,8 @@ static bool kernel_object_validation_process_slots_match(
             if (
                 process->generation == 0
                 || process->live_thread_count != 0
+                || process->sole_thread.slot != 0
+                || process->sole_thread.generation != 0
                 || process->address_space_root != 0
                 || process->primary_endpoint
                     != MICROS_PROCESS_ENDPOINT_NONE
@@ -422,6 +426,9 @@ static bool kernel_object_validation_process_counts_match(
                     != process_thread_counts[index]
                 || process_thread_counts[index]
                     > objects->max_threads_per_process
+                || !kernel_object_process_thread_index_is_valid(
+                    objects, process, (struct micros_process_handle){(uint16_t)index, process->generation}
+                )
             )
         ) {
             return false;

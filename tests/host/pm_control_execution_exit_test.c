@@ -174,6 +174,8 @@ static bool detach_child_execution(
         && context->objects.processes[
             scenario->child.slot
         ].live_thread_count == 0
+        && context->objects.processes[scenario->child.slot].sole_thread.slot == 0
+        && context->objects.processes[scenario->child.slot].sole_thread.generation == 0
         && context->objects.processes[
             scenario->child.slot
         ].primary_endpoint == MICROS_PROCESS_ENDPOINT_NONE

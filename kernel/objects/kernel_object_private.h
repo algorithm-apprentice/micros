@@ -28,6 +28,12 @@ bool kernel_object_thread_handle_is_null(
     struct micros_thread_handle handle
 );
 
+bool kernel_object_process_thread_index_is_valid(
+    const struct micros_kernel_objects *objects,
+    const struct micros_process *process,
+    struct micros_process_handle owner
+);
+
 bool kernel_object_hart_handle_is_null(struct micros_hart_handle handle);
 
 bool kernel_object_thread_scheduler_metadata_is_zero(

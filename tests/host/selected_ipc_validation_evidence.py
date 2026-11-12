@@ -81,6 +81,24 @@ LIFECYCLE_CASES = (
     ("publish-bad-current", 0, 1, 12, 1),
     ("reserve-dirty-record", 0, 0, 12, 1),
 )
+DEPENDENCY_CASES = (
+    ("dependency-short", 1, 0), ("dependency-medium", 7, 0),
+    ("dependency-long", 63, 0), ("dependency-cross-word", 63, 0),
+    ("dependency-high", 63, 0), ("dependency-candidate-short", 2, 6),
+    ("dependency-candidate-long", 64, 6), ("dependency-repeated-short", 3, 11),
+    ("dependency-repeated-long", 64, 11), ("dependency-any", 7, 0),
+    ("dependency-cleared", 63, 0), ("dependency-initial-any", 0, 0),
+    ("dependency-initial-none", 0, 11),
+    ("dependency-permuted", 63, 0),
+    ("dependency-bad-cleared", 0, 11),
+)
+OPERATION_DEPENDENCY_HOPS = {"send-wait": 1, "send-unmatched": 2, "call-wait": 1}
+INDEX_CASES = (
+    ("index-create-first", 1, 0, 1), ("index-create-second", 2, 0, 2),
+    ("index-release-single", 0, 0, 8), ("index-release-pair-low", 1, 0, 8 + 128),
+    ("index-release-pair-high", 1, 0, 8 + 128), ("index-release-many", 2, 0, 8),
+    ("index-repair-missing", 2, 15, 8 + 128), ("index-repair-duplicate", 2, 15, 8 + 128),
+)
 
 def completion_cases():
     rows = []
@@ -119,10 +137,18 @@ def expected_cases():
         "value": spec[1], "preserved": spec[4],
     } for index, spec in enumerate(LIFECYCLE_CASES, len(queries) + len(operations) + 1))
     ordinary = tuple({**row, "lookups": 0, "translations": 0} for row in queries + operations + lifecycles)
-    return ordinary + tuple(
+    completed = ordinary + tuple(
         {"version": 1, "case": index, **row}
         for index, row in enumerate(completion_cases(), len(ordinary) + 1)
     )
+    dependencies = completed + tuple({
+        "version": 1, "case": index, "name": name, "result": result,
+        "value": hops, "preserved": 1, "lookups": 0, "translations": 0,
+    } for index, (name, hops, result) in enumerate(DEPENDENCY_CASES, len(completed) + 1))
+    return dependencies + tuple({
+        "version": 1, "case": index, "name": name, "result": result,
+        "value": count, "preserved": int(result != 0), "lookups": 0, "translations": 0,
+    } for index, (name, count, result, _) in enumerate(INDEX_CASES, len(dependencies) + 1))
 
 
 def case_identities(records):
@@ -195,8 +221,11 @@ def work_failures(records, work):
     failures = []
     specs = (tuple((*spec, 0, 0) for spec in QUERY_CASES) + IPC_CASES
              + tuple((*spec[:3], 0, 0) for spec in LIFECYCLE_CASES)
-             + tuple((row["name"], row["value"], 0, 0, 2) for row in completion_cases()))
+             + tuple((row["name"], row["value"], 0, 0, 2) for row in completion_cases())
+             + tuple((name, hops, 0, 0, 0) for name, hops, _ in DEPENDENCY_CASES)
+             + tuple((name, count, 0, 0, 0) for name, count, _, _ in INDEX_CASES))
     lifecycle = {spec[0] for spec in LIFECYCLE_CASES}
+    index_visits = {row[0]: row[3] for row in INDEX_CASES}
     for row, snapshot, spec in zip(records, work, specs, strict=True):
         if row["case"] != snapshot["case"]:
             raise ValueError("IPC01 work oracle borrowed a different case")
@@ -231,8 +260,37 @@ def work_failures(records, work):
         )
         links = totals.per_owner[Owner.KERNEL_IPC][Kind.LINK_TRAVERSE]
         link_bound = 2 * 64 + 3 if row["name"] == "cancel-close" else 2 * prefix
+        link_bound += OPERATION_DEPENDENCY_HOPS.get(row["name"], 0)
+        if row["name"].startswith("dependency-"):
+            link_bound = row["value"]
+            probes = totals.per_owner[Owner.KERNEL_IPC][Kind.INDEX_PROBE]
+            comparisons = totals.per_owner[Owner.KERNEL_IPC][Kind.COMPARISON]
+            visits = totals.per_kind[Kind.RECORD_VISIT]
+            if links != row["value"]:
+                failures.append((row["name"], "dependency-hops", links, row["value"]))
+            if probes > 2 * row["value"] + 4:
+                failures.append((row["name"], "dependency-index-probes", probes, 2 * row["value"] + 4))
+            if comparisons:
+                failures.append((row["name"], "visited-prefix-comparisons", comparisons, 0))
+            if visits:
+                failures.append((row["name"], "dependency-table-visits", visits, 0))
+            words = totals.per_owner[Owner.KERNEL_IPC][Kind.BITMAP_WORD_LOAD]
+            expected_words = row["value"] - int(row["result"] == 6)
+            if words != expected_words:
+                failures.append((row["name"], "visited-word-probes", words, expected_words))
+            cleared = totals.per_owner[Owner.KERNEL_IPC][Kind.CLEARED_BYTE]
+            if cleared != 16:
+                failures.append((row["name"], "visited-storage-initialization", cleared, 16))
+        if row["name"] in index_visits:
+            visits = totals.per_owner[Owner.KERNEL_OBJECTS][Kind.RECORD_VISIT]
+            bound = index_visits[row["name"]]
+            if visits > bound or row["result"] == 0 and visits != bound:
+                failures.append((row["name"], "index-lifetime-slot-visits", visits, bound))
+            probes = totals.per_owner[Owner.KERNEL_OBJECTS][Kind.INDEX_PROBE]
+            if probes > 2 * bound + 8:
+                failures.append((row["name"], "index-lifetime-index-probes", probes, 2 * bound + 8))
         if links > link_bound:
-            failures.append((row["name"], "queue-prefix-and-replay", links, link_bound))
+            failures.append((row["name"], "queue-prefix-replay-and-dependency-hops", links, link_bound))
         token_rows = totals.per_owner[Owner.KERNEL_IPC][Kind.RECORD_VISIT]
         token_bound = 4 * 128 + 5 * 64 if row["name"] == "cancel-close" else spec[4]
         if token_rows > token_bound:

@@ -29,5 +29,7 @@ bool selected_ipc_report_case(
 );
 bool selected_ipc_completion_cases(size_t first_case);
 size_t selected_ipc_completion_case_count(void);
+bool selected_ipc_deadlock_cases(size_t first_case);
+size_t selected_ipc_deadlock_case_count(void);
 
 #endif

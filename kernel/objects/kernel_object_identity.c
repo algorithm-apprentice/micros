@@ -52,6 +52,35 @@ bool kernel_object_hart_handle_is_null(struct micros_hart_handle handle)
     return handle.generation == 0;
 }
 
+bool kernel_object_process_thread_index_is_valid(
+    const struct micros_kernel_objects *objects,
+    const struct micros_process *process,
+    struct micros_process_handle owner
+)
+{
+    const struct micros_thread *thread;
+
+    if (
+        objects->max_threads_per_process == 0
+        || objects->max_threads_per_process > MICROS_THREAD_CAPACITY
+        || objects->live_thread_count > MICROS_THREAD_CAPACITY
+        || process->live_thread_count > objects->max_threads_per_process
+        || process->live_thread_count > objects->live_thread_count
+    ) {
+        return false;
+    }
+    if (process->live_thread_count != 1) {
+        return process->sole_thread.slot == 0 && process->sole_thread.generation == 0;
+    }
+    if (!kernel_object_thread_handle_is_valid(process->sole_thread)) {
+        return false;
+    }
+    thread = &objects->threads[process->sole_thread.slot];
+    return thread->slot_state == MICROS_KERNEL_OBJECT_SLOT_LIVE
+        && thread->generation == process->sole_thread.generation
+        && thread->owner.slot == owner.slot && thread->owner.generation == owner.generation;
+}
+
 enum micros_kernel_object_error kernel_object_require_initialized(
     const struct micros_kernel_objects *objects
 )

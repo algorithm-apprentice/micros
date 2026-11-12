@@ -719,41 +719,70 @@ def trace_target_effects(obj, *, trace_test=False):
     return result
 
 
+def require_trace_object_header(name, source):
+    from tests.host.c_source_records import tokens
+    from tests.host.panic_trace_source import FATAL_EFFECT_CONTRACT, fixed_source
+    from tests.host.work_count_lexical import matching_tokens
+    from tools.stack_bound_bindings import proof_header_tokens
+
+    protected = {symbol for _, symbol in FATAL_EFFECT_CONTRACT["selected_resolvers"]}
+    actual = proof_header_tokens(source, protected)
+    expected = proof_header_tokens(fixed_source(name), protected)
+    if actual == expected:
+        return
+    if name == "include/micros/kernel_objects.h":
+        starts = tuple(index for index in range(len(expected))
+                       if expected[index:index + 3] == ("struct", "micros_process", "{"))
+        if len(starts) == 1:
+            closing = matching_tokens(expected, starts[0] + 2)
+            extension = tokens("struct micros_thread_handle sole_thread;")
+            if actual == expected[:closing] + extension + expected[closing:]:
+                return
+    raise StackEvidenceError("trace ownership header exceeds its exact sole-index boundary: " + name)
+
+
 def trace_object_layout(root):
     import os
     from pathlib import Path
     import re
 
-    from tests.host.panic_trace_source import fixed_source
     from tools.stack_artifact_files import read_regular
     from tools.validation_context import target_compiler
     from tools.validation_inputs import _file_identity
 
     root = Path(root)
-    pending, checked = ["kernel/objects/kernel_object_private.h"], set()
+    pending, checked = ["kernel/objects/kernel_object_private.h"], {}
     while pending:
         name = pending.pop()
         if name in checked:
             continue
-        data = read_regular(root / name)[0].decode()
-        if data != fixed_source(name):
-            raise StackEvidenceError("trace ownership layout changed a fixed predecessor header")
-        checked.add(name)
+        raw, identity = read_regular(root / name)
+        data = raw.decode()
+        require_trace_object_header(name, data)
+        checked[name] = tuple(sorted(identity.items()))
         pending.extend("include/" + name if name.startswith("micros/") else name
                        for name in re.findall(r'^#include "([^"]+)"$', data, flags=re.MULTILINE))
     compiler = str(target_compiler(dict(os.environ)).resolve(strict=True))
-    return dict(_trace_layout_object(str(root), compiler, _file_identity(Path(compiler))["sha256"]))
+    identities = tuple(sorted(checked.items()))
+    result = dict(_trace_layout_object(str(root), compiler, _file_identity(Path(compiler))["sha256"], identities))
+    if any(tuple(sorted(read_regular(root / name)[1].items())) != identity for name, identity in identities):
+        raise StackEvidenceError("trace ownership headers changed during layout compilation")
+    return result
 
 
 @lru_cache(maxsize=4)
-def _trace_layout_object(root, compiler, compiler_sha256):
+def _trace_layout_object(root, compiler, compiler_sha256, header_identities):
     from pathlib import Path
     import subprocess
     import tempfile
 
     from tools.stack_bound_objects import load_object, section_bytes
+    from tools.stack_artifact_files import read_regular
     from tools.validation_inputs import _file_identity
 
+    if any(tuple(sorted(read_regular(Path(root) / name)[1].items())) != identity
+           for name, identity in header_identities):
+        raise StackEvidenceError("trace ownership layout inputs changed before compilation")
     expressions = {
         "registry_bytes": "sizeof(struct micros_kernel_objects)",
         "magic": "MICROS_KERNEL_OBJECTS_MAGIC",

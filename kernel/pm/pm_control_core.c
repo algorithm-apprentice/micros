@@ -148,6 +148,7 @@ bool micros_pm_control_process_is_empty(
 {
     return (
         process->live_thread_count == 0
+        && micros_pm_control_thread_handle_is_zero(process->sole_thread)
         && process->address_space_root == 0
         && process->primary_endpoint == MICROS_PROCESS_ENDPOINT_NONE
         && process->privilege_profile == 0

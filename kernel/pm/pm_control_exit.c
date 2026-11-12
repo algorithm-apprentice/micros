@@ -450,6 +450,7 @@ void micros_pm_control_exit_detach_commit_prevalidated(
     thread->generation = generation;
     --process->live_thread_count;
     --objects->live_thread_count;
+    process->sole_thread = (struct micros_thread_handle){0, 0};
     (void)micros_vm_load_mark_exit_detached(
         vm,
         plan->process,
@@ -554,6 +555,7 @@ void micros_pm_control_release_exited_commit_prevalidated(
         ? MICROS_KERNEL_OBJECT_SLOT_QUARANTINED
         : MICROS_KERNEL_OBJECT_SLOT_FREE;
     process->live_thread_count = 0;
+    process->sole_thread = (struct micros_thread_handle){0, 0};
     process->address_space_root = 0;
     process->primary_endpoint = MICROS_PROCESS_ENDPOINT_NONE;
     process->privilege_profile = 0;

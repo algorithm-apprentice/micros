@@ -406,15 +406,16 @@
         "kernel/ipc/ipc_deadlock.c": {
           "blocked_dependency": [],
           "ipc_preflight_deadlock": [
-            [["work"],["ipc01/kernel/ipc/ipc_deadlock.c/ipc_preflight_deadlock/loop-109","insert","KERNEL_IPC","COMPARISON",1,"entry","",[["for ( steps = 0 ; steps < MICROS_THREAD_CAPACITY ; ++ steps ) {",0]],0,0]],
-            [["work"],["ipc01/kernel/ipc/ipc_deadlock.c/ipc_preflight_deadlock/loop-219","insert","KERNEL_IPC","COMPARISON",1,"entry","",[["for ( steps = 0 ; steps < MICROS_THREAD_CAPACITY ; ++ steps ) {",0],["for ( index = 0 ; index < visited_count ; ++ index ) {",0]],0,0]]
+            [["work"],["ipc01/kernel/ipc/ipc_deadlock.c/ipc_preflight_deadlock/visited_low","insert","KERNEL_IPC","CLEARED_BYTE",8,"after","uint64_t visited_low = 0 ;",[],0,1]],
+            [["work"],["ipc01/kernel/ipc/ipc_deadlock.c/ipc_preflight_deadlock/visited_high","insert","KERNEL_IPC","CLEARED_BYTE",8,"after","uint64_t visited_high = 0 ;",[],0,1]],
+            [["work"],["ipc01/kernel/ipc/ipc_deadlock.c/ipc_preflight_deadlock/loop-83","insert","KERNEL_IPC","LINK_TRAVERSE",1,"entry","",[["for ( steps = 0 ; steps < MICROS_THREAD_CAPACITY ; ++ steps ) {",0]],0,0]],
+            [["work"],["ipc01/kernel/ipc/ipc_deadlock.c/ipc_preflight_deadlock/visited-word","wrap","KERNEL_IPC","BITMAP_WORD_LOAD",1,"value","* visited",[["for ( steps = 0 ; steps < MICROS_THREAD_CAPACITY ; ++ steps ) {",0]],1,3]]
           ],
           "resolve_dependency_endpoint": [],
           "resolve_sole_live_thread": [
-            [["work"],["ipc01/kernel/ipc/ipc_deadlock.c/resolve_sole_live_thread/index-52","wrap","KERNEL_IPC","INDEX_PROBE",1,"value","owner . slot",[],1,2]],
-            [["work"],["ipc01/kernel/ipc/ipc_deadlock.c/resolve_sole_live_thread/loop-98","insert","KERNEL_IPC","INDEX_PROBE",1,"entry","",[["for ( index = 0 ; index < MICROS_THREAD_CAPACITY ; ++ index ) {",0]],0,0]],
-            [["work"],["ipc01/kernel/ipc/ipc_deadlock.c/resolve_sole_live_thread/index-109","wrap","KERNEL_IPC","INDEX_PROBE",1,"value","index",[["for ( index = 0 ; index < MICROS_THREAD_CAPACITY ; ++ index ) {",0]],0,2]]
-          ]
+            [["work"],["ipc01/kernel/ipc/ipc_deadlock.c/resolve_sole_live_thread/index-41","wrap","KERNEL_IPC","INDEX_PROBE",1,"value","owner . slot",[],1,2]]
+          ],
+          "root_thread_index_is_valid": []
         },
         "kernel/ipc/ipc_notifications.c": {
           "canonicalize_notification": [
@@ -562,6 +563,9 @@
           "kernel_object_hart_handle_is_null": [],
           "kernel_object_hart_handle_is_valid": [],
           "kernel_object_process_handle_is_valid": [],
+          "kernel_object_process_thread_index_is_valid": [
+            [["work"],["ipc01/kernel/objects/kernel_object_identity.c/kernel_object_process_thread_index_is_valid/index-95","wrap","KERNEL_OBJECTS","INDEX_PROBE",1,"value","process -> sole_thread . slot",[],0,1]]
+          ],
           "kernel_object_require_initialized": [],
           "kernel_object_resolve_hart_mutable": [
             [["work"],["ipc01/kernel/objects/kernel_object_identity.c/kernel_object_resolve_hart_mutable/index-24","wrap","KERNEL_OBJECTS","INDEX_PROBE",1,"value","handle . slot",[],0,1]]
@@ -585,7 +589,7 @@
             [["work"],["ipc01/kernel/objects/kernel_object_process.c/micros_process_create/index-63","wrap","KERNEL_OBJECTS","INDEX_PROBE",1,"value","index",[["for ( index = 0 ; index < MICROS_PROCESS_CAPACITY ; ++ index ) {",0]],0,2]]
           ],
           "micros_process_create_at": [
-            [["work"],["ipc01/kernel/objects/kernel_object_process.c/micros_process_create_at/index-55","wrap","KERNEL_OBJECTS","INDEX_PROBE",1,"value","slot",[],1,5]]
+            [["work"],["ipc01/kernel/objects/kernel_object_process.c/micros_process_create_at/index-55","wrap","KERNEL_OBJECTS","INDEX_PROBE",1,"value","slot",[],1,6]]
           ],
           "micros_process_detach_address_space": [],
           "micros_process_release": [],
@@ -600,18 +604,18 @@
         },
         "kernel/objects/kernel_object_state.c": {
           "bytes_are_zero": [
-            [["work"],["ipc01/kernel/objects/kernel_object_state.c/bytes_are_zero/loop-24","insert","KERNEL_OBJECTS","RECORD_VISIT",1,"entry","",[["for ( index = 0 ; index < size ; ++ index ) {",0]],0,0]]
+            [["work"],["ipc01/kernel/objects/kernel_object_state.c/bytes_are_zero/loop-24","insert","KERNEL_OBJECTS","COMPARISON",1,"entry","",[["for ( index = 0 ; index < size ; ++ index ) {",0]],0,0]]
           ],
           "clear_bytes": [
-            [["work"],["ipc01/kernel/objects/kernel_object_state.c/clear_bytes/loop-23","insert","KERNEL_OBJECTS","RECORD_VISIT",1,"entry","",[["for ( index = 0 ; index < size ; ++ index ) {",0]],0,0]]
+            [["work"],["ipc01/kernel/objects/kernel_object_state.c/clear_bytes/loop-23","insert","KERNEL_OBJECTS","CLEARED_BYTE",1,"entry","",[["for ( index = 0 ; index < size ; ++ index ) {",0]],0,0]]
           ],
           "kernel_object_clear_thread_ipc_state": [],
           "kernel_object_clear_thread_scheduler_metadata": [],
           "kernel_object_clear_user_context": [
-            [["work"],["ipc01/kernel/objects/kernel_object_state.c/kernel_object_clear_user_context/loop-32","insert","KERNEL_OBJECTS","RECORD_VISIT",1,"entry","",[["for ( index = 0 ; index < sizeof ( * context ) ; ++ index ) {",0]],0,0]]
+            [["work"],["ipc01/kernel/objects/kernel_object_state.c/kernel_object_clear_user_context/loop-32","insert","KERNEL_OBJECTS","CLEARED_BYTE",1,"entry","",[["for ( index = 0 ; index < sizeof ( * context ) ; ++ index ) {",0]],0,0]]
           ],
           "kernel_object_copy_user_context": [
-            [["work"],["ipc01/kernel/objects/kernel_object_state.c/kernel_object_copy_user_context/loop-46","insert","KERNEL_OBJECTS","RECORD_VISIT",1,"entry","",[["for ( index = 0 ; index < sizeof ( * destination ) ; ++ index ) {",0]],0,0]]
+            [["work"],["ipc01/kernel/objects/kernel_object_state.c/kernel_object_copy_user_context/loop-46","insert","KERNEL_OBJECTS","COPIED_BYTE",1,"entry","",[["for ( index = 0 ; index < sizeof ( * destination ) ; ++ index ) {",0]],0,0]]
           ],
           "kernel_object_storage_is_zero": [],
           "kernel_object_thread_scheduler_metadata_is_zero": [],
@@ -624,15 +628,19 @@
         },
         "kernel/objects/kernel_object_thread.c": {
           "micros_thread_create": [
-            [["work"],["ipc01/kernel/objects/kernel_object_thread.c/micros_thread_create/loop-96","insert","KERNEL_OBJECTS","RECORD_VISIT",1,"entry","",[["for ( index = 0 ; index < MICROS_THREAD_CAPACITY ; ++ index ) {",0]],0,0]],
-            [["work"],["ipc01/kernel/objects/kernel_object_thread.c/micros_thread_create/index-106","wrap","KERNEL_OBJECTS","INDEX_PROBE",1,"value","index",[["for ( index = 0 ; index < MICROS_THREAD_CAPACITY ; ++ index ) {",0]],0,2]]
+            [["work"],["ipc01/kernel/objects/kernel_object_thread.c/micros_thread_create/loop-113","insert","KERNEL_OBJECTS","RECORD_VISIT",1,"entry","",[["for ( index = 0 ; index < MICROS_THREAD_CAPACITY ; ++ index ) {",0]],0,0]],
+            [["work"],["ipc01/kernel/objects/kernel_object_thread.c/micros_thread_create/index-123","wrap","KERNEL_OBJECTS","INDEX_PROBE",1,"value","index",[["for ( index = 0 ; index < MICROS_THREAD_CAPACITY ; ++ index ) {",0]],0,2]]
           ],
           "micros_thread_release": [
-            [["work"],["ipc01/kernel/objects/kernel_object_thread.c/micros_thread_release/loop-112","insert","KERNEL_OBJECTS","RECORD_VISIT",1,"entry","",[["for ( index = 0 ; index < MICROS_HART_CAPACITY ; ++ index ) {",0]],0,0]],
-            [["work"],["ipc01/kernel/objects/kernel_object_thread.c/micros_thread_release/index-123","wrap","KERNEL_OBJECTS","INDEX_PROBE",1,"value","index",[["for ( index = 0 ; index < MICROS_HART_CAPACITY ; ++ index ) {",0]],0,1]]
+            [["work"],["ipc01/kernel/objects/kernel_object_thread.c/micros_thread_release/loop-122","insert","KERNEL_OBJECTS","RECORD_VISIT",1,"entry","",[["for ( index = 0 ; index < MICROS_HART_CAPACITY ; ++ index ) {",0]],0,0]],
+            [["work"],["ipc01/kernel/objects/kernel_object_thread.c/micros_thread_release/index-133","wrap","KERNEL_OBJECTS","INDEX_PROBE",1,"value","index",[["for ( index = 0 ; index < MICROS_HART_CAPACITY ; ++ index ) {",0]],0,1]]
           ],
           "micros_thread_resolve": [
             [["work"],["ipc01/kernel/objects/kernel_object_thread.c/micros_thread_resolve/index-62","wrap","KERNEL_OBJECTS","INDEX_PROBE",1,"value","handle . slot",[],0,1]]
+          ],
+          "select_release_survivor": [
+            [["work"],["ipc01/kernel/objects/kernel_object_thread.c/select_release_survivor/loop-24","insert","KERNEL_OBJECTS","RECORD_VISIT",1,"entry","",[["for ( size_t index = 0 ; index < MICROS_THREAD_CAPACITY ; ++ index ) {",0]],0,0]],
+            [["work"],["ipc01/kernel/objects/kernel_object_thread.c/select_release_survivor/index-35","wrap","KERNEL_OBJECTS","INDEX_PROBE",1,"value","index",[["for ( size_t index = 0 ; index < MICROS_THREAD_CAPACITY ; ++ index ) {",0]],0,2]]
           ]
         },
         "kernel/objects/kernel_object_validation.c": {
@@ -1276,6 +1284,7 @@
           "kernel_object_hart_handle_is_null": [],
           "kernel_object_hart_handle_is_valid": [],
           "kernel_object_process_handle_is_valid": [],
+          "kernel_object_process_thread_index_is_valid": [],
           "kernel_object_require_initialized": [],
           "kernel_object_resolve_hart_mutable": [],
           "kernel_object_resolve_process_mutable": [],
@@ -1316,7 +1325,8 @@
         "kernel/objects/kernel_object_thread.c": {
           "micros_thread_create": [],
           "micros_thread_release": [],
-          "micros_thread_resolve": []
+          "micros_thread_resolve": [],
+          "select_release_survivor": []
         },
         "kernel/objects/kernel_object_validation.c": {
           "kernel_object_validation_current_binding_matches": [],
@@ -1875,6 +1885,7 @@
           "kernel_object_hart_handle_is_null": [],
           "kernel_object_hart_handle_is_valid": [],
           "kernel_object_process_handle_is_valid": [],
+          "kernel_object_process_thread_index_is_valid": [],
           "kernel_object_require_initialized": [],
           "kernel_object_resolve_hart_mutable": [],
           "kernel_object_resolve_process_mutable": [],
@@ -1915,7 +1926,8 @@
         "kernel/objects/kernel_object_thread.c": {
           "micros_thread_create": [],
           "micros_thread_release": [],
-          "micros_thread_resolve": []
+          "micros_thread_resolve": [],
+          "select_release_survivor": []
         },
         "kernel/objects/kernel_object_validation.c": {
           "kernel_object_validation_current_binding_matches": [],
@@ -2386,7 +2398,8 @@
           "blocked_dependency": [],
           "ipc_preflight_deadlock": [],
           "resolve_dependency_endpoint": [],
-          "resolve_sole_live_thread": []
+          "resolve_sole_live_thread": [],
+          "root_thread_index_is_valid": []
         },
         "kernel/ipc/ipc_notifications.c": {
           "canonicalize_notification": [],
@@ -2860,6 +2873,7 @@
           "kernel_object_hart_handle_is_null": [],
           "kernel_object_hart_handle_is_valid": [],
           "kernel_object_process_handle_is_valid": [],
+          "kernel_object_process_thread_index_is_valid": [],
           "kernel_object_require_initialized": [],
           "kernel_object_resolve_hart_mutable": [],
           "kernel_object_resolve_process_mutable": [],
@@ -2912,7 +2926,8 @@
         "kernel/objects/kernel_object_thread.c": {
           "micros_thread_create": [],
           "micros_thread_release": [],
-          "micros_thread_resolve": []
+          "micros_thread_resolve": [],
+          "select_release_survivor": []
         },
         "kernel/objects/kernel_object_validation.c": {
           "kernel_object_validation_current_binding_matches": [],
@@ -4265,6 +4280,9 @@
           "kernel_object_hart_handle_is_null": [],
           "kernel_object_hart_handle_is_valid": [],
           "kernel_object_process_handle_is_valid": [],
+          "kernel_object_process_thread_index_is_valid": [
+            [["aggregate","context"],["ipc02-shared-mem04/ipc01/kernel/objects/kernel_object_identity.c/kernel_object_process_thread_index_is_valid/index-95","wrap","KERNEL_OBJECTS","INDEX_PROBE",1,"value","process -> sole_thread . slot",[],0,1]]
+          ],
           "kernel_object_require_initialized": [],
           "kernel_object_resolve_hart_mutable": [],
           "kernel_object_resolve_process_mutable": [],
@@ -4335,7 +4353,10 @@
           "micros_thread_release": [
             [["aggregate","context"],["mem04-a517d3da1e88731f8a76","insert","KERNEL_OBJECTS","INDEX_PROBE",1,"entry","",[["for ( index = 0 ; index < MICROS_HART_CAPACITY ; ++ index ) {",0]],0,0]]
           ],
-          "micros_thread_resolve": []
+          "micros_thread_resolve": [],
+          "select_release_survivor": [
+            [["aggregate","context"],["ipc02-shared-mem04/ipc01/kernel/objects/kernel_object_thread.c/select_release_survivor/loop-24","insert","KERNEL_OBJECTS","INDEX_PROBE",1,"entry","",[["for ( size_t index = 0 ; index < MICROS_THREAD_CAPACITY ; ++ index ) {",0]],0,0]]
+          ]
         },
         "kernel/objects/kernel_object_validation.c": {
           "kernel_object_validation_current_binding_matches": [],
@@ -5940,6 +5961,9 @@
           "kernel_object_hart_handle_is_null": [],
           "kernel_object_hart_handle_is_valid": [],
           "kernel_object_process_handle_is_valid": [],
+          "kernel_object_process_thread_index_is_valid": [
+            [["aggregate","context"],["ipc02-shared-mem05/ipc01/kernel/objects/kernel_object_identity.c/kernel_object_process_thread_index_is_valid/index-95","wrap","KERNEL_OBJECTS","RECORD_VISIT",1,"value","process -> sole_thread . slot",[],0,1]]
+          ],
           "kernel_object_require_initialized": [],
           "kernel_object_resolve_hart_mutable": [
             [["aggregate","context"],["mem05-current-c077863f6b9d6256191d","wrap","KERNEL_OBJECTS","RECORD_VISIT",1,"value","handle . slot",[],0,1]]
@@ -5963,7 +5987,7 @@
             [["aggregate","context"],["mem05-current-f553695756dc85618400","wrap","KERNEL_OBJECTS","RECORD_VISIT",1,"value","index",[["for ( index = 0 ; index < MICROS_PROCESS_CAPACITY ; ++ index ) {",0]],0,2]]
           ],
           "micros_process_create_at": [
-            [["aggregate","context"],["mem05-current-aeb7b28a49efdbacee68","wrap","KERNEL_OBJECTS","RECORD_VISIT",1,"value","slot",[],1,5]]
+            [["aggregate","context"],["ipc02-shared-mem05/ipc01/kernel/objects/kernel_object_process.c/micros_process_create_at/index-55","wrap","KERNEL_OBJECTS","RECORD_VISIT",1,"value","slot",[],1,6]]
           ],
           "micros_process_detach_address_space": [],
           "micros_process_release": [],
@@ -6027,8 +6051,8 @@
         },
         "kernel/objects/kernel_object_thread.c": {
           "micros_thread_create": [
-            [["aggregate","context"],["mem05-current-dc6c46f6c77eed1a98ab","insert","KERNEL_OBJECTS","INDEX_PROBE",1,"entry","",[["for ( index = 0 ; index < MICROS_THREAD_CAPACITY ; ++ index ) {",0]],0,0]],
-            [["aggregate","context"],["mem05-current-e0b28fc258eb9e6c5a65","wrap","KERNEL_OBJECTS","RECORD_VISIT",1,"value","index",[["for ( index = 0 ; index < MICROS_THREAD_CAPACITY ; ++ index ) {",0]],0,2]]
+            [["aggregate","context"],["ipc02-shared-mem05/ipc01/kernel/objects/kernel_object_thread.c/micros_thread_create/loop-113","insert","KERNEL_OBJECTS","INDEX_PROBE",1,"entry","",[["for ( index = 0 ; index < MICROS_THREAD_CAPACITY ; ++ index ) {",0]],0,0]],
+            [["aggregate","context"],["ipc02-shared-mem05/ipc01/kernel/objects/kernel_object_thread.c/micros_thread_create/index-123","wrap","KERNEL_OBJECTS","RECORD_VISIT",1,"value","index",[["for ( index = 0 ; index < MICROS_THREAD_CAPACITY ; ++ index ) {",0]],0,2]]
           ],
           "micros_thread_release": [
             [["aggregate","context"],["mem05-current-b24d8e8774a308110f1f","insert","KERNEL_OBJECTS","INDEX_PROBE",1,"entry","",[["for ( index = 0 ; index < MICROS_HART_CAPACITY ; ++ index ) {",0]],0,0]],
@@ -6036,6 +6060,10 @@
           ],
           "micros_thread_resolve": [
             [["aggregate","context"],["mem05-current-115f8b0375640d9e98bd","wrap","KERNEL_OBJECTS","RECORD_VISIT",1,"value","handle . slot",[],0,1]]
+          ],
+          "select_release_survivor": [
+            [["aggregate","context"],["ipc02-shared-mem05/ipc01/kernel/objects/kernel_object_thread.c/select_release_survivor/loop-24","insert","KERNEL_OBJECTS","INDEX_PROBE",1,"entry","",[["for ( size_t index = 0 ; index < MICROS_THREAD_CAPACITY ; ++ index ) {",0]],0,0]],
+            [["aggregate","context"],["ipc02-shared-mem05/ipc01/kernel/objects/kernel_object_thread.c/select_release_survivor/index-35","wrap","KERNEL_OBJECTS","RECORD_VISIT",1,"value","index",[["for ( size_t index = 0 ; index < MICROS_THREAD_CAPACITY ; ++ index ) {",0]],0,2]]
           ]
         },
         "kernel/objects/kernel_object_validation.c": {
@@ -6622,6 +6650,9 @@
           "kernel_object_hart_handle_is_null": [],
           "kernel_object_hart_handle_is_valid": [],
           "kernel_object_process_handle_is_valid": [],
+          "kernel_object_process_thread_index_is_valid": [
+            [["aggregate"],["ipc02-shared-obj01/ipc01/kernel/objects/kernel_object_identity.c/kernel_object_process_thread_index_is_valid/index-95","wrap","KERNEL_OBJECTS","RECORD_VISIT",1,"value","process -> sole_thread . slot",[],0,1]]
+          ],
           "kernel_object_require_initialized": [],
           "kernel_object_resolve_hart_mutable": [
             [["aggregate"],["obj01-161e997b0bc4ca314d4a","wrap","KERNEL_OBJECTS","RECORD_VISIT",1,"value","handle . slot",[],0,1]]
@@ -6645,7 +6676,7 @@
             [["aggregate"],["obj01-87b5036d83914a61db64","wrap","KERNEL_OBJECTS","RECORD_VISIT",1,"value","index",[["for ( index = 0 ; index < MICROS_PROCESS_CAPACITY ; ++ index ) {",0]],0,2]]
           ],
           "micros_process_create_at": [
-            [["aggregate"],["obj01-f60d4529433b612bc3b0","wrap","KERNEL_OBJECTS","RECORD_VISIT",1,"value","slot",[],1,5]]
+            [["aggregate"],["ipc02-shared-obj01/ipc01/kernel/objects/kernel_object_process.c/micros_process_create_at/index-55","wrap","KERNEL_OBJECTS","RECORD_VISIT",1,"value","slot",[],1,6]]
           ],
           "micros_process_detach_address_space": [],
           "micros_process_release": [],
@@ -6692,8 +6723,8 @@
         },
         "kernel/objects/kernel_object_thread.c": {
           "micros_thread_create": [
-            [["aggregate"],["obj01-27c1390dea672130b576","insert","KERNEL_OBJECTS","INDEX_PROBE",1,"entry","",[["for ( index = 0 ; index < MICROS_THREAD_CAPACITY ; ++ index ) {",0]],0,0]],
-            [["aggregate"],["obj01-2dfa5cd62eb781779a31","wrap","KERNEL_OBJECTS","RECORD_VISIT",1,"value","index",[["for ( index = 0 ; index < MICROS_THREAD_CAPACITY ; ++ index ) {",0]],0,2]]
+            [["aggregate"],["ipc02-shared-obj01/ipc01/kernel/objects/kernel_object_thread.c/micros_thread_create/loop-113","insert","KERNEL_OBJECTS","INDEX_PROBE",1,"entry","",[["for ( index = 0 ; index < MICROS_THREAD_CAPACITY ; ++ index ) {",0]],0,0]],
+            [["aggregate"],["ipc02-shared-obj01/ipc01/kernel/objects/kernel_object_thread.c/micros_thread_create/index-123","wrap","KERNEL_OBJECTS","RECORD_VISIT",1,"value","index",[["for ( index = 0 ; index < MICROS_THREAD_CAPACITY ; ++ index ) {",0]],0,2]]
           ],
           "micros_thread_release": [
             [["aggregate"],["obj01-91c8d104329306e7e5f3","insert","KERNEL_OBJECTS","INDEX_PROBE",1,"entry","",[["for ( index = 0 ; index < MICROS_HART_CAPACITY ; ++ index ) {",0]],0,0]],
@@ -6701,6 +6732,10 @@
           ],
           "micros_thread_resolve": [
             [["aggregate"],["obj01-360b9c20a19e9c319134","wrap","KERNEL_OBJECTS","RECORD_VISIT",1,"value","handle . slot",[],0,1]]
+          ],
+          "select_release_survivor": [
+            [["aggregate"],["ipc02-shared-obj01/ipc01/kernel/objects/kernel_object_thread.c/select_release_survivor/loop-24","insert","KERNEL_OBJECTS","INDEX_PROBE",1,"entry","",[["for ( size_t index = 0 ; index < MICROS_THREAD_CAPACITY ; ++ index ) {",0]],0,0]],
+            [["aggregate"],["ipc02-shared-obj01/ipc01/kernel/objects/kernel_object_thread.c/select_release_survivor/index-35","wrap","KERNEL_OBJECTS","RECORD_VISIT",1,"value","index",[["for ( size_t index = 0 ; index < MICROS_THREAD_CAPACITY ; ++ index ) {",0]],0,2]]
           ]
         },
         "kernel/objects/kernel_object_validation.c": {
@@ -7157,6 +7192,9 @@
           "kernel_object_hart_handle_is_null": [],
           "kernel_object_hart_handle_is_valid": [],
           "kernel_object_process_handle_is_valid": [],
+          "kernel_object_process_thread_index_is_valid": [
+            [["work"],["ipc02-shared-obj02/ipc01/kernel/objects/kernel_object_identity.c/kernel_object_process_thread_index_is_valid/index-95","wrap","KERNEL_OBJECTS","RECORD_VISIT",1,"value","process -> sole_thread . slot",[],0,1]]
+          ],
           "kernel_object_require_initialized": [],
           "kernel_object_resolve_hart_mutable": [
             [["work"],["obj02-obj01-161e997b0bc4ca314d4a","wrap","KERNEL_OBJECTS","RECORD_VISIT",1,"value","handle . slot",[],0,1]]
@@ -7180,7 +7218,7 @@
             [["work"],["obj02-obj01-87b5036d83914a61db64","wrap","KERNEL_OBJECTS","RECORD_VISIT",1,"value","index",[["for ( index = 0 ; index < MICROS_PROCESS_CAPACITY ; ++ index ) {",0]],0,2]]
           ],
           "micros_process_create_at": [
-            [["work"],["obj02-obj01-f60d4529433b612bc3b0","wrap","KERNEL_OBJECTS","RECORD_VISIT",1,"value","slot",[],1,5]]
+            [["work"],["ipc02-shared-obj02/ipc01/kernel/objects/kernel_object_process.c/micros_process_create_at/index-55","wrap","KERNEL_OBJECTS","RECORD_VISIT",1,"value","slot",[],1,6]]
           ],
           "micros_process_detach_address_space": [],
           "micros_process_release": [],
@@ -7225,8 +7263,8 @@
         },
         "kernel/objects/kernel_object_thread.c": {
           "micros_thread_create": [
-            [["work"],["obj02-obj01-27c1390dea672130b576","insert","KERNEL_OBJECTS","INDEX_PROBE",1,"entry","",[["for ( index = 0 ; index < MICROS_THREAD_CAPACITY ; ++ index ) {",0]],0,0]],
-            [["work"],["obj02-obj01-2dfa5cd62eb781779a31","wrap","KERNEL_OBJECTS","RECORD_VISIT",1,"value","index",[["for ( index = 0 ; index < MICROS_THREAD_CAPACITY ; ++ index ) {",0]],0,2]]
+            [["work"],["ipc02-shared-obj02/ipc01/kernel/objects/kernel_object_thread.c/micros_thread_create/loop-113","insert","KERNEL_OBJECTS","INDEX_PROBE",1,"entry","",[["for ( index = 0 ; index < MICROS_THREAD_CAPACITY ; ++ index ) {",0]],0,0]],
+            [["work"],["ipc02-shared-obj02/ipc01/kernel/objects/kernel_object_thread.c/micros_thread_create/index-123","wrap","KERNEL_OBJECTS","RECORD_VISIT",1,"value","index",[["for ( index = 0 ; index < MICROS_THREAD_CAPACITY ; ++ index ) {",0]],0,2]]
           ],
           "micros_thread_release": [
             [["work"],["obj02-obj01-91c8d104329306e7e5f3","insert","KERNEL_OBJECTS","INDEX_PROBE",1,"entry","",[["for ( index = 0 ; index < MICROS_HART_CAPACITY ; ++ index ) {",0]],0,0]],
@@ -7234,6 +7272,10 @@
           ],
           "micros_thread_resolve": [
             [["work"],["obj02-obj01-360b9c20a19e9c319134","wrap","KERNEL_OBJECTS","RECORD_VISIT",1,"value","handle . slot",[],0,1]]
+          ],
+          "select_release_survivor": [
+            [["work"],["ipc02-shared-obj02/ipc01/kernel/objects/kernel_object_thread.c/select_release_survivor/loop-24","insert","KERNEL_OBJECTS","INDEX_PROBE",1,"entry","",[["for ( size_t index = 0 ; index < MICROS_THREAD_CAPACITY ; ++ index ) {",0]],0,0]],
+            [["work"],["ipc02-shared-obj02/ipc01/kernel/objects/kernel_object_thread.c/select_release_survivor/index-35","wrap","KERNEL_OBJECTS","RECORD_VISIT",1,"value","index",[["for ( size_t index = 0 ; index < MICROS_THREAD_CAPACITY ; ++ index ) {",0]],0,2]]
           ]
         },
         "kernel/objects/kernel_object_validation.c": {
@@ -9700,18 +9742,13 @@
           "storage": []
         },
         "ipc_preflight_deadlock": {
-          "accesses": [
-            ["visited [ MICROS_THREAD_CAPACITY ]",[]],
-            ["visited [ index ]",[["for ( steps = 0 ; steps < MICROS_THREAD_CAPACITY ; ++ steps ) {",0],["for ( index = 0 ; index < visited_count ; ++ index ) {",0]]],
-            ["visited [ visited_count ]",[["for ( steps = 0 ; steps < MICROS_THREAD_CAPACITY ; ++ steps ) {",0]]]
-          ],
+          "accesses": [],
           "aliases": [],
-          "calls": ["blocked_dependency","ipc_thread_handle_is_zero","ipc_thread_handles_equal","micros_thread_resolve","resolve_dependency_endpoint","resolve_sole_live_thread"],
+          "calls": ["blocked_dependency","ipc_thread_handle_is_zero","ipc_thread_handles_equal","resolve_dependency_endpoint","resolve_sole_live_thread","root_thread_index_is_valid"],
           "directives": [],
           "guards": [],
           "loops": [
-            ["for ( steps = 0 ; steps < MICROS_THREAD_CAPACITY ; ++ steps ) {",[]],
-            ["for ( index = 0 ; index < visited_count ; ++ index ) {",[["for ( steps = 0 ; steps < MICROS_THREAD_CAPACITY ; ++ steps ) {",0]]]
+            ["for ( steps = 0 ; steps < MICROS_THREAD_CAPACITY ; ++ steps ) {",[]]
           ],
           "signature": "enum micros_ipc_error ipc_preflight_deadlock ( const struct micros_endpoint_registry * registry , const struct micros_kernel_objects * objects , struct micros_thread_handle candidate , micros_endpoint_t dependency , struct micros_thread_handle cleared_dependency )",
           "storage": []
@@ -9728,20 +9765,26 @@
         },
         "resolve_sole_live_thread": {
           "accesses": [
-            ["processes [ owner . slot ]",[]],
-            ["threads [ index ]",[["for ( index = 0 ; index < MICROS_THREAD_CAPACITY ; ++ index ) {",0]]]
+            ["processes [ owner . slot ]",[]]
           ],
           "aliases": [
-            ["processes",["["]],
-            ["threads",["["]]
+            ["processes",["["]]
           ],
           "calls": ["ipc_process_handles_equal","micros_endpoint_thread_ipc_state_is_valid","scheduler_core_preflight_thread"],
           "directives": [],
           "guards": [],
-          "loops": [
-            ["for ( index = 0 ; index < MICROS_THREAD_CAPACITY ; ++ index ) {",[]]
-          ],
+          "loops": [],
           "signature": "static enum micros_ipc_error resolve_sole_live_thread ( const struct micros_endpoint_registry * registry , const struct micros_kernel_objects * objects , struct micros_process_handle owner , struct micros_thread_handle * thread_handle , const struct micros_thread * * thread )",
+          "storage": []
+        },
+        "root_thread_index_is_valid": {
+          "accesses": [],
+          "aliases": [],
+          "calls": ["ipc_thread_handle_is_zero","ipc_thread_handles_equal","micros_process_resolve","micros_thread_resolve","scheduler_core_preflight_registry"],
+          "directives": [],
+          "guards": [],
+          "loops": [],
+          "signature": "static bool root_thread_index_is_valid ( const struct micros_kernel_objects * objects , struct micros_thread_handle handle )",
           "storage": []
         }
       },
@@ -15020,6 +15063,20 @@
           "signature": "bool kernel_object_process_handle_is_valid ( struct micros_process_handle handle )",
           "storage": []
         },
+        "kernel_object_process_thread_index_is_valid": {
+          "accesses": [
+            ["threads [ process -> sole_thread . slot ]",[]]
+          ],
+          "aliases": [
+            ["threads",["["]]
+          ],
+          "calls": ["kernel_object_thread_handle_is_valid"],
+          "directives": [],
+          "guards": [],
+          "loops": [],
+          "signature": "bool kernel_object_process_thread_index_is_valid ( const struct micros_kernel_objects * objects , const struct micros_process * process , struct micros_process_handle owner )",
+          "storage": []
+        },
         "kernel_object_require_initialized": {
           "accesses": [],
           "aliases": [],
@@ -15541,7 +15598,7 @@
           "aliases": [
             ["threads",["["]]
           ],
-          "calls": ["kernel_object_clear_thread_ipc_state","kernel_object_clear_thread_scheduler_metadata","kernel_object_require_initialized","kernel_object_resolve_process_mutable","micros_thread_next_generation"],
+          "calls": ["kernel_object_clear_thread_ipc_state","kernel_object_clear_thread_scheduler_metadata","kernel_object_process_thread_index_is_valid","kernel_object_require_initialized","kernel_object_resolve_process_mutable","micros_thread_next_generation"],
           "directives": [],
           "guards": [],
           "loops": [
@@ -15557,7 +15614,7 @@
           "aliases": [
             ["harts",["["]]
           ],
-          "calls": ["kernel_object_clear_thread_ipc_state","kernel_object_clear_thread_scheduler_metadata","kernel_object_clear_user_context","kernel_object_require_initialized","kernel_object_resolve_process_mutable","kernel_object_resolve_thread_mutable","kernel_object_thread_handles_equal","micros_thread_ipc_state_is_clear","micros_thread_next_generation"],
+          "calls": ["kernel_object_clear_thread_ipc_state","kernel_object_clear_thread_scheduler_metadata","kernel_object_clear_user_context","kernel_object_process_thread_index_is_valid","kernel_object_require_initialized","kernel_object_resolve_process_mutable","kernel_object_resolve_thread_mutable","kernel_object_thread_handles_equal","micros_thread_ipc_state_is_clear","micros_thread_next_generation","select_release_survivor"],
           "directives": [],
           "guards": [],
           "loops": [
@@ -15578,6 +15635,22 @@
           "guards": [],
           "loops": [],
           "signature": "enum micros_kernel_object_error micros_thread_resolve ( const struct micros_kernel_objects * objects , struct micros_thread_handle handle , const struct micros_thread * * thread )",
+          "storage": []
+        },
+        "select_release_survivor": {
+          "accesses": [
+            ["threads [ index ]",[["for ( size_t index = 0 ; index < MICROS_THREAD_CAPACITY ; ++ index ) {",0]]]
+          ],
+          "aliases": [
+            ["threads",["["]]
+          ],
+          "calls": [],
+          "directives": [],
+          "guards": [],
+          "loops": [
+            ["for ( size_t index = 0 ; index < MICROS_THREAD_CAPACITY ; ++ index ) {",[]]
+          ],
+          "signature": "static bool select_release_survivor ( const struct micros_kernel_objects * objects , struct micros_process_handle owner , struct micros_thread_handle removed , struct micros_thread_handle * survivor )",
           "storage": []
         }
       },
@@ -15658,7 +15731,7 @@
           "aliases": [
             ["processes",["["]]
           ],
-          "calls": [],
+          "calls": ["kernel_object_process_thread_index_is_valid"],
           "directives": [],
           "guards": [],
           "loops": [
@@ -16003,7 +16076,7 @@
         "micros_pm_control_process_is_empty": {
           "accesses": [],
           "aliases": [],
-          "calls": [],
+          "calls": ["micros_pm_control_thread_handle_is_zero"],
           "directives": [],
           "guards": [],
           "loops": [],
@@ -16333,7 +16406,7 @@
           "aliases": [
             ["threads",["["]]
           ],
-          "calls": [],
+          "calls": ["micros_pm_control_thread_handle_is_zero"],
           "directives": [],
           "guards": [],
           "loops": [],

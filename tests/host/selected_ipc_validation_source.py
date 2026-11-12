@@ -67,6 +67,39 @@ def validate_audit_boundaries(root=ROOT, subjects=None):
         raise ValueError("IPC01 added an ordinary audit or lost a complete diagnostic boundary")
     return tuple(rows)
 
+def validate_dependency_bitmap(values, sites):
+    scope = (("for ( steps = 0 ; steps < MICROS_THREAD_CAPACITY ; ++ steps ) {", 0),)
+    membership = tokens(
+        "visited = thread_handle.slot < 64 ? &visited_low : &visited_high;"
+        "bit = UINT64_C(1) << (thread_handle.slot % 64);"
+        "if ((*visited & bit) != 0) { return MICROS_IPC_ERROR_INVARIANT; }"
+        "*visited |= bit;"
+    )
+    if (
+        "[" in values
+        or any(values.count(name) != count for name, count in (
+            ("visited_low", 2), ("visited_high", 2), ("visited", 4), ("bit", 4),
+        ))
+        or sum(values[index:index + len(membership)] == membership for index in range(len(values))) != 1
+    ):
+        raise ValueError("IPC02 visited storage or exact slot/word membership changed")
+    initializers = tuple(site for site in sites if site[3] == "CLEARED_BYTE")
+    if len(initializers) != 2 or {
+        (site[1], site[4], site[5], site[6], site[7]) for site in initializers
+    } != {
+        ("insert", 8, "after", "uint64_t visited_low = 0 ;", ()),
+        ("insert", 8, "after", "uint64_t visited_high = 0 ;", ()),
+    }:
+        raise ValueError("IPC02 lost an actual visited-word initialization")
+    if sum(
+        site[1] == "wrap" and site[3] == "BITMAP_WORD_LOAD" and site[4] == 1
+        and site[5] == "value" and site[6] == "* visited" and site[7] == scope for site in sites
+    ) != 1 or sum(
+        site[1] == "insert" and site[3] == "LINK_TRAVERSE" and site[4] == 1
+        and site[5] == "entry" and site[7] == scope for site in sites
+    ) != 1:
+        raise ValueError("IPC02 lost its executing hop or visited-word observation")
+
 
 def validate_native_sites(root, path, text):
     family = declarations(root)["families"]["IPC01"]
@@ -82,6 +115,8 @@ def validate_native_sites(root, path, text):
         positions = positional_tokens(record.body)
         values = tuple(item.value for item in positions)
         stacks, closings = compound_layout(values)
+        if path == "kernel/ipc/ipc_deadlock.c" and name == "ipc_preflight_deadlock":
+            validate_dependency_bitmap(values, sites)
         required_kind = "COMPLETE_VALIDATOR_CALL" if name in AUDITS else (
             "RANGE_VISIT" if name in ("micros_privilege_profile_resolve", "ipc_select_queue") else None
         )

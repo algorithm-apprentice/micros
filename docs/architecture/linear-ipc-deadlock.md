@@ -4,8 +4,8 @@
 
 This is the independently reviewed IPC02 contract Accepted by
 [ADR-0125](../adr/0125-linear-ipc-deadlock.md).
-The paired implementation remains pending the separate design merge.
-This document contains no implementation or runtime-finding closure claim.
+Design #252 is separately merged; its paired implementation proceeds from
+that main. This contract alone makes no runtime-finding closure claim.
 
 The prerequisite is merged IPC01 #251. The
 [fixed study](../research/minix-linear-ipc-deadlock.md) traces its exact current
@@ -336,3 +336,51 @@ Independent GPT-6.1 Sol implementation review precedes the first permanent
 outcome commit. Exact reviewed/published/merge-tree equality and scoped branch
 cleanup follow the existing workflow. Only accepted implementation and merge
 close B04-F003.
+
+## Current implementation and evidence owners
+
+The object identity leaf checks the selected index. Portable process/thread
+owners and the enumerated PM commits maintain it with their existing count
+updates; complete diagnosis retains the independent count pass. The dependency
+owner resolves one indexed thread per hop and uses two local visited words.
+The original independent object, endpoint and IPC models derive the expected
+sole handle from their own thread state, not the production index.
+
+The existing `selected-ipc-validation` pair keeps all sixty IPC01 cases and
+adds fifteen dependency and eight index-lifetime cases. They cover long,
+cross-word, high-slot and permuted chains, candidate/intermediate cycles,
+`ANY`, the cleared edge and its corrupt index, and the explicit cold repair.
+Actual summaries distinguish dependency hops/index probes/bitmap loads from
+the retained queue work and distinguish eight current-hart visits from a
+two-thread release's additional 128-slot repair. Word initialization is
+measured separately; these are not elapsed-time estimates.
+
+The fixed OBJ01 reference data remains unchanged. Its native producer now
+reports a separate reference-state view retaining the original common bytes
+and original 40-byte process representation, with only the old four-byte tail
+padding represented as zero. Full current raw before/after hashes and
+byte-preservation checks remain separate and unchanged in meaning. New
+sole-index input/output digests are checked against the independently specified
+single-process fixture cases; non-plan outputs and apply effects retain every
+old comparison. No current state, handle or result is normalized, and no
+historical implementation is compiled or executed.
+
+Observed stack producers keep their independent scenario-specific slot and
+generation expectations, actual linked intervals and compiler-derived bounds.
+The existing attachment/detachment observers still authenticate current
+generation, close old records before reuse and reject foreign, duplicate or
+missing reports. Those unchanged checks, not whole-file equality of earlier
+lifetime implementations, qualify the current producer inventory.
+
+Panic ownership qualification admits the exact appended typed member while
+retaining all other types, macros, storage and protected APIs. Its compiler
+layout cache includes current header identities, so the two admitted fixture/
+current geometries cannot borrow each other's offsets. Selected-provider and
+load-fault-prefix functions retain exact source/signature/guard and linked effect checks;
+unrelated lifetime/helper bodies do not freeze the whole provider. Shared
+preprocessor/state mutations, unknown members and altered resolvers still
+fail. No fatal exclusion, assembly epoch or stack budget changes.
+
+Exact author commands, current complete stack/target acceptance, independent
+review and publication identities belong to the implementation PR. The
+correction register records closure only after accepted implementation merge.
