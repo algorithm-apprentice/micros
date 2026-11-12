@@ -109,7 +109,9 @@ inside this task, or invent an exception without review.
 
 ## Current native evidence
 
-Retain all 47 current CTest identities and every current semantic/work case.
+Retain all 47 CTest identities from the ADR-0123 base and every existing
+semantic/work case. IPC01 adds `selected-ipc-validation` to complete native
+acceptance; it does not replace an earlier CTest or enter the fast loop.
 The slow models keep their existing transition counts and seeds. This task
 does not convert a slow model into a smaller test.
 
@@ -397,7 +399,7 @@ qualifications described below, not cumulative runtime-correction admission.
 | Shared current C and bounded CMake inspection | `tests/host/c_source_records.py`, `tests/host/build_source_records.py` |
 | Complete native primitive coverage and placement | `tests/host/native_observations.py` and its independently captured JSON declarations |
 | Necessary OBJ01 non-plan/effect reference fields | `tests/host/object_hart_reference.json` |
-| Current native cases, work bounds and product identities | The existing memory/object/return `*_evidence.py` modules and seven fixture generators |
+| Current native cases, work bounds and product identities | The memory/object/return/IPC `*_evidence.py` modules and their fixture generators |
 | Current source sets, private dependencies, ABI/state/fixture ownership and independent models | The existing `test_*_source_layout.py` families and kernel-directory tests |
 | Ordinary fresh versus explicit receipt dispatch | `tools/validation_execution.py`; current profile inputs in `tools/validation_context.py` |
 | Complete twelve/eighteen-case platform execution | `tools/check_terminal_failures.py`, `tools/check_panic_traces.py` and their current capture/oracle modules |
@@ -427,7 +429,7 @@ checks. Generator implementations were not changed for this transport removal.
 
 ### Required target evidence has an ordinary owner
 
-The existing runner accepts six finite current-evidence scopes:
+The existing runner accepts seven finite current-evidence scopes:
 
 | Scope | Existing workflow and retained evidence |
 | --- | --- |
@@ -436,9 +438,10 @@ The existing runner accepts six finite current-evidence scopes:
 | `address-space-handoff` | `test-qemu-address-space-handoff`: complete handoff, wired/index and downstream witnesses |
 | `scheduler-return` | `test-qemu-scheduler`: exact selected context counts, including 1/2/1 validation |
 | `runtime-memory` | `test-qemu-user-runtime`: actual linked memory object, ELF/map/Ninja recipe and non-stack wide transfers |
+| `selected-ipc` | `test-qemu-ipc-syscall`: all six syscall and four completion classes, complete actual work snapshots and zero ordinary complete audits |
 | `diagnostic-history` | `test-qemu-panic`: the unique aligned 12,012-byte local BSS history and complete seeded panic witness |
 
-The first five require a pass result. Diagnostic history requires panic,
+The first six require a pass result. Diagnostic history requires panic,
 the complete panic report and the seeded-history expectation. Each scope
 uses the same owned `QemuResult` as its workflow, with kernel identity checks
 before execution, after execution and after witness validation. Missing

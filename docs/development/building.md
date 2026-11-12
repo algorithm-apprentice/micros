@@ -173,6 +173,19 @@ ctest --test-dir build/host-debug --output-on-failure -R '^(work-counts|work-obs
 Both tests remain part of `test-unit-fast` and complete `test-unit`; targeted
 iteration is not final author validation.
 
+For selected endpoint/IPC validation, build the ordinary/observed pair and
+the existing endpoint/IPC semantic cases:
+
+```bash
+cmake --preset host-debug
+cmake --build build/host-debug --target endpoint_test selected_ipc_validation_ordinary selected_ipc_validation_test
+ctest --test-dir build/host-debug --output-on-failure --no-tests=error -R '^(endpoint-profile|selected-ipc-validation)$'
+```
+
+The selected-IPC work pair is included by complete `test-unit`, not the fast
+loop. Its current-source, collector, semantic and work checks do not replace
+the independent IPC model or actual syscall/completion target evidence.
+
 ## Validation planning
 
 Generate a changed-path plan with:
@@ -217,6 +230,9 @@ has been accepted or is operational. Local validation does not claim hosted
 acceptance.
 
 ## Optional exact-context receipts
+
+Use the [tool-discovery environment](#tool-discovery) above for every command
+in this section.
 
 When a task additionally requires reusable receipts from the same complete
 fresh invocation, use producer mode:

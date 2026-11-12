@@ -1,4 +1,5 @@
 #include "micros/ipc_buffer.h"
+#include "micros/work_observation.h"
 
 #include <stddef.h>
 
@@ -65,6 +66,10 @@ static enum micros_ipc_buffer_error plan_buffer(
         if (plan->chunk_count >= 2) {
             return MICROS_IPC_BUFFER_ERROR_INVARIANT;
         }
+#ifdef MICROS_BUILD_IPC_SYSCALL_TEST
+        MICROS_TEST_WORK_HIT("ipc01-target-buffer-lookup", MICROS_WORK_OWNER_KERNEL_IPC,
+                             MICROS_WORK_KIND_INDEX_PROBE, 1);
+#endif
         address_error = micros_user_address_space_translate(
             process,
             current,

@@ -1,5 +1,8 @@
 #include "kernel/endpoint/endpoint_private.h"
 
+#include "kernel/endpoint/endpoint_internal.h"
+#include "kernel/scheduler/scheduler_core_internal.h"
+
 _Static_assert(
     MICROS_PROCESS_CAPACITY <= (1U << MICROS_ENDPOINT_SLOT_BITS),
     "implemented process capacity must fit the endpoint ABI"
@@ -35,6 +38,12 @@ bool endpoint_thread_handles_equal(
     );
 }
 
+bool micros_endpoint_names_slot(micros_endpoint_t endpoint, uint16_t slot)
+{
+    return slot < MICROS_PROCESS_CAPACITY && endpoint != 0
+        && (endpoint & ((UINT32_C(1) << MICROS_ENDPOINT_SLOT_BITS) - 1)) == slot;
+}
+
 enum micros_endpoint_error endpoint_require_initialized(
     const struct micros_endpoint_registry *registry
 )
@@ -47,6 +56,25 @@ enum micros_endpoint_error endpoint_require_initialized(
             != MICROS_ENDPOINT_REGISTRY_MAGIC
     ) {
         return MICROS_ENDPOINT_ERROR_NOT_INITIALIZED;
+    }
+    return MICROS_ENDPOINT_OK;
+}
+
+enum micros_endpoint_error endpoint_preflight_registry(
+    const struct micros_endpoint_registry *registry
+)
+{
+    enum micros_endpoint_error error = endpoint_require_initialized(registry);
+
+    if (error != MICROS_ENDPOINT_OK) {
+        return error;
+    }
+    if (
+        registry->profile_count == 0
+        || registry->profile_count >= MICROS_PRIVILEGE_PROFILE_CAPACITY
+        || !endpoint_profile_is_zero(&registry->profiles[0])
+    ) {
+        return MICROS_ENDPOINT_ERROR_INVARIANT;
     }
     return MICROS_ENDPOINT_OK;
 }
@@ -111,7 +139,7 @@ enum micros_endpoint_error micros_endpoint_unpack(
     return MICROS_ENDPOINT_OK;
 }
 
-enum micros_endpoint_error endpoint_process_resolve_error(
+static enum micros_endpoint_error endpoint_process_resolve_error(
     enum micros_kernel_object_error error
 )
 {
@@ -153,6 +181,124 @@ enum micros_endpoint_error endpoint_record_resolve_validated(
     return MICROS_ENDPOINT_OK;
 }
 
+static bool selected_process_metadata_is_valid(
+    const struct micros_kernel_objects *objects,
+    const struct micros_process *process
+)
+{
+    return objects->live_process_count != 0
+        && process->live_thread_count <= objects->max_threads_per_process
+        && process->live_thread_count <= objects->live_thread_count
+        && process->privilege_profile < MICROS_PRIVILEGE_PROFILE_CAPACITY;
+}
+
+enum micros_endpoint_error endpoint_preflight_process(
+    const struct micros_endpoint_registry *registry,
+    const struct micros_kernel_objects *objects,
+    struct micros_process_handle handle,
+    const struct micros_process **process
+)
+{
+    const struct micros_process *candidate;
+    enum micros_endpoint_error error = endpoint_preflight_registry(registry);
+    enum micros_kernel_object_error object_error;
+
+    if (error != MICROS_ENDPOINT_OK) {
+        return error;
+    }
+    if (scheduler_core_preflight_registry(objects) != MICROS_KERNEL_OBJECT_OK) {
+        return MICROS_ENDPOINT_ERROR_INVARIANT;
+    }
+    object_error = micros_process_resolve(objects, handle, &candidate);
+    if (object_error != MICROS_KERNEL_OBJECT_OK) {
+        return endpoint_process_resolve_error(object_error);
+    }
+    if (!selected_process_metadata_is_valid(objects, candidate)) {
+        return MICROS_ENDPOINT_ERROR_INVARIANT;
+    }
+    *process = candidate;
+    return MICROS_ENDPOINT_OK;
+}
+
+static bool selected_process_is_valid(
+    const struct micros_endpoint_registry *registry,
+    const struct micros_kernel_objects *objects,
+    const struct micros_endpoint_record *record,
+    const struct micros_process *process
+)
+{
+    if (
+        !selected_process_metadata_is_valid(objects, process)
+        || process->primary_endpoint != record->value
+        || !process->endpoint_lifecycle_consumed
+    ) {
+        return false;
+    }
+    if (process->privilege_profile == 0) {
+        return record->state == MICROS_ENDPOINT_STATE_RESERVED;
+    }
+    return registry->profiles[process->privilege_profile].id
+        == process->privilege_profile;
+}
+
+enum micros_endpoint_error micros_endpoint_select(
+    const struct micros_endpoint_registry *registry,
+    const struct micros_kernel_objects *objects,
+    micros_endpoint_t endpoint,
+    struct micros_endpoint_selection *selection
+)
+{
+    struct micros_endpoint_selection candidate;
+    struct micros_process_handle requested;
+    micros_endpoint_t canonical;
+    enum micros_endpoint_error error;
+
+    if (registry == NULL || objects == NULL || selection == NULL) {
+        return MICROS_ENDPOINT_ERROR_ARGUMENT;
+    }
+    error = endpoint_preflight_registry(registry);
+    if (error != MICROS_ENDPOINT_OK) {
+        return error;
+    }
+    if (scheduler_core_preflight_registry(objects) != MICROS_KERNEL_OBJECT_OK) {
+        return MICROS_ENDPOINT_ERROR_INVARIANT;
+    }
+    error = micros_endpoint_unpack(endpoint, &requested);
+    if (error != MICROS_ENDPOINT_OK || requested.slot >= MICROS_PROCESS_CAPACITY) {
+        return MICROS_ENDPOINT_ERROR_STALE;
+    }
+    candidate.record = &registry->endpoints[requested.slot];
+    if (candidate.record->state == MICROS_ENDPOINT_STATE_FREE) {
+        return candidate.record->owner.slot != 0
+                || candidate.record->owner.generation != 0
+                || candidate.record->value != 0
+            ? MICROS_ENDPOINT_ERROR_INVARIANT
+            : MICROS_ENDPOINT_ERROR_STALE;
+    }
+    if (
+        (candidate.record->state != MICROS_ENDPOINT_STATE_RESERVED
+            && candidate.record->state != MICROS_ENDPOINT_STATE_ACTIVE
+            && candidate.record->state != MICROS_ENDPOINT_STATE_SOURCE_ONLY)
+        || candidate.record->owner.slot != requested.slot
+        || micros_endpoint_pack(candidate.record->owner, &canonical) != MICROS_ENDPOINT_OK
+        || candidate.record->value != canonical
+    ) {
+        return MICROS_ENDPOINT_ERROR_INVARIANT;
+    }
+    if (canonical != endpoint) {
+        return MICROS_ENDPOINT_ERROR_STALE;
+    }
+    if (
+        micros_process_resolve(objects, candidate.record->owner, &candidate.process)
+            != MICROS_KERNEL_OBJECT_OK
+        || !selected_process_is_valid(registry, objects, candidate.record, candidate.process)
+    ) {
+        return MICROS_ENDPOINT_ERROR_INVARIANT;
+    }
+    *selection = candidate;
+    return MICROS_ENDPOINT_OK;
+}
+
 bool endpoint_process_has_current_thread(
     const struct micros_kernel_objects *objects,
     struct micros_process_handle process
@@ -176,57 +322,4 @@ bool endpoint_process_has_current_thread(
         }
     }
     return false;
-}
-
-bool endpoint_process_threads_are_held(
-    const struct micros_kernel_objects *objects,
-    struct micros_process_handle process,
-    bool require_unassigned
-)
-{
-    size_t index;
-
-    if (endpoint_process_has_current_thread(objects, process)) {
-        return false;
-    }
-    for (index = 0; index < MICROS_THREAD_CAPACITY; ++index) {
-        const struct micros_thread *thread = &objects->threads[index];
-
-        if (
-            thread->slot_state != MICROS_KERNEL_OBJECT_SLOT_LIVE
-            || !endpoint_process_handles_equal(thread->owner, process)
-        ) {
-            continue;
-        }
-        if (
-            thread->runtime_flags != MICROS_THREAD_RTS_INACTIVE
-            || (require_unassigned && thread->scheduler_assigned)
-        ) {
-            return false;
-        }
-    }
-    return true;
-}
-
-bool endpoint_process_threads_have_clear_ipc_state(
-    const struct micros_kernel_objects *objects,
-    struct micros_process_handle process
-)
-{
-    size_t index;
-
-    for (index = 0; index < MICROS_THREAD_CAPACITY; ++index) {
-        const struct micros_thread *thread = &objects->threads[index];
-
-        if (
-            thread->slot_state != MICROS_KERNEL_OBJECT_SLOT_LIVE
-            || !endpoint_process_handles_equal(thread->owner, process)
-        ) {
-            continue;
-        }
-        if (!micros_thread_ipc_state_is_clear(thread)) {
-            return false;
-        }
-    }
-    return true;
 }

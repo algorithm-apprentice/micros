@@ -1,4 +1,5 @@
 #include "kernel/endpoint/endpoint_private.h"
+#include "kernel/scheduler/scheduler_core_internal.h"
 #include "micros/bootstrap_control.h"
 
 bool endpoint_delivery_state_is_clear(
@@ -113,17 +114,22 @@ static bool staged_reply_token_binding_is_valid(
     const struct micros_endpoint_registry *registry,
     const struct micros_kernel_objects *objects,
     const struct micros_thread *receiver,
-    const struct micros_endpoint_record *receiver_endpoint
+    const struct micros_endpoint_record *receiver_endpoint,
+    const struct micros_endpoint_record *source
 )
 {
     const struct micros_thread *caller = NULL;
-    const struct micros_endpoint_record *caller_endpoint;
+    struct micros_thread_handle caller_handle = {0, 0};
     uint64_t reply_token =
         receiver->ipc_inbound_message.reply_token;
     size_t index;
 
     if (reply_token == 0) {
         return true;
+    }
+    if (reply_token > registry->last_reply_token
+        || source == NULL || source->state != MICROS_ENDPOINT_STATE_ACTIVE) {
+        return false;
     }
     for (index = 0; index < MICROS_THREAD_CAPACITY; ++index) {
         const struct micros_thread *candidate =
@@ -133,8 +139,6 @@ static bool staged_reply_token_binding_is_valid(
             candidate != receiver
             && candidate->slot_state
                 == MICROS_KERNEL_OBJECT_SLOT_LIVE
-            && candidate->ipc_delivery_pending
-            && candidate->ipc_staged_result == MICROS_IPC_OK
             && candidate->ipc_inbound_message.reply_token
                 == reply_token
         ) {
@@ -151,24 +155,20 @@ static bool staged_reply_token_binding_is_valid(
             return false;
         }
         caller = candidate;
+        caller_handle.slot = (uint16_t)index;
+        caller_handle.generation = candidate->generation;
     }
     if (
         caller == NULL
+        || scheduler_core_preflight_thread(objects, caller_handle, &caller)
+            != MICROS_KERNEL_OBJECT_OK
+        || !endpoint_process_handles_equal(caller->owner, source->owner)
+        || caller->ipc_reply_callee != receiver_endpoint->value
         || !endpoint_reply_wait_state_is_valid(registry, caller)
     ) {
         return false;
     }
-    caller_endpoint = &registry->endpoints[caller->owner.slot];
-    return (
-        caller_endpoint->state == MICROS_ENDPOINT_STATE_ACTIVE
-        && endpoint_process_handles_equal(
-            caller_endpoint->owner,
-            caller->owner
-        )
-        && receiver->ipc_inbound_message.source
-            == caller_endpoint->value
-        && caller->ipc_reply_callee == receiver_endpoint->value
-    );
+    return receiver->ipc_inbound_message.source == source->value;
 }
 
 static bool notification_message_is_valid(
@@ -241,16 +241,12 @@ static bool source_only_message_is_valid(
     return true;
 }
 
-bool endpoint_staged_delivery_state_is_valid(
-    const struct micros_endpoint_registry *registry,
-    const struct micros_kernel_objects *objects,
-    const struct micros_thread *thread
+static bool staged_delivery_fields_are_valid(
+    const struct micros_thread *thread,
+    const struct micros_endpoint_record *owner,
+    const struct micros_endpoint_record *source
 )
 {
-    const struct micros_endpoint_record *owner =
-        &registry->endpoints[thread->owner.slot];
-    const struct micros_endpoint_record *source;
-
     if (
         thread->ipc_queue_kind != MICROS_IPC_QUEUE_NONE
         || !endpoint_thread_handle_is_zero(thread->ipc_next)
@@ -293,22 +289,16 @@ bool endpoint_staged_delivery_state_is_valid(
             return true;
         }
         return (
-            endpoint_record_resolve_validated(
-                registry,
-                thread->ipc_inbound_message.source,
-                &source
-            ) == MICROS_ENDPOINT_OK
+            source != NULL
+            && source->value == thread->ipc_inbound_message.source
             && source->state == MICROS_ENDPOINT_STATE_ACTIVE
         );
     }
     if (
         thread->ipc_inbound_message.source
             == MICROS_ENDPOINT_NONE
-        || endpoint_record_resolve_validated(
-            registry,
-            thread->ipc_inbound_message.source,
-            &source
-        ) != MICROS_ENDPOINT_OK
+        || source == NULL
+        || source->value != thread->ipc_inbound_message.source
     ) {
         return false;
     }
@@ -327,13 +317,75 @@ bool endpoint_staged_delivery_state_is_valid(
             thread->ipc_inbound_message.type
             & MICROS_IPC_TYPE_KERNEL_MASK
         ) == 0
-        && staged_reply_token_binding_is_valid(
-            registry,
-            objects,
-            thread,
-            owner
-        )
     );
+}
+
+bool endpoint_staged_delivery_selected_is_valid(
+    const struct micros_endpoint_registry *registry,
+    const struct micros_kernel_objects *objects,
+    const struct micros_thread *thread,
+    const struct micros_endpoint_selection *owner
+)
+{
+    struct micros_endpoint_selection source;
+    const struct micros_endpoint_record *record = NULL;
+
+    if (!thread->ipc_delivery_pending || thread->ipc_receive_buffer == 0) {
+        return false;
+    }
+    if (thread->ipc_inbound_message.source != MICROS_ENDPOINT_NONE) {
+        if (micros_endpoint_select(
+            registry, objects, thread->ipc_inbound_message.source, &source
+        ) != MICROS_ENDPOINT_OK) {
+            return false;
+        }
+        record = source.record;
+    }
+    return staged_delivery_fields_are_valid(thread, owner->record, record)
+        && staged_reply_token_binding_is_valid(registry, objects, thread, owner->record, record);
+}
+
+bool endpoint_staged_delivery_state_is_valid(
+    const struct micros_endpoint_registry *registry,
+    const struct micros_kernel_objects *objects,
+    const struct micros_thread *thread
+)
+{
+    struct micros_endpoint_selection owner = {
+        .record = &registry->endpoints[thread->owner.slot],
+        .process = &objects->processes[thread->owner.slot],
+    };
+
+    return endpoint_staged_delivery_selected_is_valid(registry, objects, thread, &owner);
+}
+
+bool micros_endpoint_staged_request_matches(
+    const struct micros_endpoint_registry *registry,
+    const struct micros_kernel_objects *objects,
+    struct micros_thread_handle receiver_handle,
+    const struct micros_thread *caller,
+    const struct micros_endpoint_record *caller_endpoint
+)
+{
+    const struct micros_thread *receiver;
+    struct micros_endpoint_selection owner;
+
+    if (
+        scheduler_core_preflight_thread(objects, receiver_handle, &receiver)
+            != MICROS_KERNEL_OBJECT_OK
+        || micros_endpoint_select(
+            registry, objects, objects->processes[receiver->owner.slot].primary_endpoint, &owner
+        ) != MICROS_ENDPOINT_OK
+    ) {
+        return false;
+    }
+    return caller_endpoint->state == MICROS_ENDPOINT_STATE_ACTIVE
+        && caller->ipc_queue_kind == MICROS_IPC_QUEUE_NONE
+        && (caller->runtime_flags & MICROS_THREAD_RTS_IPC_MASK) == MICROS_THREAD_RTS_IPC_REPLY
+        && caller->ipc_reply_token != 0
+        && receiver->ipc_inbound_message.reply_token == caller->ipc_reply_token
+        && caller->ipc_reply_callee == owner.record->value
+        && staged_delivery_fields_are_valid(receiver, owner.record, caller_endpoint);
 }
 
 bool endpoint_staged_error_state_is_valid(

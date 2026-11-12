@@ -245,9 +245,9 @@ variants and timeout arguments are executable contracts in
 [CMake](../CMakeLists.txt) and the [runner owners](architecture/qemu-runner-source-organization.md).
 Missing, duplicate, malformed or partial evidence is not success.
 
-The six [current-evidence scopes](architecture/current-contract-validation.md#required-target-evidence-has-an-ordinary-owner)
-belong to their existing MMU, address-space, handoff, scheduler, user-runtime
-and seeded-panic workflows. They inspect the same owned guest result and
+The seven [current-evidence scopes](architecture/current-contract-validation.md#required-target-evidence-has-an-ordinary-owner)
+belong to their existing MMU, address-space, handoff, scheduler, user-runtime,
+IPC-syscall and seeded-panic workflows. They inspect the same owned guest result and
 actual artifacts rather than launching a duplicate guest. Terminal and trace
 controllers retain every twelve/eighteen-case execution, private debugger
 authority, complete captures, current input identity and atomic publication.
@@ -292,7 +292,7 @@ in [CMakePresets.json](../CMakePresets.json) and [CMakeLists.txt](../CMakeLists.
 | `cmake --workflow --preset test-qemu-bootstrap-manifest-panic` | Invalid manifest rejection before publication |
 | `cmake --workflow --preset test-qemu-ipc` | Blocking, tokens, notify, deadlock, close and baseline restoration |
 | `cmake --workflow --preset test-qemu-ipc-ecall-core` | Real trap routing, guard commit/rollback and registers |
-| `cmake --workflow --preset test-qemu-ipc-syscall` | Complete six-operation cross-address-space acceptance |
+| `cmake --workflow --preset test-qemu-ipc-syscall` | Complete six-operation cross-address-space acceptance and actual selected syscall/completion work |
 | `cmake --workflow --preset test-qemu-ipc-syscall-panic` | Revoked accepted receive mapping fails before return commit |
 | `cmake --workflow --preset test-qemu-nested-trap` | Per-hart emergency-stack route |
 | `cmake --workflow --preset test-qemu-frame-ownership` | Typed generation authority and failure-atomic handoff |

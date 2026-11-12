@@ -34,11 +34,6 @@ enum micros_kernel_object_error scheduler_core_resolve_hart_mutable(
     struct micros_hart **hart
 );
 
-bool scheduler_core_thread_is_current(
-    const struct micros_kernel_objects *objects,
-    struct micros_thread_handle thread
-);
-
 bool scheduler_core_hart_has_assigned_thread(
     const struct micros_kernel_objects *objects,
     struct micros_hart_handle hart_handle
@@ -83,22 +78,6 @@ void scheduler_core_queue_enqueue_head_prevalidated(
     struct micros_kernel_objects *objects,
     struct micros_hart *hart,
     struct micros_thread_handle thread_handle
-);
-
-enum micros_kernel_object_error scheduler_core_preflight_registry(
-    const struct micros_kernel_objects *objects
-);
-
-enum micros_kernel_object_error scheduler_core_preflight_thread(
-    const struct micros_kernel_objects *objects,
-    struct micros_thread_handle handle,
-    const struct micros_thread **result
-);
-
-enum micros_kernel_object_error scheduler_core_preflight_hart(
-    const struct micros_kernel_objects *objects,
-    struct micros_hart_handle handle,
-    const struct micros_hart **result
 );
 
 enum micros_kernel_object_error scheduler_core_preflight_thread_operation(

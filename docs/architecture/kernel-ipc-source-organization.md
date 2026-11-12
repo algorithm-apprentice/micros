@@ -12,6 +12,14 @@ reviewed design merged in
 The pre-extraction inventory below describes the reviewed base; the exact
 owners, source sets, private contracts, and structural gate are implemented.
 
+The [selected IPC contract](selected-ipc-validation.md), Accepted under
+ADR-0124, replaces the extraction-era nested-validation requirement.
+Participants, queue selections and receive plans remain private automatic
+state. The facade now uses queue/token preflight directly; reply/receive
+reuses the rendezvous owner's read-only receive selection while retaining
+its own single atomic scheduler/IPC commit. No reverse queue/notification/
+token dependency is introduced. Original model and target scripts remain.
+
 ## Base, goal, and readiness
 
 ```text
@@ -239,8 +247,8 @@ notifications -> common + queue + completion
 deadlock -> common
 rendezvous -> common + queue + completion + tokens + notifications
 close -> common
-reply -> common + queue + completion + tokens + notifications + deadlock
-ipc -> common + deadlock + rendezvous
+reply -> common + queue + completion + tokens + notifications + deadlock + rendezvous
+ipc -> common + queue + tokens + deadlock + rendezvous
 ```
 
 There is no notification-to-rendezvous, queue-to-notification, or

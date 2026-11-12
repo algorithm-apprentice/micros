@@ -199,7 +199,7 @@ def require_order(text: str, *fragments: str) -> None:
 def source_texts() -> dict[str, str]:
     return {
         path: source_bytes(REPOSITORY_ROOT, REPOSITORY_ROOT / path).decode()
-        for path in (*ALL_SOURCES, *PRIVATE_HEADERS)
+        for path in (*ALL_SOURCES, *PRIVATE_HEADERS, "kernel/scheduler/scheduler_core_internal.h")
         if (REPOSITORY_ROOT / path).is_file()
     }
 
@@ -360,6 +360,8 @@ class SchedulerSourceLayoutTest(unittest.TestCase):
             }
             edges = {}
             header = self.texts.get(PRIVATE_HEADERS[family], "")
+            if family == 0:
+                header += self.texts["kernel/scheduler/scheduler_core_internal.h"]
             for name, record in self.records[family].items():
                 source = paths.index(owners[name])
                 callees = {called for called, _, _, _ in call_sites(record.body) if called in owners}

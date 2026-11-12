@@ -49,6 +49,7 @@ OWNER_IMPORTS = {
         "tests.host.kernel_mapping_evidence", "tests.host.common_scheduler_return_evidence",
         "tests.host.selected_release_handoff_evidence", "tests.host.work_count_types",
         "tests.host.runtime_memory_evidence", "tests.host.diagnostic_history_evidence",
+        "tests.host.selected_ipc_validation_evidence",
         "tools.qemu_smoke_faults",
     },
 }

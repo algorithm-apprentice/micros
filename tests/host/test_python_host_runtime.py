@@ -146,14 +146,16 @@ class PythonHostRuntimeTests(unittest.TestCase):
         )
         blocks = re.findall(r"```bash\n(.*?)\n```", building, flags=re.DOTALL)
         exports = (
-            "export MICROS_PYTHON=/opt/homebrew/opt/python@3.15/bin/python3.15",
+            "export MICROS_PYTHON=/absolute/path/to/python3.15",
             "export OPENSSL_CONF=/dev/null",
             "export SSL_CERT_FILE=/dev/null",
             "export SSL_CERT_DIR=/dev/null",
             "export CLANG_NO_DEFAULT_CONFIG=1",
-            "export MICROS_CLANG=/opt/homebrew/opt/llvm/bin/clang",
-            "export MICROS_LD_LLD=/opt/homebrew/opt/lld/bin/ld.lld",
+            "export MICROS_CLANG=/absolute/path/to/clang",
+            "export MICROS_LD_LLD=/absolute/path/to/ld.lld",
         )
+        setup = next((block for block in blocks if all(export in block for export in exports)), None)
+        self.assertIsNotNone(setup)
         for marker in (
             "--execute --producer",
             "--execute --reuse",
@@ -162,10 +164,9 @@ class PythonHostRuntimeTests(unittest.TestCase):
             block = next((item for item in blocks if marker in item), None)
             with self.subTest(marker=marker):
                 self.assertIsNotNone(block)
-                command_index = block.index('"${MICROS_PYTHON}"')
+                self.assertIn('"${MICROS_PYTHON}" -E -S -B', block)
                 for export in exports:
-                    self.assertIn(export, block)
-                    self.assertLess(block.index(export), command_index)
+                    self.assertLess(building.index(export), building.index(marker))
 
     def test_environment_and_child_execution_fail_closed(self):
         python_host_runtime.validate_environment(self.environment())
@@ -332,6 +333,7 @@ class PythonHostRuntimeTests(unittest.TestCase):
             "tools/check_selected_release_handoff.py",
             "tools/check_object_hart_validation.py",
             "tools/check_common_scheduler_return.py",
+            "tools/check_selected_ipc_validation.py",
             "tools/check_stack_evidence.py",
             "tools/check_terminal_failures.py",
             "tools/generate_bootstrap_allocation_fixture.py",
@@ -341,6 +343,7 @@ class PythonHostRuntimeTests(unittest.TestCase):
             "tools/generate_selected_release_handoff_fixture.py",
             "tools/generate_object_hart_validation_fixture.py",
             "tools/generate_common_scheduler_return_fixture.py",
+            "tools/generate_selected_ipc_validation_fixture.py",
             "tools/generate_stack_observer_catalog.py",
             "tools/stack_bound_manifest.py",
             "tools/validation_context.py",

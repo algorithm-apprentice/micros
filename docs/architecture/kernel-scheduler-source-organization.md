@@ -7,6 +7,14 @@ after a clean independent design review. Its separate design merged as PR #123,
 commit `dac947c839455900264c338c5c09952f68e147c7`. Implementation now exposes all
 specified owners and phases on a fresh branch from that merged outcome.
 
+The [selected IPC contract](selected-ipc-validation.md), Accepted under
+ADR-0124, exposes only the existing `scheduler_core_preflight_registry`,
+`scheduler_core_preflight_thread`, `scheduler_core_preflight_hart` and
+`scheduler_core_thread_is_current` declarations through
+`scheduler_core_internal.h`. Their implementations and ownership remain
+unchanged; IPC does not import the scheduler-private header. Selected
+completion stays in its current target owner and preserves return ordering.
+
 ## Base, outcome, and non-goals
 
 ```text

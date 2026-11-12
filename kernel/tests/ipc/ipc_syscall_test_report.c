@@ -1,5 +1,6 @@
 #include "kernel/tests/ipc/ipc_syscall_test_internal.h"
 #include "micros/stack_observation.h"
+#include "tests/qemu/selected_ipc_work.h"
 static bool hold_syscall_fixture_threads(
     struct ipc_syscall_test_context *fixture,
     struct micros_kernel_objects *objects,
@@ -138,6 +139,10 @@ _Noreturn void micros_ipc_syscall_test_finish(void)
         || micros_frame_ownership_runtime_validate(objects)
             != MICROS_FRAME_OWNERSHIP_OK
     ) {
+        goto failure;
+    }
+    failure_stage = 5;
+    if (!micros_ipc01_work_report()) {
         goto failure;
     }
     uart_write(

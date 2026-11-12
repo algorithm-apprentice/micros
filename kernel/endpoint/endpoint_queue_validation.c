@@ -1,5 +1,7 @@
 #include "kernel/endpoint/endpoint_private.h"
 
+#include "kernel/scheduler/scheduler_core_internal.h"
+
 static bool sender_queue_state_is_valid(
     const struct micros_endpoint_registry *registry,
     const struct micros_thread *thread,
@@ -101,6 +103,111 @@ static bool receiver_queue_state_is_valid(
     );
 }
 
+bool micros_endpoint_queue_member_is_valid(
+    const struct micros_endpoint_registry *registry,
+    const struct micros_kernel_objects *objects,
+    const struct micros_endpoint_selection *destination,
+    struct micros_thread_handle handle,
+    enum micros_ipc_queue_kind kind,
+    const struct micros_thread **result
+)
+{
+    const struct micros_thread *thread;
+    const struct micros_thread *next;
+    struct micros_endpoint_selection source;
+
+    if (
+        registry == NULL || destination == NULL || result == NULL
+        || destination->record == NULL || destination->process == NULL
+        || (destination->record->state != MICROS_ENDPOINT_STATE_ACTIVE
+            && destination->record->state != MICROS_ENDPOINT_STATE_SOURCE_ONLY)
+        || scheduler_core_preflight_thread(objects, handle, &thread)
+            != MICROS_KERNEL_OBJECT_OK
+        || (thread->ipc_reply_token != 0
+            && thread->ipc_reply_token > registry->last_reply_token)
+        || (!endpoint_thread_handle_is_zero(thread->ipc_next)
+            && (endpoint_thread_handles_equal(handle, thread->ipc_next)
+                || micros_thread_resolve(objects, thread->ipc_next, &next)
+                    != MICROS_KERNEL_OBJECT_OK))
+    ) {
+        return false;
+    }
+    if (kind == MICROS_IPC_QUEUE_SENDER) {
+        if (
+            micros_endpoint_select(
+                registry, objects, objects->processes[thread->owner.slot].primary_endpoint,
+                &source
+            ) != MICROS_ENDPOINT_OK
+            || source.record->state != MICROS_ENDPOINT_STATE_ACTIVE
+            || !sender_queue_state_is_valid(registry, thread, destination->record->value)
+        ) {
+            return false;
+        }
+    } else if (kind == MICROS_IPC_QUEUE_RECEIVER) {
+        if (
+            destination->record->state != MICROS_ENDPOINT_STATE_ACTIVE
+            || (thread->ipc_receive_source != MICROS_ENDPOINT_ANY
+                && (micros_endpoint_select(
+                    registry, objects, thread->ipc_receive_source, &source
+                ) != MICROS_ENDPOINT_OK
+                    || (source.record->state != MICROS_ENDPOINT_STATE_ACTIVE
+                        && source.record->state != MICROS_ENDPOINT_STATE_SOURCE_ONLY)))
+            || !receiver_queue_state_is_valid(registry, thread, destination->record)
+        ) {
+            return false;
+        }
+    } else {
+        return false;
+    }
+    *result = thread;
+    return true;
+}
+
+static bool selected_queue_is_valid(
+    const struct micros_endpoint_registry *registry,
+    const struct micros_kernel_objects *objects,
+    const struct micros_endpoint_selection *selection,
+    enum micros_ipc_queue_kind kind
+)
+{
+    struct micros_thread_handle current = kind == MICROS_IPC_QUEUE_SENDER
+        ? selection->record->sender_head : selection->record->receiver_head;
+    struct micros_thread_handle tail = kind == MICROS_IPC_QUEUE_SENDER
+        ? selection->record->sender_tail : selection->record->receiver_tail;
+
+    if (endpoint_thread_handle_is_zero(current)) {
+        return endpoint_thread_handle_is_zero(tail);
+    }
+    for (size_t steps = 0; steps < MICROS_THREAD_CAPACITY; ++steps) {
+        const struct micros_thread *thread;
+
+        if (!micros_endpoint_queue_member_is_valid(registry, objects, selection, current, kind, &thread)) {
+            return false;
+        }
+        if (endpoint_thread_handles_equal(current, tail)) {
+            return endpoint_thread_handle_is_zero(thread->ipc_next);
+        }
+        current = thread->ipc_next;
+    }
+    return false;
+}
+
+enum micros_endpoint_error endpoint_preflight_record(
+    const struct micros_endpoint_registry *registry,
+    const struct micros_kernel_objects *objects,
+    const struct micros_endpoint_selection *selection
+)
+{
+    if (selection->record->state == MICROS_ENDPOINT_STATE_RESERVED) {
+        return endpoint_ipc_state_is_zero(selection->record)
+            ? MICROS_ENDPOINT_OK : MICROS_ENDPOINT_ERROR_INVARIANT;
+    }
+    return selected_queue_is_valid(registry, objects, selection, MICROS_IPC_QUEUE_SENDER)
+        && selected_queue_is_valid(registry, objects, selection, MICROS_IPC_QUEUE_RECEIVER)
+        && endpoint_pending_notification_state_is_valid(registry, objects, selection->record)
+        ? MICROS_ENDPOINT_OK : MICROS_ENDPOINT_ERROR_INVARIANT;
+}
+
 bool endpoint_queue_is_valid(
     const struct micros_endpoint_registry *registry,
     const struct micros_kernel_objects *objects,
@@ -169,7 +276,7 @@ bool endpoint_pending_notification_state_is_valid(
     }
     for (index = 0; index < MICROS_PROCESS_CAPACITY; ++index) {
         const struct micros_endpoint_record *source;
-        const struct micros_process *process;
+        struct micros_endpoint_selection selected;
 
         if (
             (
@@ -180,7 +287,6 @@ bool endpoint_pending_notification_state_is_valid(
             continue;
         }
         source = &registry->endpoints[index];
-        process = &objects->processes[index];
         if (
             (
                 source->state != MICROS_ENDPOINT_STATE_ACTIVE
@@ -188,11 +294,9 @@ bool endpoint_pending_notification_state_is_valid(
                     != MICROS_ENDPOINT_STATE_SOURCE_ONLY
             )
             || source->owner.slot != index
-            || process->slot_state
-                != MICROS_KERNEL_OBJECT_SLOT_LIVE
-            || process->generation != source->owner.generation
-            || process->primary_endpoint != source->value
-            || process->privilege_profile == 0
+            || micros_endpoint_select(registry, objects, source->value, &selected)
+                != MICROS_ENDPOINT_OK
+            || selected.record != source
         ) {
             return false;
         }

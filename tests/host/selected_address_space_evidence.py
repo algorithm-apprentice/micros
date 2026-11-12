@@ -667,11 +667,15 @@ def check_native_products(root, executable_paths):
     failures = _work_failures(measured)
     ordinary = measured["ordinary"]
     measure_audit_boundaries(root, Stage.GREEN)
+    semantics = semantic_results(ordinary["semantics"])
+    queries = query_failures(ordinary["queries"])
+    bindings = binding_failures(ordinary["bindings"])
     if (
-        any(failures.values()) or not all(semantic_results(ordinary["semantics"]).values())
-        or query_failures(ordinary["queries"]) or binding_failures(ordinary["bindings"])
+        any(failures.values()) or not all(semantics.values()) or queries or bindings
     ):
-        raise ValueError("MEM04 CTest failed selected semantics, work or diagnostic boundaries: " + json.dumps(failures))
+        raise ValueError("MEM04 CTest failed selected semantics, work or diagnostic boundaries: " + json.dumps({
+            "work": failures, "semantics": semantics, "queries": queries, "bindings": bindings,
+        }))
     if (
         {path: read_regular(root / path)[1] for path in FIXTURE_PATHS} != fixtures or native_symbols_tool() != nm
         or {path: read_regular(root / path)[1] for path in dependencies} != dependencies

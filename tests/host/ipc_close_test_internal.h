@@ -149,6 +149,7 @@ bool test_source_only_close_cancels_queued_sender(struct ipc_close_test_context 
 bool test_source_only_notification_dependency_blocks_strict_close(struct ipc_close_test_context *fixture);
 bool test_successful_staged_deliveries_block_close_atomically(struct ipc_close_test_context *fixture);
 bool test_close_failures_are_atomic(struct ipc_close_test_context *fixture);
+bool test_close_accepts_full_capacity_queue(struct ipc_close_test_context *fixture);
 bool test_seeded_close_scenarios(struct ipc_close_test_context *fixture);
 
 #endif

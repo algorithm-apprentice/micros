@@ -3,14 +3,15 @@
 ## Status and scope
 
 This is the independently reviewed IPC01 contract Accepted by
-[ADR-0124](../adr/0124-selected-ipc-validation.md). Implementation starts only
-after the separate design merge; this document claims no implemented
-correction. The [fixed study](../research/minix-selected-ipc-validation.md)
+[ADR-0124](../adr/0124-selected-ipc-validation.md). Its implementation follows
+separately merged design #250. The current implementation and evidence owners
+are described below; the correction register owns acceptance and finding
+closure. The [fixed study](../research/minix-selected-ipc-validation.md)
 pins current `micros` at `c8b8a26766f4908016d0aeedc8af95f990eca283` and the
 local MINIX reference at `4db99f4012570a577414fe2a43697b2f239b699e`.
 
 The outcome owns B03-F006, B04-F001 and B04-F002. MEM04, OBJ01 and OBJ02
-are merged prerequisites. No finding closes through this design.
+are merged prerequisites. Design acceptance alone closes no finding.
 
 Replace repeated complete endpoint/profile/object audits with selected
 admission and one retained operation plan. Keep permissions, generations,
@@ -417,6 +418,17 @@ token and complete-object corruption checks. A full relation audit still
 runs one full registry audit first; its subsequent public profile queries
 may benefit from direct lookup without removing any diagnostic predicate.
 
+The implementation also makes one formerly transitive diagnostic dependency
+explicit: `tty_handoff_live_binding_matches` retains the complete endpoint/object
+check previously supplied by `micros_endpoint_resolve_internal`. This keeps
+TTY's complete validator/getter and MEM04's existing scenario-50 diagnostic
+rejection unchanged. Its native fixture also checks corruption in an unrelated
+free process record, so a registry-only check cannot replace the original
+object/relation diagnostic. The selected TTY binding inspector acquires no audit.
+The current direct census is therefore the twelve retained original sites
+plus that one preserved diagnostic dependency, not thirteen new audits or a
+relaxation of the nineteen selected boundaries.
+
 ## Time, storage and independent work oracles
 
 As in the study, `P/T/H/F` denote process/endpoint, thread, hart and profile
@@ -606,3 +618,46 @@ Do not redesign object storage, scheduler transitions, user translation,
 grant authorization, bootstrap/PM/VM transactions or the deferred token/
 deadlock/queue algorithms. No source body, historical catalog key or old
 author event chain becomes an implementation prerequisite.
+
+## Current implementation and evidence
+
+The endpoint owners admit current identities, profiles and canonical selected
+queue/completion shapes. IPC owners retain the caller, destination, matching
+prefix or no-match, token and receive choice through the last fallible
+scheduler step. `scheduler_completion.c` retains the existing physical chunks
+and ABI result through its lookup-free commit. No public ABI or persistent
+object/registry layout changes.
+
+`selected-ipc-validation` compiles the actual current portable owners plus
+completion, buffer and ABI sources into ordinary and observed native products.
+Its sixty cases cover queries, operations, malformed selected state, lifecycle
+and actual completion planning/commit. The completion fixture substitutes only
+runtime-registry access, address translation and fatal reporting, and checks
+exact physical writes, register preservation and zero commit lookups.
+Hardware authority remains with the real QEMU image.
+
+`selected_ipc_validation_source.py` qualifies current loops, indexed probes,
+audit entries, capture placement and the diagnostic census. The shared
+primitive declarations remain current-source descriptions, not behavioral
+expectations. Query probe bounds account for four probes per endpoint
+identity, two per profile resolution and one process read per policy role.
+Queue work permits one prefix and at most one replay, not another selection.
+The independent bounds remain in `selected_ipc_validation_evidence.py`.
+
+The existing syscall guest publishes ten first-success class snapshots, all
+owner/dimension fields, and totals across every capture after its original
+semantic and resource cleanup. Only that fixture enables the work collector;
+disabled hooks do not evaluate their arguments. Reporting occurs outside
+the measured intervals and completion capture ends before timer preparation.
+The unchanged syscall workflow requires this witness from its same owned
+result; no second guest, shorter scenario or larger deadline is introduced.
+Its work flag is source-local to the declared audit/buffer/capture owners and
+collector, not target-wide: unrelated UART/history observations remain disabled
+and the existing finite fatal-stack qualification is unchanged.
+
+Ordinary/observed success comparison serializes every defined state field,
+including canonical profile/message bytes, without comparing unspecified
+structure padding. Rejections still require byte-exact state preservation.
+Original endpoint/IPC cases, the 8,192-transition model and MEM04 corruption
+expectations remain intact. Exact Red/Green, final planner, stack, review and
+publication evidence belongs to the implementation PR.

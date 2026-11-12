@@ -1108,6 +1108,15 @@ static bool capture_tty_bindings(void)
         } else if (scenario == 49) {
             objects->threads[context.thread.slot].context_attached = false;
         } else if (scenario == 50) {
+            struct micros_process *unrelated = &objects->processes[MICROS_PROCESS_CAPACITY - 1];
+
+            REQUIRE(unrelated->slot_state == MICROS_KERNEL_OBJECT_SLOT_FREE);
+            REQUIRE(unrelated->live_thread_count == 0);
+            unrelated->live_thread_count = 1;
+            REQUIRE(micros_tty_handoff_runtime_validate(
+                &context.bootstrap, micros_as_native_ipc_input(), objects
+            ) == MICROS_TTY_HANDOFF_ERROR_INVARIANT);
+            unrelated->live_thread_count = 0;
             micros_as_native_ipc_input()->endpoints[MICROS_PROCESS_CAPACITY - 1].value = 1;
         } else if (scenario == 51) {
             ++state->process.generation;

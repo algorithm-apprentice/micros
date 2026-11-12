@@ -291,6 +291,7 @@ CURRENT_STATIC_LOCAL_OBJECTS = {'tests/host/ipc_model_main.c': ('static const st
                                          'notify_targets = UINT32_C ( 1 ) << 1 , } , } ;',),
  'tests/host/ipc_close_test.c': ('static const struct { const char * name ; bool ( * run ) ( struct '
                                  'ipc_close_test_context * ) ; } tests [ ] = { { , '
+                                 'test_close_accepts_full_capacity_queue , } , { , '
                                  'test_close_cancels_complete_transaction , } , { , '
                                  'test_cascading_close_discards_owned_dead_endpoint_result , } , { , '
                                  'test_source_only_close_cancels_queued_sender , } , { , '
@@ -658,6 +659,7 @@ CASE_LABELS = {
         ("notify scheduler failure is atomic", "test_notify_scheduler_failure_is_atomic"),
     ),
     "close": (
+        ("full-capacity queue terminates at its tail", "test_close_accepts_full_capacity_queue"),
         ("complete cancellation transaction", "test_close_cancels_complete_transaction"),
         ("cascading close discards owned dead-endpoint result", "test_cascading_close_discards_owned_dead_endpoint_result"),
         ("source-only close cancels queued sender", "test_source_only_close_cancels_queued_sender"),
@@ -730,8 +732,9 @@ PERMITTED_OWNER_DEPENDENCIES = {
     DEADLOCK: (COMMON,),
     'kernel/ipc/ipc_rendezvous.c': (COMMON, QUEUE, COMPLETION, TOKENS, NOTIFICATIONS),
     'kernel/ipc/ipc_close.c': (COMMON,),
-    'kernel/ipc/ipc_reply.c': (COMMON, QUEUE, COMPLETION, TOKENS, NOTIFICATIONS, DEADLOCK),
-    'kernel/ipc/ipc.c': (COMMON, DEADLOCK, 'kernel/ipc/ipc_rendezvous.c'),
+    'kernel/ipc/ipc_reply.c': (COMMON, QUEUE, COMPLETION, TOKENS, NOTIFICATIONS, DEADLOCK,
+                             'kernel/ipc/ipc_rendezvous.c'),
+    'kernel/ipc/ipc.c': (COMMON, QUEUE, TOKENS, DEADLOCK, 'kernel/ipc/ipc_rendezvous.c'),
     'kernel/ipc/ipc_syscall_result.c': (),
     'kernel/ipc/ipc_syscall_request.c': ('kernel/ipc/ipc_syscall_result.c', *SOURCE_SETS["MICROS_IPC_CORE_SOURCES"]),
     'kernel/ipc/ipc_syscall.c': (
@@ -825,6 +828,12 @@ def owner_dependency_text(relative: str) -> str:
             r"\b(?:struct|union|enum)\s+[A-Za-z_][A-Za-z0-9_]*", "", c_lexical_text(text),
         ))
     return "\n".join(selected)
+
+def private_function_names(text):
+    declarations = re.sub(r"\b_Static_assert\s*\([^;]*\)\s*;", "", c_declaration_text(text))
+    return tuple(name for name in re.findall(r"\b([A-Za-z_][A-Za-z0-9_]*)\s*\(", declarations)
+                 if name not in ("_Alignas", "_Alignof", "sizeof"))
+
 
 class KernelIpcSourceLayoutTest(unittest.TestCase):
     @classmethod
@@ -921,9 +930,8 @@ class KernelIpcSourceLayoutTest(unittest.TestCase):
         for path, names in definitions.items():
             for name in names:
                 symbols.setdefault(name, set()).add(path)
-        private_core = set(re.findall(
-            r"\b([A-Za-z_][A-Za-z0-9_]*)\s*\(",
-            c_declaration_text(current_text(REPOSITORY_ROOT / 'kernel/ipc/ipc_internal.h')),
+        private_core = set(private_function_names(
+            current_text(REPOSITORY_ROOT / 'kernel/ipc/ipc_internal.h')
         ))
         for path in all_sources():
             text = owner_dependency_text(path)
@@ -991,8 +999,7 @@ class KernelIpcSourceLayoutTest(unittest.TestCase):
 
     def test_private_declarations_have_one_current_owner(self):
         for path in PRIVATE_HEADERS.values():
-            names = re.findall(r"\b([A-Za-z_][A-Za-z0-9_]*)\s*\(",
-                               c_declaration_text(current_text(REPOSITORY_ROOT / path)))
+            names = private_function_names(current_text(REPOSITORY_ROOT / path))
             for name in names:
                 if name != "_Alignas":
                     owners = [source for source in all_sources() if name in self.definitions[source]]
@@ -1154,7 +1161,7 @@ class KernelIpcSourceLayoutTest(unittest.TestCase):
             for source in all_sources():
                 self.assertNotIn(source, block, target)
         for name, count in {
-            "MICROS_IPC_CORE_SOURCES": 5, "MICROS_IPC_SYSCALL_SOURCES": 1,
+            "MICROS_IPC_CORE_SOURCES": 6, "MICROS_IPC_SYSCALL_SOURCES": 1,
             "MICROS_IPC_OPERATION_HOST_TEST_SOURCES": 1, "MICROS_IPC_CALL_HOST_TEST_SOURCES": 1,
             "MICROS_IPC_REPLY_HOST_TEST_SOURCES": 1, "MICROS_IPC_NOTIFY_HOST_TEST_SOURCES": 2,
             "MICROS_IPC_CLOSE_HOST_TEST_SOURCES": 2, "MICROS_IPC_MODEL_HOST_TEST_SOURCES": 1,

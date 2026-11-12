@@ -1,4 +1,5 @@
 #include "kernel/objects/kernel_object_private.h"
+#include "micros/work_observation.h"
 
 #include "kernel/scheduler/scheduler_core_internal.h"
 
@@ -646,6 +647,10 @@ enum micros_kernel_object_error micros_kernel_objects_validate_base(
     enum micros_kernel_object_error error;
     size_t index;
 
+#ifdef MICROS_BUILD_IPC_SYSCALL_TEST
+    MICROS_TEST_WORK_HIT("ipc01-target-object-base", MICROS_WORK_OWNER_KERNEL_OBJECTS,
+                         MICROS_WORK_KIND_COMPLETE_VALIDATOR_CALL, 1);
+#endif
     error = kernel_object_require_initialized(objects);
     if (error != MICROS_KERNEL_OBJECT_OK) {
         return error;

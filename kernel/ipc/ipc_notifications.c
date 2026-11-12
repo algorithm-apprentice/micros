@@ -30,6 +30,7 @@ enum micros_ipc_error ipc_find_pending_notification(
     const struct micros_endpoint_record *source;
     const struct micros_endpoint_record *resolved_source;
     size_t source_slot;
+    bool source_pending;
     enum micros_endpoint_error endpoint_error;
 
     if (
@@ -52,12 +53,12 @@ enum micros_ipc_error ipc_find_pending_notification(
             return ipc_endpoint_error_to_ipc(endpoint_error);
         }
         source_slot = resolved_source->owner.slot;
-        if (
-            (
-                destination->pending_notification_sources
-                & (UINT64_C(1) << source_slot)
-            ) == 0
-        ) {
+        source_pending =
+            (destination->pending_notification_sources & (UINT64_C(1) << source_slot)) != 0;
+        if (source_pending != (destination->pending_events[source_slot] != 0)) {
+            return MICROS_IPC_ERROR_INVARIANT;
+        }
+        if (!source_pending) {
             return MICROS_IPC_ERROR_NOT_READY;
         }
         source = resolved_source;
@@ -150,49 +151,24 @@ static enum micros_ipc_error resolve_notification_destination(
     struct micros_kernel_objects *objects,
     struct micros_thread_handle notifier_handle,
     micros_endpoint_t destination_endpoint,
-    micros_endpoint_t *source_endpoint,
-    struct micros_endpoint_record **destination
+    struct ipc_participant *notifier,
+    struct micros_endpoint_selection *destination
 )
 {
-    const struct micros_endpoint_record *resolved_destination;
-    enum micros_endpoint_error endpoint_error;
     enum micros_ipc_error error;
 
-    endpoint_error =
-        micros_endpoint_registry_validate_objects(registry, objects);
-    if (endpoint_error != MICROS_ENDPOINT_OK) {
-        return ipc_endpoint_error_to_ipc(endpoint_error);
-    }
-    error = ipc_resolve_operation_thread(
-        objects,
-        notifier_handle,
-        source_endpoint
-    );
+    error = ipc_admit_operation_thread(registry, objects, notifier_handle, notifier);
     if (error != MICROS_IPC_OK) {
         return error;
     }
-    endpoint_error = micros_endpoint_authorize_target(
-        registry,
-        objects,
-        *source_endpoint,
-        MICROS_PRIVILEGE_OPERATION_NOTIFY,
-        destination_endpoint
-    );
-    if (endpoint_error != MICROS_ENDPOINT_OK) {
-        return ipc_endpoint_error_to_ipc(endpoint_error);
+    error = ipc_admit_active_endpoint(registry, objects, destination_endpoint, destination);
+    if (error != MICROS_IPC_OK) {
+        return error;
     }
-    endpoint_error = micros_endpoint_resolve_active(
-        registry,
-        objects,
-        destination_endpoint,
-        &resolved_destination
-    );
-    if (endpoint_error != MICROS_ENDPOINT_OK) {
-        return ipc_endpoint_error_to_ipc(endpoint_error);
-    }
-    *destination =
-        &registry->endpoints[resolved_destination->owner.slot];
-    return MICROS_IPC_OK;
+    return ipc_endpoint_error_to_ipc(micros_privilege_profile_allows_target(
+        registry, (uint8_t)notifier->endpoint.process->privilege_profile,
+        MICROS_PRIVILEGE_OPERATION_NOTIFY, (uint8_t)destination->process->privilege_profile
+    ));
 }
 
 static enum micros_ipc_error deliver_notification_to_receiver(
@@ -273,14 +249,12 @@ enum micros_ipc_error micros_ipc_notify(
 )
 {
     struct micros_endpoint_record *destination;
-    struct micros_thread_handle previous = {0, 0};
-    struct micros_thread_handle receiver_handle = {0, 0};
-    struct micros_thread *receiver = NULL;
+    struct micros_endpoint_selection target;
+    struct ipc_participant notifier;
+    struct ipc_queue_selection receiver;
     struct micros_ipc_message notification;
-    micros_endpoint_t source_endpoint;
     size_t source_slot;
     enum micros_ipc_error error;
-    bool has_receiver;
 
     if (
         registry == NULL
@@ -294,35 +268,38 @@ enum micros_ipc_error micros_ipc_notify(
         objects,
         notifier_handle,
         destination_endpoint,
-        &source_endpoint,
-        &destination
+        &notifier,
+        &target
     );
     if (error != MICROS_IPC_OK) {
         return error;
     }
-    source_slot = objects->threads[notifier_handle.slot].owner.slot;
-    canonicalize_notification(&notification, source_endpoint, event_mask);
-    has_receiver = ipc_find_matching_receiver(
-        destination,
-        objects,
-        source_endpoint,
-        &previous,
-        &receiver_handle,
-        &receiver
+    destination = &registry->endpoints[target.record->owner.slot];
+    source_slot = notifier.endpoint.record->owner.slot;
+    canonicalize_notification(&notification, notifier.endpoint.record->value, event_mask);
+    error = ipc_select_queue(
+        registry, objects, &target, MICROS_IPC_QUEUE_RECEIVER,
+        notifier.endpoint.record->value, &receiver
     );
-    if (
-        has_receiver
-        && (receiver->runtime_flags & MICROS_THREAD_RTS_IPC_REPLY) == 0
-    ) {
+    if (error == MICROS_IPC_OK) {
         return deliver_notification_to_receiver(
             objects,
             destination,
             notifier_handle,
-            previous,
-            receiver_handle,
-            receiver,
+            receiver.previous,
+            receiver.handle,
+            &objects->threads[receiver.handle.slot],
             &notification
         );
+    }
+    if (error != MICROS_IPC_ERROR_NOT_READY) {
+        return error;
+    }
+    if (
+        ((destination->pending_notification_sources & (UINT64_C(1) << source_slot)) != 0)
+            != (destination->pending_events[source_slot] != 0)
+    ) {
+        return MICROS_IPC_ERROR_INVARIANT;
     }
     return coalesce_notification(
         objects,
@@ -370,14 +347,10 @@ enum micros_ipc_error micros_ipc_prepare_kernel_notification(
 )
 {
     struct micros_ipc_kernel_notification_plan candidate;
-    const struct micros_endpoint_record *resolved_destination;
-    const struct micros_endpoint_record *destination;
-    struct micros_thread_handle previous = {0, 0};
-    struct micros_thread_handle receiver_handle = {0, 0};
-    const struct micros_thread *receiver = NULL;
-    enum micros_endpoint_error endpoint_error;
+    struct micros_endpoint_selection destination;
+    struct ipc_queue_selection receiver;
+    enum micros_ipc_error error;
     enum micros_kernel_object_error scheduler_error;
-    bool has_receiver;
 
     if (
         registry == NULL
@@ -390,56 +363,24 @@ enum micros_ipc_error micros_ipc_prepare_kernel_notification(
         return MICROS_IPC_ERROR_ARGUMENT;
     }
     ipc_clear_bytes(&candidate, sizeof(candidate));
-    endpoint_error =
-        micros_endpoint_registry_validate_objects(registry, objects);
-    if (endpoint_error != MICROS_ENDPOINT_OK) {
-        return ipc_endpoint_error_to_ipc(endpoint_error);
+    error = ipc_admit_active_endpoint(registry, objects, destination_endpoint, &destination);
+    if (error != MICROS_IPC_OK) {
+        return error;
     }
-    endpoint_error = micros_endpoint_resolve_active(
-        registry,
-        objects,
-        destination_endpoint,
-        &resolved_destination
-    );
-    if (endpoint_error != MICROS_ENDPOINT_OK) {
-        return ipc_endpoint_error_to_ipc(endpoint_error);
-    }
-    destination =
-        &registry->endpoints[resolved_destination->owner.slot];
-    candidate.destination_slot =
-        resolved_destination->owner.slot;
+    candidate.destination_slot = destination.record->owner.slot;
     candidate.event_mask = event_mask;
     canonicalize_notification(
         &candidate.notification,
         MICROS_ENDPOINT_NONE,
         event_mask
     );
-    has_receiver = ipc_find_matching_receiver_const(
-        destination,
-        objects,
-        MICROS_ENDPOINT_NONE,
-        &previous,
-        &receiver_handle,
-        &receiver
+    error = ipc_select_queue(
+        registry, objects, &destination, MICROS_IPC_QUEUE_RECEIVER, MICROS_ENDPOINT_NONE, &receiver
     );
-    if (
-        has_receiver
-        && (
-            receiver->runtime_flags
-            & MICROS_THREAD_RTS_IPC_REPLY
-        ) == 0
-    ) {
-        if (
-            (
-                receiver->runtime_flags
-                & MICROS_THREAD_RTS_IPC_MASK
-            ) != MICROS_THREAD_RTS_IPC_RECEIVE
-        ) {
-            return MICROS_IPC_ERROR_STATE;
-        }
+    if (error == MICROS_IPC_OK) {
         scheduler_error = micros_scheduler_prepare_ipc_wake(
             objects,
-            receiver_handle,
+            receiver.handle,
             MICROS_THREAD_RTS_IPC_RECEIVE,
             &candidate.wake
         );
@@ -447,9 +388,11 @@ enum micros_ipc_error micros_ipc_prepare_kernel_notification(
             return ipc_scheduler_error_to_ipc(scheduler_error);
         }
         candidate.deliver_to_receiver = true;
-        candidate.previous_receiver = previous;
-        candidate.receiver = receiver_handle;
-        candidate.receive_buffer = receiver->ipc_receive_buffer;
+        candidate.previous_receiver = receiver.previous;
+        candidate.receiver = receiver.handle;
+        candidate.receive_buffer = receiver.thread->ipc_receive_buffer;
+    } else if (error != MICROS_IPC_ERROR_NOT_READY) {
+        return error;
     }
     candidate.active = true;
     ipc_copy_bytes(plan, &candidate, sizeof(*plan));

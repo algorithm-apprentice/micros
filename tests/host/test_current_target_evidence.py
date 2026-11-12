@@ -12,6 +12,7 @@ from tools.qemu_smoke_records import QemuResult
 from tests.host import test_common_scheduler_return as common_fixture
 from tests.host import test_kernel_mapping as mapping_fixture
 from tests.host import test_selected_release_handoff as release_fixture
+from tests.host import test_selected_ipc_validation as ipc_fixture
 from tests.host.common_scheduler_return_evidence import TARGET_MARKERS
 from tests.host.work_count_types import Stage
 from tests.host.build_source_records import cmake_command, cmake_commands
@@ -46,6 +47,7 @@ class CurrentTargetEvidenceTest(unittest.TestCase):
             ("test-qemu-scheduler", "scheduler-return"),
             ("test-qemu-user-runtime", "runtime-memory"),
             ("test-qemu-panic", "diagnostic-history"),
+            ("test-qemu-ipc-syscall", "selected-ipc"),
         ):
             command = cmake_command(source, "add_custom_target", target).split()
             with self.subTest(target=target):
@@ -154,6 +156,35 @@ class CurrentTargetEvidenceTest(unittest.TestCase):
         status, stdout, stderr = self.invoke_scheduler(output)
         self.assertEqual((0, ""), (status, stderr))
         self.assertIn("ok 1 - QEMU smoke", stdout)
+
+    def test_selected_ipc_requires_same_guest_work_and_unchanged_image(self):
+        complete = ipc_fixture.target_transcript().replace("# ", "")
+        missing = ipc_fixture.TARGET_PASS + "\n"
+        for output, changed, success in ((complete, False, True), (missing, False, False), (complete, True, False)):
+            with self.subTest(changed=changed, complete=output == complete), tempfile.TemporaryDirectory() as directory:
+                kernel = Path(directory) / "kernel.elf"
+                kernel.write_bytes(b"owned IPC image")
+
+                def execute(*args, **kwargs):
+                    if changed:
+                        kernel.write_bytes(b"changed IPC image")
+                    return QemuResult(output, 0, False)
+
+                with patch.object(qemu_smoke_cli, "run_qemu", side_effect=execute) as run:
+                    with redirect_stdout(io.StringIO()), redirect_stderr(io.StringIO()):
+                        result = qemu_smoke_cli.main([
+                            "--kernel", str(kernel), "--marker", ipc_fixture.TARGET_PASS,
+                            "--require-current-evidence", "selected-ipc",
+                        ])
+                run.assert_called_once()
+                self.assertEqual(success, result == 0)
+        with patch.object(qemu_smoke_cli, "run_qemu") as run:
+            with redirect_stderr(io.StringIO()), self.assertRaises(SystemExit):
+                qemu_smoke_cli.main([
+                    "--kernel", str(Path(__file__)), "--marker", ipc_fixture.TARGET_PASS,
+                    "--require-current-evidence", "selected-ipc", "--expect", "panic",
+                ])
+            run.assert_not_called()
 
     def test_basic_pass_marker_cannot_replace_current_work_or_image_identity(self):
         complete = common_fixture.ContextCaptureProtocolTest.transcript().replace("# ", "")

@@ -1,5 +1,7 @@
 #include "kernel/ipc/ipc_internal.h"
 
+#include "kernel/scheduler/scheduler_core_internal.h"
+
 #include "kernel/endpoint/endpoint_internal.h"
 
 void ipc_copy_bytes(void *destination, const void *source, size_t size)
@@ -57,19 +59,7 @@ bool ipc_thread_is_current(
     struct micros_thread_handle thread
 )
 {
-    size_t index;
-
-    for (index = 0; index < MICROS_HART_CAPACITY; ++index) {
-        const struct micros_hart *hart = &objects->harts[index];
-
-        if (
-            hart->slot_state == MICROS_KERNEL_OBJECT_SLOT_LIVE
-            && ipc_thread_handles_equal(hart->current_thread, thread)
-        ) {
-            return true;
-        }
-    }
-    return false;
+    return scheduler_core_thread_is_current(objects, thread);
 }
 
 enum micros_ipc_error ipc_endpoint_error_to_ipc(
@@ -156,53 +146,97 @@ static bool thread_is_held_and_clear(
     );
 }
 
-enum micros_ipc_error ipc_resolve_held_thread(
-    struct micros_kernel_objects *objects,
-    struct micros_thread_handle handle,
-    struct micros_thread **thread
+enum micros_ipc_error ipc_admit_active_endpoint(
+    const struct micros_endpoint_registry *registry,
+    const struct micros_kernel_objects *objects,
+    micros_endpoint_t endpoint,
+    struct micros_endpoint_selection *selection
 )
 {
-    const struct micros_thread *resolved;
-    enum micros_kernel_object_error error;
+    struct micros_endpoint_selection candidate;
+    enum micros_endpoint_error error =
+        micros_endpoint_select(registry, objects, endpoint, &candidate);
 
-    error = micros_thread_resolve(objects, handle, &resolved);
-    if (error == MICROS_KERNEL_OBJECT_ERROR_STALE) {
-        return MICROS_IPC_ERROR_DEAD_ENDPOINT;
+    if (error != MICROS_ENDPOINT_OK) {
+        return ipc_endpoint_error_to_ipc(error);
     }
-    if (error != MICROS_KERNEL_OBJECT_OK) {
-        return MICROS_IPC_ERROR_INVARIANT;
+    if (candidate.record->state != MICROS_ENDPOINT_STATE_ACTIVE) {
+        return candidate.record->state == MICROS_ENDPOINT_STATE_SOURCE_ONLY
+            ? MICROS_IPC_ERROR_ENDPOINT_CLOSING : MICROS_IPC_ERROR_STATE;
     }
-    if (!thread_is_held_and_clear(resolved)) {
-        return MICROS_IPC_ERROR_STATE;
-    }
-    *thread = &objects->threads[handle.slot];
+    *selection = candidate;
     return MICROS_IPC_OK;
 }
 
-enum micros_ipc_error ipc_resolve_operation_thread(
+enum micros_ipc_error ipc_admit_held_thread(
+    const struct micros_endpoint_registry *registry,
     struct micros_kernel_objects *objects,
     struct micros_thread_handle handle,
-    micros_endpoint_t *source_endpoint
+    struct ipc_participant *participant
 )
 {
-    struct micros_thread *thread;
-    enum micros_ipc_error error;
+    struct ipc_participant candidate;
+    const struct micros_thread *thread;
+    const struct micros_process *process;
+    enum micros_endpoint_error endpoint_error = endpoint_preflight_registry(registry);
+    enum micros_kernel_object_error object_error;
 
-    error = ipc_resolve_held_thread(objects, handle, &thread);
+    if (endpoint_error != MICROS_ENDPOINT_OK) {
+        return ipc_endpoint_error_to_ipc(endpoint_error);
+    }
+    object_error = scheduler_core_preflight_thread(objects, handle, &thread);
+    if (object_error != MICROS_KERNEL_OBJECT_OK) {
+        return object_error == MICROS_KERNEL_OBJECT_ERROR_STALE
+            ? MICROS_IPC_ERROR_DEAD_ENDPOINT : MICROS_IPC_ERROR_INVARIANT;
+    }
+    if (!thread_is_held_and_clear(thread)) {
+        return micros_endpoint_thread_ipc_state_is_valid(registry, objects, handle)
+            ? MICROS_IPC_ERROR_STATE : MICROS_IPC_ERROR_INVARIANT;
+    }
+    process = &objects->processes[thread->owner.slot];
+    if (process->primary_endpoint == MICROS_PROCESS_ENDPOINT_NONE) {
+        return process->privilege_profile == 0
+            ? MICROS_IPC_ERROR_STATE : MICROS_IPC_ERROR_INVARIANT;
+    }
+    endpoint_error = micros_endpoint_select(
+        registry, objects, process->primary_endpoint, &candidate.endpoint
+    );
+    if (endpoint_error != MICROS_ENDPOINT_OK) {
+        return MICROS_IPC_ERROR_INVARIANT;
+    }
+    if (
+        candidate.endpoint.record->state == MICROS_ENDPOINT_STATE_SOURCE_ONLY
+        && !micros_endpoint_thread_ipc_state_is_valid(registry, objects, handle)
+    ) {
+        return MICROS_IPC_ERROR_INVARIANT;
+    }
+    candidate.handle = handle;
+    candidate.thread = &objects->threads[handle.slot];
+    *participant = candidate;
+    return MICROS_IPC_OK;
+}
+
+enum micros_ipc_error ipc_admit_operation_thread(
+    const struct micros_endpoint_registry *registry,
+    struct micros_kernel_objects *objects,
+    struct micros_thread_handle handle,
+    struct ipc_participant *participant
+)
+{
+    struct ipc_participant candidate;
+    enum micros_ipc_error error = ipc_admit_held_thread(registry, objects, handle, &candidate);
+
     if (error != MICROS_IPC_OK) {
         return error;
     }
     if (ipc_thread_is_current(objects, handle)) {
         return MICROS_IPC_ERROR_STATE;
     }
-    *source_endpoint =
-        objects->processes[thread->owner.slot].primary_endpoint;
-    if (
-        *source_endpoint == MICROS_ENDPOINT_NONE
-        || *source_endpoint == MICROS_ENDPOINT_ANY
-    ) {
-        return MICROS_IPC_ERROR_STATE;
+    if (candidate.endpoint.record->state != MICROS_ENDPOINT_STATE_ACTIVE) {
+        return candidate.endpoint.record->state == MICROS_ENDPOINT_STATE_SOURCE_ONLY
+            ? MICROS_IPC_ERROR_ENDPOINT_CLOSING : MICROS_IPC_ERROR_STATE;
     }
+    *participant = candidate;
     return MICROS_IPC_OK;
 }
 

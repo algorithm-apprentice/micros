@@ -10,6 +10,12 @@ Design #145 separately merged as
 Implementation #146 starts on a fresh branch from that main. The source map
 and evidence requirements below add no runtime-DAG node.
 
+The [current-evidence scopes](current-contract-validation.md#required-target-evidence-has-an-ordinary-owner)
+are owned by `qemu_smoke_cli.py`, which validates each witness through its
+named evidence module using the same guest result. ADR-0124 adds the
+selected-IPC module to that existing downward dependency, not another runner
+or execution path.
+
 ```text
 reviewed micros base: 34f1048449c221b014530484bfec4b3c0ab51142
 fixed MINIX reference: 4db99f4012570a577414fe2a43697b2f239b699e

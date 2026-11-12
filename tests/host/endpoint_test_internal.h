@@ -97,4 +97,6 @@ bool endpoint_test_source_only_seal_preserves_staged_source(void);
 
 bool endpoint_test_relationship_validator_rejects_corruption(void);
 
+bool endpoint_test_selected_queries_retain_local_authority(void);
+
 #endif

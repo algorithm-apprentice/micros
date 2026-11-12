@@ -8,6 +8,10 @@ bool micros_ipc_close_test_run(void)
         bool (*run)(struct ipc_close_test_context *);
     } tests[] = {
         {
+            "full-capacity queue terminates at its tail",
+            test_close_accepts_full_capacity_queue,
+        },
+        {
             "complete cancellation transaction",
             test_close_cancels_complete_transaction,
         },
