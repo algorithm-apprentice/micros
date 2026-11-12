@@ -18,6 +18,46 @@ def record(image, owner, slot, generation, samples=3, use=512, bottom=0x10000, t
 
 
 class StackReportsTest(unittest.TestCase):
+    def test_producer_inventory_uses_current_geometry_not_frozen_lifetime_source(self):
+        from tools.stack_bound_scope import declared_producers
+
+        symbols = {
+            "__boot_stack_bottom": 0x10000, "__boot_stack_top": 0x14000,
+            "__trap_stack_bottom": 0x20000, "__trap_stack_top": 0x24000,
+            "__thread_kernel_stacks_start": 0x40000,
+            "__thread_kernel_stacks_end": 0x40000 + 128 * 16384,
+        }
+        image = SimpleNamespace(symbols=tuple(
+            SimpleNamespace(name=name, binding=1, section_index=1, value=value)
+            for name, value in symbols.items()
+        ))
+        proofs = tuple(SimpleNamespace(
+            root=SimpleNamespace(function=SimpleNamespace(image="kernel/micros.elf"), identifier=name),
+            bytes_used=bound,
+        ) for name, bound in (("boot", 160), ("supervisor", 320), ("primary-idle", 480)))
+        root = Path("/fixture")
+        directory = root / "build/stack-evidence/riscv64-scheduler-test/observed"
+        with (
+            patch("tools.stack_bound_scope.load_elf", return_value=image),
+            patch("tools.stack_bound_scope.read_regular",
+                  side_effect=AssertionError("producer expectations cannot freeze a lifetime implementation")),
+        ):
+            producers = declared_producers(root, directory, proofs)
+            self.assertEqual(
+                (("kernel", "boot", 0, 0), ("kernel", "primary", 0, 0),
+                 ("kernel", "thread", 0, 1), ("kernel", "thread", 1, 1)),
+                tuple(producer.identity for producer in producers),
+            )
+            self.assertEqual((160, 480, 320, 320), tuple(producer.bound for producer in producers))
+            self.assertEqual((0x40000, 0x44000), (producers[2].bottom, producers[2].top))
+            with self.assertRaises(StackEvidenceError):
+                declared_producers(root, directory, proofs[:-1])
+            with self.assertRaises(StackEvidenceError):
+                declared_producers(root, directory, proofs + proofs[:1])
+            image.symbols[-1].value += 16
+            with self.assertRaises(StackEvidenceError):
+                declared_producers(root, directory, proofs)
+
     def test_a_failed_static_graph_prevents_guest_execution(self):
         from tools.stack_bound_run import run_observed_scope
 

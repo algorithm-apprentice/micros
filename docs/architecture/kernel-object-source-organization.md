@@ -42,6 +42,11 @@ recovery, caching, heap, concurrency, directory or validation optimization
 is introduced. Other audit pairs and production init/shell/commands remain
 separate.
 
+The later [linear IPC dependency contract](linear-ipc-deadlock.md) adds its
+sole-thread process index to these same lifetime/identity/validation owners.
+It preserves their dependency direction and includes PM's direct lifetime
+publications; it does not add a generic thread collection.
+
 ## Preserved authority and failure boundaries
 
 Accepted ADRs 0011/0019/0021/0022/0023/0026/0029/0030 and the later lifecycle

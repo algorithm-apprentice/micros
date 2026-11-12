@@ -16,6 +16,8 @@ static bool endpoint_model_live_process_and_thread_match(
         process->slot_state != MICROS_KERNEL_OBJECT_SLOT_LIVE
         || process->generation != expected->generation
         || process->live_thread_count != 1
+        || process->sole_thread.slot != expected->thread.slot
+        || process->sole_thread.generation != expected->thread.generation
         || !expected->thread_live
     ) {
         return endpoint_model_model_fail(

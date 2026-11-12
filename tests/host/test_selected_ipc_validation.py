@@ -8,7 +8,7 @@ from unittest.mock import patch
 
 from tests.host.selected_ipc_validation_evidence import (
     OWNER_MASK, PRODUCER, TARGET_COUNT_FIELDS, TARGET_FIELDS, TARGET_PASS, TARGET_PRODUCER,
-    expected_cases, parse_native_output, parse_target_output, target_failures, work_failures,
+    INDEX_CASES, expected_cases, parse_native_output, parse_target_output, target_failures, work_failures,
 )
 from tests.host.work_count_types import Kind, Owner
 from tests.host.selected_ipc_validation_source import (
@@ -29,6 +29,14 @@ def transcript(channel="work", mutate=None):
         }
         if row["name"].startswith("completion-") and row["name"].endswith("-commit") and row["value"]:
             work["counts"][Owner.KERNEL_IPC][Kind.COPIED_BYTE] = 64
+        if row["name"].startswith("dependency-"):
+            work["counts"][Owner.KERNEL_IPC][Kind.LINK_TRAVERSE] = row["value"]
+            work["counts"][Owner.KERNEL_IPC][Kind.BITMAP_WORD_LOAD] = row["value"] - int(row["result"] == 6)
+            work["counts"][Owner.KERNEL_IPC][Kind.CLEARED_BYTE] = 16
+        if row["name"].startswith("index-"):
+            work["counts"][Owner.KERNEL_OBJECTS][Kind.RECORD_VISIT] = next(
+                spec[3] for spec in INDEX_CASES if spec[0] == row["name"]
+            )
         if mutate is not None and row["case"] == 1:
             mutate(row, work)
         lines.append("MICROS_IPC01_CASE " + json.dumps(row))
@@ -120,6 +128,32 @@ class SelectedIpcValidationEvidenceTest(unittest.TestCase):
             with self.subTest(name=name):
                 self.assertTrue(work_failures(records, changed))
 
+    def test_dependency_work_rejects_table_scans_prefix_search_and_missing_hops(self):
+        records, work = parse_native_output(transcript(), "work")
+        index = next(index for index, row in enumerate(records) if row["name"] == "dependency-long")
+        for owner, kind, value in (
+            (Owner.KERNEL_IPC, Kind.INDEX_PROBE, 128 * 63),
+            (Owner.KERNEL_IPC, Kind.COMPARISON, 63 * 62 // 2),
+            (Owner.KERNEL_IPC, Kind.LINK_TRAVERSE, 62),
+            (Owner.KERNEL_IPC, Kind.LINK_TRAVERSE, 64),
+            (Owner.KERNEL_IPC, Kind.BITMAP_WORD_LOAD, 62),
+            (Owner.KERNEL_IPC, Kind.CLEARED_BYTE, 17),
+            (Owner.KERNEL_OBJECTS, Kind.RECORD_VISIT, 1),
+        ):
+            changed = copy.deepcopy(work)
+            changed[index]["counts"][owner][kind] = value
+            with self.subTest(owner=owner, kind=kind):
+                self.assertTrue(work_failures(records, changed))
+
+    def test_index_lifetime_cannot_add_a_hot_scan_or_omit_cold_repair(self):
+        records, work = parse_native_output(transcript(), "work")
+        for name, visits in (("index-release-single", 136), ("index-release-pair-high", 8)):
+            changed = copy.deepcopy(work)
+            index = next(index for index, row in enumerate(records) if row["name"] == name)
+            changed[index]["counts"][Owner.KERNEL_OBJECTS][Kind.RECORD_VISIT] = visits
+            with self.subTest(name=name):
+                self.assertTrue(work_failures(records, changed))
+
 
 class SelectedIpcObservationTest(unittest.TestCase):
     def test_current_native_and_target_primitive_coverage(self):
@@ -150,6 +184,21 @@ class SelectedIpcObservationTest(unittest.TestCase):
             with patch("tests.host.native_observations.source_bytes", return_value=json.dumps(changed).encode()):
                 with self.assertRaises(ValueError):
                     validate_native_sites(root, path, text)
+
+    def test_dependency_bitmap_requires_its_actual_read_initializers_and_slot_mapping(self):
+        root = Path(__file__).resolve().parents[2]
+        path = "kernel/ipc/ipc_deadlock.c"
+        text = (root / path).read_text()
+        original = json.loads((root / "tests/host/native_observations.json").read_text())
+        for kind in ("BITMAP_WORD_LOAD", "CLEARED_BYTE"):
+            changed = copy.deepcopy(original)
+            sites = changed["families"]["IPC01"]["sites"][path]["ipc_preflight_deadlock"]
+            del sites[next(index for index, (_, site) in enumerate(sites) if site[3] == kind)]
+            with patch("tests.host.native_observations.source_bytes", return_value=json.dumps(changed).encode()):
+                with self.subTest(kind=kind), self.assertRaises(ValueError):
+                    validate_native_sites(root, path, text)
+        with self.assertRaises(ValueError):
+            validate_native_sites(root, path, text.replace("slot % 64", "slot % 63", 1))
 
     def test_target_audit_and_scope_hooks_cannot_move_or_disappear(self):
         root = Path(__file__).resolve().parents[2]

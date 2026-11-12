@@ -942,6 +942,42 @@ static bool test_projection_and_corruption_are_atomic(void)
             stale_endpoint
         )
     );
+    EXPECT_TRUE(setup_fixture(2, 1));
+    const struct micros_thread_handle invalid_indices[] = {
+        {0, 0}, {MICROS_THREAD_CAPACITY, 1},
+        {primary_threads[1].slot, primary_threads[1].generation + 1},
+        primary_threads[0],
+    };
+    for (size_t index = 0; index < sizeof(invalid_indices) / sizeof(invalid_indices[0]); ++index) {
+        objects.processes[processes[1].slot].sole_thread = invalid_indices[index];
+        EXPECT_TRUE(expect_send_failure_unchanged(
+            MICROS_IPC_ERROR_INVARIANT, primary_threads[0], endpoints[1]
+        ));
+    }
+    objects.processes[processes[1].slot].sole_thread = primary_threads[1];
+    objects.processes[processes[0].slot].sole_thread = primary_threads[1];
+    EXPECT_TRUE(expect_send_failure_unchanged(
+        MICROS_IPC_ERROR_INVARIANT, primary_threads[0], endpoints[1]
+    ));
+    EXPECT_TRUE(setup_fixture(2, 1));
+    objects.threads[MICROS_THREAD_CAPACITY - 1] = objects.threads[primary_threads[0].slot];
+    EXPECT_TRUE(expect_send_failure_unchanged(
+        MICROS_IPC_ERROR_INVARIANT,
+        (struct micros_thread_handle){MICROS_THREAD_CAPACITY - 1, primary_threads[0].generation},
+        endpoints[1]
+    ));
+    EXPECT_TRUE(setup_fixture(2, 1));
+    struct micros_thread hidden = objects.threads[primary_threads[1].slot];
+    struct micros_ipc_message message = message_pattern(UINT32_C(0x7004), UINT8_C(0x40));
+
+    objects.threads[MICROS_THREAD_CAPACITY - 1] = hidden;
+    EXPECT_TRUE(micros_endpoint_registry_validate_objects(&registry, &objects) == MICROS_ENDPOINT_ERROR_INVARIANT);
+    EXPECT_IPC_ERROR(
+        MICROS_IPC_OK,
+        micros_ipc_send(&registry, &objects, primary_threads[0], endpoints[1], &message)
+    );
+    EXPECT_TRUE(memcmp(&objects.threads[MICROS_THREAD_CAPACITY - 1], &hidden, sizeof(hidden)) == 0);
+    EXPECT_TRUE(micros_endpoint_registry_validate_objects(&registry, &objects) == MICROS_ENDPOINT_ERROR_INVARIANT);
     return true;
 }
 

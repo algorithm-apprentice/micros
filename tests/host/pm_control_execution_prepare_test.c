@@ -98,6 +98,8 @@ static bool prepared_execution_is_valid(
             &process
         ) == MICROS_KERNEL_OBJECT_OK
         && process->live_thread_count == 1
+        && process->sole_thread.slot == prepare->thread.slot
+        && process->sole_thread.generation == prepare->thread.generation
         && process->primary_endpoint == prepare->endpoint
         && process->privilege_profile
             == MICROS_PRIVILEGE_PROFILE_APPLICATION
@@ -178,6 +180,8 @@ static bool abort_initial_execution(
             == context->reservation_token
         && context->objects.processes[context->child.slot]
             .live_thread_count == 0
+        && context->objects.processes[context->child.slot].sole_thread.slot == 0
+        && context->objects.processes[context->child.slot].sole_thread.generation == 0
         && context->objects.processes[context->child.slot]
             .primary_endpoint == MICROS_PROCESS_ENDPOINT_NONE
         && context->objects.processes[context->child.slot]
@@ -286,10 +290,10 @@ bool test_prepare_abort_activate(
 {
     struct micros_pm_control_prepare_plan prepare;
 
+    EXPECT_TRUE(prepare_initial_execution(context, &prepare));
+    EXPECT_TRUE(prepared_execution_is_valid(context, &prepare));
     return (
-        prepare_initial_execution(context, &prepare)
-        && prepared_execution_is_valid(context, &prepare)
-        && abort_initial_execution(
+        abort_initial_execution(
             context,
             prepare.prepared_token
         )
@@ -362,6 +366,12 @@ bool test_prepared_corruption_is_invariant(
     thread = &context->objects.threads[prepare.thread.slot];
     process = &context->objects.processes[prepare.process.slot];
     endpoint = &context->endpoints.endpoints[prepare.process.slot];
+
+    process->sole_thread = (struct micros_thread_handle){0, 0};
+    EXPECT_TRUE(activation_rejects_invariant(context, prepare.prepared_token));
+    process->sole_thread = context->pm_thread;
+    EXPECT_TRUE(activation_rejects_invariant(context, prepare.prepared_token));
+    process->sole_thread = prepare.thread;
 
     ++thread->scheduler_priority;
     EXPECT_TRUE(activation_rejects_invariant(context, prepare.prepared_token));

@@ -83,6 +83,7 @@ struct micros_process {
     uint32_t primary_endpoint;
     uint32_t privilege_profile;
     bool endpoint_lifecycle_consumed;
+    struct micros_thread_handle sole_thread;
 };
 
 struct micros_thread {

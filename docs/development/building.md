@@ -185,6 +185,9 @@ ctest --test-dir build/host-debug --output-on-failure --no-tests=error -R '^(end
 The selected-IPC work pair is included by complete `test-unit`, not the fast
 loop. Its current-source, collector, semantic and work checks do not replace
 the independent IPC model or actual syscall/completion target evidence.
+The same pair includes IPC02 chain/index-lifetime cases. Add `--verbose` to
+that focused CTest command to see the validated `MICROS_IPC02_WORK` hop,
+bitmap, index and cold-repair summaries; no second producer is required.
 
 ## Validation planning
 

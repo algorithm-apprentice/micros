@@ -80,15 +80,50 @@ static struct micros_test_work_snapshot snapshot;
         } \
     } while (false)
 
-static uint64_t bytes_digest(const void *source, size_t size)
+static uint64_t extend_digest(uint64_t value, const void *source, size_t size)
 {
     const unsigned char *bytes = source;
-    uint64_t value = UINT64_C(14695981039346656037);
     size_t index;
 
     for (index = 0; index < size; ++index) {
         value ^= bytes[index];
         value *= UINT64_C(1099511628211);
+    }
+    return value;
+}
+
+static uint64_t bytes_digest(const void *source, size_t size)
+{
+    return extend_digest(UINT64_C(14695981039346656037), source, size);
+}
+
+/* Preserve the fixed reference's 40-byte process view, not a second implementation. */
+static uint64_t reference_state_digest(const struct micros_kernel_objects *objects)
+{
+    const uint32_t old_padding = 0;
+    size_t tail = offsetof(struct micros_kernel_objects, threads);
+    uint64_t value = extend_digest(
+        UINT64_C(14695981039346656037), objects, offsetof(struct micros_kernel_objects, processes)
+    );
+
+    _Static_assert(offsetof(struct micros_process, sole_thread) == 36 && sizeof(struct micros_process) == 48,
+                   "the reference view admits only the appended sole-thread handle");
+    for (size_t index = 0; index < MICROS_PROCESS_CAPACITY; ++index) {
+        value = extend_digest(value, &objects->processes[index], offsetof(struct micros_process, sole_thread));
+        value = extend_digest(value, &old_padding, sizeof(old_padding));
+    }
+    return extend_digest(value, (const unsigned char *)objects + tail, sizeof(*objects) - tail);
+}
+
+static uint64_t sole_index_digest(const struct micros_kernel_objects *objects)
+{
+    uint64_t value = UINT64_C(14695981039346656037);
+
+    for (size_t index = 0; index < MICROS_PROCESS_CAPACITY; ++index) {
+        const struct micros_thread_handle *handle = &objects->processes[index].sole_thread;
+
+        value = extend_digest(value, &handle->slot, sizeof(handle->slot));
+        value = extend_digest(value, &handle->generation, sizeof(handle->generation));
     }
     return value;
 }
@@ -443,6 +478,8 @@ static bool measure_operation(enum object_operation operation, const char *varia
     bool outputs_preserved;
     uint64_t before_output;
     uint64_t before_state;
+    uint64_t reference_before_state;
+    uint64_t before_index;
     uint64_t before_plan;
     uint64_t effect = 0;
     bool has_effect;
@@ -459,6 +496,8 @@ static bool measure_operation(enum object_operation operation, const char *varia
     fixture.value = UINT64_MAX;
     before_output = output_digest();
     before_state = bytes_digest(&fixture.before, sizeof(fixture.before));
+    reference_before_state = reference_state_digest(&fixture.before);
+    before_index = sole_index_digest(&fixture.before);
     before_plan = bytes_digest(&fixture.plan, sizeof(fixture.plan));
     ++capture_label;
 #if defined(MICROS_TEST_WORK_COUNTS)
@@ -511,6 +550,8 @@ static bool measure_operation(enum object_operation operation, const char *varia
         "\"selected_thread\":%zu,\"selected_hart\":%zu,\"result\":%u,"
         "\"diagnostic\":%u,\"preserved\":%u,\"outputs_preserved\":%u,"
         "\"before_state\":%" PRIu64 ",\"after_state\":%" PRIu64
+        ",\"reference_before_state\":%" PRIu64 ",\"reference_after_state\":%" PRIu64
+        ",\"before_index\":%" PRIu64 ",\"after_index\":%" PRIu64
         ",\"before_output\":%" PRIu64 ",\"after_output\":%" PRIu64
         ",\"value\":%" PRIu64 "}\n",
         capture_label, operation_name(operation), variant,
@@ -519,6 +560,8 @@ static bool measure_operation(enum object_operation operation, const char *varia
         result, (unsigned int)diagnostic, (unsigned int)state_preserved,
         (unsigned int)outputs_preserved, before_state,
         bytes_digest(&fixture.objects, sizeof(fixture.objects)),
+        reference_before_state, reference_state_digest(&fixture.objects),
+        before_index, sole_index_digest(&fixture.objects),
         before_output, output_digest(), fixture.value
     );
     printf(

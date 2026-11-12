@@ -223,6 +223,8 @@ static enum micros_pm_control_error validate_stopped_objects(
 
     if (
         process->live_thread_count != 1
+        || process->sole_thread.slot != state->exit.thread.slot
+        || process->sole_thread.generation != state->exit.thread.generation
         || process->address_space_root == 0
         || process->primary_endpoint != state->exit.endpoint
         || process->privilege_profile
@@ -275,6 +277,7 @@ static enum micros_pm_control_error validate_detached_objects(
 
     return (
         process->live_thread_count == 0
+        && micros_pm_control_thread_handle_is_zero(process->sole_thread)
         && process->primary_endpoint
             == MICROS_PROCESS_ENDPOINT_NONE
         && process->privilege_profile == 0
@@ -296,6 +299,8 @@ static enum micros_pm_control_error validate_prepared_objects(
 
     if (
         process->live_thread_count != 1
+        || process->sole_thread.slot != state->prepared.thread.slot
+        || process->sole_thread.generation != state->prepared.thread.generation
         || process->address_space_root == 0
         || process->primary_endpoint != state->prepared.endpoint
         || process->privilege_profile

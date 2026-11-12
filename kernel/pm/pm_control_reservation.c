@@ -57,6 +57,9 @@ enum micros_pm_control_error micros_pm_control_reserve_preflight(
             continue;
         }
         candidate.process.slot = (uint16_t)index;
+        if (!micros_pm_control_thread_handle_is_zero(objects->processes[index].sole_thread)) {
+            return MICROS_PM_CONTROL_ERROR_INVARIANT;
+        }
         candidate.process.generation = generation;
         break;
     }
@@ -87,6 +90,7 @@ void micros_pm_control_reserve_commit_prevalidated(
     process->slot_state = MICROS_KERNEL_OBJECT_SLOT_LIVE;
     process->generation = plan->process.generation;
     process->live_thread_count = 0;
+    process->sole_thread = (struct micros_thread_handle){0, 0};
     process->address_space_root = 0;
     process->primary_endpoint = MICROS_PROCESS_ENDPOINT_NONE;
     process->privilege_profile = 0;
@@ -165,6 +169,7 @@ void micros_pm_control_abort_commit_prevalidated(
         ? MICROS_KERNEL_OBJECT_SLOT_QUARANTINED
         : MICROS_KERNEL_OBJECT_SLOT_FREE;
     process->live_thread_count = 0;
+    process->sole_thread = (struct micros_thread_handle){0, 0};
     process->address_space_root = 0;
     process->primary_endpoint = MICROS_PROCESS_ENDPOINT_NONE;
     process->privilege_profile = 0;

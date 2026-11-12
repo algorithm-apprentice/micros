@@ -45,6 +45,8 @@ static bool same_process(
         && a->primary_endpoint == b->primary_endpoint
         && a->privilege_profile == b->privilege_profile
         && a->endpoint_lifecycle_consumed == b->endpoint_lifecycle_consumed
+        && a->sole_thread.slot == b->sole_thread.slot
+        && a->sole_thread.generation == b->sole_thread.generation
     );
 }
 

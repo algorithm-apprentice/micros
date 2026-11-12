@@ -236,5 +236,6 @@ bool kernel_object_test_lifecycle_model_matches_registry(
 bool kernel_object_test_seeded_lifecycle_model(void);
 
 bool kernel_object_test_validator_rejects_corrupt_relationships(void);
+bool kernel_object_test_thread_index_corruption_is_atomic(void);
 
 #endif

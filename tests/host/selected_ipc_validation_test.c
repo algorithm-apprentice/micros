@@ -271,6 +271,7 @@ static uint64_t state_digest(
         MIX_FIELD(process->primary_endpoint);
         MIX_FIELD(process->privilege_profile);
         MIX_FIELD(process->endpoint_lifecycle_consumed);
+        MIX_HANDLE(process->sole_thread);
         MIX_FIELD(endpoint->state);
         MIX_HANDLE(endpoint->owner);
         MIX_FIELD(endpoint->value);
@@ -800,7 +801,11 @@ int main(int argc, char **argv)
     if (!selected_ipc_completion_cases(query_count + IPC_CASE_COUNT + lifecycle_count)) {
         return 1;
     }
+    if (!selected_ipc_deadlock_cases(query_count + IPC_CASE_COUNT + lifecycle_count
+                                    + selected_ipc_completion_case_count())) {
+        return 1;
+    }
     printf("MICROS_IPC01_NATIVE_PASS cases=%zu\n", query_count + IPC_CASE_COUNT + lifecycle_count
-           + selected_ipc_completion_case_count());
+           + selected_ipc_completion_case_count() + selected_ipc_deadlock_case_count());
     return 0;
 }

@@ -79,6 +79,79 @@ class StackFatalBindingsTest(unittest.TestCase):
                 replace(row, line=row.line + 1) if row == origin else row for row in self.catalog.origins
             )))
 
+    def test_layout_cache_cannot_borrow_the_other_admitted_process_geometry(self):
+        from tools.stack_bound_fatal_effects import trace_object_layout
+
+        header = self.root / "include/micros/kernel_objects.h"
+        original = header.read_text()
+        extended = original.replace(
+            "    bool endpoint_lifecycle_consumed;\n",
+            "    bool endpoint_lifecycle_consumed;\n    struct micros_thread_handle sole_thread;\n", 1,
+        )
+        self.assertNotEqual(original, extended)
+        baseline = trace_object_layout(self.root)
+        try:
+            header.write_text(extended)
+            current = trace_object_layout(self.root)
+            self.assertEqual(baseline["process_bytes"] + 8, current["process_bytes"])
+            for name in ("thread_table", "hart_table", "registry_bytes"):
+                self.assertEqual(baseline[name] + 8 * baseline["process_capacity"], current[name], name)
+        finally:
+            header.write_text(original)
+        self.assertEqual(baseline, trace_object_layout(self.root))
+
+    def test_selected_owner_extension_cannot_change_resolver_or_shared_state(self):
+        source = self.root / "kernel/objects/kernel_object_identity.c"
+        original = source.read_text()
+        extension = "\nint unrelated_owner_query(void);\nint unrelated_owner_query(void) { return 0; }\n"
+        try:
+            source.write_text(original + extension)
+            self.bind()
+            for changed in (
+                original + extension + "\nstatic uint64_t hidden;\n",
+                original + extension.replace("return 0;", "\n#define MICROS_KERNEL_OBJECTS_MAGIC 0\nreturn 0;"),
+                original.replace("handle.generation != 0", "handle.generation == 0", 1) + extension,
+            ):
+                source.write_text(changed)
+                with self.assertRaises(StackEvidenceError):
+                    self.bind()
+        finally:
+            source.write_text(original)
+
+    def test_fault_prefix_extension_retains_its_source_and_actual_frame(self):
+        from tools.stack_bound_fatal import collect_fatal_artifacts, trace_fault_artifacts
+
+        unit = "kernel/objects/kernel_object_identity.c"
+        name = "kernel_object_require_initialized"
+        artifacts = collect_fatal_artifacts(
+            self.root, self.directory, self.catalog, observed_mode=False, tty_test=False,
+        )
+        source = self.root / unit
+        original = source.read_text()
+        extension = "\nint unrelated_lifetime_query(void) { return 0; }\n"
+        try:
+            with patch("tools.stack_bound_fatal.TRACE_FAULT_FUNCTIONS", ((unit, name),)):
+                trace_fault_artifacts(self.root, self.directory, self.catalog, artifacts)
+                source.write_text(original + extension)
+                trace_fault_artifacts(self.root, self.directory, self.catalog, artifacts)
+                for changed in (
+                    original + extension + "\nstatic uint64_t hidden;\n",
+                    original.replace("objects->initialization_magic !=", "objects->initialization_magic ==", 1)
+                    + extension,
+                ):
+                    source.write_text(changed)
+                    with self.assertRaises(StackEvidenceError):
+                        trace_fault_artifacts(self.root, self.directory, self.catalog, artifacts)
+                source.write_text(original + extension)
+                changed = replace(self.catalog, frames=tuple(
+                    replace(row, bytes_used=row.bytes_used + 16) if row.function.symbol == name else row
+                    for row in self.catalog.frames
+                ))
+                with self.assertRaises(StackEvidenceError):
+                    trace_fault_artifacts(self.root, self.directory, changed, artifacts)
+        finally:
+            source.write_text(original)
+
     def test_new_control_and_claimed_report_reject_foreign_source_origins(self):
         for name, foreign in (
             ("micros_panic_claim_first", "kernel/diagnostic/panic.c"),

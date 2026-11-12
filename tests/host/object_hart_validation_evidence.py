@@ -31,6 +31,7 @@ CASE_FIELDS = frozenset((
     "priority",
     "exceptions", "selected_thread", "selected_hart", "result", "diagnostic",
     "preserved", "outputs_preserved", "before_state", "after_state",
+    "reference_before_state", "reference_after_state", "before_index", "after_index",
     "before_output", "after_output", "value",
 ))
 SCHEDULER_OPERATIONS = (
@@ -183,6 +184,9 @@ def check_semantics(records, stage, *, historical=False):
     for row, wanted in zip(records, expected):
         if {key: row[key] for key in wanted} != wanted:
             raise ValueError("OBJ01 case differs from the independent " + stage + " contract: " + repr(row))
+        index_digest = expected_index_digest(wanted["threads"])
+        if row["before_index"] != index_digest or row["after_index"] != index_digest:
+            raise ValueError("OBJ01 changed the independently specified sole-index input or effect")
         if row["operation"] in readonly or row["result"] != 0:
             if row["preserved"] != 1 or row["before_state"] != row["after_state"]:
                 raise ValueError("OBJ01 read or rejection changed registry state")
@@ -225,6 +229,15 @@ def _local_work_limits(row):
     return 128 + 8 * prefix + 8 * priorities, 264 + 4 * prefix + 4 * priorities, 2 * prefix + 8
 
 
+def expected_index_digest(threads):
+    value = 14695981039346656037
+    for process in range(64):
+        generation = int(process == 0 and threads == 1)
+        for byte in bytes(2) + generation.to_bytes(4, "little"):
+            value = ((value ^ byte) * 1099511628211) & ((1 << 64) - 1)
+    return value
+
+
 def check_current_reference(root, records, plans):
     from tests.host.source_snapshot import source_bytes
 
@@ -253,7 +266,7 @@ def check_current_reference(root, records, plans):
         ):
             raise ValueError("current object reference omitted or borrowed a case")
         observed = [
-            row["case"], row["before_state"], row["after_state"],
+            row["case"], row["reference_before_state"], row["reference_after_state"],
             row["before_output"] ^ plan["before"], row["after_output"] ^ plan["after"],
             row["value"], plan["has_effect"], plan["effect"],
         ]

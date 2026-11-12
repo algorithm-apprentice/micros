@@ -935,6 +935,44 @@ class PanicTraceTransportTest(unittest.TestCase):
 
 
 class PanicTraceMachineTest(unittest.TestCase):
+    def test_sole_index_layout_admission_does_not_accept_other_type_or_member_changes(self):
+        from tools.stack_bound_fatal_effects import require_trace_object_header
+        from tools.stack_bound_types import StackEvidenceError
+
+        name = "include/micros/kernel_objects.h"
+        source = (ROOT / name).read_text()
+        require_trace_object_header(name, source)
+        for changed in (
+            source.replace("struct micros_thread_handle sole_thread;", "struct micros_process_handle sole_thread;", 1),
+            source.replace("struct micros_thread_handle sole_thread;", "struct micros_thread_handle sole_thread[2];", 1),
+            source.replace("bool endpoint_lifecycle_consumed;", "bool endpoint_lifecycle_consumed; uint64_t hidden;", 1),
+            source.replace("uint32_t generation;", "uint64_t generation;", 1),
+            source.replace("    struct micros_thread_handle sole_thread;\n", "", 1).replace(
+                "struct micros_thread {", "struct micros_thread { struct micros_thread_handle sole_thread;", 1,
+            ),
+        ):
+            with self.subTest(changed=changed[-100:]), self.assertRaises(StackEvidenceError):
+                require_trace_object_header(name, changed)
+        private_name = "kernel/objects/kernel_object_private.h"
+        private = (ROOT / private_name).read_text()
+        require_trace_object_header(private_name, private)
+        with self.assertRaises(StackEvidenceError):
+            require_trace_object_header(private_name, private + "\nstatic uint64_t hidden;\n")
+
+    def test_current_sole_thread_layout_uses_actual_compiler_geometry(self):
+        from tools.stack_bound_fatal_effects import trace_object_layout
+
+        layout = trace_object_layout(ROOT)
+        self.assertEqual(48, layout["process_bytes"])
+        self.assertEqual(
+            layout["process_table"] + layout["process_capacity"] * layout["process_bytes"],
+            layout["thread_table"],
+        )
+        self.assertEqual(
+            layout["thread_table"] + layout["thread_capacity"] * layout["thread_bytes"],
+            layout["hart_table"],
+        )
+
     def test_real_fault_dispatch_preserves_the_latch_and_exact_context_output(self):
         from tests.host.test_stack_bound_evidence import compile_fixture
         from tests.host.work_count_lexical import function_spans

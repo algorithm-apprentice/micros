@@ -32,6 +32,8 @@ static bool process_is_empty(const struct micros_process *process)
 {
     return (
         process->live_thread_count == 0
+        && process->sole_thread.slot == 0
+        && process->sole_thread.generation == 0
         && process->address_space_root == 0
         && process->primary_endpoint == MICROS_PROCESS_ENDPOINT_NONE
         && process->privilege_profile == 0
@@ -97,6 +99,8 @@ static bool frozen_vm_reservation_is_valid(
         )
         || record->root_physical_address == 0
         || process->live_thread_count != 0
+        || process->sole_thread.slot != 0
+        || process->sole_thread.generation != 0
         || process->address_space_root
             != record->root_physical_address
         || process->primary_endpoint != MICROS_PROCESS_ENDPOINT_NONE
