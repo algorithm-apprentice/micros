@@ -7,9 +7,13 @@ This is the Accepted contract for
 The paired tasks are `validation-simplification-design` and
 `validation-simplification-implementation`. Complete independent design review
 is clean and design #247 is separately merged as
-`7f621f58129b298e983bd5bf41a196087e354e8d`. The dependent implementation
-supplies the current owners described below; its PR records the exact final
-author gate and independent implementation review.
+`7f621f58129b298e983bd5bf41a196087e354e8d`. Implementation
+[#248](https://github.com/algorithm-apprentice/micros/pull/248) is merged as
+`3f35213e29850e1a3f3f31067b6342af57b7a310`, with reviewed, published and
+squash tree `c656e80c9d258a89cceafd19aacb7969fc5dd074`.
+That PR owns the complete fifty-command producer, three-profile reuse and
+clean independent GPT-6.1 Sol review record. The current owners below are
+implemented, not a pending design.
 
 The dependency-ready base is merged OBJ02 #246:
 

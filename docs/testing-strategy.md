@@ -35,2261 +35,126 @@ do not require an invented runtime test. Exploratory spikes are not merged.
 The full task and review loop is defined in
 [the AI-native development workflow](development/ai-native-workflow.md).
 
-The [validation-cost study](research/validation-feedback-cost.md) found that
-the earlier fast and full native targets ran identical Python discovery,
-and individual source checks repeatedly reconstruct complete authority.
-Accepted [ADR-0105](adr/0105-bounded-validation-feedback.md) defines
-[bounded feedback](architecture/validation-feedback.md): an owned checked
-source view, a small fast Python set, complete full discovery and live
-progress. Separate design #217 and independently reviewed implementation #218
-are merged. The source view and runner now supply an explicit fast host set; full
-mode still discovers every test, and final success follows complete closing
-verification. Workflow output is live without changing retained raw logs or
-receipt rules. Their acceptance does not substitute for a later runtime
-correction's actual source and execution evidence.
-Unit tests remain the primary portable feedback; QEMU components and focused
-cross-service integration remain necessary at their actual boundaries.
+## Current validation policy
 
-After completed OBJ02 #246 and separately merged design #247,
+[ADR-0123](adr/0123-current-contract-validation.md) and
 [current-contract validation](architecture/current-contract-validation.md)
-under [Accepted ADR-0123](adr/0123-current-contract-validation.md) replaces
-historical source admission with current behavior, ownership, observation,
-artifact, hardware, integration and stack checks. Current native generators
-compile actual current source; ordinary validation needs no retirement
-catalog or author journal. The implementation map records retained owners
-and the disposition of removed Python cases.
+define the current tooling boundary. Validate actual current code and its
+contracts, not accumulated source-retirement history. Complete host discovery
+has no skip list; ordinary/observed agreement, independent expected results,
+source/product identity and closing input checks remain mandatory.
+
+The [build guide](development/building.md) owns tool setup, invocation and
+standalone-image commands. This document owns evidence policy, layer selection
+and the planner-checked QEMU/model command matrices. Subsystem ADRs and
+contracts own exact cases, error precedence, ABI/resource bounds and witnesses;
+the original PRs own historical execution and review records.
+
+| Layer | Establishes | Required use |
+| --- | --- | --- |
+| Compiler/static checks | Warnings, ABI, freestanding and artifact closure | Every applicable build |
+| Native unit/property tests | Portable algorithms, state, authority, bounds and failure atomicity | Smallest affected development loop |
+| Persistent independent models | Complete mixed transition/state agreement with replayable seeds | Applicable model work and complete native acceptance |
+| Current structural/work checks | Ownership, private dependencies, complete primitive/site coverage, work and storage bounds | Applicable source/algorithm change and complete native acceptance |
+| QEMU components | Real traps, privilege, MMU/fences, registers, interrupts and context switches | Applicable hardware/mechanism change |
+| Cross-service integration | Composed IPC/grants, publication, rollback and resource lifetime | Native protocol model before peers exist; real QEMU integration once ready |
+| Stack evidence | Compiler/machine upper bounds plus authenticated target high-water observations | Every declared current scope and configuration |
+| End-to-end | User-visible complete system behavior | The integrated shell/POSIX milestone, not an earlier component |
+| Stress/fuzz and physical hardware | Long or malformed sequences; later platform gaps | Explicit/scheduled stress and post-MVP hardware work |
+
+A host test cannot certify target hardware. A component cannot certify a
+missing service, and a passing guest cannot waive an unknown stack edge or
+algorithmic divergence. Existing QEMU configurations and scenarios remain
+distinct; consolidation of this guide does not combine or remove them.
 
 ## Structural and algorithmic baseline evidence
 
-For MINIX-derived runtime work, semantic output is necessary but not
-sufficient. The design first records the reference data structure, algorithm,
-and complexity envelope required by ADR-0080. Portable implementation begins
-with deterministic evidence for the relevant property:
+For MINIX-derived work, follow [ADR-0080](adr/0080-minix-structural-and-algorithmic-baseline.md).
+Before implementation, trace the fixed reference's behavior, authority,
+logical data structures, mutation order, average/worst/amortized work where
+relevant, auxiliary space, stack and hot paths. Classify every adaptation.
 
-- queue/list/tree/hash topology and membership;
-- comparison, probe, link-traversal, or record-visit counts;
-- sorted, reverse-sorted, equal-key, boundary, and adversarial inputs;
-- auxiliary-storage and stack bounds; and
-- a small independent reference model when the transition is stateful.
+Deterministic evidence includes topology/membership, primitive comparisons,
+probes, traversals and movement, boundary/adversarial inputs, independent
+models and storage bounds. Analyze the logical input/capacity; a fixed array
+does not make a linear or quadratic algorithm constant-time.
+Elapsed time and model action coverage are not operation-count oracles.
 
-Complexity is analyzed over the logical record count even when production
-uses a fixed-capacity array. A wall-clock threshold cannot prove asymptotic
-parity. A complete behavior or QEMU gate cannot waive a known structural or
-algorithmic divergence.
+[Operation-count evidence](architecture/operation-count-evidence.md) owns
+passive test-only annotations, exact placement, complete composition,
+overflow failure and ordinary collector absence. Current reference fields
+retain their fixed independent provenance; candidate output cannot define
+its own expected behavior or loosen a work bound.
 
-Historical source/body/AST identities record completed transport, not current
-correctness. ADR-0123 retires their ordinary admission role. Actual Red,
-independent expected results, current ownership, primitive placement and
-finite source/machine proofs remain required. Test metadata changes belong
-with their owning outcome rather than a separate naming prerequisite.
+[Stack-bound evidence](architecture/stack-bound-evidence.md) owns actual
+compiler/object/linked frames and call closure, finite indirect/fatal
+qualifications, assembly epochs, metadata passivity, unchanged budgets and
+authenticated observations. An observed low-water mark is not a static
+upper bound. Every declared ordinary/metadata/observed variant remains
+required, including standalone production images; B13-E007 stays explicitly
+blocked until production node Q and `STACK13` exist.
+The required aggregate command is `cmake --workflow --preset test-stack-evidence`;
+the [build guide](development/building.md#stack-evidence) owns its execution
+and focused-development instructions.
 
-Use one sufficient current planner run for final acceptance. Its actual
-native/target results also satisfy the affected audit units; do not execute
-them again to populate a retirement transaction. Ordinary fresh execution
-does not collect reusable profiles or publish receipts. Explicit producer,
-reuse and recording modes retain their closed failure rules.
+Current source checks enforce module/state/fixture ownership, public ABI,
+private dependency direction, model independence and actual observation/
+machine contracts. Completed whole-body/header/AST transport and migration
+tables are historical, not ordinary acceptance. Unrelated ordinary prototypes
+or callback-free helpers do not need a metadata prerequisite. Real new
+indirect calls still fail closed until their complete targets are proved.
+Source/function size limits are [review signals](architecture/source-organization.md#review-signals),
+not reasons to freeze source spelling or manufacture a runtime refactor.
 
-### Historical foundation and correction records
+## Validation tiers and cadence
 
-The chronological records below explain earlier outcomes. Their source
-catalogs, author drivers, baseline modes and recertification ceremonies are
-historical, not commands or prerequisites for the current tree. Runtime,
-hardware, integration and finite observation/stack contracts remain in force
-as refined by ADR-0123. Current commands are in the
-[build guide](development/building.md) and the test-layer sections below.
+| Intent | Required coverage |
+| --- | --- |
+| Focused iteration | Smallest relevant unit/model/source or QEMU check; not final PR evidence |
+| Fast | Nonslow native CTests and the explicit small Python set |
+| PR | Planner-selected current coverage; implementation changes include complete native validation, with target ownership and shared/unknown-input escalation |
+| Full/milestone | Complete native discovery, all selected current QEMU/image workflows, stack gate, documentation and diff checks |
+| Documentation only | Documentation/structure plus staged, worktree and branch-range checks |
 
-The Accepted EV02 design
-[operation-count contract](architecture/operation-count-evidence.md) and
-[ADR-0083](adr/0083-test-only-operation-count-evidence.md) define exact
-test-only primitive observations, complete producer composition, overflow
-failure, and finite annotation projection. Design acceptance does not provide
-the executable tooling or close inherited runtime evidence gaps. Each later
-correction must declare its actual sites and independent Red/Green bounds;
-elapsed time and model action coverage remain insufficient.
+Use the authoritative planner's union of committed, staged, unstaged and
+untracked changes; explicit paths may not hide a changed input.
+Actual Red and focused Green precede one sufficient final plan.
+That same actual result can satisfy an affected audit unit: do not run a
+second B01-B12/B14 retirement transaction solely to duplicate it.
+After a correction, carry forward only demonstrably ownership-disjoint
+evidence under [ADR-0034](adr/0034-author-validation-before-review.md).
 
-The merged EV02 implementation adds two native CTests to both
-native tiers and hosted composition/projection/portability regressions.
-It preserves the old root-recipe and historical authority expectations through
-the exact, independently declared native extension; no runtime identity is
-retired. See the
-[operation-count implementation map](architecture/operation-count-evidence.md#implementation-map).
-Counter availability is not evidence that the later production work bounds
-already pass.
+Default/`--fresh` execution never reuses prior success and does not collect
+optional reusable profiles or publish new receipts. It still invalidates an
+old receipt before a fresh attempt and rejects execution, source-drift,
+log-finalization and publication failures. Explicit reuse/producer/recording
+follow the [closed-profile contract](architecture/validation-evidence.md);
+they cannot lower selected coverage or substitute for independent review.
+Ordinary runtime work does not need a separate receipt ceremony.
 
-The Accepted EV03
-[stack-bound contract](architecture/stack-bound-evidence.md) and
-[ADR-0084](adr/0084-checked-stack-bound-evidence.md) require compiler-produced
-fixed frames, a closed machine-call graph with explicit indirect/assembly
-edges, per-owner stack-epoch composition, and independent RV64 high-water
-observations. Unknown edges, recursion, dynamic frames, stale artifacts,
-and budget excess fail. The ten current B01-B12 rows require both static
-and target evidence; B13-E007 remains an explicit future admission at
-STACK13. Design acceptance does not create those artifacts or commands.
+Feedback budgets remain review signals: incremental `test-unit-fast` normally
+below six seconds, QEMU smoke normally below ten seconds, and integrations
+short enough for applicable PRs. Persistent models stay outside the fast
+loop without reducing their seeds, transition counts or PR coverage.
+[Measured costs](research/current-validation-overhead.md) are diagnostic;
+do not hide coverage, sleep, retry a failed guest or raise a deadline to
+manufacture a timing pass.
 
-The initial EV03 implementation's complete ordinary/metadata build matrix
-exposed a complete-ELF seed boundary: unloaded compiler metadata changed
-seeded application files, RAMFS constants/data and the embedded kernel image.
-[Accepted ADR-0085](adr/0085-stack-metadata-artifact-boundary.md) defines a
-separate artifact-ordering correction. The implementation is blocked until
-that design merges; byte passivity, object frame evidence, observed-image
-integrity and all original gates remain required.
+### Persistent model commands
 
-Corrective design #181 is merged. The restarted implementation subsequently
-verified a context-free panic-call cycle despite the exact post-seizure UART
-state predicate. [Accepted ADR-0086](adr/0086-finite-fatal-stack-context.md)
-defines the closed source/machine qualification required before another
-test-first restart. Unknown/real recursion, all original budgets and gates,
-and the later B01 runtime corrections remain required; no edge is simply
-deleted and no stack certificate is yet claimed.
-
-Corrective design #182 is merged. Its later uncommitted implementation found
-an observed VM-service stack bound of 4,240 bytes against the unchanged
-4,096-byte capacity and stopped before executing the observation image.
-[Accepted ADR-0087](adr/0087-phase-bounded-vm-load-temporaries.md) defines
-the one-source automatic-temporary lifetime correction required before
-EV03 restarts. Initial and final complete validation remain unchanged.
-After separate design merge, implementation starts with a fresh lifetime
-Red, preserves exact statement/error/state behavior in native evidence,
-and proves actual frame release plus complete ordinary/observed graph and
-target acceptance. No budget, call edge, hook coverage, timeout or historical
-oracle is waived.
-
-Design #183 is separately merged. The restarted lifetime slice has a
-source/phase regression in `tests/host/test_vm_load_stack_lifetime.py`;
-its original signature/body expectations come from the fixed EV02 source
-stage, not from the corrected candidate. Narrow iteration uses the existing
-VM semantic executable plus that independent source check:
+Run a selected persistent model separately when it is the affected layer:
 
 ```bash
-cmake --preset host-debug
-cmake --build build/host-debug --target vm_core_test
-ctest --test-dir build/host-debug --output-on-failure -R '^vm-core$'
-"${MICROS_PYTHON}" -E -S -B -m unittest tests.host.test_vm_load_stack_lifetime
-```
-
-These checks do not replace the required actual compiler/link stack proof,
-all current EV03 scenarios, complete author gate, or independent review.
-
-The explicit `test-stack-evidence` workflow now composes all 44 current
-ordinary/metadata configurations and 113 ELF outputs, then all ten separately
-instrumented QEMU scenarios. Each private build uses `cmake --fresh` and
-`cmake --build ... --clean-first`; content-bound manifests reject stale
-objects even when timestamps or cached configure values are preserved.
-Static proof precedes guest execution. Complete legacy acceptance and every
-generation-bound producer must pass before atomic certificate publication.
-Workflow availability is not execution evidence or independent review;
-both remain mandatory for the exact candidate being merged.
-
-EV03 implementation #184 is separately reviewed and merged. The
-[EV04 re-certification record](research/evidence-foundations-recertification.md)
-evaluates the complete current evidence foundations without adding a new
-test or weakening a gate. It also records the unaccepted hosted-CI attempt:
-local current-candidate evidence is not remote acceptance, and existing
-runtime validation-cost findings remain with their correction owners.
-
-After merged EV04 #189 and separate design #190, COPY01's
-[runtime memory contract](architecture/runtime-memory-primitives.md)
-defines the first real runtime correction. Its native evidence builds the
-actual pinned byte bodies for both discriminating Red properties, and the
-actual current bodies for Green. Complete residue, boundary, mode, canary,
-typed-object and protected-page evidence accompanies the two aligned-work
-oracles. Actual frontend IR, non-stack RV64 transfers and the linked runtime
-object complement, rather than replace, the complete stack gate.
-
-The task-specific three-phase driver freezes every non-candidate input before
-Red and records actual named oracle and affected-unit outcomes. A newly staged
-claim cannot retire the original memory hash. Only its validated current
-terminal journal, or the unchanged prior committed registry after review,
-can change that one assertion. Journal models exercise negative controls but
-never certify a real transition. The existing runtime tests, B05-B12/B14
-recertification, complete fresh author gate and independent review remain
-required.
-
-Accepted
-[ADR-0091](adr/0091-packed-evidence-identity-coverage.md) addresses the packed
-scheduler declarations omitted from EV01's original materialization. The
-[bounded contract](architecture/packed-evidence-identities.md) requires
-independently pinned function records and semantic minimum-multisets,
-malformed/undeclared-data rejection, exact conservation of existing facts
-and COPY01 prior retirement, and the unchanged complete fresh author gate.
-After separate design #192, the implementation adds the 177 facts through
-one private literal-data helper and the existing authority tests. Native
-regressions compare fixed Git declarations, reject malformed/undeclared
-tables and unsafe current bindings, and preserve all previous fingerprints
-plus COPY01's journal-free prior retirement. Original scheduler and directory
-source gates remain unchanged. Narrow iteration uses:
-
-```bash
-"${MICROS_PYTHON}" -E -S -B -m unittest tests.host.test_evidence_authority tests.host.test_runtime_memory.RuntimeMemoryAuthorityTest tests.host.test_scheduler_source_layout tests.host.test_kernel_directory_layout
-```
-
-This does not replace the complete fresh author plan or independent review.
-
-EV01-C01 implementation #193 is separately reviewed and merged. Accepted
-[ADR-0092](adr/0092-relocated-evidence-payload-bindings.md) defines the next
-[bounded payload repair](architecture/relocated-evidence-payloads.md).
-After separate design #194, implementation binds 102 existing logical-file
-identities to their physical source and two object hashes to their complete
-nine-source/private-header reconstruction. Actual missing-owner Red,
-independently declared complete records, path/inverse negatives and
-historical comparisons preserve all prior values and packed/COPY01
-behavior. Narrow iteration uses:
-
-```bash
-"${MICROS_PYTHON}" -E -S -B -m unittest tests.host.test_evidence_authority tests.host.test_runtime_memory.RuntimeMemoryAuthorityTest tests.host.test_scheduler_source_layout tests.host.test_endpoint_source_layout tests.host.test_kernel_object_source_layout tests.host.test_kernel_directory_layout
-```
-
-No new test target or runtime workflow is added. The complete fresh author
-plan and independent implementation review remain mandatory.
-
-EV01-C02 implementation #195 has completed those gates and merged.
-Accepted [ADR-0093](adr/0093-minix-diagnostic-histories.md) and the
-[diagnostic-history contract](architecture/diagnostic-history.md) define
-the resumed PLAT01 outcome. It requires the exact two history mechanisms,
-independent native work/state and reader/consumer cases, real TTY and seeded
-panic extensions, complete finite source/machine proof and one twenty-key
-EV01 transition. All existing executions and budgets remain required.
-This design-only phase adds no executable native target, runner option,
-fixture or journal; those begin only after the separate design merge.
-
-After design #196 and collector correction #197, the uncommitted
-implementation passed narrow native and seeded-panic checks but failed its
-real TTY first-read guard after a legal second retained IRQ. Its
-[recorded observation](research/minix-diagnostic-history.md#observed-startup-irq-retrigger)
-is not a target pass. That implementation was abandoned; corrective
-[Accepted ADR-0094](adr/0094-retrigger-safe-diagnostic-probe.md) separately
-merged as #198. It defines failure-atomic, fixture-only deferral and exact
-queued-IRQ consumption. The corrected native target also compiles the
-already declared user probe to test deferral, unchanged canaries/scalars
-and later complete transfer. Ordinary consumer errors, all legacy target
-assertions, host timeouts and full author gates remain unchanged.
-
-The restarted author harness is
-[`tools/check_diagnostic_history.py` at #246](https://github.com/algorithm-apprentice/micros/blob/f31c3654c5ede2837dad8e89ba90e8c4c0e37e12/tools/check_diagnostic_history.py).
-Its three documented intents compile and execute the fixed original
-decoder/target images for Red, the current native/target subjects for
-Green, and the complete named affected-unit commands for recertification.
-All fourteen immutable fixture/tool paths and external inputs are frozen
-before the actual Red. A compiler failure, timeout, malformed report or
-failed original target scenario cannot qualify as an expected divergence.
-
-Focused source, report and transaction iteration uses:
-
-```bash
-"${MICROS_PYTHON}" -E -S -B -m unittest tests.host.test_diagnostic_history
-```
-
-The current-source binding cases intentionally require the complete
-implementation; isolated helper/model passes do not certify an absent
-runtime. Synthetic journal tests never provide author transition events.
-The complete fresh post-terminal gate and independent implementation
-review remain required before the first completed-claim commit.
-
-The existing timeout-classifier cases use the exact pre-PLAT01 recipe
-recovered by the independently pinned diagnostic inverse. The extended
-current recipe remains outside the old timeout templates and selects the
-full matrix; neither those templates nor their expected hashes change.
-QEMU source-family fixtures use valid Python source, while malformed source
-must produce the existing unsupported-context result before QEMU metadata.
-Focused integration regression uses:
-
-```bash
-"${MICROS_PYTHON}" -E -S -B -m unittest tests.host.test_validation_build_impact tests.host.test_validation_context tests.host.test_diagnostic_history
-```
-
-The diagnostic stack regressions also compile the actual TTY-control owner.
-They admit only its two new direct-syscall wrappers, reject an indirect-call
-mutation, an undeclared helper or a borrowed source origin, and preserve
-the old owner checks. A passing constructor fixture alone does not certify
-all functions in the real linked image.
-
-PLAT01 implementation #199 has completed the actual transaction, the full
-fresh author gate and independent implementation review. Its ordinary
-committed-source checks preserve both completed retirements without local
-journals. PLAT02 retains all this evidence while defining separate polling
-and terminal-failure acceptance.
-
-PLAT02's Accepted ADR-0095 and separate design #200 are merged. Initial
-declaration and ownership iteration uses the independently frozen nine-fact
-contract while preserving all 3,920 predecessor records and both prior
-claims:
-
-```bash
-"${MICROS_PYTHON}" -E -S -B -m unittest tests.host.test_terminal_failure tests.host.test_evidence_authority
-```
-
-The same module exercises the closed debugger protocol, exact source and
-recipe inverses, bounded observation/work decoding, fixed baseline archive,
-and independent target-state expectations. The compiler models exercise
-actual RV64 entry/reset relations and qualified live-frame composition.
-They do not replace the real fixed-baseline Red, current target evidence
-or complete author gate.
-
-The build scaffolding declares one additional `panic-control` CTest in
-both native tiers and the twelve-case target workflow:
-
-```bash
-cmake --workflow --preset test-qemu-terminal-failure
-```
-
-The runtime owners and actual baseline/current modes are implemented.
-A declared workflow, parser fixture or compiler failure does not establish
-a passing target result. The first-author manifest comparison, complete
-fresh 49-command plan and independent review remain required.
-
-The [build guide](development/building.md#terminal-failure-baseline-and-current-evidence)
-documents the actual baseline intent, error distinction, fresh private
-builds, retained reports and first-author immutable-input comparison.
-
-PLAT02 implementation #201 passed that complete current gate and
-independent implementation review. Its ordinary committed checkout
-preserves the original 3,920 facts plus the nine independently declared
-terminal facts and both prior claims without author journals.
-
-The next Accepted
-[PLAT03 trace contract](architecture/panic-stack-trace.md) defines
-portable owner/cursor validation, exact frame-load work, eighteen real
-target cases, a 192-byte observation object and actual old-runtime Red.
-Its separate `MICROS_TRACE_*` records preserve the existing five-record
-panic classifier and physical-output accounting. The implementation
-must preserve all 3,929 prior facts and thirteen fingerprints, extend
-complete stack evidence to 44 configurations/113 outputs, retain all ten
-current observed scopes and run the complete 50-command fresh author gate.
-These are complete acceptance requirements, not claimed execution results.
-
-The implementation supplies the portable core and target reader, isolated
-controller, eighteen guest scenarios, independent captured-stack model,
-strict observations and four named oracles. Its version-four proof binds
-actual guest output extents, all three diagnostic work kinds, complete
-snapshot custody, fault CSR predicates and physically retained stack epochs.
-Its [build-guide commands](development/building.md#panic-trace-baseline-and-current-evidence)
-distinguish genuine fixed-runtime Red from a broken harness. Narrow host
-iteration uses `tests.host.test_panic_trace`; the `panic-trace` native CTest
-and `test-qemu-panic-trace` workflow execute the corresponding runtime owners.
-Scaffold availability is not a current runtime pass or a completed correction.
-
-The original history decoder accepts at most one complete, contiguous
-`MICROS_TRACE_*` block between the unchanged core/trap records and history.
-It retains the original history length, offsets, bytes and trailing-record
-checks; it does not strip serial bytes or relax the five-record panic
-classifier. Current trace acceptance independently compares every emitted
-frame and work count against the actual stopped stack.
-
-PLAT03 implementation #204 passed the complete 50-command fresh author gate
-and independent implementation review: 40 native CTests, 1,399 Python tests,
-matching eighteen-case runtime evidence, all 44 static configurations/
-113 outputs and ten observed scopes. Ordinary committed checks preserve
-the prior claims without an author journal.
-
-The next MEM01 design is blocked by the
-[standalone validator payload gap](research/standalone-frame-validator-payload-gap.md).
-[Accepted ADR-0098](adr/0098-standalone-frame-validator-evidence-binding.md)
-requires a separate evidence-only prerequisite. Native Red must
-expose the actual overbroad binding and immutable-input collision; Green
-must prove the exact one corrected record, 3,937 unchanged records,
-historical comparison recovery and unchanged disjointness. The separately
-merged design added no executable fixture or new test/workflow.
-
-After design #205, the initial uncommitted EV01-C03 implementation passed focused
-native checks and the complete native stage, but its full producer failed
-at ordinary `test-qemu-panic-trace`: PLAT03's historical scope rejected the
-three already committed design documents. Seven commands passed and 42
-remained unrun; this is not complete acceptance.
-
-[Accepted ADR-0099](adr/0099-panic-trace-execution-scopes.md) isolates the
-[current/baseline execution-scope repair](architecture/panic-trace-execution-scopes.md).
-Its implementation must preserve strict historical checks and all
-current input/artifact stability, require all six current production
-subjects, renew the actual eighteen-case pair in the fixed #204 envelope
-with only the reviewed controller/test overlays, then pass the complete
-fresh author gate on the actual current checkout. The two evidence contexts
-must remain separately labeled. The separate design #206 contained no
-controller/test changes.
-
-The implementation adds only Boolean-mode/current-subject checks and
-baseline-only historical-scope dispatch. Native execution-scope regressions
-retain complete current source capture, reject every missing current subject
-and source/tool/firmware/artifact drift, and preserve strict historical
-pre/post checks and failure publication behavior. These host protocol
-fixtures do not certify actual guest behavior. Narrow iteration uses:
-
-```bash
-"${MICROS_PYTHON}" -E -S -B -m unittest tests.host.test_panic_trace tests.host.test_evidence_authority.InventoryTests tests.host.test_runtime_memory.RuntimeMemoryAuthorityTest tests.host.test_diagnostic_history.DiagnosticHistoryAuthorityTest
-```
-
-The separately labeled actual target pair and complete real-current author
-plan remain required before independent implementation review.
-
-PLAT03-C02 implementation #207 passed that pair, all 50 fresh actual-current
-commands and independent review, then preserved ordinary authority in a fresh
-committed checkout without author journals. Its exact reviewed/committed/
-remote/squash tree is `6928ae70be64082d236508986c003c25a29b7c6b`.
-EV01-C03 restarted from that merged outcome before MEM01 could resume.
-
-The restarted binding uses only the qualified scalar and existing checked
-directory helper. Native regressions preserve strict schema/path/closure
-failures, recover prior comparisons through a bounded test-only inverse and
-match all current records to the independent pre-edit declaration. Narrow
-iteration includes the retained current-scope regression:
-
-```bash
-"${MICROS_PYTHON}" -E -S -B -m unittest tests.host.test_evidence_authority tests.host.test_runtime_memory.RuntimeMemoryAuthorityTest tests.host.test_diagnostic_history.DiagnosticHistoryAuthorityTest tests.host.test_terminal_failure.TerminalAuthorityTest tests.host.test_panic_trace.PanicTraceAuthorityTest tests.host.test_panic_trace.PanicTraceExecutionScopeTest tests.host.test_scheduler_source_layout tests.host.test_endpoint_source_layout tests.host.test_kernel_object_source_layout tests.host.test_kernel_directory_layout tests.host.test_frame_validation_hot_path
-```
-
-Original source gates, journal-free prior claims, the complete fresh author
-plan and independent implementation review remain required. No runtime,
-CTest, target workflow, planner or controller change belongs to EV01-C03.
-
-EV01-C03 implementation #208 passed all 50 fresh author commands and
-independent review, then passed 247 authority/source checks in a fresh
-committed checkout without author journals. The current inventory preserves
-3,938 facts in fourteen families, including its exact one-record binding
-correction.
-
-The restarted
-[Accepted MEM01 contract](architecture/bootstrap-allocation.md) under
-[ADR-0100](adr/0100-minix-bootstrap-allocation.md) fixes three native work
-oracles, complete semantic/access/rollback guards, the cursor-before-bitmap
-snapshot boundary and actual-code baseline/current fixtures. Six granular
-retirements preserve original values and all unrelated current authorities.
-The fixed #208 runtime and MINIX trace are retained; all six fact closures
-fit the declared eight candidate paths. Acceptance requires actual
-affected-unit recertification and the unchanged full target/stack scope.
-The separately reviewed design #209 contained documentation only; the
-dependent implementation supplies the closed eight-owner native evidence.
-Observations exist only in generated native translations whose passive
-inverse binds the actual original/current bodies. Both compiler modes keep
-the original/current header layouts distinct; the baseline has no cursor.
-Independent record/geometry visits, bitmap loads and selected-bit probes
-remain in complete collector snapshots rather than wall-clock thresholds.
-
-Native iteration uses:
-
-```bash
-"${MICROS_PYTHON}" -E -S -B -m unittest tests.host.test_bootstrap_allocation
-```
-
-The [actual three-phase commands](development/building.md#bootstrap-allocation-work-and-authority-evidence)
-freeze the complete source/tool/fixture envelope and record all three
-oracles. Retained transport, staged/committed/provisional authority,
-malformed declarations, observation relocation and replay tamper controls
-remain required. Neither a compile failure nor a missing scaffold qualifies
-as old-runtime work Red.
-
-The original nine bootstrap source families remain exact. Finite membership
-and gate-source inverses in MEM01's source owner separate only its complete
-native C/header pair and preserve the original complete gate AST. The pair
-remains mandatory under the new family's closed ownership.
-Missing fixture members and unknown bootstrap neighbors fail; no historical
-fact value, payload binding or family fingerprint changes. B14 also runs the
-retained bootstrap source-layout suite and Python process-owner inventory.
-The three new Python runtime users retain the exact selected `-E -S -B`
-prefix and existing runtime validation; no interpreter policy changes.
-The native recipe enumerates its input headers during each canonical CMake
-configure and retains every original source/header as an explicit generation
-dependency. It emits no custom compiler-style dependency log. The generated
-bundle remains bound to its fixed Git inventory, independently of this build
-dependency superset. The original reusable-profile parser and admission policy
-remain unchanged.
-
-MEM01 implementation #210 passed the actual three-oracle transaction,
-thirteen-unit recertification, all 50 fresh author commands and independent
-first-commit review. Fresh committed evidence preserves ordinary authority
-without author journals.
-
-The next Accepted [MEM02 contract](architecture/kernel-mapping-topology.md)
-and [ADR-0101](adr/0101-minix-kernel-mapping-topology.md) fix seventeen native
-input cases with five separate captures each. The actual fixed/current
-mapper, validator, codec and typed allocator must prove largest legal leaves,
-direct selected-table work, complete semantic guards and explicitly retained
-global validation costs. The existing MMU component must retain its two
-permission faults and TTY-controller check, then prove real 2 MiB/1 GiB
-alias loads, exact misalignment faults and complete resource restoration.
-The same ELF runs at 128/256 MiB without increasing the eight-second guest
-timeout. Exact assembly-source/object admission and all original stack
-budgets remain required.
-
-Separate design #211 is merged after clean complete and Acceptance reviews.
-The dependent implementation introduces the actual-source native case,
-test-only MMU probes and the closed three-phase driver. These fixtures do not
-by themselves claim corrected runtime code, a usable retirement or completed
-implementation acceptance. The original 50-command full gate, three granular
-retirements, prior authority and blocked B13 remain mandatory.
-
-After design #211, initial evidence-scaffold iteration uses:
-
-```bash
-"${MICROS_PYTHON}" -E -S -B -m unittest tests.host.test_kernel_mapping.KernelMappingAuthorityTest.test_eight_independent_facts_match_the_merged_contract
-"${MICROS_PYTHON}" -E -S -B -m unittest tests.host.test_kernel_mapping
-```
-
-The missing-family structural Red is not a runtime topology/work Red and
-cannot retire a transport identity. Actual fixed-source native and QEMU
-execution remains mandatory before production mapping changes.
-
-MEM02 implementation #212 passed the actual three-oracle transaction,
-thirteen-unit recertification, all fifty fresh author commands and independent
-first-commit review. Fresh committed evidence preserves ordinary authority
-without journals.
-
-The subsequent MEM03 design found missing individual identities for existing
-MEM01/MEM02 current native-source guards. Accepted
-[ADR-0102](adr/0102-granular-memory-native-source-authority.md) and the
-[EV01-C04 contract](architecture/memory-native-source-authority.md) require
-328 independently declared assertion bindings, complete conservation of the
-3,954 predecessor facts and sixteen fingerprints, strict existing source
-checks and unchanged closure rejection. Separate design #213 is merged.
-The dependent implementation supplies the literal-only declaration and
-closed inventory materialization, without modifying either existing source
-guard or native generator. Its actual Red exposes three missing identities
-after proving their old guards reject; its focused Green proves complete
-fixed-source record equality, all predecessor fingerprints, narrow closure,
-path/schema/drift rejection and journal-free prior authority.
-
-Focused iteration uses:
-
-```bash
-"${MICROS_PYTHON}" -E -S -B -m unittest tests.host.test_evidence_authority tests.host.test_bootstrap_allocation tests.host.test_kernel_mapping
-```
-
-That command passes 106 tests. The complete current fifty-command author
-producer, independent first-commit review and committed publication evidence
-remain required. Neither this prerequisite nor its synthetic closure test
-claims a runtime correction or source-identity retirement.
-
-EV01-C04 implementation #214 completed those gates and merged with the exact
-reviewed tree. Its 4,282 facts/seventeen families preserve every predecessor
-record and source guard; fresh committed/actual-main checks preserve ordinary
-authority without journals.
-
-The Accepted [MEM03 contract](architecture/selected-frame-ownership.md)
-under [ADR-0103](adr/0103-selected-frame-ownership-validation.md) requires
-five passive native observation slices plus an ordinary control over one
-fixed 99-case matrix. Actual portable operations, runtime process release
-and PM reservation validation distinguish selected work from inherited
-complete audits, while full diagnostic cases retain all active/inactive
-corruption evidence. Separate design #215 is merged. The first uncommitted
-implementation passed the three native work oracles and all twelve QEMU
-recertification commands. B14 then rejected one
-[prefix-wide token assertion](research/complete-validator-token-scope-gap.md)
-despite byte-identical active/inactive scan helpers; no terminal event or
-implementation commit was published.
-
-Accepted [ADR-0104](adr/0104-precise-complete-validator-token-authority.md)
-defines a documentation-only corrective phase. Its 40-key plan preserves
-both old prefix hashes and their historical checks, then uses independently
-fixed exact-helper identities only under proper retirement. All current
-Clang AST and corruption negatives remain mandatory. Positive prefix-only
-changes, missing/duplicate definitions and helper/signature mutations must
-prove the corrected boundary. This design adds no executable test, fixture,
-generator, CTest or adapter.
-
-The corrective design separately merged as #216. Its restarted uncommitted
-implementation passed actual Red/Green, complete recertification and a full
-gate before independent review found a launcher-boundary omission.
-The test-first correction renewed Red/Green and all thirteen units.
-Its subsequent full run was deliberately interrupted for the validation-cost
-prerequisite above; that current tree has no complete acceptance or
-implementation commit. The eventual restart must renew its required evidence.
-Archived results remain reference evidence, not a current completion claim.
-After the separately merged validation implementation #218, the fresh restart
-adds its exact provider/native-`nm` input and routes source consumers and B14
-through the checked runner. All six native products remain in one slow CTest
-required by the complete tier, not the fast target. Pre-Red non-retirement,
-original token/AST negatives, all prior facts and actual fresh work/semantic/
-recertification/full evidence remain required.
-
-That fresh implementation completed its renewed evidence and independently
-reviewed merge as #219. All fifty author commands were FRESH/exit0, including
-43 CTests, 1,526 Python tests, forty QEMU workflows, four standalone images
-and complete stack evidence. The full Python workload took 499.049 seconds;
-fast execution retained 37 CTests and 98 Python cases in 16.64 seconds.
-The exact reviewed/committed/remote/preview/squash tree is
-`5793c993338c22cf30aa552c9397c8aa234c33cc`.
-All five prior committed claims work without author journals.
-
-MEM04 design subsequently found missing per-clause identities for existing
-MEM03 source admission. Accepted
-[ADR-0106](adr/0106-granular-selected-ownership-native-source-authority.md)
-and the [EV01-C05 contract](architecture/selected-ownership-native-source-authority.md)
-require a separate documentation-only design, then actual missing-identity
-Red and complete independent equality for 484 existing clauses. Preserve
-all 4,290 predecessor records/eighteen fingerprints, the five claims and
-seventy prior retirements, unchanged source guards and closure rejection.
-The fixed C dependencies have two actual consumers; fixed headers have only
-the generator consumer. Raw retained MEM03 bodies must not be normalized
-like MEM01 bodies. Full acceptance and independent first-commit review
-remain required; this metadata outcome performs no runtime retirement.
-
-Separate EV01-C05 design #220 is merged. The dependent implementation first
-froze the complete old/new records, then demonstrated four real missing-key
-failures after the original source guards rejected the corresponding
-mutations. Its eight focused regressions and existing dependent tests pass:
-103 tests across `test_evidence_authority` and `test_selected_ownership`.
-The 4,774-fact catalog preserves every predecessor record and fingerprint.
-Focused Green does not replace the required full producer, independent
-first-commit review or journal-free committed publication evidence.
-
-EV01-C05 implementation #221 completed that final acceptance and merged with
-the exact reviewed tree. Its final full run retains 43 CTests and 1,534
-Python tests; current same-run receipts, complete target/stack evidence,
-independent review and committed/main authority checks passed.
-
-Accepted [ADR-0107](adr/0107-selected-user-address-space-validation.md) and
-the [MEM04 contract](architecture/selected-user-address-space.md) require
-actual-source native selected-path/context work and state evidence plus
-real QEMU activation/missing-translation Red. The current three-level walk
-must not lose table ownership-before-dereference, reserved-slot authority,
-output atomicity or protected-root lifetime when full audits are removed.
-Include the valid cursor-behind-allocated-words allocation-failure case:
-ordinary releases alone do not restore the original cursor.
-
-Its 33-key prospective transition preserves all 4,774 predecessor records
-and nineteen fingerprints. Frozen target adaptations retain complete
-diagnostic/release/destroy rejection while observing the changed selected
-results. The new native orchestration is one full-only slow CTest; fast
-membership and existing QEMU identities/timeouts remain unchanged.
-These are design requirements, not implemented tests or retirement evidence.
-
-The first uncommitted MEM04 attempt demonstrated that the existing runner
-suppresses guest output on success. Its aggregate TAP pass cannot satisfy
-the independent target oracle. The candidate is archived; no Green or
-retirement is claimed.
-[Accepted ADR-0108](adr/0108-qemu-accepted-transcript-reporting.md) and the
-[MEM04-C01 contract](architecture/qemu-runner-source-organization.md#mem04-c01-accepted-transcript-reporting)
-define a separate single-run reporting prerequisite, with host output
-regressions and real canonical workflow evidence. It changes no legacy
-acceptance, timeout, fast membership or final native/target/integration/stack
-coverage. Design #223 is separately merged. The implementation adds
-`tests/host/test_qemu_transcript.py` to ordinary full discovery and enables
-the option on only the two existing memory workflows. Its baseline regression
-fails on the absent successful observation after one accepted execution.
-Independent source/option/recipe inverses retain the old expected values;
-the MEM03 forward-comparison adapter removes only the new recipe tokens from
-its observed side. Focused commands are in the linked reporting contract.
-Implementation #224 completed all fifty author commands and independent
-review and is separately merged. MEM04 renews its actual evidence from that base,
-reusing one owned workflow result for its within-phase consumers rather than
-running QEMU twice.
-
-That fresh attempt exposed a different stage-5 handoff failure before the
-new semantic witness. The original strict orphan regression expected `STATE`,
-but the caller now reached its explicit complete diagnostic and returned
-`OWNERSHIP`. Actual failure and debugger evidence are recorded in the
-[handoff dependency study](research/minix-selected-user-address-space.md#indirect-handoff-preflight-error-dependence).
-[Accepted ADR-0109](adr/0109-handoff-preflight-error-ownership.md) keeps the
-fixture unchanged and makes the caller's normalization explicit.
-Its seventeen-subject/29-path contract keeps all 33 retirement keys and active
-MEM03 guards. After separate design merge, renew Red, prove the original
-handoff regression and stage-8 witnesses, then complete every current gate.
-No stage-5 panic is accepted as the planned scoped-translation Red or Green.
-
-Corrective design #225 is separately merged. The next candidate passed
-actual Green, all thirteen recertifications, 44 CTests, 1,559 Python cases
-and every current QEMU/standalone-image workflow. Its full producer then
-failed the stack source-header predicate because the public preparation
-prototype changed the whole token vector, not the visitor contract.
-The [source comparison](research/minix-selected-user-address-space.md#kernel-visitor-header-certificate-gap)
-and [Accepted ADR-0110](adr/0110-kernel-visitor-extension-admission.md) define
-one exact registered-group header extension and admission of five qualified
-callback-free mapping helpers. B14 includes real compiled linked-catalogue
-regressions for the following historical-function boundary, not just
-header-predicate cases. Both source/origin and actual machine-indirect
-rejection remain required. These focused regressions do not replace the
-complete 44-configuration/113-ELF/ten-scope
-stack gate. All existing budgets and the blocked B13 admission remain.
-The implementation must restart and renew actual evidence after separate
-design merge; the archived 45 successful commands are not final acceptance.
-
-Visitor design #226 separately merged. The fresh candidate passed all 42
-stack evidence cases and the 82-case focused scaffold suite, then actual
-four-product/two-target Red and Green. The documented single-configuration
-ordinary/metadata check reached and passed current callback binding before
-the fatal source-unit guard rejected the ordinary TTY binding declaration.
-No new recertification, full producer or complete stack certificate is claimed.
-
-[Accepted ADR-0111](adr/0111-fatal-tty-header-extension.md) requires native
-regressions through the existing public fatal source-unit guard, including
-unchanged other-unit and observer-mode rejection. The resulting third
-stack-admission input is immutable before fresh Red. After design merge,
-the complete one-configuration proof must pass after actual Green and
-before expensive recertification/full acceptance. It remains a focused
-development check, not a substitute for the complete stack matrix.
-
-Corrective design #227 is separately merged. The fresh
-[implementation map](architecture/selected-user-address-space.md#implementation-and-evidence-map)
-records the 523-reference/529-current native corpus, thirty current binding/
-argument/rebound checks, four products and exact dependent-source guard.
-Its capture-diagnostic regression verifies the same failed output is
-surfaced without another execution. The strict handoff fixture remains
-unchanged; successful final acceptance must reach the scoped target witness.
-All three stack admission boundaries have native regressions against their
-original predicates, including other-source and terminal/trace observer
-controls. Complete actual ordinary/metadata proof still follows Green.
-
-Focused harness iteration uses:
-
-```bash
-"${MICROS_PYTHON}" -E -S -B -m unittest tests.host.test_selected_address_space tests.host.test_stack_bound_evidence tests.host.test_evidence_authority_scope tests.host.test_python_host_runtime.PythonHostRuntimeTests.test_python_process_construction_has_one_reviewed_owner_inventory
-```
-
-This is not a substitute for renewed actual Red/Green/recertification, the
-complete fifty-command producer or independent implementation review.
-
-MEM04 implementation #228 completed that acceptance and independently merged.
-The final current run passed 44 CTests, all 1,570 Python cases, all forty
-QEMU workflows, four standalone images and complete 44-configuration/
-113-ELF/ten-scope stack coverage. Fast membership stayed at 37 CTests and
-98 Python cases; the latter took 6.150 seconds. Current same-run receipts
-and journal-free committed/main authority were independently checked.
-
-The next [source-authority study](research/selected-address-space-native-source-authority-gap.md)
-found real MEM04 current-source and observation rejections without individual
-inventory keys. [Accepted ADR-0112](adr/0112-granular-selected-address-space-native-source-authority.md)
-requires metadata-only missing-coverage Red after the original guards reject
-fixed-file, dependent-body, header, whole-handoff and observation mutations.
-An observation case must pass the function guard and fail the separate
-primitive/compound check. Green then proves complete independent 477-record
-equality and conservation of all 4,782 old records/twenty fingerprints/six
-claims/103 retirements. No existing source, observation, native or target
-check is relaxed. Full current acceptance and independent review remain
-required after the separate design merge.
-The corrected contract also distinguishes MEM04's fixed historical
-predecessor comparison from the independently checked complete current
-catalog. Existing historical scaffold negatives use exact fixed registration
-inputs before testing stack drift; production guards are not relaxed to
-make those fixtures pass. Current journal-free MEM04 authority and malformed
-catalog rejection remain required.
-Design #229 is separately merged. The metadata implementation first froze
-complete expected old/new records, then demonstrated seven missing-key
-failures after the original source/observation guards rejected their
-corresponding mutations. It also reproduced the original historical
-catalog and wrong-boundary scaffold failures before applying the bounded
-existing-owner adaptations. The
-[implementation map](architecture/selected-address-space-native-source-authority.md#implementation-map)
-keeps those regressions separate from current complete-catalog conservation.
-
-Focused iteration uses:
-
-```bash
-"${MICROS_PYTHON}" -E -S -B tools/run_host_tests.py --test test_evidence_authority --test test_selected_address_space
-```
-
-The owned runner preserves the complete selected case set while reusing its
-checked source view and reporting live progress. This avoids repeated cold
-authority reconstruction in direct unscoped multi-module discovery.
-
-This metadata gate does not retire an identity or replace the complete
-fresh author plan, current receipts, independent review or journal-free
-publication checks.
-
-EV01-C06 implementation #230 completed those gates and merged with the
-exact reviewed tree. The full gate passed 44 CTests and 1,578 Python cases
-in 560.893 seconds, all current target/image/stack coverage and three
-same-run receipts. Independent review, journal-free committed/main checks
-and protected completed-ref cleanup passed.
-
-The separate [MEM03 observer study](research/selected-ownership-observation-authority-gap.md)
-then demonstrated loop-anchor, bitmap-primitive and empty-helper mutations
-that pass function admission but fail the unchanged observer.
-[Accepted ADR-0113](adr/0113-granular-selected-ownership-observation-authority.md)
-requires 120 precise existing contracts, including all 57 empty sets and
-179 unchanged site records. The design authors no executable evidence.
-After separate design merge, implementation must demonstrate actual
-missing-key Red, complete independent old/new record equality, strict
-schema/path/consumer negatives and unchanged ordinary authority.
-The [EV01-C07 acceptance contract](architecture/selected-ownership-observation-authority.md#implementation-and-acceptance-boundary)
-uses the existing checked host runner for focused iteration and retains the
-complete fifty-command producer, current receipts and independent review.
-Design #231 is separately merged. The implementation first froze every
-complete expected old/new record, then recorded three missing-key failures
-after the unchanged function/source guard accepted and the observer rejected
-the corresponding mutations.
-Its [implementation map](architecture/selected-ownership-observation-authority.md#implementation-map)
-records strict literal/site/coverage/path/closure tests, all seventeen
-ordinary/inverse observation controls and complete predecessor conservation.
-The nine-case focused selection also includes existing complete-current
-inventory, MEM04 historical conservation and all six journal-free claims.
-The complete owned three-module suite and full current producer remain
-separate mandatory acceptance, not inferred from that focused result.
-Implementation #232 completed both: 135 selected cases in 291.252 seconds,
-then all fifty fresh author commands, 44 CTests and all 1,584 Python cases
-in 572.589 seconds. Complete current target/image/stack coverage, same-run
-receipts, independent review, journal-free main checks and protected ref
-cleanup passed.
-
-MEM05's [Accepted contract](architecture/selected-release-and-wired-handoff.md)
-now requires actual-source selected-set/process-owner/root/handoff work
-evidence and a real target selected-release distinction. It specifies
-five native products, 128 common rows, independent per-dimension bounds,
-current-only index/selection guards and the complete source-adapter scope.
-Current target records retain full diagnosis and separately witness scoped
-release. Independent design/correction review is clean; separate design merge still
-precedes implementation.
-Metadata registration and prior passing work
-bounds do not count as those future runtime results.
-
-After design #233 merged, a fixed-source native probe exposed the
-[MEM05-C01 count-evidence conflict](research/minix-selected-release-and-wired-handoff.md#mem05-c01-same-slot-count-evidence-conflict):
-the old same-slot/other-generation guard expects `OK`/zero despite a
-malformed reached target, while the new complete consumed-chain scope
-requires `INVARIANT` and output preservation.
-[Accepted ADR-0115](adr/0115-selected-count-generation-evidence-scope.md)
-specifies that one current-fixture exception and paired scope controls.
-Historical expectations, the common 128 rows and every existing final
-gate remain required. The implementation is archived before production
-edits or formal Red and restarts only after the corrective design merge;
-the diagnostic probe is not runtime Green or retirement evidence.
-
-Corrective design #234 separately merged. The fresh actual implementation
-then encountered the
-[MEM05-C02 handoff fixture conflict](research/minix-selected-release-and-wired-handoff.md#mem05-c02-handed-off-corruption-fixture-conflict).
-The unchanged target directly reclassifies a mapped wired owner and
-expects a valid ledger, but does not maintain the new index.
-The component's stage-8 failure is real; no Green or retirement was
-published.
-[Accepted ADR-0116](adr/0116-handed-off-leaf-fixture-coherence.md) preserves
-complete validation and the valid-ledger/invalid-leaf distinction through
-existing VM claim/release, a valid wired-leaf relocation and an isolated
-transferable-leaf insertion. Its one
-additional target input is frozen before renewed Red; original target
-results, records, deadlines and all final gates remain required.
-The archived candidate supplies diagnosis, not replacement acceptance.
-
-Design #235 has now separately merged. The fresh
-[implementation/evidence map](architecture/selected-release-and-wired-handoff.md#implementation-and-evidence-map)
-binds both dependent targets and retains the actual-current and isolated
-historical source checks. Its native protection guard uses an isolated
-host-sized page rather than assuming a RISC-V frame is a host protection
-page. No target, native, integration or stack obligation is removed.
-
-MEM05 implementation #236 has completed its renewed real Red/Green,
-thirteen-unit recertification and all fifty fresh author commands.
-The final gate passed 45 CTests, all 1,635 Python cases, forty QEMU
-workflows, four standalone images and complete 44/113/ten-scope stack
-coverage. Independent review, same-run receipts, journal-free main authority
-and protected task-ref cleanup passed. The legacy MEM03 component schema
-remains record-only for frame slices; index/link work remains measured in
-the inclusive aggregate.
-
-The [Accepted EV01-C08 contract](architecture/selected-release-handoff-native-source-authority.md)
-names the existing MEM05 source comparisons needed by the next OBJ01
-design. It preserves their raw/compact/primitive distinctions and both
-fixed-input assertion owners; it is not a new functional or MINIX algorithm
-oracle. Its historical scaffold regression receives fixed original inputs
-with positive controls, while complete-current catalog checks remain
-independent. No declaration, test or extractor is authored before the
-separate design merge, and no existing runtime, target or integration gate
-is removed.
-
-EV01-C08 design #237 is now separately merged. The
-[metadata implementation map](architecture/selected-release-handoff-native-source-authority.md#implementation-map)
-records exact literal/schema/path checks, independent complete-record
-conservation and both source/generator coverage. Eleven missing-key
-subcases failed only after their unchanged original predicates rejected
-the corresponding mutations; all nine focused cases then passed.
-The historical forty-four-input scaffold and all seven journal-free
-claims remain separate from complete-current catalog validation.
-The two-module host suite and full current producer are still mandatory,
-not inferred from focused Green.
-
-Those gates have now passed and EV01-C08 implementation #238 is merged.
-The two-module suite ran 152 cases; all fifty final author commands
-passed fresh, including 1,643 Python cases in 715.852 seconds and complete
-current native/target/image/stack coverage. Independent review and fresh
-journal-free committed/main checks passed.
-
-The following [Accepted EV01-C09 contract](architecture/object-and-panic-source-authority.md)
-repairs fifty existing portable-object metadata bindings and names eleven
-existing panic projected-source policies. It preserves all original
-comparisons and machine/stack proof. Its checked historical metadata
-inverse follows complete current-catalog validation; it cannot conceal a
-bad new fact or authorize current source. No executable artifact precedes
-separate design merge, and unit, target and integration gates remain required.
-
-That separate design #239 is now merged after clean complete correction
-and Acceptance-only review. Its
-[metadata implementation map](architecture/object-and-panic-source-authority.md#implementation-map)
-records genuine 61-subcase missing-binding/key Red after the actual source
-predicates' positive/negative controls, followed by focused Green.
-Runtime source-policy fixtures reach the post-projection equality rather
-than mislabeling the earlier strict overlay rejection.
-The original source/stack/machine guards and all historical expectations
-remain active. Complete current host/author acceptance and independent
-implementation review are still required.
-
-Those requirements are complete and EV01-C09 implementation #240 is
-independently reviewed and merged. The complete host selection passed
-165 cases; all fifty final commands passed fresh, including 45 CTests,
-1,650 Python cases in 727.215 seconds and full current target/stack
-coverage. Fresh committed/main authority is journal-free.
-
-The [Accepted OBJ01 contract](architecture/selected-object-and-hart-validation.md)
-requires actual fixed/current portable state and primitive-work evidence,
-including unchanged outputs on selected failures, regular and exceptional
-stack intervals, direct hart probing and malformed batch precedence.
-Its six-product orchestration remains in the complete tier. Existing
-models, real target scenarios, every stack budget and current acceptance
-remain mandatory. Its own source predicates receive individual identities
-from their first implementation rather than another unnamed coarse freeze.
-This design phase authors no executable fixture or prototype.
-
-The separately merged OBJ01 design #241 subsequently exposed the
-[OBJ01-C01 closure gap](research/minix-selected-object-and-hart-validation.md#obj01-c01-complete-source-authority-gap)
-during full native acceptance. Forty-six CTests passed, but three full-host
-checks rejected a missing active identity and historical/current fixture
-mixing. The smaller B14 selection had not executed those cases.
-[Accepted ADR-0120](adr/0120-obj01-complete-source-authority.md) requires the
-complete object-layout, panic-trace and stack-source projection modules in
-B14, with covered panic subsets replaced rather than duplicated.
-The added validator identity receives its own discriminating unsupported-
-current diagnostic witness in the direct-ownership oracle. Historical
-projection and actual compiled panic mutation controls remain explicit.
-The first implementation is archived. Corrective design #242 has now
-separately merged, and the fresh
-[implementation map](architecture/selected-object-and-hart-validation.md#implementation-and-evidence-map)
-records the full-only six-product recipe, independent 171-case corpus,
-complete native-source declarations and bounded Python protocol/launcher
-regressions. Both affected fixture owners are immutable before renewed Red.
-No source guard or complete discovery requirement is waived; current
-native/target/stack acceptance and independent review remain mandatory.
-
-OBJ01 implementation #243 has now completed those requirements and merged.
-Its actual transaction passed all thirteen units, including 701 B14 cases.
-The final producer passed all fifty commands fresh, 46 CTests and all 1,670
-Python tests in 864.109 seconds, with full current target/image/stack coverage
-and three same-run receipts. Independent review, bounded actual reuse and
-journal-free committed/main authority passed.
-The next [OBJ02 study](research/minix-common-scheduler-return.md) must
-separate remaining queue-projection work from already corrected MEM04/OBJ01
-costs and explicitly account for current-versus-historical return fixtures
-before any new runtime evidence is authored.
-
-Its [Accepted contract](architecture/common-scheduler-return.md) requires
-actual constructor/checked-commit/apply work and real same-thread context
-validation evidence, retaining original target semantics and cleanup.
-The legacy plan's raw byte digest must remain distinct from its new ABI and
-defined-field effect observation; an output-format change cannot silently
-drop unrelated output checks. Design acceptance does not create these future
-tests, observers or commands.
-
-Design #244 is separately merged. The uncommitted implementation measured the
-required native work and actual context-validation counts, then its B14
-gate rejected historical recipe/source consumers. The
-[recorded failures](research/minix-common-scheduler-return.md#obj02-c01-observed-consumer-scope-conflicts)
-are not runtime acceptance.
-[Accepted ADR-0122](adr/0122-obj02-evidence-consumer-scope.md) adds only three
-exact immutable test owners, preserves the existing stack-hook placement and
-requires explicit historical contexts and complete protocol models.
-The shared two-token reporting inverse remains unchanged; only the new
-task's independently checked addition is removed before that historical
-boundary. Fresh actual Red/Green and the complete original gates remain
-required after the separate corrective design merge.
-
-That correction is now separately merged as #245. The fresh
-[OBJ02 implementation map](architecture/common-scheduler-return.md#implementation-and-evidence-map)
-records the four full-only native products, complete target captures and exact
-historical-test adapters. Focused consumer regressions retain the old expected
-recipes and source/site sets; no current acceptance falls back to historical
-records. The original complete native, QEMU, integration and stack gates
-have now passed, and independently reviewed implementation #246 is merged.
-Its [acceptance record](architecture/common-scheduler-return.md#implementation-acceptance)
-retains the exact author/review/publication evidence. The separate validation
-simplification starts only after that completed outcome.
-
-## POSIX conformance evidence
-
-The shell milestone does not imply complete compatibility. Accepted ADR-0081
-requires a versioned capability matrix for the final system. Every
-unconditional mandatory POSIX row, and every conditionally mandatory row whose
-standard-defined condition holds, must eventually name:
-
-- the owning kernel/service/library/utility interface;
-- native semantic and malformed-input evidence where portable;
-- target or integration evidence where privilege or cross-service behavior is
-  essential;
-- shell/utility conformance evidence when applicable;
-- representative application-compatibility evidence; and
-- the dependency-ready task that closes any remaining staged substitution.
-
-No milestone or application demo may claim complete POSIX compatibility while
-mandatory matrix rows remain undocumented, unimplemented, or untested.
-
-## Behavior-preserving source decomposition
-
-A source-organization refactor starts with a structural Red test for the
-accepted module set and build integration. It then uses the existing behavior
-tests as the semantic oracle; a refactor must not weaken, replace, or silently
-skip those tests.
-
-For the VFS decomposition defined by ADR-0051:
-
-- each coherent extraction commit runs `vfs_test`, `vfs_service_test`, and
-  `vfs_model_test`;
-- the final candidate runs the complete native unit workflow;
-- the final candidate builds the standalone VFS service image;
-- the final candidate passes the isolated QEMU VFS gate;
-- the final candidate passes the complete pull-request validation tier.
-
-Review must also inspect module ownership, private declarations, dependency
-direction, validation order, rollback order, and build source lists. Runtime
-test success alone does not prove that a responsibility split is correct.
-
-The VFS test-source decomposition defined by ADR-0052 applies the same rule
-to the evidence implementation itself. It retains the existing `vfs-core`,
-`vfs-service-core`, `vfs-model`, standalone-image, and QEMU VFS identities;
-splitting a source file does not create another CTest or workflow. During
-extraction, only the narrow existing gate for the active slice runs. Before
-review, the author executes the authoritative pull-request plan once and
-verifies that it includes complete native validation, the standalone VFS
-image, and the QEMU VFS gate. A workflow already selected by that plan is not
-run separately. The reviewer does not routinely rerun those suites.
-
-The kernel address-space decomposition proposed by ADR-0053 preserves
-`endpoint_test`, `endpoint-profile`, `test-qemu-user-address-space`,
-`test-qemu-address-space-handoff`, and `test-qemu-user-execution` while
-splitting kernel-root, user-root, VM-transaction, execution, fixture, and
-scenario owners. It begins with one source-layout test and an exact
-23-function migration allowlist. Each extraction runs only its narrow
-existing evidence; before review, the author runs the authoritative
-pull-request plan once, and the reviewer inspects rather than routinely
-reruns that evidence.
-
-The frame-ownership decomposition defined by ADR-0054 preserves
-`frame_allocator_test`, `frame-allocator`, `frame_ownership_test`,
-`frame-ownership`, and `test-qemu-frame-ownership`. It begins with one
-source-layout test, an exact 17-symbol owner migration map, and an exact
-15-function migration allowlist. Native extraction retains the allocator and
-ledger model seeds, step counts, random-draw order, and test-case order.
-Target extraction retains the exact runtime scenario and pass record. Before
-review, the author runs the authoritative pull-request plan once; the
-reviewer inspects that evidence without routinely rerunning it.
-
-The kernel VM-handoff decomposition defined by ADR-0055 preserves
-`vm_bootstrap_test`, `vm-bootstrap`, `vm_handoff_syscall_test`,
-`vm-handoff-syscall`, `test-qemu-vm-handoff`,
-`test-qemu-address-space-handoff`, `test-qemu-vm-scratch-preemption`, and the
-existing VM role/fault panic workflows. It begins with one source-layout test,
-an exact 92-symbol owner migration map, and an exact 13-function migration
-allowlist. Extraction preserves command decode, fixed-object input-copy and
-output-publication timing, preflight/commit ordering, native case order,
-retained target scenario order, assembly hooks, markers, and timeouts. Before
-review, the author runs the authoritative pull-request plan once; the reviewer
-inspects rather than routinely reruns that evidence.
-
-The kernel PM-control decomposition defined by ADR-0056 preserves `pm_test`,
-`pm-lifecycle`, `test-qemu-pm-service`,
-`test-qemu-vm-scratch-preemption`, and the downstream TTY, RAMFS, and VFS
-workflows that compile the same production PM-control sources. It begins with
-one fail-closed source-layout test, an exact 32-function owner migration map,
-and an exact 15-function migration allowlist. Extraction preserves
-operation-13 decode and authority precedence, retained output translation,
-prepare/`fence.i`/publication order, activation, exit detach and release,
-native case order, the sole target state owner, one mutable context per native
-family, the PM-service marker, and its timeout. Before review, the author runs
-one authoritative pull-request plan, and reviewers inspect rather than
-routinely rerun that evidence.
-
-The VM service decomposition defined by ADR-0057 preserves `vm_bootstrap_test`,
-`vm-bootstrap`, `spawn_abi_test`, `spawn-abi`, `vm_core_test`, `vm-core`, the
-real `micros_vm_server` ELF, `test-qemu-vm-handoff`,
-`test-qemu-pm-service`, `test-qemu-vm-scratch-preemption`, the retained TTY,
-RAMFS, and VFS integrations, and both VM self-fault workflows. It begins with
-one fail-closed source-layout test, an exact 23-function owner migration map,
-and an exact 11-function C/Python migration allowlist. Extraction preserves
-boot-object import, deterministic frame selection, ELF/stack planning,
-scratch/freeze/abort/commit/exit ordering, native case order, service phase
-order, generated fixture bytes and symbols, scratch trap/report stages,
-markers, and timeouts. Before review, the author runs one authoritative
-pull-request plan; reviewers inspect rather than routinely rerun that
-evidence.
-
-The PM service decomposition defined by ADR-0058 preserves `pm_test` /
-`pm-lifecycle`, `spawn_abi_test` / `spawn-abi`, the real PM service and its
-32-page budget, PM-service and scratch-preemption QEMU scenarios, and the
-downstream TTY/RAMFS/VFS consumers. Its implementation begins with a structural
-Red gate, an exact 44-function owner migration, and an exact 16-function
-long migration. PM case/model tables stay local; existing service globals and
-all seven spawn-ABI mutable static buffers gain explicit ownership. Existing
-case order, 4,096-step model seed/draws/trace/comparison, request and stack
-results, kernel report, generator bytes for identical inputs, markers, and
-timeouts are preserved. Narrow extraction evidence precedes one authoritative
-final PR plan; reviewers do not routinely rerun it. Every PM service variant
-must receive the existing common post-link checker with the Accepted
-32-resident-page/one-stack-page options, without a duplicate checker run.
-The retained kernel PM-control source-layout gate follows the moved report
-owner without weakening marker or timeout evidence.
-
-The kernel IPC decomposition defined by ADR-0059 preserves
-`endpoint-profile`, `ipc-model`, all existing fast/slow entry selection, and
-the trusted IPC, ecall-core, full syscall, and unchanged buffer-loss panic
-workflows with their exact eight-second timeouts. Its implementation
-began with one fail-closed structural Red gate, an exact 70-symbol owner
-migration, and an exact 42-function long migration; both are now empty.
-Nine contexts consolidate
-only existing mutable evidence storage; automatic snapshots/reference state
-and six assembly saved-register ABI objects retain their roles. The
-8,192-transition acceptance model keeps trace `65c2014aad08f70b`, while
-notification and close retain 4,096 steps and 512 cases with their original
-draw schedules. Target register capture stays in the original non-returning
-entry frame, and the full syscall script retains all 21 commands and deferred
-timer/negative-state evidence. Narrow extraction gates precede one
-authoritative final PR plan; independent reviewers inspect rather than
-routinely rerun those commands.
-
-The kernel bootstrap correction defined by Accepted ADR-0060 preserves
-`bootstrap_test` / `bootstrap-manifest`, `bootstrap_control_test` /
-`bootstrap-control`, `fdt_test` / `fdt-parser`, the existing launcher ELF,
-all component/prefix/fatal workflows, and the shared fixture generator.
-Its implementation began with a structural gate, a 60-symbol owner migration
-and a 27-function long migration; both active migrations are now empty.
-Native case order, the 4,096-step reference
-model seed/draw/dispatch/comparison and last-16 failure trace, automatic
-fixture lifetimes, three static catalog pages, target branch/commit order,
-generator bytes and imported helper interfaces remain unchanged.
-Narrow extraction evidence precedes one complete author PR plan; independent
-reviewers inspect rather than routinely rerun that evidence.
-
-The Accepted trap/syscall correction in ADR-0061 preserves `runtime_test` /
-`user-runtime`, the existing standalone runtime test ELF and twelve-second
-QEMU runtime gate, and every current trap/interrupt/IPC/grant/VM/console
-workflow. Its implementation began with a structural Red gate recording
-exactly fourteen moving functions and nine long-function semantic splits;
-both active migrations are now empty. Exact route/hook/error/
-selector order, original-frame supervisor register capture, three existing
-evidence contexts, seven image ABI objects, native case order, all budgets,
-generator bytes, markers and timeouts remain unchanged. Narrow extraction
-evidence precedes one complete current author PR plan; independent reviewers
-inspect rather than routinely rerun the evidence. Implementation starts only
-after the separate design is reviewed, Accepted and merged.
-
-The scheduler correction defined by Accepted ADR-0062 preserves `scheduler_test` /
-`scheduler-core`, the exact eleven native cases, its 4,096-step two-hart
-model, three scheduler QEMU workflows, and all downstream production
-consumers. Its separately reviewed design merged as #123. Implementation
-began with a structural Red recording 38 C sources, six private headers,
-six source sets, 138 original-definition moves, and twelve long-function
-semantic migrations; both active migrations are now empty. The five
-existing-state consolidations,
-sole planning workspace, automatic plans/snapshots/reference state, assembly
-ABI objects, original entry continuation, exact LCG/prelude/draws/eighteen
-coverage checks, deferred completion, timer-before-commit, markers, and
-eight-second timeouts remain unchanged. Bounded source/exit checks complement
-existing semantic evidence, not a general C interpreter. Each split path
-inherits all four original metadata dimensions; the native sources retain
-full-tier classification despite empty separate workflow metadata. Narrow
-green extraction precedes one authoritative final author PR plan; independent
-reviewers inspect rather than routinely rerun the author's evidence.
-
-The RAMFS correction defined by Accepted ADR-0066 preserves the exact `ramfs-seed`,
-`ramfs-core`, and `ramfs-model` CTests, replayable 8,192-step model,
-standalone RAMFS image, authenticated six-service QEMU scenario, and
-downstream VFS/ELF-spawn consumers. The
-[canonical source contract](architecture/ramfs-source-organization.md)
-defines 32 C sources, six private headers/sets, 180 original-definition
-moves, sixteen long C splits, and one Python renderer split. Its separately
-reviewed design merged as #133; implementation #134 is also merged with
-empty owner/function migrations. Structural Red froze immutable
-owner/body/storage/case/trace/output inventories and exact CMake
-reconstruction; full-tier, QEMU, slow-model, and
-image classifications remain independently unchanged. Native/model,
-image/QEMU, and current-candidate validation-profile evidence supplement
-structural checks. Narrow green slices preceded the complete fresh author
-plan, bounded real reuse acceptance and clean independent review.
-
-The endpoint correction defined by Accepted ADR-0067 preserves `endpoint_test` /
-`endpoint-profile`, `ipc_model_test` / `ipc-model`, both existing model link
-consumers, all 25 deterministic runner entries, the four-slot 4,096-step model,
-and `test-qemu-endpoint` with its existing grant lifecycle proof. The
-[exact source contract](architecture/kernel-endpoint-source-organization.md)
-defines 25 C sources, four private headers/sets, 90 original-definition moves,
-ten long-function dispositions, typed storage/exit proof, and complete
-recipe maintenance. Implementation starts only after the separately reviewed
-design merges. Narrow green extraction precedes one complete current author
-plan and bounded real native/smoke/TTY-image reuse acceptance; reviewers
-inspect rather than routinely rerun it. This Accepted design adds no test,
-model, build target, execution, or endpoint behavior.
-
-The kernel-object correction defined by Accepted ADR-0068 preserves
-`kernel_objects_test` / `kernel-objects`, its fifteen cases and existing
-4,096-step xorshift model, all real core consumers, and
-`test-qemu-object-model` with its exact marker and eight-second budget. The
-[object source contract](architecture/kernel-object-source-organization.md)
-defines 23 C owners, three private headers/sets, 72 moves, eight long and four
-shorter semantic dispositions, original storage/exit/IRQ scopes and complete
-byte-source/recipe inverses. Shared inspection moves unchanged into one
-host-only owner with reviewed ASTs frozen; old scheduler/endpoint object
-hashes are not rebaselined. Implementation follows a separate reviewed design
-merge. Narrow native/source-layout or real target checks precede one current
-complete PR plan and additional actual same-producer native/smoke/TTY-image
-reuse acceptance. Its design authors no executable test or model and
-changes no existing execution, timeout or policy.
-
-The Accepted grant data-plane correction follows
-[ADR-0069](adr/0069-grant-data-plane-source-decomposition.md) and its exact
-[source contract](architecture/grant-data-plane-source-organization.md).
-It preserves the cohesive registry/core/runtime, the existing endpoint and
-IPC-model native entries, original model seed/LCG/4,096 transitions/thirteen
-operations/32-entry trace, and real grant/grant-syscall target scripts.
-The fourteen long and five shorter dispositions retain typed fixture/work,
-array, initializer, snapshot, script-data and IRQ scopes under complete
-original-body reconstruction. Exact source-set/consumer and three-alias
-inverses preserve previous recipe/planner oracles and all four validation
-dimensions. Only after separate clean design merge may implementation
-start with structural Red, narrow existing native or real target gates, one
-complete current PR plan and actual original-producer three-profile reuse.
-This design adds no executable test/model/harness, new invocation, marker,
-timeout, policy or profile-admission change.
-Implementation's structural gate is
-`tests/host/test_grant_data_plane_source_layout.py`: all 95 original complete
-bodies/signatures and original data remain immutable under finite typed
-scope/row/helper expansion. Independent positive and negative fixtures
-precede C outlines; literal-empty migrations and all 22 real bounded owners
-close source work, not final author/reuse or independent-review acceptance.
-
-The next TTY source correction is Accepted
-[ADR-0070](adr/0070-tty-function-and-evidence-decomposition.md) and its exact
-[source contract](architecture/tty-source-organization.md). Design authors
-documentation only and complete independent design review is clean.
-After separate merge, implementation must
-start with immutable 156-body/type, seven-long-C and Python-renderer facts,
-structural Red and independent typed state/scope/AST/data fixtures.
-Existing native and real UART/TTY/RAMFS/VFS/ELF evidence remains required:
-preserve jump-target roots, model draw/trace identity, generated bytes and
-all four selection dimensions. Full current author acceptance and bounded
-actual original-producer reuse follow narrow green slices; reviewers inspect
-that evidence without routinely rerunning it.
-
-Implementation #142 exposed the model validator's existing final dependency
-on `reference_output_pending`, omitted by the private graph. Its structural
-failure blocks implementation despite unchanged native behavior. Accepted
-[ADR-0071](adr/0071-tty-model-validation-reference-dependency.md) corrects
-only that necessary acyclic edge; independent design review is clean and
-its separate #143 merge is complete. Restart from current `main` and prove the exact final
-comparison, all other owner directions and the original model identity.
-Historical abandoned-candidate results do not satisfy restarted acceptance.
-
-The restarted #144 source outcome has all 26 real C owners and literal-empty
-move/task migrations. Actual original-body/type/CPP-scope and Python module/
-data/CLI expansion, independent context/initializer/jump/ordering fixtures,
-complete native render bytes and descriptor/error precedence are checked.
-Current narrow native and all four renderer-consumer QEMU gates pass.
-Complete current author acceptance passed all 47 commands fresh, including
-35 CTests/908 Python cases/all 38 QEMU workflows/four images. Actual bounded
-three-reused/seven-fresh original-full-producer evidence and complete
-independent read-only review are clean. #144 is merged with its identical
-reviewed tree and obsolete branches removed.
-
-The next correction is Accepted
-[ADR-0072](adr/0072-qemu-runner-source-decomposition.md) and its exact
-[runner source contract](architecture/qemu-runner-source-organization.md).
-Design #145 contains documentation only and independent design/correction/
-acceptance-only reviews are clean; its separate merge is complete.
-The fresh implementation must
-freeze the original runner/file/AST/data, all 85 test
-IDs and fixture bodies, and prove finite actual-source restoration before
-the reviewed code-family source declaration changes. Retain the cohesive
-serial lifecycle, all first errors/outcomes, independent case expectations
-and every real guest/budget. New source-member, bytecode, same-stem package,
-native-extension and foreign-namespace mutations must reject smoke reuse
-before QEMU metadata while all three supported workflows still
-demonstrate actual eligible original-producer reuse. Full current author
-and complete read-only implementation review remain mandatory.
-
-Implementation #146 is merged after complete original and bounded
-correction review. Its final candidate passed the complete 47-command
-fresh author plan, including 35 CTests/943 Python cases/all 38 QEMU
-workflows/four images, plus actual same-original-full-producer bounded
-reuse. Its reviewed squash tree and obsolete-branch cleanup are verified;
-those pre-squash receipts are historical on the new main.
-
-The kernel directory-only outcome follows Accepted
-[ADR-0073](adr/0073-kernel-directory-layout.md), with its
-[exact kernel directory contract](architecture/kernel-directory-layout.md).
-It preserves the existing executions while defining a closed 373-file
-physical transport, canonical source/line diagnostics, actual-source and
-generated-include inverses, complete CMake reconstruction and independent
-four-field classification equality. Design #147 authored no executable
-artifact and merged separately after clean review. Implementation #148 starts
-from structural Red, moved every production/evidence family in green slices,
-retained the old source and fixture oracles, and closed the 373-entry migration
-empty. Its final structural evidence rejects linked roots/descendants and
-mixed old/new generated includes, and invokes the selected native and target
-compilers to prove canonical source/line diagnostics. The reusable native
-profile requires an explicit target compiler and fingerprints it with its
-closed installation inputs; automatic discovery is fresh-only. Complete
-47-command fresh acceptance, actual original-full-producer three-profile reuse,
-clean independent review, identical squash tree, main fast-forward, and branch
-cleanup are verified.
-
-That acceptance exposed a process defect, not a missing test: an exact
-candidate may pass the complete matrix while a reusable profile was
-ineligible before execution and therefore correctly publishes no receipt.
-Accepted
-[ADR-0074](adr/0074-fail-fast-validation-producer-readiness.md) requires an
-explicit producer mode to check every selected reusable profile before any
-planned command or evidence-store mutation. A blocked producer keeps all
-commands `NOT_RUN`; a ready producer still executes the unchanged complete
-plan fresh and must publish all selected receipts under one run ID. The
-separately reviewed design is merged. The dependent implementation begins with
-host Reds for blocked execution, exact reason precedence, report schema,
-prelaunch drift, invalidation timing, same-run publication, and postflight
-versus receipt-publication failure codes; no new runtime test is invented.
-Implementation #150 is merged after those tests, real fail-fast refusal,
-current producer/reuse evidence, and clean independent review.
-
-The implemented CPython floor change is defined by
-[ADR-0075](adr/0075-cpython-3-15-host-automation-floor.md) and the
-[host-runtime contract](architecture/python-host-runtime.md). The initial Red
-ran 988 Python host cases under CPython 3.15 with `-E -S -B`; 46 failures were
-confined to interpreter-owned AST formatting. The shared project serializer,
-runtime/profile tests, and directly related structural regressions now produce
-a 1,002-case Python 3.15 host suite with all existing expected AST digests
-unchanged. Native C/ELF/QEMU/protocol evidence remains independently checked.
-
-## Test layers
-
-| Layer | Environment | Primary purpose | Expected cadence |
-| --- | --- | --- | --- |
-| Compile checks | Host | Warnings, ABI assertions, freestanding violations | Every build |
-| Unit tests | Native host process | Algorithms, parsers, state machines | Every local change |
-| Kernel component tests | QEMU test image | Traps, MMU, contexts, IRQ, IPC, grants | Every applicable pull request |
-| Integration tests | Full QEMU image | Server protocols and transactions | Every applicable pull request once all participating services exist |
-| End-to-end tests | Full QEMU image | Boot and shell-visible behavior | Every applicable pull request after shell exists |
-| Stress and fuzz tests | Host and QEMU | Long sequences, malformed data, rare transitions | Scheduled or explicit |
-| Hardware tests | Physical target | Behavior not represented by QEMU | Post-MVP |
-
-### PM Step 10 evidence
-
-PM precedes the VM mapping and VFS executable paths in the development DAG.
-Its first implementation therefore splits evidence by authority boundary:
-
-- native unit and replayable model tests cover PM record generations,
-  monotonic PIDs, parent/child relationships, init reparenting, spawn stages,
-  reverse rollback including parent loss before activation, post-activation
-  orphan reparenting, exit, zombie retention, exact-child and any-child wait,
-  `NOHANG`, one-shot reply ownership, malformed transitions, and capacity
-  exhaustion;
-- native kernel-transition tests cover exact PM role and production tuple,
-  exact inert `APPLICATION` profile identity and policy, bootstrap-sealed
-  gating, retained output translation, hidden empty-process reservation,
-  stale abort rejection, byte-exact preservation for rejected operations,
-  zero live resources after successful abort, unchanged
-  endpoint/scheduler/ownership state, and exact one-step advancement or
-  terminal quarantine of the consumed process generation plus one-step
-  PM-control transaction advancement; and
-- one QEMU component test uses the real launcher, VM, PM, and a probe to prove
-  PM readiness after handoff, malformed and unmanaged-caller results, the
-  kernel-origin bootstrap-sealed event, a real PM-only reserve/abort sequence,
-  and deterministic success shutdown.
-
-The Step 10 target test must prove that the reserved process has no root,
-thread, endpoint, profile, grant, scheduler state, or process-owned frame. It
-must not create a fake runnable child or report a successful spawn.
-
-The later executable-path integration adds the first successful spawn, VFS and
-VM tokens, application-profile installation, instruction synchronization,
-activation, running exit teardown, and an end-to-end wait result. Those later
-tests extend rather than replace the Step 10 native lifecycle model.
-
-### TTY Step 11 evidence
-
-TTY combines portable state machines with hardware and privilege behavior, so
-its evidence is split at the real authority boundaries:
-
-- native TTY tests cover byte-exact protocol parsing, strict request IDs,
-  grant direction and bounds, one pending read and write, cancellation,
-  completion notification and collection, 256-entry canonical input, CR/LF,
-  erase, overflow, echo, LF-to-CRLF output, physical drain, and replayable
-  mixed transitions;
-- native kernel-transition tests cover the exact TTY tuple and profiles,
-  console begin, one-shot operation-12 mapping, the non-managed device-leaf
-  exception, managed-memory rejection, operation-14 authority, PLIC source-10
-  claim/in-service/complete state, production syscall commit ordering and
-  failure preservation, cause-9 origin classification, `SEIE` independence,
-  begin-time deadline coverage, DLAB-safe panic seizure, and sealed owner-fault
-  diagnostics that retain the pre-seizure route/source snapshot; and
-- one QEMU component test uses the real launcher, VM, PM, and TTY plus an exact
-  test VFS peer. It proves begin before mapping, mapping before release, commit
-  before ready, one unextended guest deadline, marker-triggered host input,
-  canonical grant-backed read, empty-to-nonempty transmit start, grant-backed
-  interrupt-driven output, and deferred PLIC completion.
-
-The QEMU harness sends the configured bytes only after observing an exact TTY
-input-ready line. It uses no sleep, preserves the guest-owned readiness
-deadlines and host absolute timeout, and leaves every other QEMU workflow's
-stdin disconnected.
-
-The implementation exposes one stable `test-qemu-tty` workflow. The final
-marker is emitted by TTY after the probe's grant-backed write, and isolated
-test shutdown occurs only after the UART has physically drained and the
-kernel has validated matching source-10 claim/completion evidence.
-
-### RAMFS Step 12 evidence
-
-RAMFS is a portable state owner behind real IPC and grant boundaries, so its
-implementation must split evidence as follows:
-
-- native seed tests cover the versioned JSON declaration, deterministic
-  parent-before-child generation, pointer-free header and entry ABI, digest,
-  reserved bytes, parent/name/mode rules, exact payload coverage, aggregate
-  rounded block demand, retained seed-plus-arena cost, and every malformed or
-  capacity rejection;
-- host post-link and manifest tests cover the complete 192-page RAMFS service
-  limit and aggregate 4,096-static-mapping limit;
-- native RAMFS tests cover generation-safe nodes, root and parent invariants,
-  link/reference ownership, mount gating, absolute and relative traversal,
-  repeated separators, `.`, `..`, trailing separators, create, mkdir, short
-  EOF reads, sparse zeroes, cross-block writes, all-or-error grant failures,
-  complete directory records, cursor continuation, putnode batching, stale
-  handles, nondirectory empty/`.`/`..` traversal, and every stable result;
-- one slow replayable model performs at least 8,192 mixed mount, lookup,
-  create, mkdir, read, write, getdents, putnode, malformed, stale, capacity,
-  and injected grant-failure transitions while comparing complete production
-  state with an independent reference after each operation; and
-- one QEMU component scenario uses the real launcher, VM, PM, TTY, and RAMFS
-  plus an exact test VFS peer. It proves seed validation, one mount,
-  `/etc/motd` lookup and EOF, runtime directory/file creation, sparse
-  grant-backed I/O, one-record cursor continuation, stable malformed and
-  stale results, balanced non-root references, no live grants, VFS readiness,
-  launcher sealing, TTY-routed output, and clean shutdown.
-
-The slow native workflow is `test-ramfs-model`. The six-service component
-workflow is `test-qemu-ramfs`; it uses no host input or sleep and accepts only
-the exact RAMFS pass marker after VFS readiness, launcher sealing, physical
-UART drain, and zero live grants.
-
-### VFS Step 13 evidence
-
-VFS owns application-visible identity and coordinates two backend protocols,
-so its implementation must split evidence as follows:
-
-- native grant tests cover non-copying validation of exact grantor/grantee
-  generations, zero length, dual-invalid precedence, direction, bounds,
-  complete resident mappings, zero mutation, runtime-wrapper registers, and
-  existing checked-copy compatibility;
-- native manifest/VM tests cover the exact 128-byte capacity-seven service
-  configuration, 364,704-byte VM boot object and dependent offsets/digest,
-  an unchanged exact six-entry production manifest, and one isolated
-  seven-entry VFS fixture;
-- native VFS tests cover trusted process attach/detach, descriptor and
-  open-file ownership, shared positions, root/cwd routing, vnode and backend
-  reference aggregation, open/create/close, sequential read/write, translated
-  getdents, mkdir, chdir, every stable result, and complete rollback;
-- native console tests cover grant preflight before consuming reads, pending
-  completion, exact `CANCEL/REQUEST -> COLLECT/OK` races, accepted writes,
-  physical-drain backpressure, writable retry, coalesced event bits,
-  request-ID exhaustion, full global grant capacity, and cleanup;
-- one slow replayable model performs at least 8,192 mixed process,
-  descriptor, path, regular-I/O, directory, console, malformed, capacity,
-  grant-failure, and backend-failure transitions while comparing complete
-  production state with an independent reference after each operation;
-- host post-link and manifest tests cover the complete 80-page VFS service
-  limit and retained aggregate 4,096-static-mapping limit; and
-- one QEMU component scenario uses the six real production services plus one
-  isolated application probe. It proves one mount, trusted console descriptors,
-  relative directory creation, absolute and relative paths, regular-file data
-  through both grant hops, fixed application directory-record translation,
-  marker-triggered canonical input, TTY-routed output, the no-authority
-  test-only drain barrier, zero live grants, launcher sealing, physical UART
-  drain, and clean shutdown.
-
-The implementation must expose `test-vfs-model`, `build-vfs-service-image`,
-and `test-qemu-vfs`. The QEMU harness must send its configured input only after
-the exact VFS input-ready line, use no sleep, and accept only the exact final
-VFS pass marker.
-
-### Complete frame-validation timeout correction
-
-The blocked CPython implementation exposed a deterministic work-budget defect,
-not an acceptable flaky test. The exact ELF-spawn image could pass or cross
-its 180-second limit while QEMU monitor captures showed the hart actively
-scanning the inactive frame-ownership tail from user translation.
-
-Accepted
-[ADR-0076](adr/0076-bounded-complete-frame-ownership-validation.md) requires a
-deterministic structural work-shape Red before optimizing the complete
-validator. Existing boundary, corruption, and model tests are green semantic
-guards and must remain green while adding independent inactive generation,
-slot, kind, and reserved corruption plus the final
-`MAX_MANAGED_FRAMES - 1` partial-word case. The structural Red covers active
-and inactive raw-frame bitmap indexing and proves one loaded word supplies
-each active chunk. Target acceptance is the exact
-`test-qemu-vfs` then `test-qemu-elf-spawn` sequence, run once without retry or
-sleep, followed by one complete producer.
-
-The implementation's structural Red, sanitizer-backed native boundary and
-per-field corruption guards, frame-ownership QEMU component, and exact
-no-retry VFS-to-ELF sequence are green. Complete producer/reuse evidence
-and clean independent review closed implementation #153.
-
-### Complete VM boot-database timeout correction
-
-After the frame correction merged, the blocked CPython implementation exposed
-a separate guest deadline threshold before VM readiness. The exact same
-candidate and unchanged ELF-spawn images passed one complete producer, then
-failed the bounded reuse sequence with service 2 still `STARTING`.
-The panic `sepc` maps to
-`vm_core_boot_database_is_immutable()` immediately after its out-of-line
-initial-free bitmap query.
-
-Accepted
-[ADR-0077](adr/0077-bounded-complete-vm-boot-database-validation.md) requires a
-deterministic structural work-shape Red. It proves the canonical digest path:
-
-- bounds the matched managed-frame count before every count-derived access;
-- hashes the immutable prefix in bounded chunks;
-- loads one initial-free bitmap word for each active 64-frame chunk;
-- makes no per-frame bitmap helper call;
-- checks inactive frame-state bytes plus the partial bitmap boundary and every
-  contiguous full word beginning at the exact first fully inactive word; and
-- advances the unchanged FNV digest over proven zero bytes with a
-  count-halving logarithmic loop.
-
-Existing VM-core lifecycle and corruption tests remain green semantic guards.
-New native cases follow Accepted
-[ADR-0078](adr/0078-valid-vm-boot-database-boundary-evidence.md) and cover the
-smallest valid existing fixture count `6`, then `63`, `64`, `65`, `28,904`,
-maximum minus one, and maximum; first/final inactive frame bytes; the partial
-bitmap bit; word 1 at aligned count 64; word 2 after partial count 65; the
-final inactive bitmap bit; active bitmap corruption; immutable
-prefix/nonfree state corruption; exact digest equivalence; and coherent
-zero/maximum-plus-one header/summary counts rejected under sanitizers before
-any derived access.
-Structural negative evidence removes or moves the dominating count guard,
-shifts the full-word start, and skips or truncates the contiguous scan.
-
-Final target acceptance is the exact `test-qemu-vfs` then
-`test-qemu-elf-spawn` sequence once, without retry, sleep, deadline/timeout
-increase, optimization-flag change, or runner relaxation. One complete current
-producer and exact selected receipt reuse follow before implementation review.
-
-The implementation's nine-case structural gate, sanitizer-backed VM-core
-matrix, VM handoff component, and exact no-retry VFS-to-ELF sequence are green.
-Complete current producer/reuse evidence remains the final author gate before
-independent implementation review.
-
-### ELF spawn Step 14 evidence
-
-The [application runtime implementation map](architecture/application-runtime.md)
-separates the native `application-runtime` decoder/frontend checks from
-the existing PM component's checked application entry and return-exit proof.
-The separate [full PID-1 integration](architecture/elf-spawn-integration.md)
-now composes all six production services. Neither native startup decoding
-nor the PM component alone claims that proof.
-
-Before the host application checker reuses the existing image tooling,
-the separate [user ELF checker source correction](architecture/user-elf-checker-source-organization.md)
-must pass its design/implementation barriers. Accepted ADR-0063 preserves
-the twelve original checker cases and fixture-generator output identities,
-adds focused facade/CLI/AST regressions, and carries exact dependency and
-validation ownership to every new private source. It introduces no new QEMU
-execution or application acceptance claim.
-
-The ELF spawn path crosses every production authority owner, so evidence must
-remain split at the actual boundaries:
-
-- byte-level native protocol tests cover the canonical at-most-one-page path,
-  argv, envp, and duplicate-only descriptor request; PM, VFS, and VM payload
-  fields; every reserved byte and overflow; stable public result precedence;
-  exact application-stack pointer rebasing and auxv values; and the
-  2,048-byte initial-frame/2,048-byte runtime-stack boundary. Only malformed
-  caller-to-PM grants produce public `GRANT`; trusted internal grant-capacity
-  exhaustion produces `NO_SPACE`, and every other trusted grant failure is
-  fatal;
-- native ELF tests cover the fixed static RISC-V ELF64 header and three
-  load-segment shape, complete file-range validation, exact RX/R/RW
-  permissions, no W+X, deterministic zero fill, entry, alignment,
-  contiguity, stack separation, 15-image-page limit, and every truncated or
-  overflowed input;
-- native VM and kernel-transition tests cover lowest-frame selection, the
-  sole VM-root scratch alias and its active- and inactive-root
-  complete-validation exception, transferable-to-exact-process-generation
-  `VM_WIRED` ownership, exact four-frame private Sv39 construction,
-  byte-identical shared supervisor root entries outside VPN2 index 1, freeze,
-  mapping generation, instruction synchronization, held execution
-  preparation, fixed lower-priority application scheduling, reservation
-  consumption, final activation, rollback before and after freeze, exit
-  detach, frame release, caller authority, stale tokens, and byte-exact
-  failure preservation;
-- native PM and VFS tests cover PID consumption, parentless init, executable
-  lookup and buffering, VFS-to-VM direct grants, root/cwd inheritance,
-  descriptor preparation, hidden commit, every reverse rollback row, normal
-  exit, reaper-exit rejection, child reparenting, same-parent combined
-  lowest-PID selection after zombie publication, distinct init/original-parent
-  two-waiter staging and independent reply restoration, zombie retention,
-  one-shot wait, and complete reference cleanup. The nested regression uses
-  `init -> C -> A -> B`, with `B` already zombie and both init and `C`
-  blocked: publishing `A` must stage `B` for init and `A` for `C`.
-  Executable lookup tests require `regular-file/child -> ACCESS` and a
-  component longer than `MICROS_VFS_NAME_MAX -> TOO_BIG`, with consumed PID,
-  complete rollback, and precedence over executable, grant, and descriptor
-  work;
-- one replayable native model compares complete production and independent
-  reference state across mixed valid and invalid load, spawn, rollback, exit,
-  and wait transitions and prints its seed and operation trace on failure;
-- host checks cover full-link and seeded-runtime application ELF parity, the
-  16-page application limit, 128-KiB executable limit, PM 32-page limit, VM
-  160-page limit, VFS 80-page limit, and retained aggregate static-mapping
-  limit; and
-- one isolated QEMU MMU/context-switch component uses distinct VM and peer
-  Sv39 roots. A labeled compile-time hook after the real first `SCRATCH_MAP`
-  makes the peer runnable and shortens VM's quantum to one counter tick. The
-  ordinary timer/scheduler path must preempt VM, activate the peer root,
-  validate VM's inactive root with the scratch leaf present, block the peer,
-  and reactivate VM through the normal ASID-zero full-fence path. VM rereads a
-  scratch sentinel, performs the real `SCRATCH_COMMIT`, and an exact expected
-  load-page-fault at the scratch VA proves the PTE and stale translation are
-  gone; and
-- one QEMU integration scenario uses the six real production static services
-  plus a dynamically spawned test-only PID 1 and child. It forces one
-  descriptor failure after VM freeze, then proves valid argv/env/auxv,
-  inherited descriptors 0/1/2, VFS I/O, normal return through PM exit, exact
-  wait status, zero live image/request grants, no scratch or transferable
-  frame, and final child-resource equality with the post-PID-1 baseline.
-
-The implementation must expose `test-elf-spawn-model`,
-`build-application-images`, and `test-qemu-elf-spawn`. The QEMU harness uses
-no sleep. The target runs both QEMU scenarios and accepts integration success
-only after physical UART drain and the complete resource-baseline report.
-The test PID 1 is not production init, and this gate does not claim shell
-behavior.
-
-### Init and shell node-Q evidence
-
-Accepted
-[ADR-0079](adr/0079-production-init-shell-and-basic-commands.md) and the
-[exact architecture contract](architecture/init-shell.md) define the next
-test-first outcome.
-
-Native deterministic evidence begins with:
-
-- canonical spawn-request encoding and failure-atomic output;
-- PM command-name lifecycle and sorted application snapshot records;
-- process-list request/reply/grant failure precedence;
-- application PM/VFS client reply and grant closure;
-- shell line parsing, command resolution, spawn/wait actions and recovery;
-- init exact-child wait and shell restart;
-- echo/cat/ls/ps selected behavior; and
-- immutable checked userland seed generation.
-
-The target Red is one `test-qemu-shell` image using the ordinary six static
-services and production application mechanisms. The runner uses five
-prompt-paced raw triggers and sends:
-
-```text
-echo hello micros\rcat /etc/motd\rls /bin\rps\rexit\r
-```
-
-The concatenation is the exact 48-byte script, but no later line is sent until
-the shell emits the next raw prompt. Native runner tests cover repeated raw
-prompts, post-match cursors, partial reads, unequal option counts, write
-failure, premature QEMU exit, and incomplete-step rejection.
-
-The node-Q gate also configures an exact contiguous transcript. Runner tests
-reject extra, duplicate, reordered, missing and unterminated records between
-the unique init-ready and shell-pass lines.
-
-The gate requires ordered command output, exact application PIDs 1, 2 and 6 in
-the `ps` snapshot, normal shell exit and reaping, the pre-shell/post-reap
-resource baseline, physical UART drain, the final shell pass record and clean
-SBI shutdown.
-
-The resource oracle canonicalizes only the head cursor of a completely empty,
-zeroed TTY input ring and the head cursor of a completely empty, zeroed echo
-ring. Native mutations prove residual input/echo bytes, flags, counts,
-completed lines, pending operations and every other live resource still fail
-comparison.
-
-VFS `next_tty_request_id` and TTY `last_accepted_request_id` remain monotonic
-high-water comparisons; IDs in live pending/completion state remain exact and
-must be absent at both checkpoints.
-
-Before the final breakpoint, a shell-test-only VFS/TTY drain waits until
-aggregate TTY output includes neither echo nor resident writes. Native tests
-cover output combinations, duplicate drain and reply cleanup. After resource
-equality succeeds, the test-only kernel path performs the existing bounded
-`THRE|TEMT` poll, seizes terminal ownership through the panic-seizure
-transition, validates the seized console/route state, writes and flushes the
-raw pass marker, and performs SBI success shutdown. No production image
-receives this completion path.
-
-No sleep, retry, host-kill success, unchecked marker, production shutdown
-operation, or test-only process authority is accepted.
-
-## Planned test commands
-
-The build system should expose stable intent-based targets:
-
-```text
-ninja test-unit
-ninja test-qemu-smoke
-ninja test-qemu-integration
-ninja test-stress
-```
-
-Performance budgets are:
-
-- incremental `test-unit-fast`: normally below 6 seconds;
-- persistent native models: isolated from the fast loop and run in the PR or
-  milestone tier;
-- QEMU smoke suite: normally below 10 seconds;
-- QEMU integration suite: kept short enough for every applicable pull request;
-- stress suite: unconstrained by the fast feedback budget and run separately.
-
-Budgets are review signals, not reasons to hide necessary coverage.
-
-The current fast run contains 37 nonslow native CTests and 89 Python cases.
-The current-contract implementation measured 18.08 seconds for CTest,
-3.999 seconds for Python and 22.63 seconds for the complete workflow.
-That remains above the six-second review signal; it is not reported as a
-six-second pass. These timings are diagnostic, not portable correctness
-thresholds. Complete native discovery, models and target/integration
-coverage remain required.
-
-The native validation tiers are `test-unit-fast`, `test-ipc-model`,
-`test-tty-model`, `test-ramfs-model`, `test-vfs-model`,
-`test-elf-spawn-model`, and the complete
-`test-unit` gate. The standalone image workflows are
-`build-tty-service-image`, `build-ramfs-service-image`, and
-`build-vfs-service-image`, plus `build-application-images`. The implemented
-QEMU targets are `test-qemu-smoke`,
-`test-qemu-panic`, `test-qemu-trap`, `test-qemu-timer`,
-`test-qemu-uart-console`,
-`test-qemu-terminal-failure`, `test-qemu-panic-trace`,
-`test-qemu-frame-allocator`, `test-qemu-trap-panic`, `test-qemu-mmu`,
-`test-qemu-object-model`, `test-qemu-endpoint`,
-`test-qemu-grant`, `test-qemu-grant-syscall`, `test-qemu-user-runtime`,
-`test-qemu-bootstrap-launcher`,
-`test-qemu-vm-handoff`,
-`test-qemu-pm-service`,
-`test-qemu-vm-scratch-preemption`,
-`test-qemu-tty`,
-`test-qemu-ramfs`,
-`test-qemu-vfs`,
-`test-qemu-elf-spawn`,
-`test-qemu-vm-ready-early`,
-`test-qemu-vm-self-fault`,
-`test-qemu-vm-self-fault-sealed`,
-`test-qemu-bootstrap-ready-timeout`,
-`test-qemu-bootstrap-manifest-panic`,
-`test-qemu-ipc`, `test-qemu-ipc-ecall-core`,
-`test-qemu-ipc-syscall`, `test-qemu-ipc-syscall-panic`,
-`test-qemu-nested-trap`, and
-`test-qemu-frame-ownership`, `test-qemu-user-address-space`,
-`test-qemu-address-space-handoff`, and
-`test-qemu-user-execution`, `test-qemu-scheduler`,
-`test-qemu-scheduler-invalid-outgoing`, and
-`test-qemu-scheduler-invalid-next`. From a clean checkout,
-the implemented configure, build, and execution gates are:
-
-```bash
-cmake --workflow --preset test-unit-fast
 cmake --workflow --preset test-ipc-model
 cmake --workflow --preset test-tty-model
 cmake --workflow --preset test-ramfs-model
 cmake --workflow --preset test-vfs-model
 cmake --workflow --preset test-elf-spawn-model
-cmake --workflow --preset test-unit
-cmake --workflow --preset test-stack-evidence
-cmake --workflow --preset build-tty-service-image
-cmake --workflow --preset build-ramfs-service-image
-cmake --workflow --preset build-vfs-service-image
-cmake --workflow --preset build-application-images
-cmake --workflow --preset test-qemu-smoke
-cmake --workflow --preset test-qemu-panic
-cmake --workflow --preset test-qemu-trap
-cmake --workflow --preset test-qemu-timer
-cmake --workflow --preset test-qemu-uart-console
-cmake --workflow --preset test-qemu-terminal-failure
-cmake --workflow --preset test-qemu-panic-trace
-cmake --workflow --preset test-qemu-frame-allocator
-cmake --workflow --preset test-qemu-trap-panic
-cmake --workflow --preset test-qemu-mmu
-cmake --workflow --preset test-qemu-object-model
-cmake --workflow --preset test-qemu-endpoint
-cmake --workflow --preset test-qemu-grant
-cmake --workflow --preset test-qemu-grant-syscall
-cmake --workflow --preset test-qemu-user-runtime
-cmake --workflow --preset test-qemu-bootstrap-launcher
-cmake --workflow --preset test-qemu-vm-handoff
-cmake --workflow --preset test-qemu-pm-service
-cmake --workflow --preset test-qemu-vm-scratch-preemption
-cmake --workflow --preset test-qemu-tty
-cmake --workflow --preset test-qemu-ramfs
-cmake --workflow --preset test-qemu-vfs
-cmake --workflow --preset test-qemu-elf-spawn
-cmake --workflow --preset test-qemu-vm-ready-early
-cmake --workflow --preset test-qemu-vm-self-fault
-cmake --workflow --preset test-qemu-vm-self-fault-sealed
-cmake --workflow --preset test-qemu-bootstrap-ready-timeout
-cmake --workflow --preset test-qemu-bootstrap-manifest-panic
-cmake --workflow --preset test-qemu-ipc
-cmake --workflow --preset test-qemu-ipc-ecall-core
-cmake --workflow --preset test-qemu-ipc-syscall
-cmake --workflow --preset test-qemu-ipc-syscall-panic
-cmake --workflow --preset test-qemu-nested-trap
-cmake --workflow --preset test-qemu-frame-ownership
-cmake --workflow --preset test-qemu-user-address-space
-cmake --workflow --preset test-qemu-address-space-handoff
-cmake --workflow --preset test-qemu-user-execution
-cmake --workflow --preset test-qemu-scheduler
-cmake --workflow --preset test-qemu-scheduler-invalid-outgoing
-cmake --workflow --preset test-qemu-scheduler-invalid-next
 ```
 
-`test-unit-fast` runs the FDT parser corpus, portable frame allocator,
-typed frame-ownership ledger, Sv39 encoding, kernel-object lifecycle/model
-tests, and deterministic scheduler admission, RTS, priority-queue, policy,
-current-selection, preemption-repair, return-plan, and separate
-thread/kernel/idle accounting tests plus a replayable 4,096-step two-hart
-reference model. They also cover reversible current-thread IPC detach,
-idle/thread trap-stack anchor transitions, exact rollback, same-priority head
-preservation, and higher-priority wakeup selection. Endpoint tests cover
-endpoint encoding, immutable privilege-profile tables,
-process-bound lifecycle, stale-generation rejection, relationship validation,
-authorization, and deterministic endpoint/IPC regressions under ASan and
-UBSan. It also verifies the exact 64-byte IPC message ABI and zero-state
-invariants for dormant thread and endpoint IPC storage. The native host tests
-also cover generation-safe sender/receiver FIFO topology, exact queue
-membership, stale links, cycles, duplicate membership, and close rejection
-while queues or exact-source/reply waiters remain attached. Canonical queued
-call and queue-less reply-wait shapes, unique token values, reserved message
-types, and impossible already-matchable queue pairs are validated too.
-Failure-atomic enqueue tests prove canonical source/token overwrite, FIFO tail
-append, duplicate-token rejection, and detection of a matching peer before
-blocking. Staged-delivery tests require an exact active source generation,
-user message type, aligned retained receive buffer, runnable scheduler state,
-and no residual queue or reply authority. Matching-delivery regressions cover
-head, middle, and tail dequeue, specific and `ANY` selection, unmatched FIFO
-preservation, ordinary versus call sender wake behavior, exact staged message
-bytes, canonical no-message `OK` completion for consumed ordinary senders, no
-premature call completion, ready-queue placement, stale and corrupt queues,
-no-match preservation, and byte-exact state and output preservation on every
-failure. Direct completion tests require zero message/buffer state and
-duplicate-staging atomicity. Authorized
-send/receive operation tests add exact active source and destination
-resolution, receive/send operation and target-profile enforcement, one
-canonical message snapshot, immediate matching before blocked enqueue,
-specific and `ANY` FIFO selection, explicit scheduler-held non-current caller
-requirements, and complete state preservation on every rejected transition.
-Authorized call tests additionally prove fixed-state monotonic nonzero token
-allocation, low-level mint/reuse rejection, no wrap at exhaustion, exact
-live-caller/source/callee binding for staged nonzero tokens, rejection of
-queued token bindings, preservation of independent receiver run-time flags,
-canonical token delivery through immediate and queued paths, reply-only wait,
-retained reply buffers, and byte-exact failure preservation including
-scheduler-transition rejection.
-Authorized reply tests prove bounded opaque-token lookup, exact caller-thread
-and callee-generation matching, rejection before queued calls enter reply
-wait or before the token-bearing request completion returns, active endpoint
-and reply-operation enforcement, token-authorized bypass of an absent ordinary
-send-target permission, canonical replying source and zero delivered token,
-one-shot consumption, preservation of independent caller run-time flags,
-wakeup only at the zero boundary, validator rejection of noncanonical or
-duplicate staged call tokens, and complete state/token preservation on every
-failure including a late scheduler preflight rejection. The seeded endpoint
-model also exercises allowed and denied reply-operation authorization.
-Authorized reply/receive tests prove that the combined operation has distinct
-authority, reuses the complete reply token and message preflight, accepts a
-specific active source or `ANY`, preserves unmatched FIFO senders, retains a
-consumed queued call in reply wait, and atomically chooses immediate delivery
-or receiver blocking. They also exercise canonical replies and requests,
-validator rejection of corrupted final states, later delivery to the blocked
-receiver, and byte-exact token/state preservation for invalid receive
-arguments and late caller or sender scheduler failures. The seeded endpoint
-model exercises allowed and denied reply/receive-operation authorization.
-Authorized notification tests prove nonzero-mask validation, exact active
-source and destination generations, operation and target-profile authority,
-immediate first-compatible receiver wakeup, call-reply exclusion, nonblocking
-notifier return, per-source OR coalescing, and bitmap/event agreement. Receive
-and reply/receive tests require lowest-slot pending selection before blocked
-senders, exact source-generation revalidation, and a canonical reserved kernel
-message containing the little-endian 64-bit event mask with a zero token and
-zero payload tail. Corruption, pending-source close, stale-source, and late
-scheduler failures preserve all state. A replayable 4,096-step notification
-model compares coalescing and specific/`ANY` selection with a compact
-reference.
-Deterministic deadlock tests exhaust every realizable chain length across the
-64 endpoint slots and independently exercise the
-`MICROS_THREAD_CAPACITY`-step reference bound. They cover `SEND` before
-`REPLY` before specific `RECEIVE`, `ANY` termination, exact generation
-resolution, zero/multiple-thread projection rejection, candidate-return
-cycles, repeated intermediate corruption, and the post-reply graph used by
-`reply_receive`. Every deadlock or corruption result preserves the complete
-registry, object state, tokens, messages, and outputs.
-Endpoint-close cancellation tests combine closing-owned send, receive, call,
-notification, and staged-delivery state with foreign queued senders, specific
-receivers, reply waits, pending notifications, and already staged messages.
-They require one atomic transition to detach the closing process, wake exact
-foreign dependents with `DEAD_ENDPOINT`, preserve unrelated `ANY` receivers,
-cancel caller/callee tokens, and clear notification state in both directions;
-an owned staged `DEAD_ENDPOINT` result is discarded by a later cascading
-close, while successfully staged messages, notifications, and no-message
-completions reject close before mutation until drained. Separate stale
-queue-generation, token-generation, notification-source, staged-source,
-held-thread, and late scheduler failures prove byte-exact preservation. A
-deterministic seeded 512-case scenario sweep creates a fresh fixture for each
-selected cancellation class and checks staged-delivery preflight plus
-unrelated-state preservation.
-The final portable acceptance model retains one fixture for 8,192 mixed
-transitions. It uses seven process generations, including three processes with
-two model threads each, and independently compares complete run-time flags,
-sender/receiver queues, reply tokens, notification masks, staged messages and
-results, plus ready-queue/current scheduler state after every transition.
-Its trace covers all IPC operations, close/reuse, profile denial, malformed
-input, ordinary-send completion drain, reply-before-request-return rejection,
-and deadlock, and prints the replayable seed plus a trace hash on success and
-the recent complete operation trace on failure.
-The Python host tests include ELF allocatable-section closure, legacy-global
-rejection, and machine-readable QEMU record regressions.
-`test-ipc-model` contains the replayable endpoint lifecycle, notification,
-close-cancellation, and persistent 8,192-transition IPC models.
-`test-ramfs-model` compares the complete portable RAMFS state with an
-independent reference across 8,192 replayable mixed filesystem transitions.
-`test-vfs-model` compares the complete portable VFS state with an independent
-reference across 8,192 replayable mixed descriptor, pathname, file-I/O, and
-asynchronous console transitions.
-`test-unit` combines the fast tests and every persistent model and remains the
-complete native gate.
-
-`tools/validation_plan.py` maps committed, staged, unstaged, and untracked
-paths to `fast`, `pr`, or `full` execution plans. Documentation-only changes
-avoid target builds. Code PR plans always include complete `test-unit`.
-Unknown non-documentation paths, mixed mapped/unmapped changes, and shared
-toolchain, linker, target-entry, conditional multi-image, post-link, public
-header, or QEMU-harness changes run the full tier. Explicit paths are unioned
-with Git discovery; rename discovery classifies both paths. Execution rejects
-remaining untracked files. Every plan ends with separate index, worktree, and
-branch-range diff checks.
-Accepted [ADR-0064](adr/0064-fail-closed-validation-evidence-reuse.md) and its
-[exact contract](architecture/validation-evidence.md) define an opt-in local
-execution ledger and a bounded existing-workflow CMake exception. They are
-separately implemented in merged #132. Default and full execution remain
-fresh; reuse does not remove a required command or authorize cross-candidate
-evidence.
-The initial-profile implementation follows Accepted
-[ADR-0065](adr/0065-closed-tool-default-configuration-for-validation.md);
-its fresh implementation followed merged corrective design #131.
-The correction does not reduce any validation gate.
-The explicit fresh/reuse/gate-only interfaces and bounded supported
-environment are documented in [the build guide](development/building.md).
-RAMFS protocol, seed-parser, namespace, file-state, and replayable-model
-changes select both `test-ramfs-model` and `test-qemu-ramfs`. RAMFS startup,
-generated seed source and catalog, seed embedding/generation, and the
-six-service fixture generator retain the user-runtime, launcher, VM, PM, TTY,
-and RAMFS service gates. RAMFS service sources, generated seed data, and seed
-embedding/generation inputs also select `build-ramfs-service-image`. Inventory
-regressions require every documented QEMU workflow to have exact preset,
-ownership-map, and representative-input parity.
-The VFS implementation extends that fail-closed map: VFS core/model changes
-select `test-vfs-model`; VFS protocol, service, fixture, or test-application
-changes select `test-qemu-vfs`; operation-15 changes retain the native grant,
-grant-syscall, handed-off grant, user-runtime, and VFS gates; bootstrap
-capacity or VM static-address-space changes retain every affected launcher,
-VM, PM, TTY, RAMFS, and VFS fixture; and VFS linker/table changes select
-`build-vfs-service-image`. The VFS QEMU workflow has the same preset,
-ownership-map, and representative-input parity as every other authoritative
-gate.
-
-`test-qemu-smoke` verifies the real OpenSBI handoff, exact object/trap
-readiness, FDT memory discovery, agreement between decoded range counts and
-emitted range events, a nonempty firmware reservation result, allocator and
-MMU readiness, exact agreement between reachable kernel page tables and typed
-ownership, and clean SBI shutdown. The remaining stable targets are added when
-their dependency-DAG layers become implementation-ready.
-
-`test-qemu-panic` builds an isolated test image and verifies ordered source,
-hart, and machine-state diagnostics plus clean fatal shutdown. Panic output
-does not turn a timeout, explicit failure, missing FDT evidence, or malformed
-diagnostic stream into a pass.
-
-`test-qemu-trap` verifies the real direct-mode entry and `sret` paths with two
-distinct x1-x31 register patterns, two stacks, an observable status change, and
-an exact expected illegal-instruction label. `test-qemu-timer` verifies
-expired-only return preparation, failure-atomic timer programming, three
-accepted supervisor timer expirations, two successful interrupt rearms, final
-disarm, and the SIE-clear wait handshake.
-`test-qemu-frame-allocator` verifies production FDT/linker reservation
-integration, deterministic allocation and release from the live post-MMU
-baseline, preservation of retained table bits, exact free-count restoration,
-and runtime memory sizing by booting one ELF at 128 MiB and 256 MiB.
-`test-qemu-trap-panic` verifies that an unarmed exception retains a separately
-captured trap frame and that its `sepc` equals the fault symbol in the built
-ELF. `test-qemu-mmu` verifies exact recovery from a store page fault against RX
-text and an instruction page fault from RW/NX kernel data.
-`test-qemu-object-model` exercises the production process/thread/hart registry,
-including generation advance, stale rejection, the one-thread policy, and
-hart-local current-thread state. `test-qemu-endpoint` exercises reserved versus
-active visibility, immutable profile installation, asymmetric
-call/send/notify authorization, bound-process release rejection, stale
-endpoint rejection after generation advance, failed runtime-initialization
-preservation, and complete baseline restoration through the authoritative
-target registry. `test-qemu-grant` creates three exact address spaces and
-proves bootstrap-phase checked copy in both directions across local and
-cross-page ranges, byte/canary preservation on every failure, stale authority
-rejection, revoke/cancel behavior, generation reuse, and complete
-grant/endpoint/root/frame/object cleanup. `test-qemu-ipc` uses that same target
-registry with three
-exact production process generations,
-three distinct generation-bound Sv39 roots, saved integer contexts, complete
-thread-owned kernel-stack patterns, scheduler state, and trusted kernel-owned
-messages before the syscall ABI exists. It proves immediate and blocked
-send/receive, canonical no-message completion for consumed queued senders,
-exact call/reply token routing and one-shot use, atomic `reply_receive`,
-notification coalescing and call-reply exclusion, deadlock rejection, close
-cancellation, stale generation rejection after reuse, authorization denial,
-and final endpoint/object/hart/frame baseline restoration while roots,
-contexts, stacks, scheduler state, and messages remain preserved.
-`test-qemu-ipc-ecall-core` executes the production U-mode ecall route. It
-proves stable operation/result numbering, exact `sepc + 4`, preserved
-non-result registers, target-buffer snapshot before guard begin, immediate
-notify completion through captured return, unauthorized-send rollback through
-ordinary return, upper endpoint-bit rejection before mutation, and complete
-endpoint/object/address-space/frame baseline restoration.
-`test-qemu-ipc-syscall` runs three real address spaces through all six
-operations. It proves blocked and immediate send/receive, two tokenized call
-round trips, atomic `reply_receive` plus later sender wake, notification
-coalescing while the destination is in reply wait, pending notification
-delivery, page-crossing request/reply buffers, higher-priority wake selection,
-stable `-3`, `-1`, and `-6` results, deferred completion across a timer-selected
-peer, exact `sepc + 4`, preserved non-result registers, and complete
-endpoint/thread/root/frame cleanup.
-`test-qemu-ipc-syscall-panic` releases a previously accepted receive-buffer
-page after sender commit but before selected-thread return preflight. It
-requires the exact `invalid-bootstrap-ipc-buffer` panic and trap context.
-The ADR-0037 kernel-origin notification slice extends the native notification
-and persistent IPC models plus `test-qemu-ipc`. They prove source-`NONE`
-immediate delivery,
-pending-mask coalescing, `ANY`-only consumption, reply-wait exclusion,
-state-preserving failures, selected-thread completion return, and complete
-baseline restoration. That evidence does not claim PLIC routing,
-`irq_complete`, console handoff, or TTY behavior.
-ADR-0038 grant evidence now includes deterministic native lifecycle tests, a
-replayable 4,096-transition registry model, and target-runtime lifecycle
-coverage in `test-qemu-endpoint`. It proves token generation, revoke-time
-advance, quarantine, exact participant authority, failure-atomic endpoint
-cancellation, stale reuse rejection, and complete
-registry/endpoint/object restoration. Checked-copy ranges, directions,
-mappings, and byte evidence remain a separate design.
-ADR-0039 defines that checked-copy evidence: native authority/bounds
-and chunk-pairing tests, grant-model copy transitions, and a dedicated
-`test-qemu-grant` image proving page-local and cross-page copy in both
-directions, byte-exact failure atomicity, stale authority rejection, and
-complete cleanup. The marker explicitly identifies bootstrap phase; no
-post-handoff copy claim is valid before a separate mapping-authority design.
-ADR-0040 evidence includes native phase/owner classification and the isolated
-`test-qemu-address-space-handoff` component. It first rejects a reachable leaf
-planned `VM_TRANSFERABLE` without
-mutation, then commits every live service leaf to exact `VM_WIRED` ownership.
-After the irreversible transition it proves root validation and activation,
-IPC-buffer snapshot/write, and page-local/cross-page checked copy, while
-bootstrap mapping mutation remains phase-rejected. Foreign wired ownership,
-transferable live leaves, malformed PTEs, absent mappings, and permission
-failures preserve all affected bytes and prevalidated state. An absent
-target combined with unrelated structural corruption reports the
-structural failure first. Generic execution-context preparation returns
-`PHASE` without changing its thread, saved context, or kernel stack, while an
-already prepared thread still returns through the common scheduler path. The
-exact marker is:
-
-```text
-MICROS_ADDRESS_SPACE_HANDOFF_TEST_PASS phase=handed-off wired=validated ipc=resident grants=atomic mutation=revoked
-```
-
-ADR-0041 evidence now includes native unified-ABI tests and the dedicated
-`test-qemu-grant-syscall` workflow. Native tests cover the unified
-operation/result values, exact
-grant register shapes, upper-bit and unused-register rejection, 64-bit scalar
-preservation, token/result disjointness, recoverable grant-error mapping, and
-fatal phase/invariant classification. The isolated bootstrap QEMU component
-executes real U-mode `ecall` instructions through the production top-level
-dispatcher. It preserves representative IPC behavior while
-proving grant create, revoke, both copy directions,
-page-local/cross-page/zero-length behavior, exact stable failures,
-non-result-register preservation, stale authority after reuse, and complete
-cleanup. It emits:
-
-```text
-MICROS_GRANT_SYSCALL_TEST_PASS namespace=unified phase=bootstrap lifecycle=checked directions=checked errors=stable registers=preserved cleanup=complete
-```
-
-The retained-state `test-qemu-address-space-handoff` image also executes real
-operations 7 through 10 after its `VM_WIRED` commit, proving the same syscall
-path in `HANDED_OFF` without claiming teardown. In addition to the unchanged
-ADR-0040 marker it emits:
-
-```text
-MICROS_GRANT_SYSCALL_HANDOFF_PASS phase=handed-off operations=create,revoke,copy-from,copy-to errors=stable registers=preserved
-```
-
-ADR-0042 evidence now includes native production-wrapper tests linked against
-a host raw-syscall capture stub for all operations 1 through 10. They prove
-exact register marshalling, full-width scalar preservation, direct stable
-results without `errno`, success-only grant-token publication, unchanged
-outputs on failure, and stack-local blocking-buffer semantics. The same native
-target tests the production-prefixed `memcpy` and `memset` bodies under ASan
-and UBSan.
-
-Step 13 extends the same host and real-runtime evidence with operation 15,
-including zero length, dual-invalid precedence, and unchanged non-result
-registers.
-
-`tools/check_user_elf.py` parses ELF64 headers, program headers, sections,
-symbols, and RISC-V instructions. Its malformed-fixture regressions reject
-wrong identity or flags, permission or range violations, orphan allocatable
-sections, BSS errors, dynamic/TLS/constructor/small-data/unwind state,
-relocations, undefined symbols, noncanonical startup, extra `gp`/`tp` writes,
-and any raw stub other than exact uncompressed `ecall; ret`.
-
-The isolated `test-qemu-user-runtime` workflow consumes only that checked ELF
-through a bounded generated fixture. Three isolated process generations run
-the same fixed virtual image with patched test-only role data and separate
-external stacks. User code proves initialized data, zero BSS, readable and
-protected rodata, zero `gp`/`tp`, stack-local canaries across blocking IPC,
-raw-stub and kernel register preservation, all production operations 1 through
-10, checked grant copies and stale-token rejection, and deterministic return
-through the labeled breakpoint. Loader and teardown checks prove complete
-page zero fill, final RX/R/RW-NX permissions, instruction synchronization,
-endpoint/grant/root/frame cleanup, and restoration of the pre-test baseline.
-Only the complete sequence emits:
-
-```text
-MICROS_USER_RUNTIME_TEST_PASS elf=freestanding startup=validated syscalls=1-10 registers=preserved stack=external data=initialized bss=zero rodata=protected return=trapped cleanup=complete
-```
-
-ADR-0043 native evidence now includes the `bootstrap-manifest` and
-`bootstrap-control` CTests in both native tiers. They cover exact version-1
-layout and offsets, immutable image/profile resolution, page limits,
-explicit prerequisites, deterministic lowest-ID topology, cycles, generated
-RX/R/RW image-catalog bounds, operation-11 decoding, held versus published
-endpoint state, exact profile and scheduler publication, one starting
-service, readiness acknowledgment construction, deadline boundaries,
-VM/console role gates, failure-atomic output/state preservation, source-only
-endpoint sealing, and a replayable 4,096-operation launcher transition model.
-The common RISC-V build also compiles the fixed preparation, reverse-order
-rollback, manifest-view, syscall, timeout, and final-seal paths.
-
-ADR-0044 decoder coverage keeps operation-11 width and unused-register checks
-before current-thread resolution, then validates the `FAIL` reason and its
-`a4` detail after controller authority and runtime validation. Native cases
-cover all nine malformed-field codes and unrelated-reason detail rejection;
-detailed manifest validation separately covers authoritative cycle masks.
-
-The successful launcher workflow is now implemented:
-
-```text
-test-qemu-bootstrap-launcher
-```
-
-It uses checked launcher and probe ELFs, a generated immutable image catalog
-and deliberately permuted manifest, the production preparation and
-operation-11 paths, and one post-seal probe trap. Only the exact pass marker
-below is accepted:
-
-```text
-MICROS_BOOTSTRAP_TEST_PASS manifest=immutable order=topological profiles=exact endpoints=staged readiness=acknowledged authority=revoked
-```
-
-The two fatal-path workflows are also implemented:
-
-```text
-test-qemu-bootstrap-ready-timeout
-test-qemu-bootstrap-manifest-panic
-```
-
-The timeout image runs a released probe that deliberately omits readiness and
-requires the guest counter deadline to emit `reason=ready-timeout`; host
-timeout is rejected. The malformed-manifest image supplies a dependency cycle
-and requires `reason=manifest-cycle` before endpoint, user-frame, or scheduler
-publication. Both require the complete bootstrap panic report and explicitly
-forbid the success marker.
-
-The success image uses one real launcher ELF and test-only probe ELFs
-through the production object, address-space, runtime, IPC, scheduler, and
-syscall paths. It proves that all images and contexts are prepared while
-inactive and scheduler-unassigned, unreleased endpoints remain hidden, release
-follows explicit prerequisites, and exact profiles plus scheduler policies are
-installed atomically with endpoint publication. Readiness calls carry the
-exact source generation and reply token, and acknowledgments commit atomically.
-The native transition/classification tests retain malformed, duplicate,
-early, and foreign precedence coverage.
-Final completion holds the launcher, clears the exact controller binding, and
-seals authority while the retained source-only endpoint rejects new
-destinations but still validates already staged acknowledgment source state.
-Only the complete sequence may emit:
-
-```text
-MICROS_BOOTSTRAP_TEST_PASS manifest=immutable order=topological profiles=exact endpoints=staged readiness=acknowledged authority=revoked
-```
-
-The missing-readiness image must fail from the guest's own `time`-counter
-deadline with:
-
-```text
-MICROS_BOOTSTRAP_FAILURE reason=ready-timeout
-```
-
-The malformed-manifest image must reject a two-entry cycle before any
-manifest-directed process, user-frame, endpoint, or scheduler mutation with:
-
-```text
-MICROS_BOOTSTRAP_FAILURE reason=manifest-cycle
-```
-
-Both expected-failure images then require
-`MICROS_PANIC reason=bootstrap-failure`, clean SBI system-failure shutdown, no
-success marker, and no host timeout. The launcher gate does not claim a VM
-ownership handoff, TTY console transition, or any real service protocol.
-
-`test-qemu-nested-trap`
-injects a second fault
-after the per-hart `sscratch` sentinel is armed and proves that the registered
-emergency stack is selected without trusting interrupted `tp`.
-`test-qemu-frame-ownership` exercises the production ledger and object
-registry together: stale and cross-process owners are rejected, process
-release remains blocked while exact owners exist, forbidden handoff plans are
-failure-atomic, and one complete plan seals bootstrap mutation in a single
-transition.
-`test-qemu-user-address-space` constructs two generation-bound roots, maps the
-same virtual page to distinct typed frames, switches ASID-zero roots with exact
-fences, checks SUM-gated hardware access, proves full-page zeroing on reuse,
-rejects active/stale/corrupt roots without mutation, atomically tears roots
-down, then verifies mapping mutation is revoked after ownership handoff while
-read-only operations reject a rootless process with `STATE`. It also
-translates arbitrary aligned user addresses and proves failure-atomic 64-byte
-IPC snapshot/write across a page boundary, including range, alignment,
-mapping, and read/write permission rejection.
-`test-qemu-user-execution` enters a relocation-free payload in U-mode, proves
-user-stack access and kernel-page isolation, captures every integer register
-on a thread-owned supervisor stack, uses scheduler-owned admission/current
-selection and accounting, resumes a modified user frame through the common
-return plan, and returns through an interrupt-disabled supervisor continuation
-while preserving caller state.
-`test-qemu-scheduler` runs two private address spaces under real
-supervisor timer delivery. It proves failure-atomic timer start,
-return-boundary timer preparation, queue-reachable current ownership, separate
-thread/kernel/idle accounting, repeated equal-priority alternation, complete
-integer-register preservation, a forced spurious idle iteration, and a later
-real timer wake. The same gate now proves shared IPC completion preflight and
-commit across scheduler start, ordinary U-return, captured IPC return, and idle
-wake; deferred message copy through a validated user buffer; stable success and
-dead-endpoint `a0` results; retained prevalidated physical chunks with no
-post-timer address-space revalidation; rejection of malformed residual
-non-pending state; timer-before-completion ordering; and exact completion
-clearing. It additionally raises real source-10 UART interrupts while U-mode
-and S-mode are active, proving that user-origin cause 9 captures and returns
-through ordinary scheduler selection while supervisor-origin cause 9 returns
-directly. A third source-10 interrupt from the idle enable window proves
-`IDLE`-to-`KERNEL` accounting and immediate idle-wake selection. The exact
-additional marker is:
-
-```text
-MICROS_TTY_TRAP_TEST_PASS user=cause9-scheduled supervisor=cause9-direct idle=cause9-selected
-```
-The two isolated invalid-context gates require a U-origin timer panic with
-exact diagnostics proving the outgoing or selected context failed before any
-return-plan mutation.
+These named models keep their complete transition counts and seeds.
+They are also included by `test-unit`; selecting one is development
+evidence, not a substitute for the PR plan.
 
 ## Native unit tests
 
@@ -2366,296 +231,115 @@ sequence so the exact case can be replayed.
 
 ## QEMU kernel component tests
 
-These tests execute the real RISC-V entry, privilege, and MMU paths. They cover:
+Use actual RISC-V execution for register-preserving trap/return, timer and
+preemption, distinct user roots, privilege/isolation, executable permissions,
+translation invalidation, `fence.i`, stack ownership, nested emergency entry,
+IPC blocking/wakeup and checked grant copies. Panic/corruption scenarios use
+their isolated configurations. Native multithreaded/hart models retain the
+policy-separation checks that the one-hart target cannot demonstrate.
 
-- trap entry and return with known register patterns;
-- expected and unexpected exception handling;
-- user attempts to access supervisor pages;
-- timer interrupt and preemption;
-- repeated context switching;
-- page-table activation and invalidation;
-- exact agreement between the reachable page-table tree, allocator bits, and
-  typed frame owners;
-- same virtual addresses in distinct process roots resolve distinct exact
-  user-frame owners;
-- inactive-root mutation plus complete ASID-zero activation flushes prevent
-  stale cross-root translations;
-- every attached thread stack is pairwise disjoint, bound to its exact slot,
-  and selected only for that hart's exact current thread;
-- user return status, PC, and stack mappings are revalidated before every
-  `sret`;
-- store rejection on kernel text and instruction-fetch rejection on writable
-  kernel data;
-- executable-frame reuse with different code after `fence.i`;
-- synchronous IPC blocking and wakeup;
-- specific-source and any-source receives;
-- concurrent-call reply matching in a model with several threads per process;
-- notification coalescing;
-- stale and unauthorized endpoint use;
-- deadlock-chain rejection;
-- safe-copy across distinct address spaces;
-- invalid grant and unmapped-buffer rejection.
-- standalone user `_start`, external stack, BSS/data/rodata behavior, raw
-  `ecall`, typed wrappers, and accidental-return trapping.
-- static launcher preparation, reserved endpoint visibility, exact-profile
-  release, versioned readiness acknowledgment, internal timeout failure, and
-  final authority sealing.
-- UART transmitter drain, interrupt-disable quiescence, ordinary ownership
-  transfer away from the kernel, state-before-delivery PLIC enable, retained
-  source-10 claim ownership, explicit completion, and terminal panic seizure.
+All ordinary guests require the shared ordered boot/object/trap/FDT/allocator/
+MMU/ownership records before the expected pass or panic, complete scenario
+witnesses and clean firmware termination. Exact markers, ordering, memory-size
+variants and timeout arguments are executable contracts in
+[CMake](../CMakeLists.txt) and the [runner owners](architecture/qemu-runner-source-organization.md).
+Missing, duplicate, malformed or partial evidence is not success.
 
-Most component tests may run in one test kernel to avoid repeated QEMU startup.
-Tests expected to panic or corrupt their own address space use isolated images.
+The six [current-evidence scopes](architecture/current-contract-validation.md#required-target-evidence-has-an-ordinary-owner)
+belong to their existing MMU, address-space, handoff, scheduler, user-runtime
+and seeded-panic workflows. They inspect the same owned guest result and
+actual artifacts rather than launching a duplicate guest. Terminal and trace
+controllers retain every twelve/eighteen-case execution, private debugger
+authority, complete captures, current input identity and atomic publication.
 
-The isolated UART ownership workflow is:
+### Required QEMU matrix
 
-```text
-cmake --workflow --preset test-qemu-uart-console
-```
+The planner checks this complete matrix against the registered workflows.
+Run a row with the [build guide's tool environment](development/building.md#tool-discovery).
+Each command configures, builds and executes its own target; do not borrow
+another configuration's result. The actual recipe and exact markers remain
+in [CMakePresets.json](../CMakePresets.json) and [CMakeLists.txt](../CMakeLists.txt).
 
-It enables the NS16550A interrupt-enable register, executes the production
-console-begin quiesce and ownership transition, proves `IER = 0`, and then
-simulates TTY-side interrupt programming while ownership remains with TTY. It
-publishes the owned/idle route before enabling PLIC source 10 and `sie.SEIE`,
-checks timer and global interrupt state are preserved, triggers a real UART
-THRE interrupt, retains the PLIC claim while the route is in service, and
-requires an explicit completion write before publishing the idle route. It
-finally seizes the terminal through the production panic path. The panic check
-proves supervisor-external delivery and PLIC source 10 are disabled, the
-runtime console and route are both `PANIC`, and the fixed 8N1 divisor is
-restored before reporting success. It accepts only the exact markers:
-
-```text
-MICROS_UART_CONSOLE_TEST_PASS quiesce=drained ier=disabled ownership=tty panic=seized
-MICROS_TTY_IRQ_TEST_PASS route=state-before-enable claim=source10 retained=in-service completion=explicit
-```
+| Command | Evidence |
+| --- | --- |
+| `cmake --workflow --preset test-qemu-smoke` | Ordered boot and clean firmware shutdown |
+| `cmake --workflow --preset test-qemu-panic` | Intentional complete panic, seeded history and actual BSS storage |
+| `cmake --workflow --preset test-qemu-trap` | Register-preserving expected exception return |
+| `cmake --workflow --preset test-qemu-timer` | Accepted delivery, rearm/disarm and interrupt-state preservation |
+| `cmake --workflow --preset test-qemu-uart-console` | UART drain, two-phase ownership, real PLIC claim/completion and panic seizure |
+| `cmake --workflow --preset test-qemu-terminal-failure` | All twelve bounded polling/entry/reset/repair cases |
+| `cmake --workflow --preset test-qemu-panic-trace` | All eighteen frame/epoch/recursive/fault trace cases |
+| `cmake --workflow --preset test-qemu-frame-allocator` | Real FDT allocation/release at both required RAM sizes |
+| `cmake --workflow --preset test-qemu-trap-panic` | Unexpected exception with captured context |
+| `cmake --workflow --preset test-qemu-mmu` | Permissions/faults, large leaves, table identities and load probes at both RAM sizes |
+| `cmake --workflow --preset test-qemu-object-model` | Generation-safe object reuse and per-hart identity |
+| `cmake --workflow --preset test-qemu-endpoint` | Publication, privileges, generations and baseline cleanup |
+| `cmake --workflow --preset test-qemu-grant` | Exact participants, direction, cross-page copy and atomic denial |
+| `cmake --workflow --preset test-qemu-grant-syscall` | Actual operations 7-10, stable results, registers and teardown |
+| `cmake --workflow --preset test-qemu-user-runtime` | Independent checked ELF/startup/raw ecall/wrappers and actual linked memory transfers |
+| `cmake --workflow --preset test-qemu-bootstrap-launcher` | Held preparation, ordered release/readiness and sealed authority |
+| `cmake --workflow --preset test-qemu-vm-handoff` | Independent database validation, irreversible handoff and wired grant exchange |
+| `cmake --workflow --preset test-qemu-pm-service` | Reserve/abort/prepare/activate/exit/release, checked application and no leaked resources |
+| `cmake --workflow --preset test-qemu-vm-scratch-preemption` | Real root switch/reactivation and stale scratch-load fault after commit |
+| `cmake --workflow --preset test-qemu-tty` | Marker-paced canonical input, deferred IRQs, grant I/O, diagnostic forwarding and physical drain |
+| `cmake --workflow --preset test-qemu-ramfs` | Seed, mount, sparse I/O, cursor, balanced references and zero live grants |
+| `cmake --workflow --preset test-qemu-vfs` | Application descriptors, namespace, translated directories and two-hop file/console I/O |
+| `cmake --workflow --preset test-qemu-elf-spawn` | Real dynamic test PID 1/child, post-freeze rollback, argv/env/I/O, exit/wait and resource equality |
+| `cmake --workflow --preset test-qemu-vm-ready-early` | Exact pre-handoff readiness rejection |
+| `cmake --workflow --preset test-qemu-vm-self-fault` | Running-phase VM fault and fatal bootstrap ordering |
+| `cmake --workflow --preset test-qemu-vm-self-fault-sealed` | Sealed-phase VM fault without revived bootstrap failure |
+| `cmake --workflow --preset test-qemu-bootstrap-ready-timeout` | Guest-owned missing-ready deadline |
+| `cmake --workflow --preset test-qemu-bootstrap-manifest-panic` | Invalid manifest rejection before publication |
+| `cmake --workflow --preset test-qemu-ipc` | Blocking, tokens, notify, deadlock, close and baseline restoration |
+| `cmake --workflow --preset test-qemu-ipc-ecall-core` | Real trap routing, guard commit/rollback and registers |
+| `cmake --workflow --preset test-qemu-ipc-syscall` | Complete six-operation cross-address-space acceptance |
+| `cmake --workflow --preset test-qemu-ipc-syscall-panic` | Revoked accepted receive mapping fails before return commit |
+| `cmake --workflow --preset test-qemu-nested-trap` | Per-hart emergency-stack route |
+| `cmake --workflow --preset test-qemu-frame-ownership` | Typed generation authority and failure-atomic handoff |
+| `cmake --workflow --preset test-qemu-user-address-space` | Isolation, selected paths, release/rollback and complete cleanup |
+| `cmake --workflow --preset test-qemu-address-space-handoff` | Wired/index obligations and handed-off grant/return behavior |
+| `cmake --workflow --preset test-qemu-user-execution` | Real U-mode round trip, isolation, registers and stack ownership |
+| `cmake --workflow --preset test-qemu-scheduler` | Queue/accounting/preemption/idle behavior and exact common-return work witnesses |
+| `cmake --workflow --preset test-qemu-scheduler-invalid-outgoing` | Invalid outgoing context panics before plan mutation |
+| `cmake --workflow --preset test-qemu-scheduler-invalid-next` | Invalid selected context panics before plan mutation |
 
 ## Integration tests
 
-Integration tests exercise stable protocols rather than internal functions.
-Before every participating service is dependency-ready, the earlier component
-uses a native protocol/transition model and does not pull its successor into
-the current task. The first pull request or milestone gate where all peers
-exist must add the corresponding QEMU integration scenario.
+Before every participating service is dependency-ready, use a native protocol/
+transition model without pulling a successor into the task. The first
+applicable PR or milestone where all peers exist requires real QEMU
+integration. Keep generation/permission failures, rollback and cleanup at
+their actual authority boundaries.
 
-Integration scenarios include:
+| Boundary | Required evidence and detailed contract |
+| --- | --- |
+| Bootstrap and VM | Exact manifest/profile release, ready ordering, irreversible wired handoff, early-ready rejection, running/sealed VM fault classification and launcher sealing: [ADR-0043](adr/0043-static-bootstrap-launcher.md), [ADR-0045](adr/0045-static-vm-bootstrap-and-handoff.md) |
+| PM | Hidden reservation, stale generations/tokens, byte-preserving rejection, reverse rollback, exit/zombie/wait/reparenting; the initial empty reserve/abort fixture is not successful spawn: [ADR-0046](adr/0046-pm-process-lifecycle-and-spawn-metadata.md), [coordinator](architecture/pm-spawn-coordinator.md) |
+| TTY | Console begin -> exact VM mapping -> release -> commit -> ready, one unextended guest deadline, retained source-10 claim and explicit completion, grant-backed canonical input/output and physical drain: [ADR-0047](adr/0047-tty-console-handoff-and-serial-protocol.md) |
+| RAMFS | Seed/ELF budget, mount, generation-safe namespace, sparse grant-backed I/O, complete-record cursor, balanced references and zero live grants: [ADR-0048](adr/0048-ramfs-service-and-vfs-filesystem-protocol.md) |
+| VFS | Process/descriptor/open-file/vnode ownership, preflight before consuming reads, independent grant hops, translated directory records, asynchronous TTY completion/cancel/retry and resource cleanup: [ADR-0049](adr/0049-vfs-service-and-application-io-protocol.md) |
+| Executable lifecycle | Real PM/VFS/VM/kernel forward and reverse transactions, prepared mapping seal, lower-priority activation, source-only exit detach, release and wait: [ADR-0050](adr/0050-post-handoff-elf-spawn.md), [integration map](architecture/elf-spawn-integration.md) |
+| VM scratch preemption | Real timer switch to another root, inactive scratch validity, ASID-zero reactivation, commit and exact stale-load page fault: [ADR-0050](adr/0050-post-handoff-elf-spawn.md) |
+| Application runtime | Checked ELF, canonical argv/env/auxv, independent startup bytes, non-result registers and normal-return PM exit: [runtime map](architecture/application-runtime.md) |
+| Complete validators | Retain boundary/corruption and Clang-AST work-shape controls, including every inactive field, exact bitmap bounds and count domination: [ADR-0076](adr/0076-bounded-complete-frame-ownership-validation.md), [ADR-0077](adr/0077-bounded-complete-vm-boot-database-validation.md), [valid VM cases](adr/0078-valid-vm-boot-database-boundary-evidence.md) |
 
-- launcher exact-generation readiness, timeout, and fatal malformed-message
-  paths;
-- manifest service-profile installation without inferred privileges;
-- VM `VM_READY` ownership commit before its generic launcher readiness;
-- TTY console-begin and exact mapping before release, then console commit
-  before its generic launcher readiness;
-- final launcher authority sealing before PM spawns init;
-- application privilege-profile installation through PM's separate authority;
-- VM ownership handoff;
-- fatal VM-originated fault handling;
-- PM exit/wait behavior;
-- PM/VFS/VM spawn success and rollback;
-- load-complete token binding, stale-token rejection, and PM-only executable
-  preparation/activation authority;
-- rejection of mapping mutation while prepared, generation revalidation at
-  activation, and abort/reprepare recovery;
-- UART interrupt delivery to TTY;
-- two-phase early-console ownership transfer and deferred PLIC completion;
-- init console descriptors and child descriptor-duplication actions;
-- VFS/RAMFS open, read, write, close, and directory operations;
-- non-transitive application/VFS/backend bounce-buffer paths;
-- client termination during an outstanding request;
-- malformed message type, endpoint, grant, and request identifier;
-- later, service restart and endpoint replacement.
+The actual current VM boot object has seven-address-space capacity and
+364,704 bytes; the service configuration remains 128 bytes and the production
+manifest remains six services. Earlier six-slot sizes are historical, not
+alternative accepted current layouts.
 
-The currently implemented ADR-0045 VM-handoff evidence validates the exact
-364672-byte six-address-space boot-information ABI, canonical ranges, address
-spaces, mappings, frame states, independent counts and digest,
-failure-atomic all-user-frame wired staging, operation-12 shape and summary
-authority, irreversible commit, and the retained replayable 4096-transition
-ownership model. Step 13 must atomically update that same evidence to the
-364704-byte, seven-address-space ADR-0049 layout before any capacity-seven
-fixture can pass.
-
-The successful workflow is implemented:
-
-```text
-test-qemu-vm-handoff
-```
-
-It uses the production launcher, one real VM ELF, and one test-only probe. The
-kernel constructs and reads back the fixed VM database, while the VM
-independently validates every range, mapping, state, count, and digest before
-issuing the real VM-only operation-12 ecall. The gate then proves post-handoff
-return, VM readiness only after ownership publication, dependent probe
-release, launcher sealing, and a real bidirectional checked-copy grant exchange
-between the probe and VM. Only the exact marker is accepted:
-
-```text
-MICROS_VM_HANDOFF_TEST_PASS snapshot=validated ownership=handed-off vm=wired readiness=acknowledged authority=vm
-```
-
-The expected-failure workflow:
-
-```text
-test-qemu-vm-ready-early
-```
-
-has the real VM validate its boot database but deliberately send ordinary
-readiness before operation 12. It requires the exact `ready-role-gate`
-bootstrap failure for the bound VM service and endpoint, forbids the handoff
-success marker, and rejects host timeout.
-
-Both fatal workflows are implemented:
-
-```text
-test-qemu-vm-self-fault
-test-qemu-vm-self-fault-sealed
-```
-
-The running image commits the same handoff and faults before generic VM
-readiness. The fixture first quiesces the UART and transfers ordinary output
-ownership to TTY, so the exact VM self-fault record also proves that fatal
-diagnostics seize panic ownership before their first byte. The workflow
-requires the exact VM identity, fault registers, `ownership=handed-off`, the
-authoritative `RUNNING+STARTING` service-fault record, ordered trap-context
-panic, and no success marker. The sealed variant first completes VM readiness,
-the real grant exchange, and launcher sealing; it then requires
-`MICROS_PANIC reason=vm-self-fault`, exact trap context, no success marker, and
-no `MICROS_BOOTSTRAP_FAILURE` record of any kind.
-
-The PM Step 10 workflow is implemented:
-
-```text
-test-qemu-pm-service
-```
-
-It starts the production launcher and VM, the real PM service, and one
-test-only probe. PM validates its exact service identity and portable
-lifecycle-table initialization before sending readiness. Before sealing, the
-probe receives stable bad-version, malformed, and unmanaged-caller results,
-and the test compares the complete PM table byte for byte to prove rejection
-did not mutate lifecycle state. Launcher completion then commits the exact
-kernel-origin bootstrap-sealed notification. PM consumes that event, reserves
-a process, and asks VM to freeze a four-page application containing a
-position-independent child. PM proves stale prepare output preservation,
-prepare/abort/re-prepare, activation, and load commit; the child then calls PM
-so PM can prove stale exit output preservation, exit begin/detach,
-premature-release rejection, VM exit release, and final process release. The
-kernel requires no remaining child root, mapping, thread, endpoint, profile,
-grant, scheduler state, or process-owned frame, while process/thread
-generations and reservation/prepared/exit tokens remain advanced. Only the
-exact marker is accepted:
-
-```text
-MICROS_PM_SERVICE_TEST_PASS handoff=complete readiness=acknowledged protocol=stable sealed=received prepare=aborted-reprepared activate=committed exit=detached-released resources=clean process-generation=advanced thread-generation=advanced tokens=advanced
-```
-
-The first ELF-spawn Step 14 QEMU component is implemented:
-
-```text
-test-qemu-vm-scratch-preemption
-```
-
-It starts the production launcher, VM, and PM service plus one test-only
-orchestration driver. PM performs a real operation-13 reservation and replies
-to the driver, preserving PM's exact launcher/VM/VFS call authority; the driver then
-calls VM with the opaque transaction. VM performs real `LOAD_BEGIN` and
-`SCRATCH_MAP` operation-12 calls, writes the scratch sentinel, and reaches the
-labeled test hook. The hook releases PM as the measured peer, reduces VM's
-remaining quantum to one tick, and resumes VM in a labeled user-mode spin so
-only the ordinary timer can cause the measured preemption. The scheduler must
-switch to PM's distinct root, where the production complete-root validator
-accepts VM's inactive scratch exception. PM then blocks through ordinary
-`RECEIVE`; the scheduler reactivates VM through the normal ASID-zero full-fence
-path. VM rereads the sentinel, performs the real `SCRATCH_COMMIT`, and executes
-the labeled stale load. Only an exact load-page fault at the removed scratch
-address passes, together with an absent scratch PTE, `SCRATCH_CLEAR`, and the
-frame retained as the transaction's unmapped `VM_TRANSFERABLE` entry. The
-final `test-qemu-elf-spawn` workflow remains reserved for this component plus
-the later complete spawn integration scenario.
-
-The TTY Step 11 workflow is implemented:
-
-```text
-test-qemu-tty
-```
-
-It links the production launcher, VM, PM, and TTY service with one exact VFS
-test peer. VM installs only the manifest-bound UART leaf before release, TTY
-commits ownership before readiness, and a deliberately pending transmit
-interrupt proves that readiness retains the claimed source until TTY's exact
-completion. The host sends `micros-ttyx<DEL>-input<CR>` only after the complete
-input-ready line. The VFS peer receives `micros-tty-input<LF>` through a
-write-direction grant and submits the final marker through a read-direction
-grant. The kernel requires matching nonzero source-10 claim/completion counts,
-one retained pre-ready claim, no live grants, a physically drained UART, and
-clean SBI shutdown. Only the exact marker is accepted:
-
-```text
-MICROS_TTY_TEST_PASS handoff=two-phase mapping=exact irq=deferred input=canonical output=interrupt-driven grants=checked
-```
-
-The RAMFS Step 12 component workflow is implemented:
-
-```text
-test-qemu-ramfs
-```
-
-It links the production launcher, VM, PM, TTY, and RAMFS services with one
-exact VFS test peer. VFS mounts once, reads the seeded `/etc/motd`, observes
-short EOF, creates `/tmp/note`, verifies sparse zeroes and written bytes,
-enumerates one directory record at a time, and checks malformed-version,
-wrong-direction-grant, stale-node, and excessive-putnode results. VFS revokes
-every temporary grant and releases every non-root reference before readiness.
-An exact resumable pre-readiness report proves that RAMFS test diagnostics
-preempt generic active-service fault classification for the current VFS
-thread; stage failures use the same path and retain their specific panic
-reason.
-After launcher sealing, it submits the sole marker through the real TTY path,
-waits for TTY completion and writability, revokes the marker grant, and reports
-through the isolated breakpoint hook. The kernel requires all six services
-ready, the VFS thread current, valid VM and TTY handoffs, and zero live grants,
-then waits for physical UART drain before clean shutdown. Only the exact marker
-is accepted:
-
-```text
-MICROS_RAMFS_TEST_PASS seed=validated mount=single lookup=bounded files=writable directories=cursor grants=checked refs=balanced
-```
-
-The VFS Step 13 component workflow is implemented:
-
-```text
-test-qemu-vfs
-```
-
-It links the six production services with one profile-8 application probe.
-Production VFS still accepts exactly six configured services; only the
-compile-time fixture path accepts service 7, mounts RAMFS, and attaches that
-endpoint with root, cwd, and console descriptors. The probe reads seeded
-`/etc/motd` through EOF, creates `tmp` relative to root, writes `tmp/note`,
-reopens it by absolute and cwd-relative paths, returns cwd to root, and
-enumerates complete translated 80-byte root records without exposing a RAMFS
-handle. Every transient descriptor is closed and every application and backend
-grant is revoked.
-
-The probe writes the exact input-ready line through VFS and TTY before the host
-sends `micros-vfsx<DEL>-input<CR>`. Descriptor 0 receives
-`micros-vfs-input<LF>`. After writing the pass marker, the probe invokes the
-private no-authority drain call; VFS waits until TTY resident output is empty.
-The kernel then requires the exact probe thread, all seven ready states, sealed
-launcher authority, valid VM and TTY handoffs, zero live grants, and physical
-UART drain before clean SBI shutdown. Only the exact marker is accepted:
-
-```text
-MICROS_VFS_TEST_PASS mount=single descriptors=owned paths=absolute,relative files=two-hop directories=translated console=two-hop grants=balanced
-```
-
-Every blocking scenario has a host-side timeout. A timeout is a test failure
-with the latest structured serial events attached.
+Serial input is driven by exact ready lines/prompts, never sleeps.
+Unrelated workflows keep stdin disconnected. Guests retain their own
+readiness deadlines and the host absolute timeout. Timeout, premature exit,
+host-kill or a pass marker without the final drain/resource/firmware boundary
+is failure. Later service restart and endpoint replacement remain separate
+future integration requirements.
 
 ## End-to-end tests
 
-The shell MVP test boots a release-like image and drives the serial console. It
-verifies externally visible behavior rather than internal implementation
-order. At minimum it:
+The future node-Q shell MVP test must boot a release-like image and drive the
+serial console. It must verify externally visible behavior rather than
+internal implementation order. At minimum it:
 
 1. waits for versioned init and shell readiness markers;
 2. runs `echo`;
@@ -2668,6 +352,27 @@ order. At minimum it:
 Later POSIX work may use differential tests against MINIX or another reference
 system. Differential tests compare documented results, return values, and
 `errno`; they do not require identical scheduling or IPC traces.
+
+Production node Q is not implemented by the existing dynamic test PID 1.
+Its exact [shell contract](architecture/init-shell.md) retains the prompt-paced
+five-command script, contiguous transcript, expected application PIDs,
+shell reaping/restart, resource equality, bounded TTY drain and clean shutdown.
+The [correction register](research/minix-complete-baseline-findings-and-correction-dag.md)
+owns `BASE01`, `NODE00`-`NODE03`, `STACK13` and `RECERT01` ordering.
+
+## POSIX conformance evidence
+
+[ADR-0081](adr/0081-complete-posix-compatible-system-goal.md) requires a
+versioned POSIX.1-2024 capability matrix. Every unconditional mandatory row,
+every applicable conditionally mandatory row and every claimed optional/XSI
+group needs executable evidence. Conditional inapplicability must cite the
+standard's exact condition, not an internal MVP profile.
+
+Complete compatibility also requires the shell/mandatory utilities and
+representative applications without project-private source changes.
+The [staged-omission manifest](research/posix-staged-omission-manifest.md)
+keeps every future replacement obligation explicit. Current native,
+integration or shell progress is not a complete-POSIX claim.
 
 ## Machine-readable output
 
@@ -2694,7 +399,10 @@ the final result is flushed.
 
 ## Assertions and observability
 
-Debug builds continuously verify:
+Debug assertions and explicit diagnostics verify the invariants below.
+Selected ordinary-path checks and complete-audit boundaries follow their
+Accepted subsystem contracts; this does not restore global scans to every
+operation:
 
 - run-queue and IPC-queue membership;
 - process/thread ownership and hart-local current-thread state;
@@ -2751,5 +459,7 @@ Each implementation pull request must provide:
 - explicit negative tests for permissions and invalid input;
 - updated documentation when an interface or invariant changes.
 
-Documentation-only changes do not require a target build unless documentation
-tests are later introduced.
+Pure documentation changes run the documented documentation/structure and
+diff checks. They do not require native suites, target builds or invented
+runtime Reds. Exact current author evidence and independent review remain
+mandatory at the applicable phase.

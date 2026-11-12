@@ -5,15 +5,9 @@ agents.
 
 ## Before changing the repository
 
-Read, in order:
-
-1. [Agent contract](AGENTS.md)
-2. [System overview](docs/architecture/system-overview.md)
-3. [Development dependency DAG](docs/architecture/development-dag.md)
-4. [Roadmap](docs/roadmap.md)
-5. [ADR index](docs/adr/README.md) and every ADR relevant to the change
-6. [Testing strategy](docs/testing-strategy.md)
-7. [AI-native workflow](docs/development/ai-native-workflow.md)
+Start with [AGENTS.md](AGENTS.md) and follow its required context order.
+The [documentation map](docs/README.md#reading-map-and-ownership) identifies
+the current status, architecture, dependency, testing and workflow owners.
 
 Accepted ADRs are the architectural source of truth. Do not silently edit an
 Accepted decision to change its meaning. Add a new ADR that supersedes it.
@@ -43,77 +37,37 @@ Accepted decision to change its meaning. Add a new ADR that supersedes it.
 
 ## Current validation commands
 
-Select the supported runtime before invoking repository automation:
-
-```bash
-export MICROS_PYTHON=/absolute/path/to/python3.15
-export OPENSSL_CONF=/dev/null
-export SSL_CERT_FILE=/dev/null
-export SSL_CERT_DIR=/dev/null
-```
-
-Generate the validation plan for the current change with:
+Use the [build guide](docs/development/building.md) for the supported tool
+environment and runnable commands. Generate the current change's plan with:
 
 ```bash
 "${MICROS_PYTHON}" -E -S -B tools/validation_plan.py --tier fast
 "${MICROS_PYTHON}" -E -S -B tools/validation_plan.py --tier pr
 ```
 
-Add `--execute` to run it. Use `--tier full` for `main`, milestone acceptance,
-shared build/boot/harness changes, or any change that should bypass path
-classification. The PR tier always includes complete `test-unit`; the fast
-tier is for iteration only. Explicit `--path` values are added to repository
-discovery rather than replacing it. Stage untracked files before using
-`--execute`.
+Add `--execute --fresh` for ordinary execution. The planner owns coverage:
+fast is iteration only, implementation PRs include complete native validation,
+and shared/unknown changes escalate. Full/milestone selection keeps all
+required current target, image and stack evidence.
+Explicit paths add to discovery rather than replacing it.
 
-For documentation and repository-instruction changes, run:
+Pure documentation corrections need one documentation PR and the
+[documentation-only gate](docs/development/building.md#documentation-only-checks),
+not a full native/QEMU run. No new behavior or decision may be hidden in that
+classification. [ADR-0123](docs/adr/0123-current-contract-validation.md)
+retires historical source catalogs and repeated author ceremonies, not real
+behavioral, hardware, cross-service or stack checks.
 
-```bash
-"${MICROS_PYTHON}" -E -S -B -m unittest discover -s tests/host -p 'test_*.py'
-"${MICROS_PYTHON}" -E -S -B tools/check_docs.py
-git add <intended-files>
-git diff --quiet
-git diff --check
-git diff --cached --check
-git ls-files --others --exclude-standard
-git write-tree
-git diff --check origin/main...HEAD
-```
-
-`git diff --quiet` is the pre-review cleanliness gate and must exit zero.
-Worktree and cached `--check` commands are separate whitespace gates. Untracked
-output must be empty for task files, and `git write-tree` identifies the
-reviewed staged change. The `origin/main...HEAD` check is the post-commit
-pull-request range gate.
-
-Implementation milestones add their own native and QEMU commands when those
-test targets exist. The current boot-foundation gates are:
-
-```bash
-cmake --workflow --preset test-unit
-cmake --workflow --preset test-qemu-smoke
-cmake --workflow --preset test-qemu-panic
-cmake --workflow --preset test-qemu-trap
-cmake --workflow --preset test-qemu-timer
-cmake --workflow --preset test-qemu-frame-allocator
-cmake --workflow --preset test-qemu-trap-panic
-cmake --workflow --preset test-qemu-mmu
-cmake --workflow --preset test-qemu-object-model
-cmake --workflow --preset test-qemu-nested-trap
-cmake --workflow --preset test-qemu-frame-ownership
-cmake --workflow --preset test-qemu-user-address-space
-cmake --workflow --preset test-qemu-user-execution
-```
-
-Each workflow configures and builds its own image before running the selected
-gate. `build-riscv64-debug` remains available when only the normal target
-artifact is needed.
+Before review, stage all intended files, prove the tracked worktree is clean,
+require empty untracked task-file output, and bind exact command results to
+`HEAD` and `git write-tree`. Whitespace checks do not prove cleanliness.
+Use the current planner; do not copy an old task's gate list.
 
 ## Pull requests
 
 Use the repository pull request template. A pull request must identify:
 
-- design or implementation phase;
+- design or implementation phase, or an explicit pure-documentation correction;
 - task and dependency position;
 - goal, scope, and non-goals;
 - relevant ADRs;

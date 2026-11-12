@@ -1,442 +1,137 @@
 # Documentation
 
-This directory contains the design baseline for `micros`.
+Start with the guide for the question you need to answer. General guides
+describe the current system and workflow; subsystem contracts provide the
+exact details. Historical research and accepted decision records are not
+repeated as status narratives in every guide.
+
+## Reading map and ownership
+
+| Question | Canonical document | Keep elsewhere |
+| --- | --- | --- |
+| What is the project? | [Repository README](../README.md) | Detailed architecture, complete command catalogs |
+| What is delivered and what remains? | [Roadmap](roadmap.md#current-status) | Individual PR restart stories |
+| Which audit findings are closed and which correction is next? | [Correction register](research/minix-complete-baseline-findings-and-correction-dag.md#current-correction-progress) | Copied finding counts in several guides |
+| How do components and authorities interact? | [System overview](architecture/system-overview.md) | Implementation history and CLI instructions |
+| Which dependencies gate implementation? | [Development DAG](architecture/development-dag.md) | A second runtime/state-machine specification |
+| How do I build and execute checks? | [Build guide](development/building.md) | Repeated architecture and test transcripts |
+| What evidence and QEMU/model workflows are required? | [Testing strategy](testing-strategy.md) | Per-PR run IDs, durations and reviews |
+| How are tasks designed, validated and reviewed? | [AI-native workflow](development/ai-native-workflow.md) | Duplicated rules in prompts or new instruction files |
+| Why was a decision made? | [ADR index](adr/README.md) | Silent edits to an Accepted decision |
+| What proved one outcome? | Its original PR and linked subsystem acceptance record | Growing chronological appendices in general guides |
+
+[AGENTS.md](../AGENTS.md) remains the agent entry point and defines the
+required context order. [CONTRIBUTING.md](../CONTRIBUTING.md) is the human
+entry point. All committed project content is English.
 
 ## Architecture
 
-- [System overview](architecture/system-overview.md) defines the target system,
-  trust boundary, component responsibilities, boot phases, and invariants.
-- [Responsibility-based source organization](architecture/source-organization.md)
-  defines cohesive module ownership, review signals, and staged decomposition.
-- [Repository source-module audit](architecture/source-module-audit.md)
-  classifies every in-scope tracked implementation/test source review signal
-  at the audited base and records dependency-ordered correction units and
-  cohesive exceptions.
-- [Kernel address-space source organization](architecture/kernel-address-space-source-organization.md)
-  defines exact kernel-root, user-root, VM-transaction, user-execution, and
-  native/QEMU evidence ownership for the next audit correction.
-- [Kernel PM-control source organization](architecture/kernel-pm-control-source-organization.md)
-  defines exact operation-13 ABI, validation, reservation, execution,
-  activation, exit, syscall-adapter, and native-evidence ownership.
-- [VM service source organization](architecture/vm-service-source-organization.md)
-  defines exact boot/image planning, portable state, frame, load/exit,
-  service-adapter, host/QEMU evidence, and fixture-generator ownership.
-- [PM service source organization](architecture/pm-service-source-organization.md)
-  defines exact lifecycle, codec, validation, request/layout, service,
-  native/model, kernel-report, and generator ownership.
-- [PM spawn and exit coordinator](architecture/pm-spawn-coordinator.md)
-  maps the Accepted post-handoff transaction to lifecycle, peer-adapter,
-  commit, rollback, and native-model implementation owners.
-- [Application runtime implementation map](architecture/application-runtime.md)
-  maps the Accepted initial stack, separate startup, PM return-exit,
-  checked images, and component evidence without claiming PID-1 integration.
-- [ELF spawn integration implementation map](architecture/elf-spawn-integration.md)
-  maps the final six-production-service dynamic PID-1/child rollback,
-  inherited I/O, exit/wait, physical drain, and complete resource proof.
-- [Kernel IPC source organization](architecture/kernel-ipc-source-organization.md)
-  defines exact queue, completion, token, event, cancellation, syscall,
-  native/reference-model, and target-script ownership.
-- [Kernel endpoint source organization](architecture/kernel-endpoint-source-organization.md)
-  defines exact representation, profile, complete-validation, publication,
-  close, native/model, and target ownership without changing authority.
-- [Kernel object source organization](architecture/kernel-object-source-organization.md)
-  defines Accepted representation/identity, process/thread/context/hart,
-  base-validation, native/reference-model and target ownership, including
-  retained byte-source oracles and closed-profile coupling.
-- [Grant data-plane source organization](architecture/grant-data-plane-source-organization.md)
-  defines Accepted range/copy, captured syscall, native/reference-model and
-  real target-script boundaries while retaining the cohesive registry.
-- [TTY source organization](architecture/tty-source-organization.md)
-  records the completed runtime, service, independent evidence and generator
-  owners without changing terminal or device authority.
-- [QEMU runner source organization](architecture/qemu-runner-source-organization.md)
-  records completed report, command, process/serial, CLI, discovery and
-  exact argument-builder source/loader closure boundaries.
-- [Kernel directory layout](architecture/kernel-directory-layout.md)
-  defines the Accepted closed physical hierarchy, unchanged logical owners,
-  private includes, canonical diagnostics and retained validation transport.
-- [Kernel bootstrap source organization](architecture/kernel-bootstrap-source-organization.md)
-  defines exact manifest, preparation, runtime, syscall, boot-entry,
-  launcher, native-reference, and generator ownership before implementation.
-- [Trap and syscall source organization](architecture/trap-syscall-source-organization.md)
-  defines routed context, interrupts, syscall authority, return, bounded
-  hooks, and retained runtime-evidence ownership.
-- [Kernel scheduler source organization](architecture/kernel-scheduler-source-organization.md)
-  defines queue, IPC transaction, validation, planning, accounting, target
-  return, fixture, and independent-model ownership before implementation.
-- [User ELF checker source organization](architecture/user-elf-checker-source-organization.md)
-  defines exact decoding, structural validation, service policy, instruction,
-  CLI, fixture, and discovery ownership before application-checker reuse.
-- [VFS test source organization](architecture/vfs-test-source-organization.md)
-  defines the exact behavior, fixture, model, target, and tooling boundaries
-  required before VFS exit-cleanup coverage is added.
-- [Development dependency DAG](architecture/development-dag.md) converts the
-  cyclic runtime architecture into an acyclic implementation sequence.
-- [Validation evidence and owned build changes](architecture/validation-evidence.md)
-  records the Accepted exact-candidate command-reuse and bounded CMake
-  classification contract; existing fresh execution remains authoritative.
-- [Bounded validation feedback](architecture/validation-feedback.md)
-  defines the Accepted checked source-view boundary, distinct fast/full host tiers
-  and live progress while preserving actual acceptance and necessary target
-  and cross-service evidence.
-- [Current-contract validation](architecture/current-contract-validation.md)
-  is the current implementation/evidence map for source snapshots, native
-  observations, target ownership and one sufficient final author plan.
+### Runtime and subsystem contracts
 
-### Historical validation-admission records
+| Area | Contracts |
+| --- | --- |
+| Platform and failure diagnostics | [Diagnostic histories](architecture/diagnostic-history.md), [terminal failure](architecture/terminal-failure.md), [panic stack trace](architecture/panic-stack-trace.md) |
+| Physical memory and kernel mappings | [Bootstrap allocation](architecture/bootstrap-allocation.md), [mapping topology](architecture/kernel-mapping-topology.md), [selected ownership](architecture/selected-frame-ownership.md) |
+| User roots and ownership lifecycle | [Selected address spaces](architecture/selected-user-address-space.md), [release and wired handoff](architecture/selected-release-and-wired-handoff.md) |
+| Objects and scheduling | [Selected object/hart validation](architecture/selected-object-and-hart-validation.md), [common scheduler return](architecture/common-scheduler-return.md) |
+| IPC and grants | [Blocking IPC](adr/0030-minix-baseline-blocking-ipc.md), [grant registry](adr/0038-kernel-managed-direct-grant-registry.md), [checked copies](adr/0039-page-bounded-checked-grant-copy.md), [unified syscall ABI](adr/0041-unified-risc-v-grant-syscalls.md) |
+| Static startup and VM | [Service runtime](adr/0042-freestanding-user-service-runtime.md), [launcher](adr/0043-static-bootstrap-launcher.md), [VM handoff](adr/0045-static-vm-bootstrap-and-handoff.md) |
+| PM and executable lifecycle | [PM model](adr/0046-pm-process-lifecycle-and-spawn-metadata.md), [post-handoff spawn](adr/0050-post-handoff-elf-spawn.md), [coordinator](architecture/pm-spawn-coordinator.md), [application runtime](architecture/application-runtime.md), [ELF-spawn integration](architecture/elf-spawn-integration.md) |
+| TTY, RAMFS and VFS | [TTY protocol](adr/0047-tty-console-handoff-and-serial-protocol.md), [RAMFS protocol](adr/0048-ramfs-service-and-vfs-filesystem-protocol.md), [VFS protocol](adr/0049-vfs-service-and-application-io-protocol.md) |
+| Future production user environment | [Init and shell](architecture/init-shell.md), gated by the correction register rather than the presence of its Accepted design |
+| Runtime compiler primitives | [Memory primitives](architecture/runtime-memory-primitives.md) |
 
-The following records explain completed evidence prerequisites. ADR-0123
-retires their live catalogs, binding tables and author ceremonies; they are
-not prerequisites to repeat or extend for current development.
+### Source ownership
 
-- [Evidence authority transition](architecture/evidence-authority-transition.md)
-  separates historical source-transport identities from independent
-  MINIX-derived correction oracles and defines fail-closed retirement.
-- [Packed evidence identity coverage](architecture/packed-evidence-identities.md)
-  defines the Accepted EV01-C01 correction for the existing packed scheduler
-  declarations without rebaselining or retiring any identity.
-- [Relocated evidence payload bindings](architecture/relocated-evidence-payloads.md)
-  defines the Accepted EV01-C02 repair for direct logical-file hash rows
-  whose actual current source is missing from their payload.
-- [Standalone frame-validator binding](architecture/standalone-frame-validator-binding.md)
-  defines the Accepted one-key EV01-C03 repair for collateral fallback paths that
-  block the next allocator correction's immutable-input boundary.
-- [Granular memory-native source authority](architecture/memory-native-source-authority.md)
-  defines EV01-C04's Accepted current-source assertion bindings for the existing
-  MEM01/MEM02 native evidence, without relaxing their checks.
-- [Granular selected address-space native source authority](architecture/selected-address-space-native-source-authority.md)
-  defines the Accepted EV01-C06 names for existing MEM04 source and observation
-  comparisons, without changing admission or authorizing runtime retirement.
-- [Granular selected-ownership observation authority](architecture/selected-ownership-observation-authority.md)
-  defines Accepted EV01-C07's complete function-local MEM03 primitive/coverage
-  identities without changing a source or observation predicate.
-- [Granular selected release/handoff native source authority](architecture/selected-release-handoff-native-source-authority.md)
-  defines Accepted EV01-C08's precise names for existing MEM05 source comparisons,
-  preserving both fixed-input assertion owners before OBJ01 design resumes.
-- [Object and panic source authority](architecture/object-and-panic-source-authority.md)
-  defines Accepted EV01-C09's exact portable-object payload repair and existing panic
-  source-policy names, without changing runtime or stack admission.
+[Responsibility-based organization](architecture/source-organization.md)
+defines module boundaries and review signals.
+[The source-module audit](architecture/source-module-audit.md) records
+the decomposition outcomes and before-next-touch obligations.
 
-### Runtime and measurement contracts
+| Family | Current ownership maps |
+| --- | --- |
+| Memory and VM boundary | [Address spaces](architecture/kernel-address-space-source-organization.md), [frame ownership](architecture/frame-ownership-source-organization.md), [kernel VM handoff](architecture/kernel-vm-handoff-source-organization.md), [PM control](architecture/kernel-pm-control-source-organization.md) |
+| Kernel control | [Bootstrap](architecture/kernel-bootstrap-source-organization.md), [trap/syscall](architecture/trap-syscall-source-organization.md), [scheduler](architecture/kernel-scheduler-source-organization.md), [objects](architecture/kernel-object-source-organization.md) |
+| Communication | [Endpoints](architecture/kernel-endpoint-source-organization.md), [IPC](architecture/kernel-ipc-source-organization.md), [grants](architecture/grant-data-plane-source-organization.md) |
+| Services and evidence | [VM](architecture/vm-service-source-organization.md), [PM](architecture/pm-service-source-organization.md), [TTY](architecture/tty-source-organization.md), [RAMFS](architecture/ramfs-source-organization.md), [VFS tests](architecture/vfs-test-source-organization.md) |
+| Host tools and physical layout | [ELF checker](architecture/user-elf-checker-source-organization.md), [QEMU runner](architecture/qemu-runner-source-organization.md), [kernel directories](architecture/kernel-directory-layout.md) |
 
-- [Selected object and hart validation](architecture/selected-object-and-hart-validation.md)
-  defines Accepted OBJ01's selected scheduler checks, direct current identity and
-  regular/exceptional stack proof while retaining complete diagnostics.
-- [Common scheduler return](architecture/common-scheduler-return.md)
-  records Accepted OBJ02's bounded queue/link plan, protected context reuse
-  and independently reviewed implementation #246.
-- [Operation-count evidence](architecture/operation-count-evidence.md)
-  defines the Accepted EV02 primitive-counter, complete-composition, and
-  primitive-placement/passivity contract.
-- [Stack-bound evidence](architecture/stack-bound-evidence.md)
-  defines the Accepted EV03 compiler/call-graph, assembly/indirect, target
-  high-water, and future node-Q admission contract.
-- [Runtime memory primitives](architecture/runtime-memory-primitives.md)
-  defines COPY01's Accepted generic MINIX word family, exact work evidence and
-  first granular real source-authority transition after EV04.
-- [Kernel diagnostic histories](architecture/diagnostic-history.md)
-  defines PLAT01's Accepted history, exact TTY reader, notification,
-  output-arbitration and terminal replay contract.
-- [Bounded UART and terminal panic](architecture/terminal-failure.md)
-  defines PLAT02's Accepted finite waits, first-entry/reset ownership, terminal
-  metadata repair and independently observed failure boundaries.
-- [Bounded panic stack trace](architecture/panic-stack-trace.md)
-  defines PLAT03's Accepted current-kernel frame walk, exact stack/epoch
-  authentication, finite read/output rules and independent target evidence.
-- [Panic-trace execution scopes](architecture/panic-trace-execution-scopes.md)
-  defines the Accepted separation of strict historical author scope from complete,
-  run-stable ordinary current inputs without weakening either boundary.
-- [Bootstrap allocation and range validation](architecture/bootstrap-allocation.md)
-  defines MEM01's Accepted search coordinate, whole-interval/word validation,
-  exact mutation/rollback rules and six-key evidence transition.
-- [Kernel mapping topology and direct table identity](architecture/kernel-mapping-topology.md)
-  defines MEM02's Accepted largest-legal Sv39 leaves, checked parent-indexed
-  table identities, retained complete validation and native/hardware evidence.
-- [Selected frame ownership and complete audits](architecture/selected-frame-ownership.md)
-  defines MEM03's Accepted active-metadata/selected-record/whole-active boundaries,
-  retained complete diagnostics and the Accepted precise-token authority amendment.
-- [Selected release and wired-handoff plans](architecture/selected-release-and-wired-handoff.md)
-  records the Accepted MEM05 index, selected-set and bootstrap-plan contract
-  and independently reviewed implementation #236.
-- [Stack metadata artifact-boundary evidence](research/stack-metadata-artifact-boundary.md)
-  records the blocked EV03 complete-ELF seed dependency and its narrow
-  corrective-design prerequisite.
-- [Fatal-stack context evidence](research/fatal-stack-context-evidence.md)
-  records the verified current panic-call cycle and the finite
-  Accepted source/machine/state qualification required before EV03 can restart.
-- [VM load temporary-stack evidence](research/vm-load-temporary-stack-evidence.md)
-  records the later 4,240-byte observed VM bound and the Accepted exact
-  preparation-lifetime prerequisite, without relaxing the 4 KiB budget.
+Completed decomposition records retain their original migration evidence.
+Current private dependencies, state/ABI ownership and independent models
+remain authoritative; obsolete whole-body transport follows ADR-0123's
+supersession boundary, not the original historical freeze.
+
+## Validation and development
+
+| Intent | Contract |
+| --- | --- |
+| Current validation owners, retained cases and failure boundaries | [Current-contract validation](architecture/current-contract-validation.md) |
+| Primitive counters and observation integrity | [Operation-count evidence](architecture/operation-count-evidence.md) |
+| Static/observed stack closure and future B13 admission | [Stack-bound evidence](architecture/stack-bound-evidence.md) |
+| Optional exact-context receipts and build classification | [Validation evidence](architecture/validation-evidence.md) |
+| Supported interpreter and closed host runtime | [Python runtime](architecture/python-host-runtime.md) |
+| Hosted execution design, not an operational-CI claim | [GitHub Actions](development/github-actions-ci.md), [parallel validation](development/parallel-ci-validation.md) |
+| Measurements and diagnosed cost | [Current overhead](research/current-validation-overhead.md), [earlier feedback cost](research/validation-feedback-cost.md) |
 
 ## Research
 
-- [Current validation overhead](research/current-validation-overhead.md)
-  traces the measured post-OBJ02 proof, historical-execution and receipt costs
-  behind the Accepted current-contract simplification.
-- [Validation feedback cost](research/validation-feedback-cost.md)
-  records the measured repeated authority-query cost, current tier/logging
-  defects and the distinct roles of unit, structural and integration tests.
+### Baseline, audit and remaining scope
 
-- [Complete-validator token scope gap](research/complete-validator-token-scope-gap.md)
-  records the accidental preprocessed-prefix identity that blocked MEM03's
-  first uncommitted recertification despite unchanged complete-scan helpers.
+- [MINIX dependency analysis](research/minix-dependency-analysis.md):
+  fixed reference, cyclic runtime dependencies and bootstrap adaptations.
+- [Structural/algorithmic baseline](adr/0080-minix-structural-and-algorithmic-baseline.md)
+  and [transition study](research/minix-structural-algorithm-transition.md).
+- [Complete audit contract](research/minix-complete-baseline-audit.md),
+  [findings and correction DAG](research/minix-complete-baseline-findings-and-correction-dag.md):
+  fixed audit rows, links to all B01-B14 studies and current closure.
+- [Staged-omission manifest](research/posix-staged-omission-manifest.md):
+  exactly-once replacement points for deferred MINIX/POSIX mechanisms.
+- [Complete POSIX goal](adr/0081-complete-posix-compatible-system-goal.md):
+  final external behavior, distinct from the first shell milestone.
+- [Evidence-foundation acceptance](research/evidence-foundations-recertification.md):
+  EV04 and the separately unaccepted hosted-CI outcome.
 
-- [MINIX selected frame-ownership baseline](research/minix-selected-frame-ownership.md)
-  traces selected metadata and separate diagnostics, the current 26 direct
-  audit call sites and the obligations their consumers currently inherit.
-- [MINIX selected release and wired-handoff baseline](research/minix-selected-release-and-wired-handoff.md)
-  traces fixed teardown/startup mechanisms, current selected-set and
-  per-process rescans, mutation coherence and MEM05's reviewed scope/bounds.
+### Mechanism studies
 
-- [Memory-native source authority gap](research/memory-native-source-authority-gap.md)
-  records the fixed current-source guards, missing individual identities and
-  closed 328-clause census repaired by separately merged EV01-C04.
-- [Selected address-space native source authority gap](research/selected-address-space-native-source-authority-gap.md)
-  records the fixed MEM04 guards and 477-clause census that precede MEM05 design.
-- [Selected-ownership observation authority gap](research/selected-ownership-observation-authority-gap.md)
-  records distinct MEM03 primitive/coverage rejections and the closed
-  120-function census found when MEM05 design resumed.
-- [Selected release/handoff native source authority gap](research/selected-release-handoff-native-source-authority-gap.md)
-  records the existing MEM05 comparisons and closed 453-clause census
-  that block OBJ01's granular source-replacement scope.
-- [Object and panic source-authority gap](research/object-and-panic-source-authority-gap.md)
-  records fifty misbound object identities and eleven existing projected-file
-  policies found when OBJ01 research resumed after #238.
-- [MINIX selected object and hart validation](research/minix-selected-object-and-hart-validation.md)
-  traces the fixed local mechanisms, forty-two actual audit calls, failure
-  boundaries, stack geometry and OBJ01's ninety-four-key source closure.
-- [MINIX common scheduler return](research/minix-common-scheduler-return.md)
-  traces fixed linked-queue selection, remaining projection work and the
-  same-thread context-validation boundary corrected by OBJ02.
+| Family | Fixed-reference research |
+| --- | --- |
+| Platform | [Diagnostic history](research/minix-diagnostic-history.md), [UART/failure](research/minix-terminal-failure-baseline.md), [trace](research/minix-panic-stack-trace.md) |
+| Memory | [Allocation](research/minix-bootstrap-allocation.md), [kernel mapping](research/minix-kernel-mapping-topology.md), [ownership](research/minix-selected-frame-ownership.md), [address spaces](research/minix-selected-user-address-space.md), [release/handoff](research/minix-selected-release-and-wired-handoff.md) |
+| Objects/scheduler | [Original scheduler](research/minix-scheduler-and-context-switch.md), [selected object/hart](research/minix-selected-object-and-hart-validation.md), [common return](research/minix-common-scheduler-return.md) |
+| IPC/grants | [Endpoints/IPC](research/minix-endpoint-and-ipc.md), [IRQ notification](research/minix-irq-notification.md), [grants/safe copy](research/minix-direct-grants-and-safecopy.md), [wired resolution](research/minix-post-handoff-wired-address-resolution.md), [user syscalls](research/minix-user-grant-syscall-boundary.md) |
+| Startup/services | [User runtime](research/minix-user-service-runtime.md), [RS/SEF](research/minix-rs-sef-bootstrap.md), [VM](research/minix-vm-bootstrap-and-handoff.md), [PM](research/minix-pm-process-lifecycle.md), [filesystem protocol](research/minix-vfs-mfs-filesystem-protocol.md), [VFS routing](research/minix-vfs-process-descriptor-and-device-routing.md) |
+| Evidence and primitives | [Driver](research/minix-validation-driver-baseline.md), [operation counts](research/minix-operation-count-evidence.md), [stack bounds](research/minix-stack-bound-evidence.md), [copy/fill](research/minix-runtime-memory-primitives.md) |
 
-- [MINIX kernel mapping topology baseline](research/minix-kernel-mapping-topology.md)
-  traces fixed large-page and direct-table mechanisms, shared-root compatibility,
-  current search costs and the explicit Sv39 storage adaptation.
-- [MINIX bootstrap allocation baseline](research/minix-bootstrap-allocation.md)
-  traces the distinct kernel-range and VM-cache phases, current repeated work,
-  complexity/storage bounds and the completed evidence prerequisites.
-- [Panic-trace current-scope blocker](research/panic-trace-current-scope-blocker.md)
-  records the actual full-gate rejection of already committed later documents
-  and the isolated PLAT03-C02 prerequisite.
-- [Standalone frame-validator payload gap](research/standalone-frame-validator-payload-gap.md)
-  records the actual 797-path fallback, immutable/candidate collision and
-  independently specified one-record correction.
-- [MINIX panic stack-trace baseline](research/minix-panic-stack-trace.md)
-  traces the fixed current-kernel walk, pinned RV64 frame convention,
-  ownership barriers, complexity and retained evidence for PLAT03.
-- [MINIX UART and terminal failure baseline](research/minix-terminal-failure-baseline.md)
-  traces bounded polling, panic entry/reset ownership and current console
-  failure boundaries for the dependency-ready PLAT02 design.
-- [MINIX diagnostic history baseline](research/minix-diagnostic-history.md)
-  traces the two retained histories, notification, consumer transfer,
-  panic replay and direct-output boundary for PLAT01.
-- [Relocated evidence payload gap](research/relocated-evidence-payload-gap.md)
-  records the 104 affected identities and the concrete immutable/candidate
-  closure conflict found during PLAT01 planning.
-- [Packed evidence identity gap](research/packed-evidence-identity-gap.md)
-  records the fixed-source omission, existing consumers and preserved
-  assertions behind the EV01-C01 prerequisite.
-- [MINIX stack-bound evidence study](research/minix-stack-bound-evidence.md)
-  traces fixed-reference stack ownership and guard behavior, RV64 adaptations,
-  simultaneous-frame composition, and the EV03 evidence boundary.
-- [MINIX runtime copy/fill study](research/minix-runtime-memory-primitives.md)
-  traces generic and ARM alignment/word mechanisms, C object-representation
-  constraints, exact work bounds and the Accepted COPY01 boundary.
-- [MINIX dependency analysis](research/minix-dependency-analysis.md) records the
-  source baseline, component relationships, strongly connected component, and
-  bootstrap lessons used to derive the `micros` design.
-- [MINIX baseline parity audit](research/minix-baseline-parity-audit.md)
-  classifies every merged kernel foundation as baseline behavior, required
-  target adaptation, compatible extension, staged substitution, or correction.
-- [MINIX structural and algorithmic transition](research/minix-structural-algorithm-transition.md)
-  defines the current data-structure, algorithm, and complexity certification
-  ledger and records the first node-Q findings.
-- [Complete MINIX baseline audit contract](research/minix-complete-baseline-audit.md)
-  pins the reviewed tree, assigns every runtime/evidence path and operation to
-  a sequential audit unit, and blocks implementation until consolidation.
-- [POSIX and MINIX staged-omission manifest](research/posix-staged-omission-manifest.md)
-  gives every deferred final-system family one substitute, replacement point,
-  predecessor set, and conformance gate.
-- [B01 platform baseline audit](research/minix-complete-baseline-b01-platform.md)
-  audits entry, firmware memory discovery, early UART, panic, PLIC, and timer
-  mechanisms and records the first blocking findings.
-- [B02 memory baseline audit](research/minix-complete-baseline-b02-memory.md)
-  audits frame allocation/ownership, Sv39 construction, process roots,
-  translation, release, and handoff complexity.
-- [B03 object and scheduler baseline audit](research/minix-complete-baseline-b03-objects-scheduler.md)
-  audits identity/lifecycle, stacks, ready queues, accounting, policy, common
-  return, and idle.
-- [B04 endpoint and IPC baseline audit](research/minix-complete-baseline-b04-endpoint-ipc.md)
-  audits identity/privilege, queues, synchronous operations, reply tokens,
-  notifications, deadlock, close, and retained delivery.
-- [B05 grant and user-execution baseline audit](research/minix-complete-baseline-b05-grants-user-execution.md)
-  audits direct-grant lifecycle and copy, syscall/trap/context paths, service
-  and application startup, and runtime memory primitives.
-- [B06 static-bootstrap baseline audit](research/minix-complete-baseline-b06-static-bootstrap.md)
-  audits immutable boot identity, manifest/topology validation, complete
-  service preparation, release/readiness, deadlines, failure, and sealing.
-- [B07 VM baseline audit](research/minix-complete-baseline-b07-vm.md)
-  audits boot-database adoption, frame policy, executable/stack planning,
-  scratch/freeze/commit/abort, exit release, and operation-12 authority.
-- [B08 PM and spawn baseline audit](research/minix-complete-baseline-b08-pm-spawn.md)
-  audits PM identity/parentage, hidden spawn/rollback, exit/zombie/wait,
-  operation-13 authority, and canonical spawn request/layout handling.
-- [B09 TTY baseline audit](research/minix-complete-baseline-b09-tty.md)
-  audits console handoff, UART/PLIC ownership, raw and canonical queues,
-  grant-backed requests, output ordering, and validation cadence.
-- [B10 RAMFS baseline audit](research/minix-complete-baseline-b10-ramfs.md)
-  audits seed/runtime state, node/reference ownership, namespace lookup,
-  allocation, sparse I/O, directory enumeration, and validation cadence.
-- [B11 VFS baseline audit](research/minix-complete-baseline-b11-vfs.md)
-  audits process/descriptor/open-file/vnode ownership, namespace and console
-  routing, two-hop I/O, cleanup, spawn-local state, and validation cadence.
-- [B12 ELF/application-lifecycle baseline audit](research/minix-complete-baseline-b12-elf-lifecycle.md)
-  audits the complete PM/VFS/VM/kernel forward, rollback, activation, startup,
-  exit, and wait transaction across the primary subsystem owners.
-- [B13 node-Q accepted-design baseline audit](research/minix-complete-baseline-b13-node-q.md)
-  audits production init, shell, command, snapshot, sorting, and archived
-  candidate complexity against the fixed MINIX/NetBSD baseline.
-- [B14 executable-evidence baseline audit](research/minix-complete-baseline-b14-evidence.md)
-  audits every native, model, QEMU, generator, checker, runner, and recipe
-  path and records the remaining oracle, operation-count, and stack gaps.
-- [MINIX operation-count evidence study](research/minix-operation-count-evidence.md)
-  distinguishes reference error/action counters from the test-only primitive
-  work evidence required by EV02.
-- [B14 executable-evidence role manifest](research/minix-complete-baseline-b14-evidence-manifest.md)
-  materializes every primary and secondary path, CTest, workflow, compile
-  definition, generated output, conditional, bridge, and consumer.
-- [Complete MINIX baseline findings register and correction DAG](research/minix-complete-baseline-findings-and-correction-dag.md)
-  assigns all 80 audited findings exactly once to the reviewed pre-node
-  blocking queue or the SOM-24 post-node replacement point.
-- [Evidence-foundation re-certification and EV04](research/evidence-foundations-recertification.md)
-  records merged EV01-EV03, current-candidate barrier acceptance and the
-  separate unaccepted hosted-CI performance boundary.
-- [MINIX scheduler and context-switch study](research/minix-scheduler-and-context-switch.md)
-  traces runnable queues, accounting, context selection, restore, and
-  user-scheduler authority before scheduler implementation.
-- [MINIX kernel scheduler source-organization baseline](research/minix-kernel-scheduler-source-organization.md)
-  traces those fixed-reference responsibilities and classifies the existing
-  adaptations before the source-only scheduler correction.
-- [MINIX endpoint and blocking IPC study](research/minix-endpoint-and-ipc.md)
-  traces endpoint validation, privilege checks, send/receive queues,
-  request/reply blocking, notifications, deadlock detection, and exit cleanup.
-- [MINIX kernel endpoint source-organization baseline](research/minix-kernel-endpoint-source-organization.md)
-  traces fixed representation, privilege installation, inhibited publication,
-  and teardown owners before the behavior-preserving endpoint correction.
-- [MINIX kernel object source-organization baseline](research/minix-kernel-object-source-organization.md)
-  traces exact-slot/generation, cleanup, CPU-local and execution-state
-  responsibilities before the source-only object correction.
-- [MINIX kernel IPC source-organization baseline](research/minix-kernel-ipc-source-organization.md)
-  traces those responsibilities against the fixed local reference before the
-  behavior-preserving shared IPC correction.
-- [MINIX IRQ notification study](research/minix-irq-notification.md) traces
-  interrupt ownership, kernel pseudo-source delivery, event coalescing,
-  explicit driver acknowledgment, and endpoint cleanup.
-- [MINIX direct grant and safe-copy study](research/minix-direct-grants-and-safecopy.md)
-  traces grant identity, table authority, direction and bounds checks, fault
-  behavior, revocation, and checked cross-address-space copy.
-- [MINIX grant data-plane source-organization baseline](research/minix-grant-data-plane-source-organization.md)
-  traces those fixed ownership and failure boundaries before the Accepted
-  source-only range, adapter, model and target-script correction.
-- [MINIX TTY source-organization baseline](research/minix-tty-source-organization.md)
-  traces terminal, request, output, resource and interrupt responsibilities.
-- [MINIX QEMU runner responsibility baseline](research/minix-qemu-runner-source-organization.md)
-  classifies hosted test-driver responsibilities and the existing
-  OpenSBI/QEMU validation adaptations.
-- [MINIX kernel directory-layout baseline](research/minix-kernel-directory-layout.md)
-  traces fixed explicit source/architecture/handler/include ownership
-  without importing MINIX's hierarchy or broad private surface.
-- [MINIX runtime safe-copy and post-handoff resolution study](research/minix-post-handoff-wired-address-resolution.md)
-  traces safe-copy mapping authority after VM startup and derives the
-  wired-only `micros` handoff replacement.
-- [MINIX user grant and safe-copy syscall study](research/minix-user-grant-syscall-boundary.md)
-  traces direct IPC traps, user-managed grant publication, safe-copy kernel
-  calls, and the required unified `micros` register ABI.
-- [MINIX user-service runtime study](research/minix-user-service-runtime.md)
-  traces process entry, libc initialization, IPC vectors, grant and safe-copy
-  wrappers, and the service-startup boundary used by the freestanding runtime
-  design.
-- [MINIX user ELF checker source-organization baseline](research/minix-user-elf-checker-source-organization.md)
-  classifies the existing host parsing, executable-shape, startup-policy,
-  and deterministic fixture checks before their source-only correction.
-- [MINIX RS and SEF bootstrap study](research/minix-rs-sef-bootstrap.md)
-  traces static service descriptors, inhibited privilege setup, endpoint
-  visibility, initialization callbacks, readiness replies, boot ordering,
-  timeouts, and the deferred RS recovery breadth.
-- [MINIX bootstrap source-organization baseline](research/minix-bootstrap-source-organization.md)
-  applies that fixed trace to the behavior-preserving bootstrap correction
-  without importing RS recovery or changing accepted authority.
-- [MINIX VM bootstrap and handoff study](research/minix-vm-bootstrap-and-handoff.md)
-  traces boot-memory import, VM's frame database, wired self-hosting,
-  privileged mapping authority, boot-service adoption, and fatal VM faults.
-- [MINIX PM process-lifecycle study](research/minix-pm-process-lifecycle.md)
-  traces PM-owned process identity, creation coordination, exit teardown,
-  zombie retention, wait completion, reparenting, and rollback boundaries.
-- [MINIX VFS/MFS filesystem protocol study](research/minix-vfs-mfs-filesystem-protocol.md)
-  traces VFS-only filesystem authority, mount and lookup, node references,
-  file and directory mutation, directional grants, sparse I/O, and directory
-  cursors.
-- [MINIX VFS process, descriptor, and device-routing study](research/minix-vfs-process-descriptor-and-device-routing.md)
-  traces caller binding, descriptor/open-file/vnode ownership, root and
-  working-directory routing, character-device suspension, and process cleanup.
-- [MINIX VFS source-organization baseline](research/minix-vfs-source-organization.md)
-  maps MINIX VFS responsibilities to the required `micros` adaptations before
-  the portable VFS core is decomposed.
-- [MINIX VFS test-organization baseline](research/minix-vfs-test-organization.md)
-  traces the shared harness, behavior-oriented test programs, helper
-  executables, and required `micros` evidence extensions before the VFS test
-  sources are decomposed.
-- [MINIX kernel address-space source-organization baseline](research/minix-kernel-address-space-source-organization.md)
-  traces privileged root binding, page-table mechanism, region policy,
-  lifecycle orchestration, and the required `micros` adaptations.
-- [MINIX kernel PM-control source-organization baseline](research/minix-kernel-pm-control-source-organization.md)
-  traces common kernel-call dispatch, process reservation, execution
-  installation, stop/detach/release ordering, and the required `micros`
-  adaptations.
-- [MINIX VM service source-organization baseline](research/minix-vm-service-source-organization.md)
-  traces service dispatch, physical allocation, regions/page tables,
-  executable planning, exit release, faults, and required `micros`
-  adaptations.
-- [MINIX PM service source-organization baseline](research/minix-pm-service-source-organization.md)
-  traces semantic identity, dispatch, lifecycle/wait completion, argument
-  capture, and the current source-only correction.
+Source-organization studies are linked from their corresponding ownership
+maps above. The full [research directory](research/) preserves audit manifests,
+measured reproductions and historical correction investigations.
 
-## Planning and verification
+## Historical records and decisions
 
-- [MINIX validation-driver baseline](research/minix-validation-driver-baseline.md)
-  traces fixed test identity/selection/outcomes and classifies the proposed
-  development-only evidence extension without importing the hosted runner.
+Do not delete or silently rewrite Accepted ADRs to hide superseded decisions.
+The [ADR index](adr/README.md) records status; later ADRs define exact
+supersession. An ADR's design-time statement that implementation has not
+started is a historical phase record, not today's project status.
 
-- [Roadmap](roadmap.md) defines milestones, exit criteria, deferred scope, and
-  major risks.
-- [Testing strategy](testing-strategy.md) defines the host, QEMU, integration,
-  stress, and observability layers.
+ADR-0123 retires the operational catalog/binding/journal protocols in
+[EV01](architecture/evidence-authority-transition.md),
+[packed identities](architecture/packed-evidence-identities.md),
+[relocated payloads](architecture/relocated-evidence-payloads.md),
+[standalone validator binding](architecture/standalone-frame-validator-binding.md),
+[memory-native bindings](architecture/memory-native-source-authority.md),
+[selected-ownership bindings](architecture/selected-ownership-native-source-authority.md),
+[address-space bindings](architecture/selected-address-space-native-source-authority.md),
+[ownership observations](architecture/selected-ownership-observation-authority.md),
+[release/handoff bindings](architecture/selected-release-handoff-native-source-authority.md),
+[object/panic bindings](architecture/object-and-panic-source-authority.md),
+[old source-view providers](architecture/validation-feedback.md) and
+[historical trace execution scopes](architecture/panic-trace-execution-scopes.md).
+Those records remain available for provenance, not as prerequisites to replay.
+Their independent runtime, observation and machine obligations remain where
+the current validation contract explicitly retains them.
 
-## Development
-
-- [Build and smoke-test guide](development/building.md) defines prerequisites,
-  tool discovery, build artifacts, and the deterministic QEMU command.
-- [AI-native development workflow](development/ai-native-workflow.md) defines
-  the shared human/agent task, TDD, review, and merge contract.
-- [GitHub Actions validation](development/github-actions-ci.md) defines the
-  Accepted hosted execution, source/tool authority, evidence and CI-bootstrap
-  review boundary; its [research record](research/github-actions-ci-baseline.md)
-  preserves the fixed MINIX and current platform evidence.
-- [Parallel CI validation](development/parallel-ci-validation.md) defines
-  bounded independent producers and a complete same-run aggregate;
-  [measured serial evidence](research/parallel-ci-validation-evidence.md)
-  records why the unmerged single-job implementation was abandoned.
-- [Contributing guide](../CONTRIBUTING.md) is the contributor entry point.
-- [Agent contract](../AGENTS.md) is the tool-neutral AI agent entry point.
-
-## Decisions
-
-- [ADR index](adr/README.md) lists all architecture decisions and their current
-  status.
-- [ADR-0081](adr/0081-complete-posix-compatible-system-goal.md) defines the
-  complete POSIX-compatible long-term product goal.
-- [ADR-0082](adr/0082-evidence-authority-transition.md) defines the reviewed
-  authority transition required before frozen-body corrections.
-
-All project documentation, source code, identifiers, comments, tests, and
-commit messages are written in English.
+When updating documentation, change the owner of the fact and link to it.
+Keep current status concise, exact contracts in their subsystem document,
+and per-attempt commands/trees/reviews in the PR. Git history retains removed
+duplicate prose; do not create another archive copy or status registry just
+to preserve repeated narration.

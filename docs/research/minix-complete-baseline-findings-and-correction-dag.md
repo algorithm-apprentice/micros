@@ -28,395 +28,56 @@ ready node. The preferred pre-node order below selects one dependency-ready
 task at a time. An out-of-scope discovery becomes a separate task; it never
 expands the active pull request.
 
-The post-pin
-[EV04 re-certification record](evidence-foundations-recertification.md)
-records separately merged EV01 #177, EV02 #179 and EV03 #184. Its acceptance
-merge opens the evidence barrier after current-candidate validation and
-independent review. These three infrastructure outcomes do not close the
-76 pre-node runtime findings or change the frozen counts above. The separate
-hosted-CI implementation remains unaccepted; it adds no runtime-DAG edge.
+## Current correction progress
 
-The first runtime outcome after that barrier, `COPY01`, is merged as #191
-after separate design #190 / ADR-0090. Its
-[implementation map](../architecture/runtime-memory-primitives.md#implementation-map)
-closes only B05-F006/B05-E005 through actual primitive Red/Green, granular
-recertification, the complete fresh author gate and clean independent
-implementation re-review. Its reviewed, published and squash trees are
-identical. That merge left 75 pre-node runtime findings open.
+The counts in the fixed audit block above describe the original audit, not
+the remaining work. This table is the current closure record after OBJ02
+#246 and validation simplification #248. Each listed runtime outcome completed
+its required evidence and independent review before merge.
 
-The next PLAT01 design found an
-[EV01 packed-identity coverage gap](packed-evidence-identity-gap.md).
-EV01-C01 is a separate corrective evidence prerequisite under
-[Accepted ADR-0091](../adr/0091-packed-evidence-identity-coverage.md).
-Its design #192 and independently reviewed implementation #193 are merged,
-adding the 177 omitted facts while preserving all previous authority.
-Resumed PLAT01 planning then identified the
-[relocated payload binding prerequisite](relocated-evidence-payload-gap.md),
-EV01-C02 under Accepted
-[ADR-0092](../adr/0092-relocated-evidence-payload-bindings.md).
-Its separate design #194 and independently reviewed implementation #195
-are merged, supplying precise source bindings without changing any identity
-or historical value. PLAT01 has resumed through Accepted
-[ADR-0093](../adr/0093-minix-diagnostic-histories.md) and its
-[diagnostic-history contract](../architecture/diagnostic-history.md).
-These maintenance prerequisites add no
-runtime correction node or finding owner to the pinned 59-node, 155-edge
-graph; they repair the evidence gate before the next selected runtime row.
-The historical audit totals and the separately blocked hosted CI outcome
-are not relabeled as completed work.
+| Outcome | Accepted implementation/barrier | Finding closure | Contract or evidence |
+| --- | --- | --- | --- |
+| EV01-EV04 | #177, #179, #184, #189 | B14-F001/F002/F003 foundations; B13 remains a future admission | [Foundation record](evidence-foundations-recertification.md) |
+| COPY01 | #191 | B05-F006 | [Runtime memory](../architecture/runtime-memory-primitives.md) |
+| PLAT01 | #199 | B01-F002 | [Diagnostic histories](../architecture/diagnostic-history.md) |
+| PLAT02 | #201 | B01-F001/F003/F005 | [Terminal failure](../architecture/terminal-failure.md) |
+| PLAT03 | #204 | B01-F004 | [Panic trace](../architecture/panic-stack-trace.md) |
+| MEM01 | #210 | B01-F006, B02-F001 | [Allocation](../architecture/bootstrap-allocation.md) |
+| MEM02 | #212 | B02-F003/F004 | [Kernel mapping](../architecture/kernel-mapping-topology.md) |
+| MEM03 | #219 | B02-F002 | [Selected ownership](../architecture/selected-frame-ownership.md) |
+| MEM04 | #228 | B02-F005 | [Selected address spaces](../architecture/selected-user-address-space.md) |
+| MEM05 | #236 | B02-F006/F007 | [Release and handoff](../architecture/selected-release-and-wired-handoff.md) |
+| OBJ01 | #243 | B03-F001/F003/F004 | [Object/hart acceptance](../architecture/selected-object-and-hart-validation.md#implementation-acceptance) |
+| OBJ02 | #246 | B03-F002/F005 | [Common-return acceptance](../architecture/common-scheduler-return.md#implementation-acceptance) |
 
-After design #196 and collector correction #197, PLAT01's uncommitted
-implementation found a [real startup IRQ retrigger](minix-diagnostic-history.md#observed-startup-irq-retrigger)
-that invalidated the first-probe ordering assumption. That implementation
-was abandoned; [Accepted ADR-0094](../adr/0094-retrigger-safe-diagnostic-probe.md)
-separately merged as #198 before a fresh implementation restart.
+Of the original 79 pre-node finding records, these outcomes close 22:
+three evidence-foundation records and nineteen runtime records.
+**57 remain: 50 foundation/runtime records before node Q and seven B13
+records.** The separately staged B04-F005 is not included in that remaining
+pre-node count. Closing foundation tooling does not certify every still-open
+operation's work bound or the future B13 stack.
 
-PLAT01 implementation #199 is independently reviewed and merged as
-`8375ca2f5285bc42063af8ed92ba6f3811d517e8`, with reviewed/publication/squash
-tree `cb472a9262b9d6f22c42c4c9e1182bf1da069d78`. Actual replacement
-Red/Green, B01-B12/B14 recertification, the complete 48-command fresh author
-gate and all current stack evidence passed. Ordinary committed checks
-preserve both completed retirements without local journals.
-This closes only B01-F002, leaving 74 pre-node runtime findings open.
-The historical audit counts and 59-node, 155-edge graph remain unchanged.
+The next preferred runtime outcome is **IPC01**. Its OBJ01, OBJ02 and MEM04
+prerequisites are merged. It still needs its own reviewed design and
+implementation; no later finding is closed by documentation cleanup.
 
-PLAT02 implementation #201 follows the separately reviewed design #200
-and [Accepted terminal contract](../architecture/terminal-failure.md).
-Its independently reviewed, published and squash tree is
-`53d900f539d0e766b2998ff57aeea990ac25e30a`; the squash commit is
-`e12b2d6c163ac92282d380eff5be419fad7f7a30`.
-Actual baseline/current Red-Green, the complete 49-command fresh author
-gate, 43 static configurations/112 ELF outputs and ten observed scopes
-passed. The fresh committed checkout preserves all prior authority
-without a journal. This closes only B01-F001/F003/F005 and their
-E002/E003/E005 evidence gaps, leaving 71 pre-node runtime findings open.
+Validation simplification #248 follows separate design #247 / ADR-0123.
+It changes no runtime finding, node or edge. Current contracts replace the
+retired EV01 catalog/provider/journal machinery and metadata-only naming
+prerequisites. Actual Red, independent expectations, complete current
+native/target/integration/stack evidence and review remain mandatory;
+one final planner execution may also supply affected-unit evidence.
 
-PLAT03 design #202 is separately merged. Its
-[fixed-source study](minix-panic-stack-trace.md) and
-[Accepted trace contract](../architecture/panic-stack-trace.md) cover
-only B01-F004/B01-E004. Independent design and Acceptance reviews were
-clean. The first uncommitted implementation then misinterpreted case 8's
-shorthand rejection label, despite the contract's correct explicit
-progress-before-range order. It was stopped and abandoned before
-production changes. The documentation-only
-[Accepted ADR-0097 clarification](../adr/0097-panic-trace-link-rejection-precedence.md)
-separately merged as #203 before the restarted implementation. PLAT03 now
-supplies the bounded private trace, native/target evidence and version-four
-fault-epoch proof. Its acceptance requires matching immutable baseline/current
-inputs, the complete fresh 50-command author gate and independent review;
-implementation #204 passed those gates and merged as
-`ddca7661d4fa7e13acf0aaa5f0ba55b91f9c9916`, with identical reviewed,
-committed, remote and squash tree
-`3bf57ef9d12345f7b72e082a5843c97a2476f23e`. Fresh committed
-authority/source checks pass without author journals. This closes only
-B01-F004/B01-E004, leaving 70 pre-node runtime findings open.
+The node register and diagrams below retain the original 59 nodes and
+155 edges. Historical source-retirement details in completed-node rows
+describe their original acceptance, not ceremonies to repeat today.
+Detailed prerequisite/restart investigations remain in their linked
+subsystem contracts, research records and original PRs; the former repeated
+status narrative is preserved in Git history.
 
-Independent review of the next MEM01 design found a distinct
-[standalone frame-validator payload gap](standalone-frame-validator-payload-gap.md).
-The author verified that its 797-path fallback intersects MEM01's immutable
-command inputs, so the existing transition validator correctly rejects the
-proposal. The initial MEM01 design was blocked and preserved as reference; its
-implementation has not started.
-[Accepted ADR-0098](../adr/0098-standalone-frame-validator-evidence-binding.md)
-defines the separate EV01-C03 one-key metadata prerequisite. No memory
-correction or hosted-CI work proceeds in parallel. The runtime finding
-ownership, historical audit counts and graph remain unchanged.
-
-EV01-C03 design #205 is merged. Its initial implementation was preserved
-after the distinct
-[ordinary panic-trace scope failure](panic-trace-current-scope-blocker.md):
-the full plan passed seven commands, then rejected three already committed
-design files against the original PLAT03 membership.
-[Accepted ADR-0099](../adr/0099-panic-trace-execution-scopes.md) separates
-historical baseline authority from complete current-run input stability.
-Design #206 and implementation #207 have now independently passed their
-required gates and merged. The actual historical pair, full current author
-plan, unchanged authority and journal-free committed checks passed.
-EV01-C03 restarted, passed its complete current author and independent
-review gates, and merged as #208. Its exact reviewed/committed/remote/squash
-tree is `36110108d7839460b2f384761bb9aaa540e82444`; journal-free committed
-checks passed. The six actual MEM01 fact closures now fit its eight
-candidate paths without immutable command-input overlap.
-
-MEM01 implementation #210 is independently reviewed and merged under
-[Accepted ADR-0100](../adr/0100-minix-bootstrap-allocation.md) and the
-[allocation contract](../architecture/bootstrap-allocation.md).
-It follows separate design #209 and genuine pre-production Red. Current Green,
-the six-key transaction, thirteen-unit recertification, all 50 fresh author
-commands and independent first-commit review passed. The exact
-reviewed/committed/remote/preview/squash tree is
-`08f31a8b1dfc639c8b826ea65d092327fea159a1`, merged as
-`3f7e33026f92c8c1765ce00c2b03b5c2d6855197`; journal-free committed checks and
-exact task-ref cleanup passed. This closes B01-F006/B02-F001, leaving
-68 pre-node runtime findings open.
-
-MEM02 implementation #212 is independently reviewed and merged.
-Accepted [ADR-0101](../adr/0101-minix-kernel-mapping-topology.md) and the
-[kernel-map contract](../architecture/kernel-mapping-topology.md) cover
-B02-F003/B02-F004 and B02-E003. Independent complete and Acceptance reviews
-are clean; separate design #211 merged as
-`e7d936d6d26e372a8794bc5fd8feb6d976fcd529`, tree
-`4f520e80e7f7a7490f67d438029c5d7ff77abcc0`.
-Actual pre-production Red, current Green, the exact three-key transaction,
-thirteen-unit recertification, all fifty fresh author commands and independent
-first-commit review passed. The identical
-reviewed/committed/remote/preview/squash tree is
-`910e04a2129a692ec74ede4c34ff19c8f18e2397`, merged as
-`bf4eef8f0c59a9d06ae3a20d4a52c5f07943c2ee`. Journal-free committed checks
-and exact task-ref cleanup passed. B02-F003/B02-F004 are closed, leaving
-66 pre-node runtime findings open.
-
-The subsequent MEM03 design found the
-[memory-native source authority gap](memory-native-source-authority-gap.md).
-Accepted [ADR-0102](../adr/0102-granular-memory-native-source-authority.md)
-defines the [EV01-C04 prerequisite](../architecture/memory-native-source-authority.md).
-Separate design #213 is merged as
-`52c9b3ab44acdd3b80429f98a4e15cd3e064f63c`.
-Implementation #214 passed actual coverage Red, all fifty fresh author
-commands, independent first-commit review and journal-free committed checks.
-It merged as `8927f9956eb270962517b19715a12bc93a5fa466`, with identical
-reviewed/committed/remote/preview/squash tree
-`9f7802dfdfc84034b626068b5c160b90a645dad7`; exact task-ref/check-worktree
-cleanup and actual-main authority checks passed.
-
-MEM03 design #215 is merged under Accepted
-[ADR-0103](../adr/0103-selected-frame-ownership-validation.md) and the
-[selected ownership contract](../architecture/selected-frame-ownership.md).
-Its first uncommitted implementation passed actual native Red/Green and all
-twelve QEMU recertification commands, then stopped on B14's
-[prefix-token scope defect](complete-validator-token-scope-gap.md).
-The implementation is archived without retirement or a permanent commit.
-The corrective design under Accepted
-[ADR-0104](../adr/0104-precise-complete-validator-token-authority.md) separately
-merged as #216. Its restarted uncommitted candidate passed a full author gate
-before independent review found a launcher-boundary omission. The correction
-renewed actual Red/Green and recertification, but its following full run was
-stopped for the [measured validation-cost problem](validation-feedback-cost.md).
-No implementation commit or merge occurred.
-
-The user-prioritized Accepted
-[bounded feedback prerequisite](../architecture/validation-feedback.md)
-separately merged as design #217 and independently reviewed implementation
-#218. MEM03 restarted from that exact new base with fresh declarations and
-execution evidence. Actual Red/Green, thirteen-unit recertification, all
-fifty fresh author commands and independent first-commit review passed.
-Implementation #219 merged as
-`da258293f507c745c8e157cd84bd13b2fb4b5e77`, with identical
-reviewed/committed/remote/preview/squash tree
-`5793c993338c22cf30aa552c9397c8aa234c33cc`.
-Journal-free committed/main checks and exact cleanup passed.
-B02-F002/B02-E002 are closed, leaving 65 pre-node runtime findings open.
-The archives are not this retirement evidence.
-
-The next MEM04 design found the
-[selected-ownership native-source authority gap](selected-ownership-native-source-authority-gap.md).
-Accepted [ADR-0106](../adr/0106-granular-selected-ownership-native-source-authority.md)
-defines [EV01-C05](../architecture/selected-ownership-native-source-authority.md):
-484 exact existing clauses, unchanged guards and no runtime retirement.
-Separate design #220 is merged as
-`1d9eab05afab16a4caff519a84790541036ee240`. Its independently reviewed
-metadata-only implementation #221 merged as
-`f28377decc0d20533e05330f2f2211db3f230910`, with identical reviewed and squash
-tree `4b56076479ac53092c4c83d9c9b52829b66139ba`.
-Real coverage Red, complete current acceptance, journal-free committed/main
-checks and exact cleanup passed.
-
-The Accepted [MEM04 contract](../architecture/selected-user-address-space.md)
-under [ADR-0107](../adr/0107-selected-user-address-space-validation.md) merged
-as design #222. The separate reporting prerequisite #223/#224 is also merged.
-The fresh uncommitted runtime attempt is archived after a demonstrated
-handoff error dependency; [Accepted ADR-0109](../adr/0109-handoff-preflight-error-ownership.md)
-has clean independent design review and separately merged as #225.
-MEM04 includes bootstrap allocation's selected-prefix
-check rather than leaving that ordinary per-page audit unowned, and retains
-an explicit twenty-row complete-audit ledger for existing diagnostics,
-certification and downstream correction owners. No global
-all-audits-removed claim or runtime retirement is made by this design.
-The Accepted one-file handoff dependency keeps the existing twenty audit
-callers and 33 retirement keys; its whole-file identity already belongs to
-committed MEM03 retirement and must not be retired twice.
-The following candidate completed actual Green/recertification and 45 full
-producer commands, but stack certification rejected its unrelated new
-public declaration. The candidate is archived. The subsequent
-[Accepted ADR-0110 design](../adr/0110-kernel-visitor-extension-admission.md)
-adds only a fixed-source one-declaration header admission and exact
-five-helper callback-free admission for the existing visitor group.
-No runtime finding, existing callback authority or stack budget is waived.
-That design separately merged as #226. The fresh native/target Green
-candidate passed current visitor binding but failed the next fatal
-source-unit header predicate in an early ordinary/metadata check.
-It is archived.
-[Accepted ADR-0111](../adr/0111-fatal-tty-header-extension.md) has clean
-independent review and preserves all fatal proof obligations, seventeen
-production subjects, 29 candidate paths and the 33-key retirement scope.
-That design separately merged as #227. The fresh implementation follows the
-exact [evidence map](../architecture/selected-user-address-space.md#implementation-and-evidence-map)
-and must renew every author phase; none of the archives closes a finding.
-That fresh MEM04 implementation completed actual Red/Green, thirteen-unit
-recertification, all fifty author commands and independent review, then
-merged as #228 with identical reviewed/published/squash content and
-journal-free committed authority. Its exact 33-key transition closes the
-named selected-operation scope, not the residual release/handoff and
-command-owner algorithms.
-
-MEM05 design is next but its early read-only census found missing per-clause
-MEM04 native/source authority. The
-[Accepted EV01-C06 contract](../architecture/selected-address-space-native-source-authority.md)
-and [ADR-0112](../adr/0112-granular-selected-address-space-native-source-authority.md)
-define a metadata-only prerequisite with 477 existing clauses and no new
-retirement. MEM05 design remains blocked until that pair separately merges.
-The independently reviewed prerequisite design is merged as #229.
-Its metadata implementation adds only the named existing clauses and
-bounded historical-catalog/test adaptations; it preserves all six
-committed authorities and 103 retirements without runtime changes.
-Implementation #230 has completed full current acceptance and independent
-review, then merged with identical reviewed and squash content.
-Journal-free main authority and exact task-ref cleanup passed.
-
-Resumed MEM05 research found the separate
-[MEM03 observation-authority gap](selected-ownership-observation-authority-gap.md).
-[Accepted ADR-0113](../adr/0113-granular-selected-ownership-observation-authority.md)
-and [EV01-C07](../architecture/selected-ownership-observation-authority.md)
-define 120 existing function-local primitive/coverage identities.
-This is the sole active metadata design; MEM05 design is blocked on its
-separate reviewed implementation. No runtime finding, node or edge changes.
-The complete and Acceptance-only design reviews are clean and design #231
-is separately merged. The dependent metadata implementation preserves every
-old record and guard while materializing the 120 named comparisons.
-Its complete acceptance and independent implementation review still precede
-MEM05 design resumption.
-Those requirements are complete and implementation #232 is independently
-reviewed and merged. The
-[MEM05 fixed-source study](minix-selected-release-and-wired-handoff.md) and
-[Accepted release/handoff contract](../architecture/selected-release-and-wired-handoff.md)
-have clean independent design/correction review.
-B02-F006/F007 remain open; the separate design merge still precedes
-implementation and actual runtime acceptance.
-Finding ownership, the 59-node runtime graph and hosted-CI acceptance remain
-unchanged.
-
-MEM05 design #233 is now separately merged. Its pre-Red implementation
-preparation found the
-[same-slot count-evidence conflict](minix-selected-release-and-wired-handoff.md#mem05-c01-same-slot-count-evidence-conflict).
-The scaffold is archived without production edits, formal events or
-retirement. MEM05-C01 under
-[Accepted ADR-0115](../adr/0115-selected-count-generation-evidence-scope.md)
-separately merged as #234.
-The correction retains the whole-slot algorithm and admits one exact
-current-fixture result/output adaptation. It adds no runtime finding,
-node, edge, retirement key or validation waiver.
-
-The fresh implementation then exposed the
-[MEM05-C02 handed-off corruption fixture conflict](minix-selected-release-and-wired-handoff.md#mem05-c02-handed-off-corruption-fixture-conflict).
-The candidate is archived without Green, recertification or retirement.
-[Accepted ADR-0116](../adr/0116-handed-off-leaf-fixture-coherence.md)
-has clean independent design review and is the sole active documentation-only
-correction. It preserves the Accepted index algorithm and complete checks with one
-additional frozen target owner and a valid-ledger/invalid-leaf setup
-through existing VM ownership interfaces.
-The 82-key partition and all runtime finding owners remain unchanged;
-MEM05 implementation restarts only after the separate design merge.
-Hosted CI and later MINIX/POSIX outcomes remain separately owned.
-
-That design is now separately merged as #235 after clean complete and
-Acceptance-only review. Journal-free committed/main authority and exact
-completed-ref cleanup passed. The fresh MEM05 implementation is the
-sole active outcome, with thirty candidate paths and the unchanged
-82-key partition. No archived execution closes a runtime finding.
-
-MEM05 implementation #236 has now passed complete current acceptance and
-clean independent review, then separately merged with exact reviewed/
-published/squash content. Fresh committed/main authority is journal-free;
-completed refs were removed and purposeful archives preserved.
-This closes only B02-F006/F007.
-
-OBJ01 is the next preferred runtime outcome, with its MEM04 prerequisite
-already merged. Its read-only source census found the
-[MEM05 native-source authority gap](selected-release-handoff-native-source-authority-gap.md).
-[Accepted ADR-0117](../adr/0117-granular-selected-release-handoff-native-source-authority.md)
-and [EV01-C08](../architecture/selected-release-handoff-native-source-authority.md)
-define the separate 453-clause metadata prerequisite. Only that design is
-active; OBJ01 design is blocked and its implementation pending until the
-reviewed pair merges. The 59-node runtime graph, finding ownership and
-hosted-CI boundary remain unchanged.
-
-EV01-C08 design #237 has now separately merged after clean correction and
-Acceptance-only review. Its
-[metadata implementation map](../architecture/selected-release-handoff-native-source-authority.md#implementation-map)
-records the complete independent 453-row addition, genuine missing-key
-Red and focused Green without changing any old fact, guard or retirement.
-Only that implementation is active. Complete current acceptance and
-independent implementation review still precede its merge and OBJ01
-design resumption.
-
-EV01-C08 implementation #238 has now completed that acceptance and
-independently merged, with exact publication-tree equality, journal-free
-main authority and protected completed-ref cleanup. OBJ01 research resumed
-and found the separate
-[object and panic source-authority gap](object-and-panic-source-authority-gap.md).
-[Accepted ADR-0118](../adr/0118-precise-object-and-panic-source-authority.md)
-and [EV01-C09](../architecture/object-and-panic-source-authority.md) define
-fifty metadata repairs and eleven existing-predicate names.
-Only the prerequisite design is active. OBJ01 design remains blocked until
-its reviewed pair merges; the runtime graph and all finding owners remain
-unchanged.
-
-EV01-C09 design #239 has now separately merged after clean independent
-correction and Acceptance-only reviews. Fresh journal-free committed/main
-checks and protected ref cleanup passed. Its
-[metadata implementation](../architecture/object-and-panic-source-authority.md#implementation-map)
-is the sole active outcome, with independently frozen records and genuine
-missing-coverage Red followed by focused Green.
-OBJ01 design remains blocked until complete current acceptance,
-independent implementation review and the separate implementation merge.
-No runtime finding closes through this metadata work.
-
-EV01-C09 implementation #240 has now independently completed acceptance
-and merged. Exact publication content, fresh journal-free main authority
-and protected completed-ref cleanup passed.
-[Accepted ADR-0119](../adr/0119-selected-object-and-hart-validation.md)
-and the [OBJ01 contract](../architecture/selected-object-and-hart-validation.md)
-resume the next preferred runtime design, owning only
-B03-F001/F003/F004. Its fixed-source census separates sixteen migrating
-scheduler entry audits from twenty-six retained outside boundaries.
-Only design is active; implementation remains pending separate review,
-Acceptance and merge. The runtime graph and finding ownership do not change.
-
-OBJ01 design #241 separately merged, then full native acceptance exposed
-the [OBJ01-C01 closure gap](minix-selected-object-and-hart-validation.md#obj01-c01-complete-source-authority-gap).
-The uncommitted implementation was archived. The separately reviewed
-correction under Accepted ADR-0120 has now merged as #242.
-The fresh [implementation map](../architecture/selected-object-and-hart-validation.md#implementation-and-evidence-map)
-retains the runtime scope and thirty-eight candidate paths while binding
-all ninety-five existing identities and complete affected-source coverage.
-Actual renewed acceptance and independent review still precede closure of
-B03-F001/F003/F004; no later finding or hosted-CI outcome is closed.
-
-OBJ01 implementation #243 has now passed complete current acceptance and
-independent review, then separately merged with exact reviewed/publication
-tree equality. Fresh journal-free committed/main authority and completed-ref
-cleanup passed. Only B03-F001/F003/F004 close.
-The preferred next [OBJ02 study](minix-common-scheduler-return.md) is active
-with OBJ01 and MEM04 merged. It owns only B03-F002/F005 and contains no
-executable implementation. Its new contract still requires separate design
-review, Acceptance and merge before implementation.
-
-The [Accepted OBJ02 contract](../architecture/common-scheduler-return.md)
-under [ADR-0121](../adr/0121-bounded-common-scheduler-return.md) now records
-the bounded delta, context-reuse and precise legacy-evidence boundaries.
-Its fifty-eight-key selection retains the existing finding owners and
-runtime prerequisites. Independent design review is clean; it retires
-nothing during design, and separate merge still precedes implementation.
-
-The uncommitted OBJ02 implementation subsequently reached actual native/target
-Green but failed complete B14 consumer closure. It is archived without final
-acceptance or retirement.
-[Accepted ADR-0122](../adr/0122-obj02-evidence-consumer-scope.md) and
-[OBJ02-C01](../architecture/common-scheduler-return.md#obj02-c01-complete-evidence-consumer-scope)
-are the sole active corrective design. They add three exact immutable test
-owners while preserving the runtime contract, 58 selected identities,
-28 candidate paths, finding ownership and graph edges. OBJ02 implementation
-restarts after the correction's separate reviewed merge.
+Hosted CI remains separately unaccepted and adds no runtime-DAG edge.
+Optional platform work and later POSIX milestones are in
+[the roadmap](../roadmap.md), not silently included in these audit counts.
 
 ## Consolidation invariants
 
@@ -450,6 +111,10 @@ restarts after the correction's separate reviewed merge.
   explicitly supersedes them.
 
 ## Consolidated findings register
+
+Titles, severity and pre/post-node disposition describe the fixed audit.
+[Current correction progress](#current-correction-progress) records closure;
+a historical `Pre-node blocking` label does not reopen a merged correction.
 
 | Finding | Severity | Disposition | Title | Correction node | Source audit |
 | --- | --- | --- | --- | --- | --- |
@@ -536,7 +201,8 @@ restarts after the correction's separate reviewed merge.
 
 ## Correction-node register
 
-Each pre-node finding-owning row is one future design/implementation pair.
+Each pre-node finding-owning row identifies one design/implementation outcome.
+Completed outcomes are listed above; remaining rows still require their own pair.
 `EV04`, `BASE01`, `STACK13`, and `RECERT01` are acceptance-only barriers.
 `NODE00` and `NODE03` are prerequisite/integration outcomes that own no
 archived-candidate finding. `EXT01` and `IPC05` execute only at the existing
@@ -559,7 +225,7 @@ blocking queue.
 | `MEM04` | Runtime correction | `B02-F005` | `MEM02`, `MEM03` | Use fixed-level lookup/translation/allocation-prefix walks and selected root/context/owner preparation instead of complete state validation. | Exact PTE-level, owner, activation, fault-path and allocation-compensation evidence. |
 | `MEM05` | Runtime correction | `B02-F006`, `B02-F007` | `MEM04` | Implementation #236 follows the Accepted [selected release/handoff contract](../architecture/selected-release-and-wired-handoff.md), with coherent owner indexing, selected-word sets and protected release/handoff plans. | Actual native/target Red-Green, exact 82-key transition, thirteen-unit recertification, full current acceptance and independent review complete. |
 | `OBJ01` | Runtime correction | `B03-F001`, `B03-F003`, `B03-F004` | `MEM04` | Independently reviewed implementation #243 is merged; [acceptance and exact publication](../architecture/selected-object-and-hart-validation.md#implementation-acceptance) follow Accepted ADR-0119/0120. | Actual object/hart/stack work, consumed-state failure atomicity, complete diagnostics, ninety-five-key transition, all affected units and complete current acceptance passed; journal-free authority reaches 280 retirements. |
-| `OBJ02` | Runtime correction | `B03-F002`, `B03-F005` | `OBJ01`, `MEM04` | Independently reviewed Accepted [common-return contract](../architecture/common-scheduler-return.md) and [fixed-source study](minix-common-scheduler-return.md); bounded queue/link deltas and protected same-thread context reuse. | Queue-shift, zero-quantum, plan-compare, commit-store and actual target validation traces; fifty-eight-key transition and no implementation before separate reviewed design merge. |
+| `OBJ02` | Runtime correction | `B03-F002`, `B03-F005` | `OBJ01`, `MEM04` | Independently reviewed implementation #246 follows the [common-return contract](../architecture/common-scheduler-return.md) and [fixed-source study](minix-common-scheduler-return.md); bounded queue/link deltas and protected same-thread context reuse. | Queue-shift, zero-quantum, plan-compare, commit-store and actual target validation traces; complete current acceptance and independent review passed. |
 | `IPC01` | Runtime correction | `B03-F006`, `B04-F001`, `B04-F002` | `OBJ01`, `OBJ02`, `MEM04` | Use selected endpoint/object/completion plans and retained immutable authorization instead of nested global validation. | Per-operation endpoint/object/translation counts and failure-atomic completion cases. |
 | `IPC02` | Runtime correction | `B04-F003` | `IPC01` | Replace quadratic thread-capacity projection with the reference dependency-chain mechanism. | Hop/visit counts for chains, cycles, sparse slots, and maximum depth. |
 | `IPC03` | Runtime correction | `B04-F004` | `IPC01` | Bind reply tokens directly to their pending request/owner while preserving generation and close semantics. | Allocation, lookup, stale, close, and reuse probe counts. |
@@ -898,10 +564,11 @@ prerequisite must be merged and re-certified first.
 
 ## Re-certification and completion
 
-For each implementation outcome:
+For each implementation outcome, applying ADR-0123's one-plan rule:
 
-1. re-run the exact new structural/operation/stack evidence plus the narrow
-   existing semantic and target gates selected by the authoritative planner;
+1. run actual Red and focused Green, then the current planner's required
+   structural/operation/stack, semantic and target evidence once; the same
+   actual result may satisfy its affected unit without a second transaction;
 2. update every source B-unit ledger named by the task findings;
 3. re-certify any downstream unit whose accepted mechanism, complexity
    expression, or evidence mapping changed;
