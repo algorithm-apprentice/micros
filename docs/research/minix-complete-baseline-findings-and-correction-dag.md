@@ -31,8 +31,8 @@ expands the active pull request.
 ## Current correction progress
 
 The counts in the fixed audit block above describe the original audit, not
-the remaining work. This table is the current closure record after OBJ02
-#246 and validation simplification #248. Each listed runtime outcome completed
+the remaining work. This table is the current closure record through IPC01
+#251 and validation simplification #248. Each listed runtime outcome completed
 its required evidence and independent review before merge.
 
 | Outcome | Accepted implementation/barrier | Finding closure | Contract or evidence |
@@ -49,19 +49,20 @@ its required evidence and independent review before merge.
 | MEM05 | #236 | B02-F006/F007 | [Release and handoff](../architecture/selected-release-and-wired-handoff.md) |
 | OBJ01 | #243 | B03-F001/F003/F004 | [Object/hart acceptance](../architecture/selected-object-and-hart-validation.md#implementation-acceptance) |
 | OBJ02 | #246 | B03-F002/F005 | [Common-return acceptance](../architecture/common-scheduler-return.md#implementation-acceptance) |
+| IPC01 | #251 | B03-F006, B04-F001/F002 | [Selected IPC implementation](../architecture/selected-ipc-validation.md#current-implementation-and-evidence) |
 
-Of the original 79 pre-node finding records, these outcomes close 22:
-three evidence-foundation records and nineteen runtime records.
-**57 remain: 50 foundation/runtime records before node Q and seven B13
+Of the original 79 pre-node finding records, these outcomes close 25:
+three evidence-foundation records and twenty-two runtime records.
+**54 remain: 47 foundation/runtime records before node Q and seven B13
 records.** The separately staged B04-F005 is not included in that remaining
 pre-node count. Closing foundation tooling does not certify every still-open
 operation's work bound or the future B13 stack.
 
-The next preferred runtime outcome is **IPC01**. Its OBJ01, OBJ02 and MEM04
-prerequisites are merged. Its [selected-validation contract](../architecture/selected-ipc-validation.md)
-and [ADR-0124](../adr/0124-selected-ipc-validation.md) define the independently
-reviewed design, merged as #250. Its separate implementation is in progress;
-the three IPC01 findings remain open until accepted implementation evidence.
+The next preferred runtime outcome is **IPC02**, whose IPC01 predecessor is
+merged. Its [linear deadlock contract](../architecture/linear-ipc-deadlock.md)
+and [ADR-0125](../adr/0125-linear-ipc-deadlock.md) have clean independent design
+review and are Accepted; implementation remains pending the separate design merge.
+The design does not close B04-F003.
 
 Validation simplification #248 follows separate design #247 / ADR-0123.
 It changes no runtime finding, node or edge. Current contracts replace the
@@ -228,8 +229,8 @@ blocking queue.
 | `MEM05` | Runtime correction | `B02-F006`, `B02-F007` | `MEM04` | Implementation #236 follows the Accepted [selected release/handoff contract](../architecture/selected-release-and-wired-handoff.md), with coherent owner indexing, selected-word sets and protected release/handoff plans. | Actual native/target Red-Green, exact 82-key transition, thirteen-unit recertification, full current acceptance and independent review complete. |
 | `OBJ01` | Runtime correction | `B03-F001`, `B03-F003`, `B03-F004` | `MEM04` | Independently reviewed implementation #243 is merged; [acceptance and exact publication](../architecture/selected-object-and-hart-validation.md#implementation-acceptance) follow Accepted ADR-0119/0120. | Actual object/hart/stack work, consumed-state failure atomicity, complete diagnostics, ninety-five-key transition, all affected units and complete current acceptance passed; journal-free authority reaches 280 retirements. |
 | `OBJ02` | Runtime correction | `B03-F002`, `B03-F005` | `OBJ01`, `MEM04` | Independently reviewed implementation #246 follows the [common-return contract](../architecture/common-scheduler-return.md) and [fixed-source study](minix-common-scheduler-return.md); bounded queue/link deltas and protected same-thread context reuse. | Queue-shift, zero-quantum, plan-compare, commit-store and actual target validation traces; complete current acceptance and independent review passed. |
-| `IPC01` | Runtime correction | `B03-F006`, `B04-F001`, `B04-F002` | `OBJ01`, `OBJ02`, `MEM04` | Use selected endpoint/object/completion plans and retained immutable authorization instead of nested global validation. | Per-operation endpoint/object/translation counts and failure-atomic completion cases. |
-| `IPC02` | Runtime correction | `B04-F003` | `IPC01` | Replace quadratic thread-capacity projection with the reference dependency-chain mechanism. | Hop/visit counts for chains, cycles, sparse slots, and maximum depth. |
+| `IPC01` | Runtime correction | `B03-F006`, `B04-F001`, `B04-F002` | `OBJ01`, `OBJ02`, `MEM04` | Independently reviewed implementation #251 follows the [selected IPC contract](../architecture/selected-ipc-validation.md). | Actual native and same-guest zero-audit/translation evidence, complete diagnostics, full current acceptance and independent review passed. |
+| `IPC02` | Runtime correction | `B04-F003` | `IPC01` | [Accepted linear projection](../architecture/linear-ipc-deadlock.md): maintain exact sole-thread identity and replace per-hop table/prefix scans after separate design merge. | Hop/visit counts, index lifetime and failure preservation for chains, cycles, sparse slots and maximum depth. |
 | `IPC03` | Runtime correction | `B04-F004` | `IPC01` | Bind reply tokens directly to their pending request/owner while preserving generation and close semantics. | Allocation, lookup, stale, close, and reuse probe counts. |
 | `IPC04` | Runtime correction | `B04-F006` | `IPC01` | Remove the pre-baseline tail-index optimization and reproduce the audited reference queue mutation order. | Linear append/receive/close traces and queue-operation counts. |
 | `GRANT01` | Runtime correction | `B05-F001`, `B05-F002` | `IPC01` | Move complete grant/runtime audits off create/revoke/copy syscalls and retain one selected relation/range plan. | Exact Vgrant/Vep/TTY call counts and syscall failure atomicity. |
