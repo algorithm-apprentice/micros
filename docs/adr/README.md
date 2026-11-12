@@ -139,3 +139,4 @@ to make the project appear more consistent than it was.
 | [0121](0121-bounded-common-scheduler-return.md) | Bounded common scheduler return | Accepted |
 | [0122](0122-obj02-evidence-consumer-scope.md) | Complete OBJ02 evidence consumer scope | Accepted |
 | [0123](0123-current-contract-validation.md) | Current-contract validation | Accepted |
+| [0124](0124-selected-ipc-validation.md) | Selected IPC validation | Accepted |

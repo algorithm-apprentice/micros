@@ -58,8 +58,10 @@ pre-node count. Closing foundation tooling does not certify every still-open
 operation's work bound or the future B13 stack.
 
 The next preferred runtime outcome is **IPC01**. Its OBJ01, OBJ02 and MEM04
-prerequisites are merged. It still needs its own reviewed design and
-implementation; no later finding is closed by documentation cleanup.
+prerequisites are merged. Its [selected-validation contract](../architecture/selected-ipc-validation.md)
+and [ADR-0124](../adr/0124-selected-ipc-validation.md) define the independently
+reviewed design. Implementation starts only after the separate design merge;
+the three IPC01 findings remain open.
 
 Validation simplification #248 follows separate design #247 / ADR-0123.
 It changes no runtime finding, node or edge. Current contracts replace the
