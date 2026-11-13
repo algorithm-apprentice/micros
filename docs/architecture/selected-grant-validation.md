@@ -4,8 +4,8 @@
 
 This is the independently reviewed GRANT01 contract Accepted by
 [ADR-0128](../adr/0128-selected-grant-validation.md).
-Design #258 is separately merged; its paired implementation proceeds from
-that main. The design alone closes no B05 finding.
+Design #258 and its independently reviewed implementation #259 are separately
+merged. The correction register owns their B05-F001/F002 closure.
 The [fixed study](../research/minix-selected-grant-validation.md)
 pins local MINIX and current `micros` after IPC04 #257.
 
