@@ -2,11 +2,12 @@
 
 ## Status and scope
 
-This is the independently reviewed BOOT01 design Accepted by
-[ADR-0132](../adr/0132-indexed-bootstrap-transitions.md), owning B06-F001.
+BOOT01 implementation #266 follows the independently reviewed design #265,
+Accepted by [ADR-0132](../adr/0132-indexed-bootstrap-transitions.md),
+and closes B06-F001.
 EV04 #189 is its actual prerequisite; preferred predecessor GRANT03 #264
-is complete. Design #265 is separately merged; its paired implementation
-proceeds from that main. The design alone closes no BOOT01 finding.
+is complete. The implementation PR owns the exact native, actual target,
+full stack, independent review and publication evidence.
 
 The implementation names the two indices `service_slots` and
 `binding_slots`. `bootstrap_transitions_internal.h` declares
