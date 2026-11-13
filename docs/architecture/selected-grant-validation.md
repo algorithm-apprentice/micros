@@ -4,7 +4,8 @@
 
 This is the independently reviewed GRANT01 contract Accepted by
 [ADR-0128](../adr/0128-selected-grant-validation.md).
-Implementation remains pending the separate design merge.
+Design #258 is separately merged; its paired implementation proceeds from
+that main. The design alone closes no B05 finding.
 The [fixed study](../research/minix-selected-grant-validation.md)
 pins local MINIX and current `micros` after IPC04 #257.
 
@@ -335,3 +336,27 @@ ADR-0123; no historical catalog or duplicate recertification ceremony.
 Independent design review precedes the design commit. Fresh independent
 implementation review precedes its first permanent commit. Only accepted
 implementation and exact-tree merge close B05-F001/F002.
+
+### Current executable evidence
+
+The [focused native pair](../development/building.md#native-unit-tests) uses
+the current-source observation engine. Its portable, selected-corruption and
+captured-runtime cases live in `selected_grant_validation_test.c`,
+`selected_grant_scope_test.c` and `selected_grant_runtime_test.c` under
+`tests/host/`. The retained original grant cases and model are unchanged in
+count, seed and draw schedule.
+
+Both variants compile the real grant/IPC runtime publication and complete
+validators, grant adapter/codec, copy orchestration/range/commit and TTY
+binding providers. The native bootstrap finder is the actual current
+definition and its observed bounded header helper. Test-only backends supply
+the object-runtime fixture, IRQ state, controlled memory-boundary results and
+panic capture; no grant, participant, TTY or complete-validator success is
+stubbed. Fixture restoration changes only test-owned inputs and the existing
+authoritative runtime storage, not a new production reset API.
+
+The native cases establish C orchestration, not RISC-V IRQ or physical-PTE
+correctness. Those remain the actual target gates above. The source ledger
+in `tests/host/selected_grant_validation_source.py` also preserves the cold
+grant, cancellation, bootstrap and PM audit boundaries and the three exact
+denial-only inspector consumers.

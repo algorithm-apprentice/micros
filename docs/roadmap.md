@@ -20,7 +20,7 @@ interactive shell or a complete MINIX/POSIX certification.
 | --- | --- | --- |
 | Platform, memory, objects and protected communication | Implemented and exercised by native/target gates; remaining structural/algorithmic findings are not waived by behavioral success | [System overview](architecture/system-overview.md) |
 | Static services and executable lifecycle | Implemented through the dynamic test PID-1 integration | [ELF-spawn evidence](architecture/elf-spawn-integration.md) |
-| MINIX baseline corrections | Evidence foundations and preferred runtime outcomes through IPC04 are merged; GRANT01 design is the active outcome | [Current correction progress](research/minix-complete-baseline-findings-and-correction-dag.md#current-correction-progress) |
+| MINIX baseline corrections | Evidence foundations and preferred runtime outcomes through IPC04 are merged; GRANT01 implementation follows its merged design | [Current correction progress](research/minix-complete-baseline-findings-and-correction-dag.md#current-correction-progress) |
 | Validation simplification | Current-contract implementation is merged; historical catalogs/journals and duplicate recertification execution are retired | [Current validation and acceptance](architecture/current-contract-validation.md) |
 | Production init, shell and commands | Accepted scope, not implemented on main; blocked through `BASE01`, with B13 stack admission later at `STACK13` | [Node-Q contract](architecture/init-shell.md) |
 | Hosted GitHub Actions | Designs accepted; implementation remains unaccepted after hosted observed-guest timeouts. No operational workflow on main | [Hosted-CI record](research/evidence-foundations-recertification.md) |

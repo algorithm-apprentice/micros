@@ -4,7 +4,9 @@
 #include <stddef.h>
 #include <stdint.h>
 
+#include "kernel/endpoint/endpoint_internal.h"
 #include "kernel/grant/grant_internal.h"
+#include "kernel/scheduler/scheduler_core_internal.h"
 #include "micros/user_address_space.h"
 
 #define MICROS_GRANT_REGISTRY_MAGIC UINT64_C(0x4d4943524f534752)
@@ -52,19 +54,6 @@ static bool process_handles_equal(
         left.slot == right.slot
         && left.generation == right.generation
     );
-}
-
-static enum micros_grant_error map_object_error(
-    enum micros_kernel_object_error error
-)
-{
-    if (error == MICROS_KERNEL_OBJECT_ERROR_STALE) {
-        return MICROS_GRANT_ERROR_DEAD_ENDPOINT;
-    }
-    if (error == MICROS_KERNEL_OBJECT_ERROR_ARGUMENT) {
-        return MICROS_GRANT_ERROR_ARGUMENT;
-    }
-    return MICROS_GRANT_ERROR_INVARIANT;
 }
 
 static enum micros_grant_error map_endpoint_error(
@@ -121,6 +110,26 @@ static bool authority_is_zero(
     );
 }
 
+enum micros_grant_error micros_grant_preflight_context(
+    const struct micros_grant_registry *registry,
+    const struct micros_endpoint_registry *endpoint_registry,
+    const struct micros_kernel_objects *objects
+)
+{
+    if (registry == NULL || endpoint_registry == NULL || objects == NULL) {
+        return MICROS_GRANT_ERROR_ARGUMENT;
+    }
+    if (registry->initialization_magic != MICROS_GRANT_REGISTRY_MAGIC) {
+        return MICROS_GRANT_ERROR_NOT_INITIALIZED;
+    }
+    if (registry->active_count > MICROS_GRANT_CAPACITY
+        || endpoint_preflight_registry(endpoint_registry) != MICROS_ENDPOINT_OK
+        || scheduler_core_preflight_registry(objects) != MICROS_KERNEL_OBJECT_OK) {
+        return MICROS_GRANT_ERROR_INVARIANT;
+    }
+    return MICROS_GRANT_OK;
+}
+
 static enum micros_grant_error resolve_active_process_endpoint(
     const struct micros_endpoint_registry *endpoint_registry,
     const struct micros_kernel_objects *objects,
@@ -131,49 +140,54 @@ static enum micros_grant_error resolve_active_process_endpoint(
 )
 {
     const struct micros_process *resolved_process;
-    const struct micros_endpoint_record *resolved_endpoint;
-    enum micros_kernel_object_error object_error;
+    struct micros_endpoint_selection selected;
     enum micros_endpoint_error endpoint_error;
 
-    object_error = micros_process_resolve(
-        objects,
-        process_handle,
-        &resolved_process
-    );
-    if (object_error != MICROS_KERNEL_OBJECT_OK) {
-        return map_object_error(object_error);
-    }
-    if (
-        resolved_process->primary_endpoint
-            == MICROS_PROCESS_ENDPOINT_NONE
-        || resolved_process->privilege_profile == 0
-    ) {
-        return inactive_error;
-    }
-    endpoint_error = micros_endpoint_resolve_active(
-        endpoint_registry,
-        objects,
-        resolved_process->primary_endpoint,
-        &resolved_endpoint
-    );
+    endpoint_error = endpoint_preflight_process(endpoint_registry, objects, process_handle, &resolved_process);
     if (endpoint_error != MICROS_ENDPOINT_OK) {
-        if (endpoint_error == MICROS_ENDPOINT_ERROR_STATE) {
-            return inactive_error;
-        }
         return map_endpoint_error(endpoint_error);
     }
-    if (!process_handles_equal(
-        resolved_endpoint->owner,
-        process_handle
-    )) {
+    if (resolved_process->primary_endpoint == MICROS_PROCESS_ENDPOINT_NONE) {
+        return resolved_process->privilege_profile == 0 ? inactive_error : MICROS_GRANT_ERROR_INVARIANT;
+    }
+    if (micros_endpoint_select(
+        endpoint_registry, objects, resolved_process->primary_endpoint, &selected
+    ) != MICROS_ENDPOINT_OK || selected.process != resolved_process
+        || !process_handles_equal(selected.record->owner, process_handle)) {
         return MICROS_GRANT_ERROR_INVARIANT;
+    }
+    if (selected.record->state != MICROS_ENDPOINT_STATE_ACTIVE) {
+        return selected.record->state == MICROS_ENDPOINT_STATE_SOURCE_ONLY
+            ? MICROS_GRANT_ERROR_STATE : inactive_error;
     }
     if (process != NULL) {
         *process = resolved_process;
     }
     if (endpoint != NULL) {
-        *endpoint = resolved_endpoint;
+        *endpoint = selected.record;
     }
+    return MICROS_GRANT_OK;
+}
+
+static enum micros_grant_error resolve_selected_active_participant(
+    const struct micros_endpoint_registry *registry,
+    const struct micros_kernel_objects *objects,
+    struct micros_process_handle handle,
+    enum micros_grant_error inactive_error,
+    const struct micros_endpoint_selection *selected,
+    const struct micros_process **process,
+    const struct micros_endpoint_record **endpoint
+)
+{
+    if (selected->record == NULL || !process_handles_equal(selected->record->owner, handle)) {
+        return resolve_active_process_endpoint(registry, objects, handle, inactive_error, process, endpoint);
+    }
+    if (selected->record->state != MICROS_ENDPOINT_STATE_ACTIVE) {
+        return selected->record->state == MICROS_ENDPOINT_STATE_SOURCE_ONLY
+            ? MICROS_GRANT_ERROR_STATE : inactive_error;
+    }
+    *process = selected->process;
+    *endpoint = selected->record;
     return MICROS_GRANT_OK;
 }
 
@@ -394,6 +408,49 @@ static enum micros_grant_error validate_registry_storage(
         : MICROS_GRANT_ERROR_INVARIANT;
 }
 
+struct selected_grant_record {
+    const struct micros_grant_record *record;
+    struct micros_endpoint_selection grantor;
+    struct micros_endpoint_selection grantee;
+};
+
+_Static_assert(sizeof(struct selected_grant_record) <= 64, "selected grant storage is bounded");
+
+static enum micros_grant_error preflight_selected_record(
+    const struct micros_grant_registry *registry,
+    const struct micros_endpoint_registry *endpoints,
+    const struct micros_kernel_objects *objects,
+    size_t slot,
+    struct selected_grant_record *selection
+)
+{
+    struct selected_grant_record candidate = {.record = &registry->grants[slot]};
+    enum micros_grant_error error = validate_record_storage(candidate.record, slot);
+
+    if (error != MICROS_GRANT_OK) {
+        return error;
+    }
+    if (candidate.record->state == MICROS_GRANT_SLOT_ACTIVE) {
+        if (registry->active_count == 0
+            || micros_endpoint_select(
+                endpoints, objects, candidate.record->grantor_endpoint, &candidate.grantor
+            ) != MICROS_ENDPOINT_OK
+            || (candidate.grantor.record->state != MICROS_ENDPOINT_STATE_ACTIVE
+                && candidate.grantor.record->state != MICROS_ENDPOINT_STATE_SOURCE_ONLY)
+            || !process_handles_equal(candidate.grantor.record->owner, candidate.record->grantor)
+            || micros_endpoint_select(
+                endpoints, objects, candidate.record->grantee_endpoint, &candidate.grantee
+            ) != MICROS_ENDPOINT_OK
+            || (candidate.grantee.record->state != MICROS_ENDPOINT_STATE_ACTIVE
+                && candidate.grantee.record->state != MICROS_ENDPOINT_STATE_SOURCE_ONLY)
+            || candidate.grantee.record->value == candidate.grantor.record->value) {
+            return MICROS_GRANT_ERROR_INVARIANT;
+        }
+    }
+    *selection = candidate;
+    return MICROS_GRANT_OK;
+}
+
 enum micros_grant_error micros_grant_registry_validate(
     const struct micros_grant_registry *registry,
     const struct micros_endpoint_registry *endpoint_registry,
@@ -516,6 +573,7 @@ enum micros_grant_error micros_grant_prepare_create(
     micros_grant_t candidate;
     enum micros_grant_error error;
     size_t slot;
+    size_t active_prefix = 0;
 
     if (
         registry == NULL
@@ -531,7 +589,7 @@ enum micros_grant_error micros_grant_prepare_create(
     if (!range_is_valid(base, length)) {
         return MICROS_GRANT_ERROR_RANGE;
     }
-    error = micros_grant_registry_validate(
+    error = micros_grant_preflight_context(
         registry,
         endpoint_registry,
         objects
@@ -565,6 +623,14 @@ enum micros_grant_error micros_grant_prepare_create(
         return MICROS_GRANT_ERROR_UNAUTHORIZED;
     }
     for (slot = 0; slot < MICROS_GRANT_CAPACITY; ++slot) {
+        error = validate_record_storage(&registry->grants[slot], slot);
+        if (error != MICROS_GRANT_OK) {
+            return error;
+        }
+        if (registry->grants[slot].state == MICROS_GRANT_SLOT_ACTIVE
+            && ++active_prefix > registry->active_count) {
+            return MICROS_GRANT_ERROR_INVARIANT;
+        }
         if (
             registry->grants[slot].state
                 == MICROS_GRANT_SLOT_FREE
@@ -573,7 +639,11 @@ enum micros_grant_error micros_grant_prepare_create(
         }
     }
     if (slot == MICROS_GRANT_CAPACITY) {
-        return MICROS_GRANT_ERROR_CAPACITY;
+        return active_prefix == registry->active_count
+            ? MICROS_GRANT_ERROR_CAPACITY : MICROS_GRANT_ERROR_INVARIANT;
+    }
+    if (registry->active_count == MICROS_GRANT_CAPACITY) {
+        return MICROS_GRANT_ERROR_INVARIANT;
     }
     if (
         micros_grant_pack(
@@ -671,6 +741,7 @@ static enum micros_grant_error resolve_owned_record(
 {
     const struct micros_process *grantor_process;
     const struct micros_endpoint_record *grantor_endpoint;
+    struct selected_grant_record selected;
     uint32_t generation;
     enum micros_grant_error error;
 
@@ -678,7 +749,7 @@ static enum micros_grant_error resolve_owned_record(
     if (error != MICROS_GRANT_OK) {
         return error;
     }
-    error = micros_grant_registry_validate(
+    error = micros_grant_preflight_context(
         registry,
         endpoint_registry,
         objects
@@ -686,18 +757,23 @@ static enum micros_grant_error resolve_owned_record(
     if (error != MICROS_GRANT_OK) {
         return error;
     }
-    error = resolve_active_process_endpoint(
+    error = preflight_selected_record(registry, endpoint_registry, objects, *slot, &selected);
+    if (error != MICROS_GRANT_OK) {
+        return error;
+    }
+    error = resolve_selected_active_participant(
         endpoint_registry,
         objects,
         grantor,
         MICROS_GRANT_ERROR_DEAD_ENDPOINT,
+        &selected.grantor,
         &grantor_process,
         &grantor_endpoint
     );
     if (error != MICROS_GRANT_OK) {
         return error;
     }
-    *record = &registry->grants[*slot];
+    *record = selected.record;
     if (
         (*record)->state != MICROS_GRANT_SLOT_ACTIVE
         || (*record)->generation != generation
@@ -953,6 +1029,7 @@ enum micros_grant_error micros_grant_prepare_copy_authority(
     const struct micros_endpoint_record *grantee_record;
     const struct micros_endpoint_record *grantor_record;
     const struct micros_grant_record *record;
+    struct selected_grant_record selected;
     size_t slot;
     uint32_t generation;
     enum micros_grant_error error;
@@ -981,7 +1058,7 @@ enum micros_grant_error micros_grant_prepare_copy_authority(
     if (error != MICROS_GRANT_OK) {
         return error;
     }
-    error = micros_grant_registry_validate(
+    error = micros_grant_preflight_context(
         grant_registry,
         endpoint_registry,
         objects
@@ -991,18 +1068,23 @@ enum micros_grant_error micros_grant_prepare_copy_authority(
             ? MICROS_GRANT_ERROR_INVARIANT
             : error;
     }
-    error = resolve_active_process_endpoint(
+    error = preflight_selected_record(grant_registry, endpoint_registry, objects, slot, &selected);
+    if (error != MICROS_GRANT_OK) {
+        return error;
+    }
+    error = resolve_selected_active_participant(
         endpoint_registry,
         objects,
         grantee,
         MICROS_GRANT_ERROR_DEAD_ENDPOINT,
+        &selected.grantee,
         &grantee_process,
         &grantee_record
     );
     if (error != MICROS_GRANT_OK) {
         return error;
     }
-    record = &grant_registry->grants[slot];
+    record = selected.record;
     if (
         record->state != MICROS_GRANT_SLOT_ACTIVE
         || record->generation != generation
@@ -1012,14 +1094,15 @@ enum micros_grant_error micros_grant_prepare_copy_authority(
     if (record->grantee_endpoint != grantee_process->primary_endpoint) {
         return MICROS_GRANT_ERROR_UNAUTHORIZED;
     }
-    error = map_endpoint_error(
-        micros_endpoint_resolve_active(
-            endpoint_registry,
-            objects,
-            grantor_endpoint,
-            &grantor_record
-        )
-    );
+    if (grantor_endpoint == record->grantor_endpoint) {
+        grantor_record = selected.grantor.record;
+        error = grantor_record->state == MICROS_ENDPOINT_STATE_ACTIVE
+            ? MICROS_GRANT_OK : MICROS_GRANT_ERROR_STATE;
+    } else {
+        error = map_endpoint_error(micros_endpoint_resolve_active(
+            endpoint_registry, objects, grantor_endpoint, &grantor_record
+        ));
+    }
     if (error != MICROS_GRANT_OK) {
         return error;
     }

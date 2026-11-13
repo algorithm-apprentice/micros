@@ -178,8 +178,7 @@ static enum micros_grant_error grant_copy_execute(
         goto done;
     }
     work.device_status =
-        micros_tty_handoff_runtime_device_authority(
-            endpoint_registry,
+        micros_tty_handoff_runtime_inspect_device_binding(
             objects,
             &work.device_authority
         );
@@ -233,15 +232,13 @@ struct grant_copy_validation {
 
 static void grant_copy_prepare_remote_plan(
     struct grant_copy_validation *work,
-    const struct micros_endpoint_registry *endpoint_registry,
     const struct micros_kernel_objects *objects,
     size_t length,
     uint32_t required_permission
 )
 {
     work->device_status =
-        micros_tty_handoff_runtime_device_authority(
-            endpoint_registry,
+        micros_tty_handoff_runtime_inspect_device_binding(
             objects,
             &work->device_authority
         );
@@ -331,7 +328,7 @@ enum micros_grant_error micros_grant_validate_range(
         goto done;
     }
     grant_copy_prepare_remote_plan(
-        &work, endpoint_registry, objects, length, required_permission
+        &work, objects, length, required_permission
     );
 
 done:

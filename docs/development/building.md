@@ -195,6 +195,23 @@ workflow.
 walk, selected receive and full-capacity close work, with scheduler request
 records shown separately from endpoint/IPC records.
 
+For selected grant validation, use the existing observation engine's dedicated
+ordinary/observed pair:
+
+```bash
+cmake --preset host-debug
+cmake --build build/host-debug --target selected_grant_validation_ordinary selected_grant_validation_test
+ctest --test-dir build/host-debug --output-on-failure --no-tests=error -R '^selected-grant-validation$'
+```
+
+This pair is included by complete `test-unit`, not the fast loop. It retains
+current-source and executable identity, independent semantic/work checks and
+ordinary/observed agreement; it does not replace the grant model or real
+grant, syscall, device and cross-service evidence.
+It executes the actual captured C adapter and copy/TTY orchestration, with
+native-only IRQ, memory-boundary and panic backends. Add `--verbose` to the
+CTest command for per-case audit, grant-prefix, record and index work.
+
 ## Validation planning
 
 Generate a changed-path plan with:

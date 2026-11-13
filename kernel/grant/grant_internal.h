@@ -13,6 +13,12 @@ struct micros_grant_create_plan {
     struct micros_grant_record record;
 };
 
+enum micros_grant_error micros_grant_preflight_context(
+    const struct micros_grant_registry *registry,
+    const struct micros_endpoint_registry *endpoint_registry,
+    const struct micros_kernel_objects *objects
+);
+
 enum micros_grant_error micros_grant_prepare_create(
     const struct micros_grant_registry *registry,
     const struct micros_endpoint_registry *endpoint_registry,

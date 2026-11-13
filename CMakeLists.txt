@@ -4241,6 +4241,139 @@ if(MICROS_BUILD_HOST_TESTS)
     set_tests_properties(selected-ipc-validation PROPERTIES LABELS slow)
     add_dependencies(test-unit selected_ipc_validation_ordinary selected_ipc_validation_test)
 
+    set(GRANT01_NATIVE_ROOT "${CMAKE_CURRENT_BINARY_DIR}/selected-grant-validation")
+    set(GRANT01_NATIVE_INPUTS
+        ${MICROS_KERNEL_OBJECT_CORE_SOURCES}
+        ${MICROS_SCHEDULER_CORE_SOURCES}
+        ${MICROS_ENDPOINT_CORE_SOURCES}
+        kernel/grant/grant.c
+        kernel/grant/grant_copy_core.c
+        kernel/grant/grant_copy.c
+        kernel/grant/grant_copy_range.c
+        kernel/grant/grant_runtime.c
+        kernel/grant/grant_syscall.c
+        kernel/grant/grant_syscall_core.c
+        kernel/grant/grant_abi.c
+        kernel/ipc/ipc_runtime.c
+        kernel/tty/tty_handoff_core.c
+        kernel/tty/tty_handoff_runtime_state.c
+        kernel/tty/tty_handoff_runtime_validate.c
+        kernel/boot/bootstrap_control_core.c
+    )
+    set(GRANT01_NATIVE_HEADERS
+        ${OBJ01_NATIVE_HEADERS}
+        include/micros/endpoint.h
+        include/micros/grant.h
+        include/micros/grant_copy.h
+        include/micros/user_address_space.h
+        include/micros/sv39.h
+        include/micros/work_observation.h
+        kernel/grant/grant_internal.h
+        kernel/endpoint/endpoint_private.h
+        kernel/endpoint/endpoint_internal.h
+        tests/qemu/selected_ipc_work.h
+        arch/riscv64/interrupt.h
+        kernel/boot/bootstrap_control_internal.h
+        kernel/grant/grant_copy_internal.h
+        kernel/grant/grant_runtime_internal.h
+        kernel/grant/grant_syscall.h
+        kernel/ipc/ipc_runtime_internal.h
+        kernel/trap/syscall.h
+        kernel/tty/tty_handoff_core.h
+        kernel/tty/tty_handoff_runtime.h
+        kernel/tty/tty_handoff_runtime_internal.h
+        arch/riscv64/panic_context.h
+        arch/riscv64/trap_context.h
+        include/micros/bootstrap.h
+        include/micros/bootstrap_control.h
+        include/micros/frame_allocator.h
+        include/micros/frame_ownership.h
+        include/micros/frame_ownership_runtime.h
+        include/micros/grant_runtime.h
+        include/micros/grant_syscall_core.h
+        include/micros/ipc_core.h
+        include/micros/ipc_runtime.h
+        include/micros/kernel_address_space.h
+        include/micros/kernel_object_runtime.h
+        include/micros/panic.h
+        include/micros/spawn.h
+        include/micros/syscall_abi.h
+        include/micros/tty.h
+        include/micros/user_address_space_core.h
+        include/micros/vm.h
+        include/micros/vm_bootstrap.h
+        kernel/memory/user_address_space_internal.h
+        kernel/vm/vm_handoff_core.h
+    )
+    set(GRANT01_NATIVE_DEPENDENCIES ${GRANT01_NATIVE_INPUTS} ${GRANT01_NATIVE_HEADERS})
+    list(TRANSFORM GRANT01_NATIVE_DEPENDENCIES PREPEND "${CMAKE_CURRENT_SOURCE_DIR}/")
+    set(GRANT01_NATIVE_OUTPUTS)
+    foreach(grant01_channel IN ITEMS ordinary work)
+        set(GRANT01_SOURCES_${grant01_channel})
+        foreach(grant01_source IN LISTS GRANT01_NATIVE_INPUTS)
+            list(APPEND GRANT01_SOURCES_${grant01_channel}
+                "${GRANT01_NATIVE_ROOT}/${grant01_channel}/${grant01_source}")
+        endforeach()
+        list(APPEND GRANT01_NATIVE_OUTPUTS ${GRANT01_SOURCES_${grant01_channel}})
+        foreach(grant01_header IN LISTS GRANT01_NATIVE_HEADERS)
+            list(APPEND GRANT01_NATIVE_OUTPUTS "${GRANT01_NATIVE_ROOT}/${grant01_channel}/${grant01_header}")
+        endforeach()
+    endforeach()
+    add_custom_command(
+        OUTPUT ${GRANT01_NATIVE_OUTPUTS}
+        COMMAND "${MICROS_PYTHON}" ${MICROS_PYTHON_ARGS}
+            "${CMAKE_CURRENT_SOURCE_DIR}/tools/generate_selected_grant_validation_fixture.py"
+        DEPENDS ${GRANT01_NATIVE_DEPENDENCIES}
+            tests/host/selected_grant_validation_test.c
+            tests/host/selected_grant_validation_internal.h
+            tests/host/selected_grant_irq.h
+            tests/host/selected_grant_validation_evidence.py
+            tests/host/selected_grant_validation_source.py
+            tests/host/native_observations.py
+            tests/host/native_observations.json
+            tests/host/source_snapshot.py
+            tests/host/c_source_records.py
+            tests/host/work_count_lexical.py
+            tests/host/work_count_projection.py
+            tests/host/work_count_types.py
+            tools/generate_selected_grant_validation_fixture.py
+        WORKING_DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}"
+        VERBATIM
+    )
+    add_executable(selected_grant_validation_ordinary ${GRANT01_SOURCES_ordinary}
+        tests/host/selected_grant_validation_test.c tests/host/selected_grant_runtime_test.c
+        tests/host/selected_grant_scope_test.c tests/host/selected_grant_backend.c)
+    add_executable(selected_grant_validation_test ${GRANT01_SOURCES_work}
+        tests/host/selected_grant_validation_test.c tests/host/selected_grant_runtime_test.c
+        tests/host/selected_grant_scope_test.c tests/host/selected_grant_backend.c tests/work/work_counts.c)
+    foreach(grant01_channel IN ITEMS ordinary work)
+        if(grant01_channel STREQUAL ordinary)
+            set(grant01_target selected_grant_validation_ordinary)
+        else()
+            set(grant01_target selected_grant_validation_test)
+        endif()
+        target_include_directories(${grant01_target} PRIVATE
+            "${GRANT01_NATIVE_ROOT}/${grant01_channel}"
+            "${GRANT01_NATIVE_ROOT}/${grant01_channel}/include"
+            "${CMAKE_CURRENT_SOURCE_DIR}" "${CMAKE_CURRENT_SOURCE_DIR}/include")
+        target_compile_features(${grant01_target} PRIVATE c_std_17)
+        target_compile_options(${grant01_target} PRIVATE
+            -Wall -Wextra -Werror -Wpedantic -Wmissing-prototypes -Wstrict-prototypes -fno-builtin)
+        if(MICROS_ENABLE_SANITIZERS AND CMAKE_C_COMPILER_ID MATCHES "Clang|GNU")
+            target_compile_options(${grant01_target} PRIVATE -fno-omit-frame-pointer -fsanitize=address,undefined)
+            target_link_options(${grant01_target} PRIVATE -fsanitize=address,undefined)
+        endif()
+    endforeach()
+    target_compile_definitions(selected_grant_validation_test PRIVATE
+        MICROS_TEST_WORK_COUNTS=1 MICROS_SELECTED_GRANT_LAUNCHER=1
+        "MICROS_SELECTED_GRANT_PYTHON=\"${MICROS_PYTHON}\""
+        "MICROS_SELECTED_GRANT_DRIVER=\"${CMAKE_CURRENT_SOURCE_DIR}/tools/check_selected_grant_validation.py\""
+        "MICROS_SELECTED_GRANT_ROOT=\"${CMAKE_CURRENT_SOURCE_DIR}\"")
+    add_test(NAME selected-grant-validation COMMAND selected_grant_validation_test
+        "$<TARGET_FILE:selected_grant_validation_ordinary>")
+    set_tests_properties(selected-grant-validation PROPERTIES LABELS slow)
+    add_dependencies(test-unit selected_grant_validation_ordinary selected_grant_validation_test)
+
     include("${CMAKE_CURRENT_SOURCE_DIR}/tests/stack/StackEvidence.cmake")
     include("${CMAKE_CURRENT_SOURCE_DIR}/tests/work/WorkCounts.cmake")
     return()

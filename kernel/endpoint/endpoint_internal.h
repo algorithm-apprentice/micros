@@ -12,6 +12,13 @@ enum micros_endpoint_error endpoint_preflight_registry(
     const struct micros_endpoint_registry *registry
 );
 
+enum micros_endpoint_error endpoint_preflight_process(
+    const struct micros_endpoint_registry *registry,
+    const struct micros_kernel_objects *objects,
+    struct micros_process_handle handle,
+    const struct micros_process **process
+);
+
 bool micros_endpoint_names_slot(micros_endpoint_t endpoint, uint16_t slot);
 
 bool micros_endpoint_reply_token_slot(uint64_t token, uint16_t *slot);

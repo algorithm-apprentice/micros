@@ -61,8 +61,7 @@ static void grant_syscall_create_request(
         return;
     }
     work->device_status =
-        micros_tty_handoff_runtime_device_authority(
-            work->endpoint_registry,
+        micros_tty_handoff_runtime_inspect_device_binding(
             context->objects,
             &work->device_authority
         );
@@ -186,8 +185,9 @@ micros_grant_handle_captured_user_ecall(
     if (
         work.grant_registry == NULL
         || work.endpoint_registry == NULL
-        || micros_grant_runtime_validate() != MICROS_GRANT_OK
-        || micros_ipc_runtime_validate() != MICROS_ENDPOINT_OK
+        || micros_grant_preflight_context(
+            work.grant_registry, work.endpoint_registry, context->objects
+        ) != MICROS_GRANT_OK
     ) {
         panic_grant_syscall(hart, frame, "grant-runtime-invariant");
     }
