@@ -6,8 +6,9 @@ This is the independently reviewed GRANT03 design Accepted by
 [ADR-0131](../adr/0131-retained-grant-copy-spans.md), owning B05-F005.
 GRANT01 #259, COPY01 #191 and MEM04 #228 are merged; the preferred
 serialized predecessor GRANT02 #262 is complete.
-Design #263 is separately merged. Its paired implementation proceeds from
-that main; the design alone closes no GRANT03 finding.
+Design #263 and independently reviewed implementation #264 are separately
+merged. Exact native/work, target/artifact, composed-resource, stack and
+publication evidence is recorded in the implementation PR.
 
 The [fixed study](../research/minix-grant-copy-spans.md) owns reference
 provenance and difference classification. This contract changes only
