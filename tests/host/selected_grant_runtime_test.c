@@ -254,7 +254,7 @@ static bool runtime_setup(const struct runtime_case *test)
 {
     struct grant01_fixture *fixture = grant01_fixture();
 
-    REQUIRE(grant01_setup(test->occupied, GRANT01_ACTORS));
+    REQUIRE(grant01_setup(test->operation == RUNTIME_DEVICE ? 0 : test->occupied, GRANT01_ACTORS));
     REQUIRE(runtime_context(test->operation == RUNTIME_CREATE_DEVICE ? 3
                             : test->operation >= RUNTIME_SYSCALL_FROM ? 1 : 0));
     REQUIRE(runtime_tty());
@@ -273,9 +273,13 @@ static bool runtime_setup(const struct runtime_case *test)
         fixture->grants.grants[0].base = MICROS_USER_VIRTUAL_BASE + 4088;
         fixture->grants.grants[0].length = 32;
     } else if (test->operation == RUNTIME_DEVICE) {
-        fixture->grants.grants[0].grantor = fixture->processes[3];
-        fixture->grants.grants[0].grantor_endpoint = fixture->identities[3];
-        fixture->grants.grants[0].base = MICROS_TTY_UART_VIRTUAL_BASE;
+        micros_grant_t grant = MICROS_GRANT_NONE;
+
+        REQUIRE(micros_grant_create(
+            &fixture->grants, &fixture->endpoints, &fixture->objects, fixture->processes[3],
+            fixture->identities[1], MICROS_TTY_UART_VIRTUAL_BASE, 64,
+            MICROS_GRANT_PERMISSION_DEFINED_MASK, &grant
+        ) == MICROS_GRANT_OK && grant == 64);
     } else if (test->operation == RUNTIME_SAME_VA) {
         fixture->grants.grants[0].base = MICROS_TTY_UART_VIRTUAL_BASE + 32;
         fixture->memory_base[0] = MICROS_TTY_UART_VIRTUAL_BASE;

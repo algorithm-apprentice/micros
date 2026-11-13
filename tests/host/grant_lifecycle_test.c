@@ -229,6 +229,46 @@ static bool grant_test_create_revoke_and_reuse(
     return true;
 }
 
+static bool grant_test_lifo_reuse(struct grant_test_fixture *fixture)
+{
+    micros_grant_t grants[3];
+    micros_grant_t created = MICROS_GRANT_NONE;
+
+    EXPECT_TRUE(grant_test_setup_fixture(fixture));
+    for (size_t slot = 0; slot < 3; ++slot) {
+        EXPECT_GRANT_ERROR(MICROS_GRANT_OK, micros_grant_create(
+            &fixture->grant_registry, &fixture->endpoint_registry, &fixture->objects,
+            fixture->processes[0], fixture->endpoints[1],
+            MICROS_USER_VIRTUAL_BASE + slot * 64, 64, MICROS_GRANT_PERMISSION_READ, &grants[slot]
+        ));
+        EXPECT_TRUE(grants[slot] == 64 + slot);
+    }
+    EXPECT_GRANT_ERROR(MICROS_GRANT_OK, micros_grant_revoke(
+        &fixture->grant_registry, &fixture->endpoint_registry, &fixture->objects,
+        fixture->processes[0], grants[0]
+    ));
+    EXPECT_GRANT_ERROR(MICROS_GRANT_OK, micros_grant_revoke(
+        &fixture->grant_registry, &fixture->endpoint_registry, &fixture->objects,
+        fixture->processes[0], grants[2]
+    ));
+    EXPECT_GRANT_ERROR(MICROS_GRANT_OK, micros_grant_create(
+        &fixture->grant_registry, &fixture->endpoint_registry, &fixture->objects,
+        fixture->processes[0], fixture->endpoints[1],
+        MICROS_USER_VIRTUAL_BASE, 64, MICROS_GRANT_PERMISSION_READ, &created
+    ));
+    if (created != 130) {
+        fprintf(stderr, "GRANT02_LIFO expected=130 actual=%u\n", created);
+        return false;
+    }
+    EXPECT_GRANT_ERROR(MICROS_GRANT_OK, micros_grant_create(
+        &fixture->grant_registry, &fixture->endpoint_registry, &fixture->objects,
+        fixture->processes[0], fixture->endpoints[1],
+        MICROS_USER_VIRTUAL_BASE, 64, MICROS_GRANT_PERMISSION_READ, &created
+    ));
+    EXPECT_TRUE(created == 128);
+    return true;
+}
+
 bool grant_test_create_inspect_revoke_and_reuse(void)
 {
     struct grant_test_fixture *fixture = grant_test_context();
@@ -245,7 +285,7 @@ bool grant_test_create_inspect_revoke_and_reuse(void)
     if (!grant_test_create_foreign_denials(fixture, &work)) {
         return false;
     }
-    return grant_test_create_revoke_and_reuse(fixture, &work);
+    return grant_test_create_revoke_and_reuse(fixture, &work) && grant_test_lifo_reuse(fixture);
 }
 
 bool grant_test_create_failures_and_capacity(void)
@@ -349,9 +389,12 @@ bool grant_test_terminal_generation_quarantines(void)
             MICROS_GRANT_SLOT_QUARANTINED;
         fixture->grant_registry.grants[index].generation =
             MICROS_GRANT_GENERATION_MAX;
+        fixture->grant_registry.grants[index].free_next = MICROS_GRANT_NONE;
     }
     fixture->grant_registry.grants[MICROS_GRANT_CAPACITY - 1].generation =
         MICROS_GRANT_GENERATION_MAX - 1;
+    fixture->grant_registry.free_head = ((MICROS_GRANT_GENERATION_MAX - 1) << MICROS_GRANT_SLOT_BITS)
+        | (MICROS_GRANT_CAPACITY - 1);
     EXPECT_GRANT_ERROR(
         MICROS_GRANT_OK,
         micros_grant_registry_validate(

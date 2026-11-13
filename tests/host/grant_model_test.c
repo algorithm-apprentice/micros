@@ -2,6 +2,7 @@
 
 struct grant_test_boundary_case {
     struct micros_grant_registry expected;
+    struct grant_model_index model_index;
     micros_grant_t terminal;
     size_t index;
 };
@@ -12,7 +13,8 @@ static bool grant_test_boundary_fill_registry(
 )
 {
     EXPECT_TRUE(grant_test_setup_fixture(fixture));
-    work->expected = fixture->grant_registry;
+    grant_test_model_initialize_reference(
+        &work->expected, &work->model_index, fixture->grant_registry.initialization_magic);
     for (work->index = 0; work->index < MICROS_GRANT_CAPACITY; ++work->index) {
         struct micros_grant_record *record =
             &work->expected.grants[work->index];
@@ -45,6 +47,9 @@ static bool grant_test_boundary_fill_registry(
             .permissions = MICROS_GRANT_PERMISSION_READ,
         };
         ++work->expected.active_count;
+        --work->model_index.free_count;
+        work->model_index.publication[work->index] = ++work->model_index.last_publication;
+        grant_test_model_project_indexes(&work->expected, &work->model_index);
         EXPECT_TRUE(grant_test_registries_equal(&fixture->grant_registry, &work->expected));
     }
     return true;
@@ -91,10 +96,17 @@ static bool grant_test_boundary_quarantine_prepare(
             MICROS_GRANT_SLOT_QUARANTINED;
         fixture->grant_registry.grants[work->index].generation =
             MICROS_GRANT_GENERATION_MAX;
+        fixture->grant_registry.grants[work->index].free_next = MICROS_GRANT_NONE;
     }
     fixture->grant_registry.grants[MICROS_GRANT_CAPACITY - 1].generation =
         MICROS_GRANT_GENERATION_MAX - 1;
+    fixture->grant_registry.free_head = ((MICROS_GRANT_GENERATION_MAX - 1) << MICROS_GRANT_SLOT_BITS)
+        | (MICROS_GRANT_CAPACITY - 1);
     work->expected = fixture->grant_registry;
+    memset(&work->model_index, 0, sizeof(work->model_index));
+    work->model_index.free_count = 1;
+    work->model_index.free_slots[0] = MICROS_GRANT_CAPACITY - 1;
+    grant_test_model_project_indexes(&work->expected, &work->model_index);
     return true;
 }
 
@@ -129,6 +141,9 @@ static bool grant_test_boundary_terminal_revoke(
             .permissions = MICROS_GRANT_PERMISSION_WRITE,
         };
     work->expected.active_count = 1;
+    work->model_index.free_count = 0;
+    work->model_index.publication[MICROS_GRANT_CAPACITY - 1] = ++work->model_index.last_publication;
+    grant_test_model_project_indexes(&work->expected, &work->model_index);
     EXPECT_TRUE(grant_test_registries_equal(&fixture->grant_registry, &work->expected));
     EXPECT_GRANT_ERROR(
         MICROS_GRANT_OK,
@@ -140,16 +155,8 @@ static bool grant_test_boundary_terminal_revoke(
             work->terminal
         )
     );
-    memset(
-        &work->expected.grants[MICROS_GRANT_CAPACITY - 1],
-        0,
-        sizeof(work->expected.grants[MICROS_GRANT_CAPACITY - 1])
-    );
-    work->expected.grants[MICROS_GRANT_CAPACITY - 1].state =
-        MICROS_GRANT_SLOT_QUARANTINED;
-    work->expected.grants[MICROS_GRANT_CAPACITY - 1].generation =
-        MICROS_GRANT_GENERATION_MAX - 1;
-    work->expected.active_count = 0;
+    grant_test_model_retire_reference(&work->expected, &work->model_index, MICROS_GRANT_CAPACITY - 1);
+    grant_test_model_project_indexes(&work->expected, &work->model_index);
     return (
         grant_test_registries_equal(&fixture->grant_registry, &work->expected)
         && micros_grant_registry_validate(
@@ -248,6 +255,7 @@ static bool grant_test_model_compare_state(
     size_t step
 )
 {
+    grant_test_model_project_indexes(&run->expected, &run->index);
     if (
         !grant_test_registries_equal(&fixture->grant_registry, &run->expected)
         || micros_grant_registry_validate(
@@ -319,7 +327,7 @@ static bool grant_test_grant_model(void)
     size_t step;
 
     EXPECT_TRUE(grant_test_setup_fixture(fixture));
-    run.expected = fixture->grant_registry;
+    grant_test_model_initialize_reference(&run.expected, &run.index, fixture->grant_registry.initialization_magic);
     for (step = 0; step < GRANT_PROCESS_COUNT; ++step) {
         run.expected_process_slot[step] = fixture->processes[step].slot;
         run.expected_process_generation[step] =

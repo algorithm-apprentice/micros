@@ -46,6 +46,19 @@ static void reset_resources(void)
     baseline->kernel.pm.last_prepared_token = 1;
     baseline->kernel.vm.last_load_token = 1;
     baseline->kernel.vm.last_mapping_generation = 1;
+    baseline->kernel.grants.free_head = 64;
+    for (size_t slot = 0; slot < MICROS_GRANT_CAPACITY; ++slot) {
+        struct micros_grant_record *record = &baseline->kernel.grants.grants[slot];
+
+        record->generation = 1;
+        record->free_next = slot == MICROS_GRANT_CAPACITY - 1 ? MICROS_GRANT_NONE : (uint32_t)(65 + slot);
+        record->grantor_link = (struct micros_grant_link){MICROS_GRANT_NONE, MICROS_GRANT_NONE};
+        record->grantee_link = record->grantor_link;
+    }
+    for (size_t slot = 0; slot < MICROS_PROCESS_CAPACITY; ++slot) {
+        baseline->kernel.grants.participants[slot] =
+            (struct micros_grant_endpoint_index){MICROS_ENDPOINT_NONE, MICROS_GRANT_NONE};
+    }
     baseline->kernel.table_count = 1;
     baseline->kernel.tables[0].physical_address = UINT64_C(0x90000000);
     baseline->kernel.tables[0].entries[0] = UINT64_C(0x20000001);
@@ -69,11 +82,145 @@ static void reset_resources(void)
     resource_context.current = *baseline;
 }
 
+static bool corrupt_grants_are_rejected(void)
+{
+    const struct micros_elf_spawn_kernel_resources *baseline = &resource_context.baseline.kernel;
+    const struct micros_elf_spawn_kernel_resources *current = &resource_context.current.kernel;
+
+    return !micros_elf_spawn_same_kernel_resources(baseline, current)
+        && !micros_elf_spawn_same_kernel_resources(current, baseline)
+        && !micros_elf_spawn_same_kernel_resources(current, current);
+}
+
+static bool test_quiescent_grant_history(void)
+{
+    const struct micros_elf_spawn_kernel_resources *baseline = &resource_context.baseline.kernel;
+    struct micros_elf_spawn_kernel_resources *current = &resource_context.current.kernel;
+
+    reset_resources();
+    /* Allocate 0/1, then retire 0/1: the valid free stack becomes 1/0/2/... . */
+    current->grants.grants[0].generation = 2;
+    current->grants.grants[1].generation = 2;
+    current->grants.free_head = 129;
+    current->grants.grants[1].free_next = 128;
+    current->grants.grants[0].free_next = 66;
+    CHECK(micros_elf_spawn_same_kernel_resources(baseline, current));
+    CHECK(!micros_elf_spawn_same_kernel_resources(current, baseline));
+    reset_resources();
+    current->grants.initialization_magic++;
+    CHECK(!micros_elf_spawn_same_kernel_resources(baseline, current));
+    return true;
+}
+
+static bool test_corrupt_quiescent_grants(void)
+{
+    static const size_t dirty_offsets[] = {
+        offsetof(struct micros_grant_record, grantor_link.previous),
+        offsetof(struct micros_grant_record, grantor_link.next),
+        offsetof(struct micros_grant_record, grantee_link.previous),
+        offsetof(struct micros_grant_record, grantee_link.next),
+        offsetof(struct micros_grant_record, grantor.slot),
+        offsetof(struct micros_grant_record, grantor.generation),
+        offsetof(struct micros_grant_record, grantor_endpoint),
+        offsetof(struct micros_grant_record, grantee_endpoint),
+        offsetof(struct micros_grant_record, base),
+        offsetof(struct micros_grant_record, length),
+        offsetof(struct micros_grant_record, permissions),
+        sizeof(struct micros_grant_record) - 1,
+    };
+    struct micros_grant_registry *grants = &resource_context.current.kernel.grants;
+    uint8_t *record = (uint8_t *)&grants->grants[0];
+
+    for (size_t index = 0; index < sizeof(dirty_offsets) / sizeof(dirty_offsets[0]); ++index) {
+        reset_resources();
+        record[dirty_offsets[index]] ^= 1;
+        CHECK(corrupt_grants_are_rejected());
+    }
+    reset_resources();
+    grants->active_count = 1;
+    CHECK(corrupt_grants_are_rejected());
+    reset_resources();
+    grants->grants[0].state = MICROS_GRANT_SLOT_ACTIVE;
+    CHECK(corrupt_grants_are_rejected());
+    reset_resources();
+    grants->grants[0].state = (enum micros_grant_slot_state)3;
+    CHECK(corrupt_grants_are_rejected());
+    reset_resources();
+    grants->grants[0].generation = 0;
+    CHECK(corrupt_grants_are_rejected());
+    reset_resources();
+    grants->grants[0].generation = MICROS_GRANT_GENERATION_MAX + 1;
+    CHECK(corrupt_grants_are_rejected());
+    reset_resources();
+    grants->grants[MICROS_GRANT_CAPACITY - 1].generation = MICROS_GRANT_GENERATION_MAX;
+    CHECK(corrupt_grants_are_rejected());
+    reset_resources();
+    grants->free_head = MICROS_GRANT_NONE;
+    CHECK(corrupt_grants_are_rejected());
+    reset_resources();
+    grants->grants[0].free_next = 129;
+    CHECK(corrupt_grants_are_rejected());
+    reset_resources();
+    grants->grants[0].free_next = 66;
+    CHECK(corrupt_grants_are_rejected());
+    reset_resources();
+    grants->grants[2].free_next = 65;
+    CHECK(corrupt_grants_are_rejected());
+    reset_resources();
+    grants->participants[3].endpoint = UINT32_C(0x1003);
+    CHECK(corrupt_grants_are_rejected());
+    reset_resources();
+    grants->participants[3].head = 64;
+    CHECK(corrupt_grants_are_rejected());
+    return true;
+}
+
+static bool test_quarantined_grant_resources(void)
+{
+    const size_t last = MICROS_GRANT_CAPACITY - 1;
+    const struct micros_elf_spawn_kernel_resources *baseline = &resource_context.baseline.kernel;
+    struct micros_elf_spawn_kernel_resources *current = &resource_context.current.kernel;
+    struct micros_grant_record *record = &current->grants.grants[last];
+
+    reset_resources();
+    record->state = MICROS_GRANT_SLOT_QUARANTINED;
+    record->generation = MICROS_GRANT_GENERATION_MAX - 1;
+    current->grants.grants[last - 1].free_next = MICROS_GRANT_NONE;
+    CHECK(micros_elf_spawn_same_kernel_resources(current, current));
+    CHECK(!micros_elf_spawn_same_kernel_resources(baseline, current));
+    resource_context.baseline.kernel.grants = current->grants;
+    CHECK(micros_elf_spawn_same_kernel_resources(baseline, current));
+    record->generation = MICROS_GRANT_GENERATION_MAX;
+    CHECK(micros_elf_spawn_same_kernel_resources(current, current));
+    CHECK(!micros_elf_spawn_same_kernel_resources(baseline, current));
+    record->generation = 1;
+    CHECK(corrupt_grants_are_rejected());
+    record->generation = MICROS_GRANT_GENERATION_MAX - 1;
+    record->free_next = 64;
+    CHECK(corrupt_grants_are_rejected());
+    record->free_next = MICROS_GRANT_NONE;
+    current->grants.grants[last - 1].free_next =
+        ((MICROS_GRANT_GENERATION_MAX - 1) << MICROS_GRANT_SLOT_BITS) | (uint32_t)last;
+    CHECK(corrupt_grants_are_rejected());
+    reset_resources();
+    current->grants.free_head = MICROS_GRANT_NONE;
+    for (size_t slot = 0; slot < MICROS_GRANT_CAPACITY; ++slot) {
+        current->grants.grants[slot].state = MICROS_GRANT_SLOT_QUARANTINED;
+        current->grants.grants[slot].generation = MICROS_GRANT_GENERATION_MAX;
+        current->grants.grants[slot].free_next = MICROS_GRANT_NONE;
+    }
+    CHECK(micros_elf_spawn_same_kernel_resources(current, current));
+    return true;
+}
+
 bool test_elf_spawn_kernel_resource_oracle(void)
 {
     struct micros_elf_spawn_kernel_resources *current = &resource_context.current.kernel;
     const struct micros_elf_spawn_kernel_resources *baseline = &resource_context.baseline.kernel;
 
+    CHECK(test_quiescent_grant_history());
+    CHECK(test_corrupt_quiescent_grants());
+    CHECK(test_quarantined_grant_resources());
     reset_resources();
     CHECK(micros_elf_spawn_same_kernel_resources(baseline, current));
     current->objects.processes[6].generation++;
@@ -98,6 +245,15 @@ bool test_elf_spawn_kernel_resource_oracle(void)
     CHECK(!micros_elf_spawn_same_kernel_resources(baseline, current));
     reset_resources();
     current->grants.grants[0].state = MICROS_GRANT_SLOT_ACTIVE;
+    CHECK(!micros_elf_spawn_same_kernel_resources(baseline, current));
+    reset_resources();
+    current->grants.free_head = 128;
+    CHECK(!micros_elf_spawn_same_kernel_resources(baseline, current));
+    reset_resources();
+    current->grants.participants[0] = (struct micros_grant_endpoint_index){UINT32_C(0x1000), 64};
+    CHECK(!micros_elf_spawn_same_kernel_resources(baseline, current));
+    reset_resources();
+    current->grants.grants[0].free_next = 64;
     CHECK(!micros_elf_spawn_same_kernel_resources(baseline, current));
     reset_resources();
     current->ownership.owners[1].slot = 7;
@@ -162,6 +318,9 @@ bool test_elf_spawn_resource_counter_and_inactive_byte_policy(void)
     current->kernel.objects.processes[9].generation++;
     current->kernel.objects.threads[9].generation++;
     current->kernel.grants.grants[0].generation++;
+    current->kernel.grants.free_head = 128;
+    current->kernel.grants.grants[1].generation++;
+    current->kernel.grants.grants[0].free_next = 129;
     current->kernel.endpoints.last_reply_token++;
     current->kernel.pm.last_transaction++;
     current->kernel.pm.last_prepared_token++;

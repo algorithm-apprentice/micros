@@ -278,6 +278,7 @@
           "publish_profile_table": []
         },
         "kernel/grant/grant.c": {
+          "advance_incident_walk": [],
           "authority_is_zero": [],
           "bytes_are_zero": [
             [["work"],["grant01/kernel/grant/grant.c/bytes_are_zero/loop-24","insert","KERNEL_GRANT","COMPARISON",1,"entry","",[["for ( index = 0 ; index < size ; ++ index ) {",0]],0,0]]
@@ -286,70 +287,106 @@
             [["work"],["grant01/kernel/grant/grant.c/clear_bytes/loop-23","insert","KERNEL_GRANT","CLEARED_BYTE",1,"entry","",[["for ( index = 0 ; index < size ; ++ index ) {",0]],0,0]]
           ],
           "clear_record_authority": [],
+          "clear_record_links": [],
           "copy_bytes": [
             [["work"],["grant01/kernel/grant/grant.c/copy_bytes/loop-31","insert","KERNEL_GRANT","COPIED_BYTE",1,"entry","",[["for ( index = 0 ; index < size ; ++ index ) {",0]],0,0]]
           ],
+          "grant_slot": [],
+          "insert_member_prevalidated": [],
+          "link_token_has_shape": [],
+          "links_are_null": [],
+          "links_have_shape": [],
+          "lowest_selected_slot": [],
           "map_endpoint_error": [],
+          "member_link_prevalidated": [
+            [["work"],["grant01/kernel/grant/grant.c/member_link_prevalidated/index-9","wrap","KERNEL_GRANT","INDEX_PROBE",1,"value","grant_slot ( token )",[],0,1]]
+          ],
           "micros_grant_commit_create_prevalidated": [
-            [["work"],["grant01/kernel/grant/grant.c/micros_grant_commit_create_prevalidated/index-6","wrap","KERNEL_GRANT","INDEX_PROBE",1,"value","plan -> slot",[],0,1]]
+            [["work"],["grant01/kernel/grant/grant.c/micros_grant_commit_create_prevalidated/index-14","wrap","KERNEL_GRANT","INDEX_PROBE",1,"value","plan -> slot",[],0,1]]
           ],
           "micros_grant_commit_endpoint_cancel": [
-            [["work"],["grant01/kernel/grant/grant.c/micros_grant_commit_endpoint_cancel/loop-106","insert","KERNEL_GRANT","RECORD_VISIT",1,"entry","",[["for ( index = 0 ; index < MICROS_GRANT_CAPACITY ; ++ index ) {",0]],0,0]],
-            [["work"],["grant01/kernel/grant/grant.c/micros_grant_commit_endpoint_cancel/index-117","wrap","KERNEL_GRANT","INDEX_PROBE",1,"value","index",[["for ( index = 0 ; index < MICROS_GRANT_CAPACITY ; ++ index ) {",0]],0,4]],
-            [["work"],["grant01/kernel/grant/grant.c/micros_grant_commit_endpoint_cancel/index-192","wrap","KERNEL_GRANT","INDEX_PROBE",1,"value","index",[["for ( index = 0 ; index < MICROS_GRANT_CAPACITY ; ++ index ) {",0]],2,4]],
-            [["work"],["grant01/kernel/grant/grant.c/micros_grant_commit_endpoint_cancel/index-209","wrap","KERNEL_GRANT","INDEX_PROBE",1,"value","index",[["for ( index = 0 ; index < MICROS_GRANT_CAPACITY ; ++ index ) {",0]],3,4]],
-            [["work"],["grant01/kernel/grant/grant.c/micros_grant_commit_endpoint_cancel/loop-249","insert","KERNEL_GRANT","RECORD_VISIT",1,"entry","",[["for ( index = 0 ; index < MICROS_GRANT_CAPACITY ; ++ index ) {",1]],0,0]],
-            [["work"],["grant01/kernel/grant/grant.c/micros_grant_commit_endpoint_cancel/index-276","wrap","KERNEL_GRANT","INDEX_PROBE",1,"value","index",[["for ( index = 0 ; index < MICROS_GRANT_CAPACITY ; ++ index ) {",1],["if ( ( plan -> selected_slots & ( UINT64_C ( 1 ) << index ) ) != 0 ) {",0]],0,2]]
+            [["work"],["grant01/kernel/grant/grant.c/micros_grant_commit_endpoint_cancel/loop-104","insert","KERNEL_GRANT","RECORD_VISIT",1,"entry","",[["while ( walk . current != MICROS_GRANT_NONE ) {",0]],0,0]],
+            [["work"],["grant01/kernel/grant/grant.c/micros_grant_commit_endpoint_cancel/index-168","wrap","KERNEL_GRANT","INDEX_PROBE",1,"value","slot",[["while ( walk . current != MICROS_GRANT_NONE ) {",0]],2,3]],
+            [["work"],["grant01/kernel/grant/grant.c/micros_grant_commit_endpoint_cancel/loop-237","insert","KERNEL_GRANT","RECORD_VISIT",1,"entry","",[["while ( remaining != 0 ) {",0]],0,0]]
           ],
           "micros_grant_create": [],
           "micros_grant_inspect": [],
           "micros_grant_pack": [],
           "micros_grant_preflight_context": [],
           "micros_grant_prepare_copy_authority": [],
-          "micros_grant_prepare_create": [
-            [["work"],["grant01/kernel/grant/grant.c/micros_grant_prepare_create/loop-197","insert","KERNEL_GRANT","RECORD_VISIT",1,"entry","",[["for ( slot = 0 ; slot < MICROS_GRANT_CAPACITY ; ++ slot ) {",0]],0,0]],
-            [["work"],["grant01/kernel/grant/grant.c/micros_grant_prepare_create/index-206","wrap","KERNEL_GRANT","INDEX_PROBE",1,"value","slot",[["for ( slot = 0 ; slot < MICROS_GRANT_CAPACITY ; ++ slot ) {",0]],0,4]],
-            [["work"],["grant01/kernel/grant/grant.c/micros_grant_prepare_create/index-229","wrap","KERNEL_GRANT","INDEX_PROBE",1,"value","slot",[["for ( slot = 0 ; slot < MICROS_GRANT_CAPACITY ; ++ slot ) {",0]],2,4]],
-            [["work"],["grant01/kernel/grant/grant.c/micros_grant_prepare_create/index-254","wrap","KERNEL_GRANT","INDEX_PROBE",1,"value","slot",[["for ( slot = 0 ; slot < MICROS_GRANT_CAPACITY ; ++ slot ) {",0]],3,4]],
-            [["work"],["grant01/kernel/grant/grant.c/micros_grant_prepare_create/index-308","wrap","KERNEL_GRANT","INDEX_PROBE",1,"value","slot",[],6,9]],
-            [["work"],["grant01/kernel/grant/grant.c/micros_grant_prepare_create/index-374","wrap","KERNEL_GRANT","INDEX_PROBE",1,"value","slot",[["{",10]],0,1]]
-          ],
+          "micros_grant_prepare_create": [],
           "micros_grant_prepare_endpoint_cancel": [
-            [["work"],["grant01/kernel/grant/grant.c/micros_grant_prepare_endpoint_cancel/loop-168","insert","KERNEL_GRANT","RECORD_VISIT",1,"entry","",[["for ( index = 0 ; index < MICROS_GRANT_CAPACITY ; ++ index ) {",0]],0,0]],
-            [["work"],["grant01/kernel/grant/grant.c/micros_grant_prepare_endpoint_cancel/index-179","wrap","KERNEL_GRANT","INDEX_PROBE",1,"value","index",[["for ( index = 0 ; index < MICROS_GRANT_CAPACITY ; ++ index ) {",0]],0,1]],
-            [["work"],["grant01/kernel/grant/grant.c/micros_grant_prepare_endpoint_cancel/index-220","wrap","KERNEL_GRANT","INDEX_PROBE",1,"value","index",[["for ( index = 0 ; index < MICROS_GRANT_CAPACITY ; ++ index ) {",0],["if ( record -> state == MICROS_GRANT_SLOT_ACTIVE && ( record -> grantor_endpoint == endpoint || record -> grantee_endpoint == endpoint ) ) {",0]],1,2]]
+            [["work"],["grant01/kernel/grant/grant.c/micros_grant_prepare_endpoint_cancel/loop-176","insert","KERNEL_GRANT","RECORD_VISIT",1,"entry","",[["while ( walk . current != MICROS_GRANT_NONE ) {",0]],0,0]],
+            [["work"],["grant01/kernel/grant/grant.c/micros_grant_prepare_endpoint_cancel/index-255","wrap","KERNEL_GRANT","INDEX_PROBE",1,"value","slot",[["while ( walk . current != MICROS_GRANT_NONE ) {",0]],2,3]]
           ],
           "micros_grant_registry_initialize": [
-            [["work"],["grant01/kernel/grant/grant.c/micros_grant_registry_initialize/loop-65","insert","KERNEL_GRANT","RECORD_VISIT",1,"entry","",[["for ( index = 0 ; index < MICROS_GRANT_CAPACITY ; ++ index ) {",0]],0,0]],
-            [["work"],["grant01/kernel/grant/grant.c/micros_grant_registry_initialize/index-69","wrap","KERNEL_GRANT","INDEX_PROBE",1,"value","index",[["for ( index = 0 ; index < MICROS_GRANT_CAPACITY ; ++ index ) {",0]],0,2]],
-            [["work"],["grant01/kernel/grant/grant.c/micros_grant_registry_initialize/index-80","wrap","KERNEL_GRANT","INDEX_PROBE",1,"value","index",[["for ( index = 0 ; index < MICROS_GRANT_CAPACITY ; ++ index ) {",0]],1,2]]
+            [["work"],["grant01/kernel/grant/grant.c/micros_grant_registry_initialize/loop-76","insert","KERNEL_GRANT","RECORD_VISIT",1,"entry","",[["for ( index = 0 ; index < MICROS_GRANT_CAPACITY ; ++ index ) {",0]],0,0]],
+            [["work"],["grant01/kernel/grant/grant.c/micros_grant_registry_initialize/index-80","wrap","KERNEL_GRANT","INDEX_PROBE",1,"value","index",[["for ( index = 0 ; index < MICROS_GRANT_CAPACITY ; ++ index ) {",0]],0,6]],
+            [["work"],["grant01/kernel/grant/grant.c/micros_grant_registry_initialize/index-91","wrap","KERNEL_GRANT","INDEX_PROBE",1,"value","index",[["for ( index = 0 ; index < MICROS_GRANT_CAPACITY ; ++ index ) {",0]],1,6]],
+            [["work"],["grant01/kernel/grant/grant.c/micros_grant_registry_initialize/index-105","wrap","KERNEL_GRANT","INDEX_PROBE",1,"value","index",[["for ( index = 0 ; index < MICROS_GRANT_CAPACITY ; ++ index ) {",0]],2,6]],
+            [["work"],["grant01/kernel/grant/grant.c/micros_grant_registry_initialize/index-113","wrap","KERNEL_GRANT","INDEX_PROBE",1,"value","index",[["for ( index = 0 ; index < MICROS_GRANT_CAPACITY ; ++ index ) {",0]],3,6]],
+            [["work"],["grant01/kernel/grant/grant.c/micros_grant_registry_initialize/loop-159","insert","KERNEL_GRANT","RECORD_VISIT",1,"entry","",[["for ( index = 0 ; index < MICROS_PROCESS_CAPACITY ; ++ index ) {",0]],0,0]],
+            [["work"],["grant01/kernel/grant/grant.c/micros_grant_registry_initialize/index-163","wrap","KERNEL_GRANT","INDEX_PROBE",1,"value","index",[["for ( index = 0 ; index < MICROS_PROCESS_CAPACITY ; ++ index ) {",0]],0,2]],
+            [["work"],["grant01/kernel/grant/grant.c/micros_grant_registry_initialize/index-174","wrap","KERNEL_GRANT","INDEX_PROBE",1,"value","index",[["for ( index = 0 ; index < MICROS_PROCESS_CAPACITY ; ++ index ) {",0]],1,2]]
           ],
           "micros_grant_registry_validate": [
             [["work"],["grant01/kernel/grant/grant.c/micros_grant_registry_validate/audit","insert","KERNEL_GRANT","COMPLETE_VALIDATOR_CALL",1,"entry","",[],0,0]],
             [["work"],["grant01/kernel/grant/grant.c/micros_grant_registry_validate/loop-69","insert","KERNEL_GRANT","RECORD_VISIT",1,"entry","",[["for ( index = 0 ; index < MICROS_GRANT_CAPACITY ; ++ index ) {",0]],0,0]],
             [["work"],["grant01/kernel/grant/grant.c/micros_grant_registry_validate/index-80","wrap","KERNEL_GRANT","INDEX_PROBE",1,"value","index",[["for ( index = 0 ; index < MICROS_GRANT_CAPACITY ; ++ index ) {",0]],0,1]]
           ],
-          "micros_grant_revoke": [
-            [["work"],["grant01/kernel/grant/grant.c/micros_grant_revoke/index-56","wrap","KERNEL_GRANT","INDEX_PROBE",1,"value","slot",[],2,4]]
-          ],
+          "micros_grant_revoke": [],
           "micros_grant_unpack": [],
+          "participant_root_prevalidated": [
+            [["work"],["grant01/kernel/grant/grant.c/participant_root_prevalidated/index-5","wrap","KERNEL_GRANT","INDEX_PROBE",1,"value","endpoint & ( ( UINT32_C ( 1 ) << MICROS_ENDPOINT_SLOT_BITS ) - 1 )",[],0,1]]
+          ],
           "permissions_are_valid": [],
+          "preflight_free_head": [],
+          "preflight_grant_metadata": [],
+          "preflight_insertion": [],
+          "preflight_record_unlink": [],
           "preflight_selected_record": [
             [["work"],["grant01/kernel/grant/grant.c/preflight_selected_record/index-12","wrap","KERNEL_GRANT","INDEX_PROBE",1,"value","slot",[["{",0]],0,1]]
           ],
+          "preflight_unlink": [],
           "process_handles_equal": [],
+          "publish_cancel_plan": [
+            [["work"],["grant01/kernel/grant/grant.c/publish_cancel_plan/loop-37","insert","KERNEL_GRANT","RECORD_VISIT",1,"entry","",[["while ( remaining != 0 ) {",0]],0,0]],
+            [["work"],["grant01/kernel/grant/grant.c/publish_cancel_plan/index-52","wrap","KERNEL_GRANT","INDEX_PROBE",1,"value","slot",[["while ( remaining != 0 ) {",0]],1,4]],
+            [["work"],["grant01/kernel/grant/grant.c/publish_cancel_plan/index-60","wrap","KERNEL_GRANT","INDEX_PROBE",1,"value","slot",[["while ( remaining != 0 ) {",0]],2,4]],
+            [["work"],["grant01/kernel/grant/grant.c/publish_cancel_plan/index-69","wrap","KERNEL_GRANT","INDEX_PROBE",1,"value","slot",[["while ( remaining != 0 ) {",0]],3,4]]
+          ],
           "range_is_valid": [],
           "resolve_active_process_endpoint": [],
           "resolve_live_process_endpoint": [],
           "resolve_owned_record": [],
           "resolve_selected_active_participant": [],
-          "retire_record": [],
+          "retire_record_prevalidated": [
+            [["work"],["grant01/kernel/grant/grant.c/retire_record_prevalidated/index-9","wrap","KERNEL_GRANT","INDEX_PROBE",1,"value","slot",[],0,2]]
+          ],
+          "select_indexed_record": [
+            [["work"],["grant01/kernel/grant/grant.c/select_indexed_record/index-38","wrap","KERNEL_GRANT","INDEX_PROBE",1,"value","slot",[],2,4]]
+          ],
+          "select_member": [],
+          "select_participant_root": [
+            [["work"],["grant01/kernel/grant/grant.c/select_participant_root/index-39","wrap","KERNEL_GRANT","INDEX_PROBE",1,"value","owner . slot",[],1,2]]
+          ],
+          "select_stored_participant": [],
+          "unlink_member_prevalidated": [],
           "validate_record_storage": [],
+          "validate_registry_indexes": [
+            [["work"],["grant01/kernel/grant/grant.c/validate_registry_indexes/audit","insert","KERNEL_GRANT","COMPLETE_VALIDATOR_CALL",1,"entry","",[],0,0]],
+            [["work"],["grant01/kernel/grant/grant.c/validate_registry_indexes/loop-26","insert","KERNEL_GRANT","RECORD_VISIT",1,"entry","",[["while ( cursor != MICROS_GRANT_NONE ) {",0]],0,0]],
+            [["work"],["grant01/kernel/grant/grant.c/validate_registry_indexes/loop-108","insert","KERNEL_GRANT","RECORD_VISIT",1,"entry","",[["for ( size_t slot = 0 ; slot < MICROS_PROCESS_CAPACITY ; ++ slot ) {",0]],0,0]],
+            [["work"],["grant01/kernel/grant/grant.c/validate_registry_indexes/index-119","wrap","KERNEL_GRANT","INDEX_PROBE",1,"value","slot",[["for ( size_t slot = 0 ; slot < MICROS_PROCESS_CAPACITY ; ++ slot ) {",0]],0,3]],
+            [["work"],["grant01/kernel/grant/grant.c/validate_registry_indexes/loop-194","insert","KERNEL_GRANT","RECORD_VISIT",1,"entry","",[["for ( size_t slot = 0 ; slot < MICROS_PROCESS_CAPACITY ; ++ slot ) {",0],["while ( cursor != MICROS_GRANT_NONE ) {",0]],0,0]],
+            [["work"],["grant01/kernel/grant/grant.c/validate_registry_indexes/loop-309","insert","KERNEL_GRANT","RECORD_VISIT",1,"entry","",[["for ( size_t slot = 0 ; slot < MICROS_GRANT_CAPACITY ; ++ slot ) {",0]],0,0]],
+            [["work"],["grant01/kernel/grant/grant.c/validate_registry_indexes/index-320","wrap","KERNEL_GRANT","INDEX_PROBE",1,"value","slot",[["for ( size_t slot = 0 ; slot < MICROS_GRANT_CAPACITY ; ++ slot ) {",0]],0,2]]
+          ],
           "validate_registry_storage": [
             [["work"],["grant01/kernel/grant/grant.c/validate_registry_storage/audit","insert","KERNEL_GRANT","COMPLETE_VALIDATOR_CALL",1,"entry","",[],0,0]],
-            [["work"],["grant01/kernel/grant/grant.c/validate_registry_storage/loop-45","insert","KERNEL_GRANT","RECORD_VISIT",1,"entry","",[["for ( index = 0 ; index < MICROS_GRANT_CAPACITY ; ++ index ) {",0]],0,0]],
-            [["work"],["grant01/kernel/grant/grant.c/validate_registry_storage/index-56","wrap","KERNEL_GRANT","INDEX_PROBE",1,"value","index",[["for ( index = 0 ; index < MICROS_GRANT_CAPACITY ; ++ index ) {",0]],0,3]],
-            [["work"],["grant01/kernel/grant/grant.c/validate_registry_storage/index-79","wrap","KERNEL_GRANT","INDEX_PROBE",1,"value","index",[["for ( index = 0 ; index < MICROS_GRANT_CAPACITY ; ++ index ) {",0]],2,3]]
+            [["work"],["grant01/kernel/grant/grant.c/validate_registry_storage/loop-41","insert","KERNEL_GRANT","RECORD_VISIT",1,"entry","",[["for ( index = 0 ; index < MICROS_GRANT_CAPACITY ; ++ index ) {",0]],0,0]],
+            [["work"],["grant01/kernel/grant/grant.c/validate_registry_storage/index-52","wrap","KERNEL_GRANT","INDEX_PROBE",1,"value","index",[["for ( index = 0 ; index < MICROS_GRANT_CAPACITY ; ++ index ) {",0]],0,3]],
+            [["work"],["grant01/kernel/grant/grant.c/validate_registry_storage/index-75","wrap","KERNEL_GRANT","INDEX_PROBE",1,"value","index",[["for ( index = 0 ; index < MICROS_GRANT_CAPACITY ; ++ index ) {",0]],2,3]]
           ]
         },
         "kernel/grant/grant_abi.c": {
@@ -10011,6 +10048,16 @@
     "kernel/grant/grant.c": {
       "complete": 1,
       "functions": {
+        "advance_incident_walk": {
+          "accesses": [],
+          "aliases": [],
+          "calls": ["grant_slot","select_member"],
+          "directives": [],
+          "guards": [],
+          "loops": [],
+          "signature": "static bool advance_incident_walk ( const struct micros_grant_registry * registry , micros_endpoint_t endpoint , struct grant_incident_walk * walk , struct grant_member_view * member )",
+          "storage": []
+        },
         "authority_is_zero": {
           "accesses": [],
           "aliases": [],
@@ -10052,11 +10099,21 @@
         "clear_record_authority": {
           "accesses": [],
           "aliases": [],
-          "calls": ["clear_bytes"],
+          "calls": ["clear_bytes","clear_record_links"],
           "directives": [],
           "guards": [],
           "loops": [],
           "signature": "static void clear_record_authority ( struct micros_grant_record * record )",
+          "storage": []
+        },
+        "clear_record_links": {
+          "accesses": [],
+          "aliases": [],
+          "calls": [],
+          "directives": [],
+          "guards": [],
+          "loops": [],
+          "signature": "static void clear_record_links ( struct micros_grant_record * record )",
           "storage": []
         },
         "copy_bytes": {
@@ -10074,6 +10131,66 @@
           "signature": "static void copy_bytes ( void * destination , const void * source , size_t size )",
           "storage": []
         },
+        "grant_slot": {
+          "accesses": [],
+          "aliases": [],
+          "calls": [],
+          "directives": [],
+          "guards": [],
+          "loops": [],
+          "signature": "static size_t grant_slot ( micros_grant_t grant )",
+          "storage": []
+        },
+        "insert_member_prevalidated": {
+          "accesses": [],
+          "aliases": [],
+          "calls": ["member_link_prevalidated","participant_root_prevalidated"],
+          "directives": [],
+          "guards": [],
+          "loops": [],
+          "signature": "static void insert_member_prevalidated ( struct micros_grant_registry * registry , micros_endpoint_t endpoint , micros_grant_t token , const struct micros_grant_link * link )",
+          "storage": []
+        },
+        "link_token_has_shape": {
+          "accesses": [],
+          "aliases": [],
+          "calls": ["micros_grant_unpack"],
+          "directives": [],
+          "guards": [],
+          "loops": [],
+          "signature": "static bool link_token_has_shape ( micros_grant_t token )",
+          "storage": []
+        },
+        "links_are_null": {
+          "accesses": [],
+          "aliases": [],
+          "calls": [],
+          "directives": [],
+          "guards": [],
+          "loops": [],
+          "signature": "static bool links_are_null ( const struct micros_grant_link * link )",
+          "storage": []
+        },
+        "links_have_shape": {
+          "accesses": [],
+          "aliases": [],
+          "calls": ["link_token_has_shape"],
+          "directives": [],
+          "guards": [],
+          "loops": [],
+          "signature": "static bool links_have_shape ( const struct micros_grant_link * link , micros_grant_t self )",
+          "storage": []
+        },
+        "lowest_selected_slot": {
+          "accesses": [],
+          "aliases": [],
+          "calls": [],
+          "directives": [],
+          "guards": [],
+          "loops": [],
+          "signature": "static size_t lowest_selected_slot ( uint64_t mask )",
+          "storage": []
+        },
         "map_endpoint_error": {
           "accesses": [],
           "aliases": [],
@@ -10084,12 +10201,24 @@
           "signature": "static enum micros_grant_error map_endpoint_error ( enum micros_endpoint_error error )",
           "storage": []
         },
+        "member_link_prevalidated": {
+          "accesses": [
+            ["grants [ grant_slot ( token ) ]",[]]
+          ],
+          "aliases": [],
+          "calls": ["grant_slot"],
+          "directives": [],
+          "guards": [],
+          "loops": [],
+          "signature": "static struct micros_grant_link * member_link_prevalidated ( struct micros_grant_registry * registry , micros_endpoint_t endpoint , micros_grant_t token )",
+          "storage": []
+        },
         "micros_grant_commit_create_prevalidated": {
           "accesses": [
             ["grants [ plan -> slot ]",[]]
           ],
           "aliases": [],
-          "calls": ["clear_bytes","copy_bytes"],
+          "calls": ["clear_bytes","copy_bytes","insert_member_prevalidated"],
           "directives": [],
           "guards": [],
           "loops": [],
@@ -10098,18 +10227,15 @@
         },
         "micros_grant_commit_endpoint_cancel": {
           "accesses": [
-            ["grants [ index ]",[["for ( index = 0 ; index < MICROS_GRANT_CAPACITY ; ++ index ) {",0]]],
-            ["expected_generation [ index ]",[["for ( index = 0 ; index < MICROS_GRANT_CAPACITY ; ++ index ) {",0]]],
-            ["expected_generation [ index ]",[["for ( index = 0 ; index < MICROS_GRANT_CAPACITY ; ++ index ) {",0]]],
-            ["grants [ index ]",[["for ( index = 0 ; index < MICROS_GRANT_CAPACITY ; ++ index ) {",1],["if ( ( plan -> selected_slots & ( UINT64_C ( 1 ) << index ) ) != 0 ) {",0]]]
+            ["expected_generation [ slot ]",[["while ( walk . current != MICROS_GRANT_NONE ) {",0]]]
           ],
           "aliases": [],
-          "calls": ["micros_endpoint_unpack","retire_record","validate_registry_storage"],
+          "calls": ["advance_incident_walk","grant_slot","lowest_selected_slot","preflight_free_head","preflight_grant_metadata","preflight_record_unlink","retire_record_prevalidated","select_participant_root"],
           "directives": [],
           "guards": [],
           "loops": [
-            ["for ( index = 0 ; index < MICROS_GRANT_CAPACITY ; ++ index ) {",[]],
-            ["for ( index = 0 ; index < MICROS_GRANT_CAPACITY ; ++ index ) {",[]]
+            ["while ( walk . current != MICROS_GRANT_NONE ) {",[]],
+            ["while ( remaining != 0 ) {",[]]
           ],
           "signature": "enum micros_grant_error micros_grant_commit_endpoint_cancel ( struct micros_grant_registry * registry , struct micros_grant_cancel_plan * plan )",
           "storage": []
@@ -10147,7 +10273,7 @@
         "micros_grant_preflight_context": {
           "accesses": [],
           "aliases": [],
-          "calls": ["endpoint_preflight_registry","scheduler_core_preflight_registry"],
+          "calls": ["endpoint_preflight_registry","preflight_grant_metadata","scheduler_core_preflight_registry"],
           "directives": [],
           "guards": [],
           "loops": [],
@@ -10165,34 +10291,25 @@
           "storage": []
         },
         "micros_grant_prepare_create": {
-          "accesses": [
-            ["grants [ slot ]",[["for ( slot = 0 ; slot < MICROS_GRANT_CAPACITY ; ++ slot ) {",0]]],
-            ["grants [ slot ]",[["for ( slot = 0 ; slot < MICROS_GRANT_CAPACITY ; ++ slot ) {",0]]],
-            ["grants [ slot ]",[["for ( slot = 0 ; slot < MICROS_GRANT_CAPACITY ; ++ slot ) {",0]]],
-            ["grants [ slot ]",[]],
-            ["grants [ slot ]",[["{",10]]]
-          ],
+          "accesses": [],
           "aliases": [],
-          "calls": ["clear_bytes","copy_bytes","map_endpoint_error","micros_endpoint_resolve_active","micros_grant_pack","micros_grant_preflight_context","permissions_are_valid","range_is_valid","resolve_active_process_endpoint","validate_record_storage"],
+          "calls": ["clear_bytes","copy_bytes","grant_slot","map_endpoint_error","micros_endpoint_resolve_active","micros_grant_preflight_context","permissions_are_valid","preflight_insertion","range_is_valid","resolve_active_process_endpoint","select_indexed_record"],
           "directives": [],
           "guards": [],
-          "loops": [
-            ["for ( slot = 0 ; slot < MICROS_GRANT_CAPACITY ; ++ slot ) {",[]]
-          ],
+          "loops": [],
           "signature": "enum micros_grant_error micros_grant_prepare_create ( const struct micros_grant_registry * registry , const struct micros_endpoint_registry * endpoint_registry , const struct micros_kernel_objects * objects , struct micros_process_handle grantor , micros_endpoint_t grantee , uintptr_t base , size_t length , uint32_t permissions , struct micros_grant_create_plan * plan )",
           "storage": []
         },
         "micros_grant_prepare_endpoint_cancel": {
           "accesses": [
-            ["grants [ index ]",[["for ( index = 0 ; index < MICROS_GRANT_CAPACITY ; ++ index ) {",0]]],
-            ["expected_generation [ index ]",[["for ( index = 0 ; index < MICROS_GRANT_CAPACITY ; ++ index ) {",0],["if ( record -> state == MICROS_GRANT_SLOT_ACTIVE && ( record -> grantor_endpoint == endpoint || record -> grantee_endpoint == endpoint ) ) {",0]]]
+            ["expected_generation [ slot ]",[["while ( walk . current != MICROS_GRANT_NONE ) {",0]]]
           ],
           "aliases": [],
-          "calls": ["clear_bytes","copy_bytes","map_endpoint_error","micros_endpoint_resolve_internal","micros_grant_registry_validate"],
+          "calls": ["advance_incident_walk","grant_slot","map_endpoint_error","micros_endpoint_select","micros_grant_preflight_context","preflight_free_head","preflight_record_unlink","preflight_selected_record","publish_cancel_plan","select_participant_root"],
           "directives": [],
           "guards": [],
           "loops": [
-            ["for ( index = 0 ; index < MICROS_GRANT_CAPACITY ; ++ index ) {",[]]
+            ["while ( walk . current != MICROS_GRANT_NONE ) {",[]]
           ],
           "signature": "enum micros_grant_error micros_grant_prepare_endpoint_cancel ( const struct micros_grant_registry * registry , const struct micros_endpoint_registry * endpoint_registry , const struct micros_kernel_objects * objects , micros_endpoint_t endpoint , struct micros_grant_cancel_plan * plan )",
           "storage": []
@@ -10200,14 +10317,19 @@
         "micros_grant_registry_initialize": {
           "accesses": [
             ["grants [ index ]",[["for ( index = 0 ; index < MICROS_GRANT_CAPACITY ; ++ index ) {",0]]],
-            ["grants [ index ]",[["for ( index = 0 ; index < MICROS_GRANT_CAPACITY ; ++ index ) {",0]]]
+            ["grants [ index ]",[["for ( index = 0 ; index < MICROS_GRANT_CAPACITY ; ++ index ) {",0]]],
+            ["grants [ index ]",[["for ( index = 0 ; index < MICROS_GRANT_CAPACITY ; ++ index ) {",0]]],
+            ["grants [ index ]",[["for ( index = 0 ; index < MICROS_GRANT_CAPACITY ; ++ index ) {",0]]],
+            ["participants [ index ]",[["for ( index = 0 ; index < MICROS_PROCESS_CAPACITY ; ++ index ) {",0]]],
+            ["participants [ index ]",[["for ( index = 0 ; index < MICROS_PROCESS_CAPACITY ; ++ index ) {",0]]]
           ],
           "aliases": [],
-          "calls": ["bytes_are_zero"],
+          "calls": ["bytes_are_zero","clear_record_links"],
           "directives": [],
           "guards": [],
           "loops": [
-            ["for ( index = 0 ; index < MICROS_GRANT_CAPACITY ; ++ index ) {",[]]
+            ["for ( index = 0 ; index < MICROS_GRANT_CAPACITY ; ++ index ) {",[]],
+            ["for ( index = 0 ; index < MICROS_PROCESS_CAPACITY ; ++ index ) {",[]]
           ],
           "signature": "enum micros_grant_error micros_grant_registry_initialize ( struct micros_grant_registry * registry )",
           "storage": []
@@ -10217,7 +10339,7 @@
             ["grants [ index ]",[["for ( index = 0 ; index < MICROS_GRANT_CAPACITY ; ++ index ) {",0]]]
           ],
           "aliases": [],
-          "calls": ["micros_endpoint_registry_validate_objects","micros_endpoint_resolve_internal","resolve_live_process_endpoint","validate_registry_storage"],
+          "calls": ["micros_endpoint_registry_validate_objects","micros_endpoint_resolve_internal","resolve_live_process_endpoint","validate_registry_indexes","validate_registry_storage"],
           "directives": [],
           "guards": [],
           "loops": [
@@ -10227,11 +10349,9 @@
           "storage": []
         },
         "micros_grant_revoke": {
-          "accesses": [
-            ["grants [ slot ]",[]]
-          ],
+          "accesses": [],
           "aliases": [],
-          "calls": ["resolve_owned_record","retire_record"],
+          "calls": ["preflight_free_head","preflight_record_unlink","resolve_owned_record","retire_record_prevalidated"],
           "directives": [],
           "guards": [],
           "loops": [],
@@ -10248,6 +10368,18 @@
           "signature": "enum micros_grant_error micros_grant_unpack ( micros_grant_t grant , size_t * slot , uint32_t * generation )",
           "storage": []
         },
+        "participant_root_prevalidated": {
+          "accesses": [
+            ["participants [ endpoint & ( ( UINT32_C ( 1 ) << MICROS_ENDPOINT_SLOT_BITS ) - 1 ) ]",[]]
+          ],
+          "aliases": [],
+          "calls": [],
+          "directives": [],
+          "guards": [],
+          "loops": [],
+          "signature": "static struct micros_grant_endpoint_index * participant_root_prevalidated ( struct micros_grant_registry * registry , micros_endpoint_t endpoint )",
+          "storage": []
+        },
         "permissions_are_valid": {
           "accesses": [],
           "aliases": [],
@@ -10258,16 +10390,66 @@
           "signature": "static bool permissions_are_valid ( uint32_t permissions )",
           "storage": []
         },
+        "preflight_free_head": {
+          "accesses": [],
+          "aliases": [],
+          "calls": ["select_indexed_record"],
+          "directives": [],
+          "guards": [],
+          "loops": [],
+          "signature": "static bool preflight_free_head ( const struct micros_grant_registry * registry )",
+          "storage": []
+        },
+        "preflight_grant_metadata": {
+          "accesses": [],
+          "aliases": [],
+          "calls": ["link_token_has_shape"],
+          "directives": [],
+          "guards": [],
+          "loops": [],
+          "signature": "static enum micros_grant_error preflight_grant_metadata ( const struct micros_grant_registry * registry )",
+          "storage": []
+        },
+        "preflight_insertion": {
+          "accesses": [],
+          "aliases": [],
+          "calls": ["select_member","select_participant_root"],
+          "directives": [],
+          "guards": [],
+          "loops": [],
+          "signature": "static bool preflight_insertion ( const struct micros_grant_registry * registry , micros_endpoint_t endpoint , const struct micros_grant_endpoint_index * * root )",
+          "storage": []
+        },
+        "preflight_record_unlink": {
+          "accesses": [],
+          "aliases": [],
+          "calls": ["preflight_unlink"],
+          "directives": [],
+          "guards": [],
+          "loops": [],
+          "signature": "static bool preflight_record_unlink ( const struct micros_grant_registry * registry , const struct micros_grant_record * record , micros_grant_t token )",
+          "storage": []
+        },
         "preflight_selected_record": {
           "accesses": [
             ["grants [ slot ]",[["{",0]]]
           ],
           "aliases": [],
-          "calls": ["micros_endpoint_select","process_handles_equal","validate_record_storage"],
+          "calls": ["process_handles_equal","select_stored_participant","validate_record_storage"],
           "directives": [],
           "guards": [],
           "loops": [],
-          "signature": "static enum micros_grant_error preflight_selected_record ( const struct micros_grant_registry * registry , const struct micros_endpoint_registry * endpoints , const struct micros_kernel_objects * objects , size_t slot , struct selected_grant_record * selection )",
+          "signature": "static enum micros_grant_error preflight_selected_record ( const struct micros_grant_registry * registry , const struct micros_endpoint_registry * endpoints , const struct micros_kernel_objects * objects , size_t slot , const struct micros_endpoint_selection * known , struct selected_grant_record * selection )",
+          "storage": []
+        },
+        "preflight_unlink": {
+          "accesses": [],
+          "aliases": [],
+          "calls": ["select_member","select_participant_root"],
+          "directives": [],
+          "guards": [],
+          "loops": [],
+          "signature": "static bool preflight_unlink ( const struct micros_grant_registry * registry , micros_endpoint_t endpoint , micros_grant_t token , const struct micros_grant_link * link )",
           "storage": []
         },
         "process_handles_equal": {
@@ -10278,6 +10460,22 @@
           "guards": [],
           "loops": [],
           "signature": "static bool process_handles_equal ( struct micros_process_handle left , struct micros_process_handle right )",
+          "storage": []
+        },
+        "publish_cancel_plan": {
+          "accesses": [
+            ["expected_generation [ slot ]",[["while ( remaining != 0 ) {",0]]],
+            ["expected_generation [ slot ]",[["while ( remaining != 0 ) {",0]]],
+            ["expected_generation [ slot ]",[["while ( remaining != 0 ) {",0]]]
+          ],
+          "aliases": [],
+          "calls": ["copy_bytes","lowest_selected_slot"],
+          "directives": [],
+          "guards": [],
+          "loops": [
+            ["while ( remaining != 0 ) {",[]]
+          ],
+          "signature": "static void publish_cancel_plan ( struct micros_grant_cancel_plan * plan , const struct micros_grant_cancel_plan * candidate )",
           "storage": []
         },
         "range_is_valid": {
@@ -10330,24 +10528,98 @@
           "signature": "static enum micros_grant_error resolve_selected_active_participant ( const struct micros_endpoint_registry * registry , const struct micros_kernel_objects * objects , struct micros_process_handle handle , enum micros_grant_error inactive_error , const struct micros_endpoint_selection * selected , const struct micros_process * * process , const struct micros_endpoint_record * * endpoint )",
           "storage": []
         },
-        "retire_record": {
-          "accesses": [],
+        "retire_record_prevalidated": {
+          "accesses": [
+            ["grants [ slot ]",[]]
+          ],
           "aliases": [],
-          "calls": ["clear_record_authority","micros_grant_pack"],
+          "calls": ["clear_record_authority","micros_grant_pack","unlink_member_prevalidated"],
           "directives": [],
           "guards": [],
           "loops": [],
-          "signature": "static void retire_record ( struct micros_grant_record * record , size_t slot )",
+          "signature": "static void retire_record_prevalidated ( struct micros_grant_registry * registry , size_t slot )",
+          "storage": []
+        },
+        "select_indexed_record": {
+          "accesses": [
+            ["grants [ slot ]",[]]
+          ],
+          "aliases": [],
+          "calls": ["micros_grant_unpack","validate_record_storage"],
+          "directives": [],
+          "guards": [],
+          "loops": [],
+          "signature": "static bool select_indexed_record ( const struct micros_grant_registry * registry , micros_grant_t token , enum micros_grant_slot_state state , const struct micros_grant_record * * record )",
+          "storage": []
+        },
+        "select_member": {
+          "accesses": [],
+          "aliases": [],
+          "calls": ["select_indexed_record"],
+          "directives": [],
+          "guards": [],
+          "loops": [],
+          "signature": "static bool select_member ( const struct micros_grant_registry * registry , micros_endpoint_t endpoint , micros_grant_t token , struct grant_member_view * view )",
+          "storage": []
+        },
+        "select_participant_root": {
+          "accesses": [
+            ["participants [ owner . slot ]",[]]
+          ],
+          "aliases": [],
+          "calls": ["link_token_has_shape","micros_endpoint_unpack"],
+          "directives": [],
+          "guards": [],
+          "loops": [],
+          "signature": "static bool select_participant_root ( const struct micros_grant_registry * registry , micros_endpoint_t endpoint , const struct micros_grant_endpoint_index * * root )",
+          "storage": []
+        },
+        "select_stored_participant": {
+          "accesses": [],
+          "aliases": [],
+          "calls": ["micros_endpoint_select"],
+          "directives": [],
+          "guards": [],
+          "loops": [],
+          "signature": "static bool select_stored_participant ( const struct micros_endpoint_registry * endpoints , const struct micros_kernel_objects * objects , micros_endpoint_t endpoint , const struct micros_endpoint_selection * known , struct micros_endpoint_selection * selection )",
+          "storage": []
+        },
+        "unlink_member_prevalidated": {
+          "accesses": [],
+          "aliases": [],
+          "calls": ["member_link_prevalidated","participant_root_prevalidated"],
+          "directives": [],
+          "guards": [],
+          "loops": [],
+          "signature": "static void unlink_member_prevalidated ( struct micros_grant_registry * registry , micros_endpoint_t endpoint , const struct micros_grant_link * link )",
           "storage": []
         },
         "validate_record_storage": {
           "accesses": [],
           "aliases": [],
-          "calls": ["authority_is_zero","micros_grant_pack","permissions_are_valid","range_is_valid"],
+          "calls": ["authority_is_zero","link_token_has_shape","links_are_null","links_have_shape","micros_endpoint_unpack","micros_grant_pack","permissions_are_valid","process_handles_equal","range_is_valid"],
           "directives": [],
           "guards": [],
           "loops": [],
           "signature": "static enum micros_grant_error validate_record_storage ( const struct micros_grant_record * record , size_t slot )",
+          "storage": []
+        },
+        "validate_registry_indexes": {
+          "accesses": [
+            ["participants [ slot ]",[["for ( size_t slot = 0 ; slot < MICROS_PROCESS_CAPACITY ; ++ slot ) {",0]]],
+            ["grants [ slot ]",[["for ( size_t slot = 0 ; slot < MICROS_GRANT_CAPACITY ; ++ slot ) {",0]]]
+          ],
+          "aliases": [],
+          "calls": ["grant_slot","micros_endpoint_unpack","select_indexed_record","select_member"],
+          "directives": [],
+          "guards": [],
+          "loops": [
+            ["while ( cursor != MICROS_GRANT_NONE ) {",[]],
+            ["for ( size_t slot = 0 ; slot < MICROS_PROCESS_CAPACITY ; ++ slot ) {",[]],
+            ["while ( cursor != MICROS_GRANT_NONE ) {",[["for ( size_t slot = 0 ; slot < MICROS_PROCESS_CAPACITY ; ++ slot ) {",0]]],
+            ["for ( size_t slot = 0 ; slot < MICROS_GRANT_CAPACITY ; ++ slot ) {",[]]
+          ],
+          "signature": "static bool validate_registry_indexes ( const struct micros_grant_registry * registry )",
           "storage": []
         },
         "validate_registry_storage": {
@@ -10356,7 +10628,7 @@
             ["grants [ index ]",[["for ( index = 0 ; index < MICROS_GRANT_CAPACITY ; ++ index ) {",0]]]
           ],
           "aliases": [],
-          "calls": ["validate_record_storage"],
+          "calls": ["preflight_grant_metadata","validate_record_storage"],
           "directives": [],
           "guards": [],
           "loops": [

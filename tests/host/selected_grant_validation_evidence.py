@@ -62,24 +62,25 @@ OWNER_MASK = sum(1 << owner for owner in (
 CASE_FIELDS = ("version", "case", "name", "result", "value", "preserved", "before_state", "after_state")
 WORK_FIELDS = ("version", "reserved0", "producer", "case", "owner_mask", "reserved1", "counts")
 CASES = (
-    ("create-empty", 0, 64, 0, 1), ("create-last", 0, 127, 0, 64),
-    ("create-full", 4, (1 << 32) - 1, 1, 64),
+    ("create-empty", 0, 64, 0, 0), ("create-last", 0, 127, 0, 0),
+    ("create-full", 4, (1 << 32) - 1, 1, 0),
     ("inspect-first", 0, 64, 1, 0), ("inspect-last", 0, 64, 1, 0),
     ("inspect-stale", 5, 0, 1, 0),
     ("revoke-first", 0, 2, 0, 0), ("revoke-last", 0, 2, 0, 0),
     ("authority-first", 0, 0x40000008, 1, 0),
     ("authority-last", 0, 0x40000fc8, 1, 0),
     ("authority-write", 0, 0x400007c8, 1, 0),
-    ("diagnostic-dense", 0, 64, 1, 128),
-    ("cancel-dense", 0, (1 << 64) - 1, 1, 192),
+    ("diagnostic-dense", 0, 64, 1, 384),
+    ("cancel-dense", 0, (1 << 64) - 1, 1, 128),
+    ("cancel-empty", 0, 0, 1, 0), ("cancel-sparse", 0, 1, 1, 2),
     ("syscall-unavailable", 12, 0, 1, 0),
     ("syscall-revoke", 0, 0, 0, 0),
     ("syscall-shape", 0, (1 << 64) - 1, 1, 0),
-    ("syscall-create", 0, 64, 0, 1),
+    ("syscall-create", 0, 64, 0, 0),
     ("copy-from", 0, 32, 1, 0), ("copy-to", 0, 32, 1, 0),
     ("validate-remote", 0, 0, 1, 0), ("copy-device", 10, 0, 1, 0),
     ("copy-same-va-ram", 0, 32, 1, 0),
-    ("syscall-create-device", 0, (1 << 64) - 6, 1, 1),
+    ("syscall-create-device", 0, (1 << 64) - 6, 1, 0),
     ("syscall-copy-from", 0, 0, 1, 0), ("syscall-copy-to", 0, 0, 1, 0),
     ("syscall-validate", 0, 0, 1, 0),
     ("copy-no-device", 0, 32, 1, 0), ("copy-prepared-device", 0, 32, 1, 0),
@@ -88,7 +89,7 @@ CASES = (
     ("copy-bad-device-route", 12, 0, 1, 0), ("copy-unused-bootstrap-policy", 0, 32, 1, 0),
     ("syscall-readiness-before-shape", 12, 0, 1, 0),
     ("syscall-shape-unrelated-corruption", 0, (1 << 64) - 1, 1, 0),
-    ("syscall-selected-invariant", 12, 0, 1, 0), ("syscall-create-device-invariant", 12, 0, 1, 1),
+    ("syscall-selected-invariant", 12, 0, 1, 0), ("syscall-create-device-invariant", 12, 0, 1, 0),
     ("copy-zero-before-device", 0, 0, 1, 0), ("copy-phase-before-zero", 11, 0, 1, 0),
     ("copy-range-before-phase", 8, 0, 1, 0),
     ("copy-fault-invariant", 12, 0, 1, 0), ("copy-invariant-fault", 12, 0, 1, 0),
@@ -104,17 +105,39 @@ CASES = (
     ("inspect-caller-profile", 12, 0, 1, 0),
     ("inspect-caller-primary", 12, 0, 1, 0),
     ("inspect-unbound-profile", 12, 0, 1, 0),
-    ("create-unvisited-suffix", 0, 64, 0, 1),
-    ("create-prefix-storage", 12, (1 << 32) - 1, 1, 1),
-    ("create-prefix-count", 12, (1 << 32) - 1, 1, 1),
-    ("create-full-count", 12, (1 << 32) - 1, 1, 1),
-    ("create-quarantine-count", 12, (1 << 32) - 1, 1, 64),
-    ("create-all-quarantined", 4, (1 << 32) - 1, 1, 64),
-    ("create-skipped-relation", 0, 65, 0, 2),
+    ("create-unvisited-suffix", 0, 64, 0, 0),
+    ("create-prefix-storage", 12, (1 << 32) - 1, 1, 0),
+    ("create-prefix-count", 12, (1 << 32) - 1, 1, 0),
+    ("create-full-count", 12, (1 << 32) - 1, 1, 0),
+    ("create-quarantine-count", 4, (1 << 32) - 1, 1, 0),
+    ("create-all-quarantined", 4, (1 << 32) - 1, 1, 0),
+    ("create-skipped-relation", 0, 67, 0, 0),
     ("create-participant-before-prefix", 6, (1 << 32) - 1, 1, 0),
     ("inspect-source-only", 9, 0, 1, 0),
+    ("index-free-shape", 12, 0, 1, 0), ("index-free-stale", 12, 0, 1, 0),
+    ("index-free-active", 12, 0, 1, 0), ("index-free-cycle", 12, 0, 1, 0),
+    ("index-root-tag", 12, 0, 1, 0),
+    ("index-revoke-stale", 12, 0, 1, 0), ("index-revoke-reciprocal", 12, 0, 1, 0),
+    ("index-inspect-unconsumed", 0, 64, 1, 0),
+    ("index-prepare-cycle", 12, 0, 1, 6), ("index-prepare-role", 12, 0, 1, 2),
+    ("cancel-prepare-poison", 0, 1, 1, 2),
+    ("cancel-commit-extra", 12, 0, 1, 2), ("cancel-commit-missing", 12, 0, 1, 2),
+    ("cancel-commit-generation", 12, 0, 1, 2),
+    ("cancel-commit-empty", 0, 64, 1, 0), ("cancel-commit-sparse", 0, 63, 0, 2),
+    ("cancel-commit-dense", 0, 0, 0, 128),
+    ("cancel-commit-mixed", 0, 2, 0, 8), ("cancel-commit-closed", 0, 2, 0, 8),
+    ("cancel-commit-quarantine", 0, 2, 0, 8),
 )
-COLD_CASES = frozenset(("diagnostic-dense", "cancel-dense"))
+COLD_CASES = frozenset(("diagnostic-dense",))
+CANCELLATION_COUNTS = {
+    "cancel-empty": 0, "cancel-sparse": 1, "cancel-dense": 64,
+    "index-prepare-cycle": 3, "index-prepare-role": 1, "cancel-prepare-poison": 1,
+}
+CANCELLATION_COMMITS = {
+    "cancel-commit-extra": 1, "cancel-commit-missing": 1, "cancel-commit-generation": 1,
+    "cancel-commit-empty": 0, "cancel-commit-sparse": 1, "cancel-commit-dense": 64,
+    "cancel-commit-mixed": 4, "cancel-commit-closed": 4, "cancel-commit-quarantine": 4,
+}
 
 
 def expected_cases():
@@ -198,12 +221,20 @@ def work_failures(records, work):
             other = totals.per_kind[Kind.RECORD_VISIT] - grants
             if other:
                 failures.append((row["name"], "unrelated-table-visits", other, 0))
-            # Fixed profile/storage reads plus each admitted allocation-prefix row.
+            # Fixed metadata and per-incident selected checks, not a capacity scan.
             byte_limits = {
                 Kind.COMPARISON: 512 + 64 * spec[4],
                 Kind.COPIED_BYTE: 256,
                 Kind.CLEARED_BYTE: 256,
             }
+            if row["name"] in CANCELLATION_COUNTS:
+                count = CANCELLATION_COUNTS[row["name"]]
+                byte_limits[Kind.COPIED_BYTE] = 32 + 8 * count
+                byte_limits[Kind.CLEARED_BYTE] = 32
+            if row["name"] in CANCELLATION_COMMITS:
+                count = CANCELLATION_COMMITS[row["name"]]
+                byte_limits[Kind.COPIED_BYTE] = 32 + 72 * count
+                byte_limits[Kind.CLEARED_BYTE] = 32 + 72 * count
             for kind, bound in byte_limits.items():
                 if totals.per_kind[kind] > bound:
                     failures.append((row["name"], kind.name.lower(), totals.per_kind[kind], bound))

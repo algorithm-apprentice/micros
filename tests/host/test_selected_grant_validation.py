@@ -56,7 +56,7 @@ class SelectedGrantValidationTest(unittest.TestCase):
         subjects = audit_subjects(root)
         validate_audit_boundaries(root, subjects)
         for path, before, after in (
-            ("kernel/grant/grant.c", "error = micros_grant_registry_validate(", "error = dropped_audit("),
+            ("kernel/grant/grant.c", "error = validate_registry_storage(", "error = dropped_audit("),
             ("kernel/grant/grant.c", "error = micros_grant_preflight_context(", "error = micros_grant_registry_validate("),
             ("kernel/grant/grant_copy.c", "micros_tty_handoff_runtime_inspect_device_binding(",
              "micros_tty_handoff_runtime_device_authority("),
@@ -79,6 +79,25 @@ class SelectedGrantValidationTest(unittest.TestCase):
         self.assertEqual("", result.stdout)
         self.assertEqual("__PYVENV_LAUNCHER__ is unsupported\n", result.stderr)
 
+    def test_sparse_plan_cannot_hide_aggregate_initialization_or_copy(self):
+        root = Path(__file__).resolve().parents[2]
+        subjects = audit_subjects(root)
+        for path, before, after in (
+            ("kernel/grant/grant.c", "struct micros_grant_cancel_plan candidate;",
+             "struct micros_grant_cancel_plan candidate = {0};"),
+            ("kernel/pm/pm_control_syscall_exit.c", "struct micros_grant_cancel_plan grants;",
+             "struct micros_grant_cancel_plan grants = {0};"),
+            ("kernel/grant/grant.c",
+             "copy_bytes(&plan->expected_generation[slot], &candidate->expected_generation[slot],\n"
+             "                   sizeof(plan->expected_generation[slot]));",
+             "copy_bytes(plan, candidate, sizeof(*plan));"),
+        ):
+            changed = dict(subjects)
+            self.assertIn(before, changed[path])
+            changed[path] = changed[path].replace(before, after, 1)
+            with self.subTest(path=path, before=before), self.assertRaises(ValueError):
+                validate_audit_boundaries(root, changed)
+
     def test_complete_channels_and_independent_bounds(self):
         ordinary, absent = parse_native_output(transcript("ordinary"), "ordinary")
         observed, work = parse_native_output(transcript(), "work")
@@ -86,7 +105,7 @@ class SelectedGrantValidationTest(unittest.TestCase):
         self.assertEqual((), absent)
         self.assertEqual((), work_failures(observed, work))
 
-    def test_audits_scans_hidden_bulk_work_and_missing_allocation_visits_fail(self):
+    def test_audits_scans_and_hidden_bulk_work_fail(self):
         records, work = parse_native_output(transcript(), "work")
         for name, owner, kind, value in (
             ("inspect-last", Owner.KERNEL_GRANT, Kind.COMPLETE_VALIDATOR_CALL, 1),
@@ -94,8 +113,17 @@ class SelectedGrantValidationTest(unittest.TestCase):
             ("authority-first", Owner.KERNEL_ENDPOINT, Kind.RECORD_VISIT, 1),
             ("revoke-first", Owner.KERNEL_GRANT, Kind.COPIED_BYTE, 257),
             ("inspect-first", Owner.KERNEL_GRANT, Kind.COMPARISON, 513),
-            ("create-empty", Owner.KERNEL_GRANT, Kind.RECORD_VISIT, 0),
-            ("create-last", Owner.KERNEL_GRANT, Kind.RECORD_VISIT, 63),
+            ("create-empty", Owner.KERNEL_GRANT, Kind.RECORD_VISIT, 1),
+            ("create-last", Owner.KERNEL_GRANT, Kind.RECORD_VISIT, 1),
+            ("cancel-empty", Owner.KERNEL_GRANT, Kind.RECORD_VISIT, 1),
+            ("cancel-sparse", Owner.KERNEL_GRANT, Kind.RECORD_VISIT, 3),
+            ("cancel-empty", Owner.KERNEL_GRANT, Kind.COPIED_BYTE, 33),
+            ("cancel-sparse", Owner.KERNEL_GRANT, Kind.CLEARED_BYTE, 33),
+            ("cancel-commit-empty", Owner.KERNEL_GRANT, Kind.RECORD_VISIT, 1),
+            ("cancel-commit-sparse", Owner.KERNEL_GRANT, Kind.RECORD_VISIT, 3),
+            ("cancel-commit-mixed", Owner.KERNEL_GRANT, Kind.RECORD_VISIT, 9),
+            ("cancel-commit-empty", Owner.KERNEL_GRANT, Kind.CLEARED_BYTE, 33),
+            ("cancel-commit-sparse", Owner.KERNEL_GRANT, Kind.COPIED_BYTE, 105),
             ("diagnostic-dense", Owner.KERNEL_GRANT, Kind.COMPLETE_VALIDATOR_CALL, 0),
         ):
             changed = copy.deepcopy(work)

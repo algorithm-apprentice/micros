@@ -60,8 +60,16 @@ struct grant_test_fixture {
     size_t model_trace_count;
 };
 
+struct grant_model_index {
+    size_t free_count;
+    uint16_t free_slots[MICROS_GRANT_CAPACITY];
+    uint32_t publication[MICROS_GRANT_CAPACITY];
+    uint32_t last_publication;
+};
+
 struct grant_model_run {
     struct micros_grant_registry expected;
+    struct grant_model_index index;
     uint16_t expected_process_slot[GRANT_PROCESS_COUNT];
     uint32_t expected_process_generation[GRANT_PROCESS_COUNT];
     micros_endpoint_t expected_endpoint[GRANT_PROCESS_COUNT];
@@ -139,6 +147,13 @@ bool grant_test_registries_equal(
     const struct micros_grant_registry *left,
     const struct micros_grant_registry *right
 );
+
+void grant_test_model_initialize_reference(
+    struct micros_grant_registry *expected, struct grant_model_index *index, uint64_t magic);
+void grant_test_model_project_indexes(
+    struct micros_grant_registry *expected, const struct grant_model_index *index);
+void grant_test_model_retire_reference(
+    struct micros_grant_registry *expected, struct grant_model_index *index, size_t slot);
 
 uint32_t grant_test_model_next(uint32_t *state);
 

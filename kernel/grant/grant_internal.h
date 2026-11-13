@@ -10,8 +10,11 @@ struct micros_grant_create_plan {
     bool active;
     size_t slot;
     micros_grant_t grant;
+    micros_grant_t free_next;
     struct micros_grant_record record;
 };
+
+_Static_assert(sizeof(struct micros_grant_create_plan) <= 128, "grant create planning is bounded");
 
 enum micros_grant_error micros_grant_preflight_context(
     const struct micros_grant_registry *registry,

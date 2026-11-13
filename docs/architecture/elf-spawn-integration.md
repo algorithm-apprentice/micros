@@ -172,8 +172,8 @@ zero after release; their clearing is checked rather than masked.
 ### Quiescent grant resource equivalence
 
 This is the independently reviewed corrective design Accepted by
-[ADR-0130](../adr/0130-quiescent-grant-resource-equivalence.md); its
-implementation remains behind the separate corrective design merge.
+[ADR-0130](../adr/0130-quiescent-grant-resource-equivalence.md) and separately
+merged as #261. Its implementation belongs to the restarted GRANT02 outcome.
 The [fixed investigation](../research/quiescent-grant-resource-evidence.md)
 distinguishes the failed local candidate from accepted code.
 

@@ -20,6 +20,7 @@ enum grant_operation {
     GRANT_WRITE,
     GRANT_DIAGNOSTIC,
     GRANT_CANCEL_PLAN,
+    GRANT_CANCEL_SPARSE,
 };
 
 struct grant_case {
@@ -44,6 +45,8 @@ static const struct grant_case cases[] = {
     {"authority-write", GRANT_WRITE, 64, 31, MICROS_GRANT_OK},
     {"diagnostic-dense", GRANT_DIAGNOSTIC, 64, 0, MICROS_GRANT_OK},
     {"cancel-dense", GRANT_CANCEL_PLAN, 64, 0, MICROS_GRANT_OK},
+    {"cancel-empty", GRANT_CANCEL_PLAN, 0, 0, MICROS_GRANT_OK},
+    {"cancel-sparse", GRANT_CANCEL_SPARSE, 64, 0, MICROS_GRANT_OK},
 };
 
 static struct grant01_fixture fixture;
@@ -113,17 +116,59 @@ bool grant01_setup(size_t occupied, size_t actors)
     return true;
 }
 
+static bool expected_active(const struct grant_case *test, size_t slot)
+{
+    bool active = slot < test->occupied
+        || (test->operation == GRANT_CREATE && test->result == MICROS_GRANT_OK && slot == test->slot);
+
+    return active && !(test->operation == GRANT_REVOKE && test->result == MICROS_GRANT_OK && slot == test->slot);
+}
+
+static struct micros_grant_link expected_links(const struct grant_case *test, size_t slot, size_t actor)
+{
+    struct micros_grant_link link = {MICROS_GRANT_NONE, MICROS_GRANT_NONE};
+    size_t previous = MICROS_GRANT_CAPACITY;
+    size_t next = MICROS_GRANT_CAPACITY;
+
+    for (size_t other = 0; other < MICROS_GRANT_CAPACITY; ++other) {
+        size_t grantor = test->operation == GRANT_CANCEL_SPARSE && other != 0 ? 1 : 0;
+
+        if (!expected_active(test, other) || (actor != grantor && actor != grantor + 1)) {
+            continue;
+        }
+        if (other > slot && other < previous) {
+            previous = other;
+        }
+        if (other < slot && (next == MICROS_GRANT_CAPACITY || other > next)) {
+            next = other;
+        }
+    }
+    if (previous != MICROS_GRANT_CAPACITY) {
+        link.previous = (uint32_t)(64 + previous);
+    }
+    if (next != MICROS_GRANT_CAPACITY) {
+        link.next = (uint32_t)(64 + next);
+    }
+    return link;
+}
+
 static bool registry_matches(const struct grant_case *test)
 {
     bool created = test->operation == GRANT_CREATE && test->result == MICROS_GRANT_OK;
     bool revoked = test->operation == GRANT_REVOKE && test->result == MICROS_GRANT_OK;
     size_t occupied = test->occupied + created - revoked;
+    micros_grant_t heads[3] = {MICROS_GRANT_NONE, MICROS_GRANT_NONE, MICROS_GRANT_NONE};
+    micros_grant_t original_free = test->occupied == 64 ? MICROS_GRANT_NONE : (uint32_t)(64 + test->occupied);
 
     REQUIRE(fixture.grants.active_count == occupied);
     REQUIRE(fixture.grants.initialization_magic == fixture.before_grants.initialization_magic);
+    REQUIRE(fixture.grants.free_head == (revoked ? 128 + test->slot
+            : occupied == 64 ? MICROS_GRANT_NONE : 64 + occupied));
     for (size_t slot = 0; slot < MICROS_GRANT_CAPACITY; ++slot) {
         const struct micros_grant_record *record = &fixture.grants.grants[slot];
         bool active = slot < test->occupied;
+        size_t grantor = test->operation == GRANT_CANCEL_SPARSE && slot != 0 ? 1 : 0;
+        size_t grantee = grantor + 1;
         uint32_t generation = 1;
 
         if (created && slot == test->slot) {
@@ -135,12 +180,36 @@ static bool registry_matches(const struct grant_case *test)
         }
         REQUIRE(record->state == (active ? MICROS_GRANT_SLOT_ACTIVE : MICROS_GRANT_SLOT_FREE));
         REQUIRE(record->generation == generation);
-        REQUIRE(record->grantor.slot == 0 && record->grantor.generation == (active ? 1U : 0U));
-        REQUIRE(record->grantor_endpoint == (active ? fixture.identities[0] : 0));
-        REQUIRE(record->grantee_endpoint == (active ? fixture.identities[1] : 0));
+        REQUIRE(record->grantor.slot == (active ? grantor : 0)
+                && record->grantor.generation == (active ? 1U : 0U));
+        REQUIRE(record->grantor_endpoint == (active ? fixture.identities[grantor] : 0));
+        REQUIRE(record->grantee_endpoint == (active ? fixture.identities[grantee] : 0));
         REQUIRE(record->base == (active ? MICROS_USER_VIRTUAL_BASE + slot * 64 : 0));
         REQUIRE(record->length == (active ? 64U : 0U));
         REQUIRE(record->permissions == (active ? MICROS_GRANT_PERMISSION_DEFINED_MASK : 0));
+        if (active) {
+            struct micros_grant_link grantor_link = expected_links(test, slot, grantor);
+            struct micros_grant_link grantee_link = expected_links(test, slot, grantee);
+
+            REQUIRE(record->free_next == MICROS_GRANT_NONE);
+            REQUIRE(record->grantor_link.previous == grantor_link.previous && record->grantor_link.next == grantor_link.next);
+            REQUIRE(record->grantee_link.previous == grantee_link.previous && record->grantee_link.next == grantee_link.next);
+            heads[grantor] = heads[grantee] = (uint32_t)(64 + slot);
+        } else {
+            micros_grant_t next = revoked && slot == test->slot ? original_free
+                : slot + 1 == MICROS_GRANT_CAPACITY ? MICROS_GRANT_NONE : (uint32_t)(65 + slot);
+
+            REQUIRE(record->free_next == next);
+            REQUIRE(record->grantor_link.previous == MICROS_GRANT_NONE && record->grantor_link.next == MICROS_GRANT_NONE
+                    && record->grantee_link.previous == MICROS_GRANT_NONE && record->grantee_link.next == MICROS_GRANT_NONE);
+        }
+    }
+    for (size_t actor = 0; actor < MICROS_PROCESS_CAPACITY; ++actor) {
+        micros_grant_t head = actor < 3 ? heads[actor] : MICROS_GRANT_NONE;
+
+        REQUIRE(fixture.grants.participants[actor].head == head);
+        REQUIRE(fixture.grants.participants[actor].endpoint
+                == (head == MICROS_GRANT_NONE ? MICROS_ENDPOINT_NONE : fixture.identities[actor]));
     }
     return true;
 }
@@ -162,11 +231,17 @@ static uint64_t registry_digest(const struct micros_grant_registry *registry)
 #define MIX(field) hash = mix(hash, &(field), sizeof(field))
     MIX(registry->initialization_magic);
     MIX(registry->active_count);
+    MIX(registry->free_head);
     for (size_t slot = 0; slot < MICROS_GRANT_CAPACITY; ++slot) {
         const struct micros_grant_record *record = &registry->grants[slot];
 
         MIX(record->state);
         MIX(record->generation);
+        MIX(record->free_next);
+        MIX(record->grantor_link.previous);
+        MIX(record->grantor_link.next);
+        MIX(record->grantee_link.previous);
+        MIX(record->grantee_link.next);
         MIX(record->grantor.slot);
         MIX(record->grantor.generation);
         MIX(record->grantor_endpoint);
@@ -174,6 +249,10 @@ static uint64_t registry_digest(const struct micros_grant_registry *registry)
         MIX(record->base);
         MIX(record->length);
         MIX(record->permissions);
+    }
+    for (size_t slot = 0; slot < MICROS_PROCESS_CAPACITY; ++slot) {
+        MIX(registry->participants[slot].endpoint);
+        MIX(registry->participants[slot].head);
     }
 #undef MIX
     return hash;
@@ -217,7 +296,21 @@ static bool run_case(size_t index, const struct grant_case *test)
     bool preserved = test->result != MICROS_GRANT_OK
         || (test->operation != GRANT_CREATE && test->operation != GRANT_REVOKE);
 
-    REQUIRE(grant01_setup(test->occupied, 3));
+    REQUIRE(grant01_setup(test->operation == GRANT_CANCEL_SPARSE ? 0 : test->occupied, 3));
+    if (test->operation == GRANT_CANCEL_SPARSE) {
+        for (size_t slot = 0; slot < 64; ++slot) {
+            size_t grantor = slot == 0 ? 0 : 1;
+            micros_grant_t created = MICROS_GRANT_NONE;
+
+            REQUIRE(micros_grant_create(
+                &fixture.grants, &fixture.endpoints, &fixture.objects,
+                fixture.processes[grantor], fixture.identities[grantor + 1],
+                MICROS_USER_VIRTUAL_BASE + slot * 64, 64, MICROS_GRANT_PERMISSION_DEFINED_MASK, &created
+            ) == MICROS_GRANT_OK);
+            REQUIRE(created == 64 + slot);
+        }
+        grant01_snapshot();
+    }
     memset(&output, 0xa5, sizeof(output));
     output_before = output;
     memset(&authority, 0xa5, sizeof(authority));
@@ -288,11 +381,16 @@ static bool run_case(size_t index, const struct grant_case *test)
                 && authority.required_permission == (test->operation == GRANT_READ
                     ? MICROS_GRANT_PERMISSION_READ : MICROS_GRANT_PERMISSION_WRITE));
         value = authority.remote_address;
-    } else if (test->operation == GRANT_CANCEL_PLAN) {
+    } else if (test->operation == GRANT_CANCEL_PLAN || test->operation == GRANT_CANCEL_SPARSE) {
+        uint64_t selected = test->operation == GRANT_CANCEL_SPARSE ? 1
+            : test->occupied == 0 ? 0 : UINT64_MAX;
+
         REQUIRE(plan.active && plan.registry_identity == (uintptr_t)&fixture.grants
-                && plan.endpoint == fixture.identities[0] && plan.selected_slots == UINT64_MAX);
+                && plan.endpoint == fixture.identities[0] && plan.selected_slots == selected);
         for (size_t slot = 0; slot < MICROS_GRANT_CAPACITY; ++slot) {
-            REQUIRE(plan.expected_generation[slot] == 1);
+            if ((selected & (UINT64_C(1) << slot)) != 0) {
+                REQUIRE(plan.expected_generation[slot] == 1);
+            }
         }
     }
     REQUIRE(registry_matches(test));

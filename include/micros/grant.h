@@ -43,9 +43,22 @@ enum micros_grant_error {
     MICROS_GRANT_ERROR_INVARIANT,
 };
 
+struct micros_grant_link {
+    micros_grant_t previous;
+    micros_grant_t next;
+};
+
+struct micros_grant_endpoint_index {
+    micros_endpoint_t endpoint;
+    micros_grant_t head;
+};
+
 struct micros_grant_record {
     enum micros_grant_slot_state state;
     uint32_t generation;
+    micros_grant_t free_next;
+    struct micros_grant_link grantor_link;
+    struct micros_grant_link grantee_link;
     struct micros_process_handle grantor;
     micros_endpoint_t grantor_endpoint;
     micros_endpoint_t grantee_endpoint;
@@ -57,7 +70,9 @@ struct micros_grant_record {
 struct micros_grant_registry {
     uint64_t initialization_magic;
     size_t active_count;
+    micros_grant_t free_head;
     struct micros_grant_record grants[MICROS_GRANT_CAPACITY];
+    struct micros_grant_endpoint_index participants[MICROS_PROCESS_CAPACITY];
 };
 
 struct micros_grant_cancel_plan {
@@ -67,6 +82,12 @@ struct micros_grant_cancel_plan {
     uint64_t selected_slots;
     uint32_t expected_generation[MICROS_GRANT_CAPACITY];
 };
+
+_Static_assert(MICROS_GRANT_CAPACITY == 64, "grant membership uses one exact slot mask");
+_Static_assert(sizeof(struct micros_grant_record) <= 72, "grant record index storage is bounded");
+_Static_assert(sizeof(struct micros_grant_endpoint_index) <= 8, "grant endpoint roots are bounded");
+_Static_assert(sizeof(struct micros_grant_registry) <= 5144, "grant registry index storage is bounded");
+_Static_assert(sizeof(struct micros_grant_cancel_plan) <= 288, "grant cancellation retains its existing bound");
 
 enum micros_grant_error micros_grant_pack(
     size_t slot,
