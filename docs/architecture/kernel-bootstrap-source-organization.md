@@ -16,6 +16,12 @@ Both active migrations are empty. The structural gate retains the reviewed
 60-symbol and 27-long-function inventories and enforces the final owners,
 preserved interfaces, evidence identities and validation inheritance.
 
+The Accepted [BOOT01 contract](indexed-bootstrap-transitions.md) keeps
+these owners while replacing service-ID scans and whole-runtime mutation
+plans. BOOT02 separately owns command audit cadence; BOOT03 owns copy/fill
+algorithms. Current metadata upkeep follows ADR-0123, not the historical
+source-transport ceremony below.
+
 ## Reviewed base and scope
 
 The reviewed implementation base is:
