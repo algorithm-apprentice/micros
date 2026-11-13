@@ -19,6 +19,11 @@ retains its original six-case prefix and appends eight service-adapter cases;
 the separate model is authorized by ADR-0050, not by the source-only
 correction below.
 
+The [Accepted VM01 contract](selected-vm-validation.md) explicitly refines ordinary
+complete-validation cadence, not the complete digest/boundary evidence,
+source owners or preparation temporary lifetimes. It remains design-only
+with clean independent review; implementation requires its separate merge.
+
 Implementation must not begin until
 [ADR-0057](../adr/0057-vm-service-source-decomposition.md) is Accepted and its
 design pull request is merged.
