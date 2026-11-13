@@ -20,6 +20,9 @@ existing stateless copy provider as a kernel retained-span consumer.
 It does not change COPY01's algorithm, ABI, exact access footprint or
 compiler adaptations, and does not import the user runtime's forwarding
 symbols or authority into the kernel.
+The [Accepted BOOT03 contract](bootstrap-memory-transfers.md) uses the same provider
+for existing bootstrap copy/zero-fill helpers. It adds no memory algorithm
+or authority; implementation remains pending the separate design merge.
 
 ## Stable interfaces and preconditions
 

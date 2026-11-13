@@ -6,8 +6,9 @@ This is the independently reviewed BOOT02 contract for B06-F002/F003 under
 [ADR-0133](../adr/0133-selected-bootstrap-command-validation.md).
 BOOT01 #266, MEM04 #228, OBJ01 #243, OBJ02 #246, IPC01 #251 and GRANT01
 #259 are merged. Independent design review is clean and the contract is
-Accepted. Design #267 is separately merged; its paired implementation
-proceeds from that main.
+Accepted. Implementation #268 follows separately merged design #267 and
+closes B06-F002/F003. The implementation PR owns its exact native,
+actual target, full stack, independent review and publication evidence.
 
 The [fixed study](../research/minix-selected-bootstrap-command-validation.md)
 owns the MINIX/current trace. This outcome replaces complete diagnosis
@@ -411,4 +412,5 @@ image and all 44 static/113-ELF/ten observed stack scopes. B13 remains
 blocked. One sufficient current author plan and fresh independent review
 precede the first permanent implementation commit and exact-tree merge.
 
-This design phase authors documentation only.
+Exact executed commands and review/publication identities remain in
+implementation PR #268.
