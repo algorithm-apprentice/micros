@@ -185,9 +185,12 @@ and use. They do not publish or retain a separate validated-state cache.
 These interfaces describe an already committed mapping binding. They do
 not authorize a VM/TTY command, install a PTE, transfer a frame, certify a
 load plan, resolve a grant or validate the complete endpoint/bootstrap
-registries. Only the new selected address-space validation helpers and
-their evidence may consume them. Other command callers retain the original
-complete authority interfaces.
+registries. Only the selected address-space validation helpers and their
+evidence currently consume them. The later
+[GRANT01 contract](selected-grant-validation.md) defines a three-site,
+denial-only TTY consumer extension after its own review, Acceptance and
+separate design merge; it grants no VM/TTY command authority. Other command
+callers retain the original complete authority interfaces.
 
 When an initialized controller has no active exception, return its checked
 process/root/fixed-slot identity with inactive state. For an uninitialized
