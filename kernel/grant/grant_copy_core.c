@@ -3,6 +3,8 @@
 #include <stddef.h>
 #include <stdint.h>
 
+#include "lib/runtime/memory.h"
+
 static enum micros_grant_error validate_range_plan(
     const struct micros_grant_copy_range_plan *plan,
     size_t length
@@ -127,11 +129,8 @@ void micros_grant_copy_commit(
                 destination_chunk->physical_address
                 + destination_offset
             );
-        size_t index;
 
-        for (index = 0; index < count; ++index) {
-            output[index] = input[index];
-        }
+        micros_runtime_memcpy(output, input, count);
         copied += count;
         source_offset += count;
         destination_offset += count;

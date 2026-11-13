@@ -2215,6 +2215,10 @@ APPLICATION_RUNTIME_COMPONENT_INPUTS = (
 )
 GATE_INPUTS["test-qemu-pm-service"] += APPLICATION_RUNTIME_COMPONENT_INPUTS
 
+for name, inputs in GATE_INPUTS.items():
+    if "kernel/grant_copy_core.c" in inputs:
+        GATE_INPUTS[name] += ("lib/runtime/memory.c", "lib/runtime/memory.h")
+
 SLOW_MODEL_INPUTS = {
     "test-ipc-model": (
         "CMakeLists.txt",
@@ -2224,6 +2228,8 @@ SLOW_MODEL_INPUTS = {
         "kernel/grant_abi.c",
         "kernel/grant_copy.c",
         "kernel/grant_copy_core.c",
+        "lib/runtime/memory.c",
+        "lib/runtime/memory.h",
         "kernel/grant_runtime.c",
         "kernel/grant_syscall.c",
         "kernel/grant_syscall_core.c",

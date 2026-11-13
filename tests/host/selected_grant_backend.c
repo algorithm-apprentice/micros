@@ -68,7 +68,9 @@ enum micros_user_address_space_error micros_user_address_space_translate(
     if (fixture->translation_error[process.slot][page] != MICROS_USER_ADDRESS_SPACE_OK) {
         return fixture->translation_error[process.slot][page];
     }
-    *physical_address = (uintptr_t)&fixture->memory[process.slot][offset];
+    *physical_address = (uintptr_t)&fixture->memory[
+        fixture->overlap_memory && process.slot == 1 ? 0 : process.slot
+    ][offset];
     *permissions = fixture->permissions[process.slot][page];
     *contiguous_bytes = MICROS_SV39_PAGE_SIZE - offset % MICROS_SV39_PAGE_SIZE;
     return MICROS_USER_ADDRESS_SPACE_OK;

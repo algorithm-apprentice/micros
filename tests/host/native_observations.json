@@ -2,7 +2,7 @@
   "families": {
     "GRANT01": {
       "channels": ["work"],
-      "native_sources": ["kernel/boot/bootstrap_control_core.c","kernel/endpoint/endpoint.c","kernel/endpoint/endpoint_close.c","kernel/endpoint/endpoint_codec.c","kernel/endpoint/endpoint_completion_validation.c","kernel/endpoint/endpoint_identity.c","kernel/endpoint/endpoint_object_validation.c","kernel/endpoint/endpoint_privilege.c","kernel/endpoint/endpoint_publication.c","kernel/endpoint/endpoint_queue_validation.c","kernel/endpoint/endpoint_registry.c","kernel/grant/grant.c","kernel/grant/grant_abi.c","kernel/grant/grant_copy.c","kernel/grant/grant_copy_core.c","kernel/grant/grant_copy_range.c","kernel/grant/grant_runtime.c","kernel/grant/grant_syscall.c","kernel/grant/grant_syscall_core.c","kernel/ipc/ipc_runtime.c","kernel/objects/kernel_object_context.c","kernel/objects/kernel_object_hart.c","kernel/objects/kernel_object_identity.c","kernel/objects/kernel_object_process.c","kernel/objects/kernel_object_stack.c","kernel/objects/kernel_object_state.c","kernel/objects/kernel_object_thread.c","kernel/objects/kernel_object_validation.c","kernel/objects/kernel_objects.c","kernel/scheduler/scheduler_core.c","kernel/scheduler/scheduler_core_accounting.c","kernel/scheduler/scheduler_core_ipc.c","kernel/scheduler/scheduler_core_ipc_transition.c","kernel/scheduler/scheduler_core_policy.c","kernel/scheduler/scheduler_core_queue.c","kernel/scheduler/scheduler_core_return.c","kernel/scheduler/scheduler_core_return_plan.c","kernel/scheduler/scheduler_core_validate.c","kernel/tty/tty_handoff_core.c","kernel/tty/tty_handoff_runtime_state.c","kernel/tty/tty_handoff_runtime_validate.c"],
+      "native_sources": ["kernel/boot/bootstrap_control_core.c","kernel/endpoint/endpoint.c","kernel/endpoint/endpoint_close.c","kernel/endpoint/endpoint_codec.c","kernel/endpoint/endpoint_completion_validation.c","kernel/endpoint/endpoint_identity.c","kernel/endpoint/endpoint_object_validation.c","kernel/endpoint/endpoint_privilege.c","kernel/endpoint/endpoint_publication.c","kernel/endpoint/endpoint_queue_validation.c","kernel/endpoint/endpoint_registry.c","kernel/grant/grant.c","kernel/grant/grant_abi.c","kernel/grant/grant_copy.c","kernel/grant/grant_copy_core.c","kernel/grant/grant_copy_range.c","kernel/grant/grant_runtime.c","kernel/grant/grant_syscall.c","kernel/grant/grant_syscall_core.c","kernel/ipc/ipc_runtime.c","kernel/objects/kernel_object_context.c","kernel/objects/kernel_object_hart.c","kernel/objects/kernel_object_identity.c","kernel/objects/kernel_object_process.c","kernel/objects/kernel_object_stack.c","kernel/objects/kernel_object_state.c","kernel/objects/kernel_object_thread.c","kernel/objects/kernel_object_validation.c","kernel/objects/kernel_objects.c","kernel/scheduler/scheduler_core.c","kernel/scheduler/scheduler_core_accounting.c","kernel/scheduler/scheduler_core_ipc.c","kernel/scheduler/scheduler_core_ipc_transition.c","kernel/scheduler/scheduler_core_policy.c","kernel/scheduler/scheduler_core_queue.c","kernel/scheduler/scheduler_core_return.c","kernel/scheduler/scheduler_core_return_plan.c","kernel/scheduler/scheduler_core_validate.c","kernel/tty/tty_handoff_core.c","kernel/tty/tty_handoff_runtime_state.c","kernel/tty/tty_handoff_runtime_validate.c","lib/runtime/memory.c"],
       "sites": {
         "kernel/boot/bootstrap_control_core.c": {
           "micros_bootstrap_control_find_binding": []
@@ -404,10 +404,9 @@
         "kernel/grant/grant_copy_core.c": {
           "chunks_overlap": [],
           "micros_grant_copy_commit": [
-            [["work"],["grant01/kernel/grant/grant_copy_core.c/micros_grant_copy_commit/loop-31","insert","KERNEL_GRANT","COPY_UNIT",1,"entry","",[["while ( copied < length ) {",0]],0,0]],
+            [["work"],["grant01/kernel/grant/grant_copy_core.c/micros_grant_copy_commit/loop-31","insert","KERNEL_GRANT","RANGE_VISIT",1,"entry","",[["while ( copied < length ) {",0]],0,0]],
             [["work"],["grant01/kernel/grant/grant_copy_core.c/micros_grant_copy_commit/index-42","wrap","KERNEL_GRANT","INDEX_PROBE",1,"value","source_index",[["while ( copied < length ) {",0]],0,1]],
-            [["work"],["grant01/kernel/grant/grant_copy_core.c/micros_grant_copy_commit/index-56","wrap","KERNEL_GRANT","INDEX_PROBE",1,"value","destination_index",[["while ( copied < length ) {",0]],0,1]],
-            [["work"],["grant01/kernel/grant/grant_copy_core.c/micros_grant_copy_commit/loop-149","insert","KERNEL_GRANT","COPIED_BYTE",1,"entry","",[["while ( copied < length ) {",0],["for ( index = 0 ; index < count ; ++ index ) {",0]],0,0]]
+            [["work"],["grant01/kernel/grant/grant_copy_core.c/micros_grant_copy_commit/index-56","wrap","KERNEL_GRANT","INDEX_PROBE",1,"value","destination_index",[["while ( copied < length ) {",0]],0,1]]
           ],
           "micros_grant_copy_plan_validate": [
             [["work"],["grant01/kernel/grant/grant_copy_core.c/micros_grant_copy_plan_validate/loop-65","insert","KERNEL_GRANT","RANGE_VISIT",1,"entry","",[["for ( source_index = 0 ; source_index < source -> chunk_count ; ++ source_index ) {",0]],0,0]],
@@ -957,6 +956,10 @@
           ],
           "tty_handoff_selected_binding_is_valid": [],
           "tty_handoff_thread_handles_equal": []
+        },
+        "lib/runtime/memory.c": {
+          "micros_runtime_memcpy": [],
+          "micros_runtime_memset": []
         }
       },
       "subsets": {
@@ -10748,17 +10751,14 @@
         "micros_grant_copy_commit": {
           "accesses": [
             ["chunks [ source_index ]",[["while ( copied < length ) {",0]]],
-            ["chunks [ destination_index ]",[["while ( copied < length ) {",0]]],
-            ["output [ index ]",[["while ( copied < length ) {",0],["for ( index = 0 ; index < count ; ++ index ) {",0]]],
-            ["input [ index ]",[["while ( copied < length ) {",0],["for ( index = 0 ; index < count ; ++ index ) {",0]]]
+            ["chunks [ destination_index ]",[["while ( copied < length ) {",0]]]
           ],
           "aliases": [],
-          "calls": [],
+          "calls": ["micros_runtime_memcpy"],
           "directives": [],
           "guards": [],
           "loops": [
-            ["while ( copied < length ) {",[]],
-            ["for ( index = 0 ; index < count ; ++ index ) {",[["while ( copied < length ) {",0]]]
+            ["while ( copied < length ) {",[]]
           ],
           "signature": "void micros_grant_copy_commit ( const struct micros_grant_copy_range_plan * source , const struct micros_grant_copy_range_plan * destination , size_t length )",
           "storage": []
@@ -20852,6 +20852,42 @@
         }
       },
       "storage": ["static struct micros_vm_handoff_state handoff_state;"]
+    },
+    "lib/runtime/memory.c": {
+      "complete": 1,
+      "functions": {
+        "micros_runtime_memcpy": {
+          "accesses": [],
+          "aliases": [],
+          "calls": ["MICROS_TEST_WORK_HIT","__builtin_assume_aligned","__builtin_memcpy_inline"],
+          "directives": [],
+          "guards": [],
+          "loops": [
+            ["while ( remaining != 0 ) {",[["if ( ( ( uintptr_t ) target & 7U ) != ( ( uintptr_t ) input & 7U ) ) {",0]]],
+            ["while ( remaining != 0 && ( ( uintptr_t ) target & 7U ) != 0 ) {",[]],
+            ["while ( remaining >= 8 ) {",[]],
+            ["while ( remaining != 0 ) {",[]]
+          ],
+          "signature": "void * micros_runtime_memcpy ( void * restrict destination , const void * restrict source , size_t length )",
+          "storage": []
+        },
+        "micros_runtime_memset": {
+          "accesses": [],
+          "aliases": [],
+          "calls": ["MICROS_TEST_WORK_HIT","_Alignas","__builtin_assume_aligned","__builtin_memcpy_inline"],
+          "directives": [],
+          "guards": [],
+          "loops": [
+            ["while ( remaining != 0 ) {",[["if ( remaining < 12 ) {",0]]],
+            ["while ( ( ( uintptr_t ) target & 3U ) != 0 ) {",[]],
+            ["while ( remaining >= 4 ) {",[]],
+            ["while ( remaining != 0 ) {",[]]
+          ],
+          "signature": "void * micros_runtime_memset ( void * destination , int byte , size_t length )",
+          "storage": []
+        }
+      },
+      "storage": []
     },
     "tests/qemu/selected_ipc_work.c": {
       "complete": 1,

@@ -3,11 +3,13 @@ import json
 import os
 from pathlib import Path
 import subprocess
+import tempfile
 import unittest
 from unittest.mock import patch
 
 from tests.host.selected_grant_validation_evidence import (
-    CASES, COLD_CASES, OWNER_MASK, PRODUCER, expected_cases, parse_native_output, work_failures,
+    CASES, COLD_CASES, OWNER_MASK, PRODUCER, SPAN_GEOMETRY,
+    expected_cases, parse_native_output, span_work, work_failures,
 )
 from tests.host.selected_grant_validation_source import audit_subjects, validate_audit_boundaries, validate_native_sites
 from tests.host.work_count_types import Kind, Owner
@@ -25,6 +27,13 @@ def transcript(channel="work"):
         work["counts"][Owner.KERNEL_GRANT][Kind.RECORD_VISIT] = spec[4]
         if row["name"] in COLD_CASES:
             work["counts"][Owner.KERNEL_GRANT][Kind.COMPLETE_VALIDATOR_CALL] = 1
+        if row["name"] in SPAN_GEOMETRY:
+            spans, units, copied, core = span_work(row["name"])
+            work["counts"][Owner.RUNTIME][Kind.COPY_UNIT] = units
+            work["counts"][Owner.RUNTIME][Kind.COPIED_BYTE] = copied
+            if core:
+                work["counts"][Owner.KERNEL_GRANT][Kind.RANGE_VISIT] = spans
+                work["counts"][Owner.KERNEL_GRANT][Kind.INDEX_PROBE] = 2 * spans
         lines.append("MICROS_GRANT01_CASE " + json.dumps(row))
         if channel == "work":
             lines.append("MICROS_GRANT01_WORK " + json.dumps(work))
@@ -33,6 +42,95 @@ def transcript(channel="work"):
 
 
 class SelectedGrantValidationTest(unittest.TestCase):
+    def test_shared_provider_inherits_the_grant_consumers_validation(self):
+        from tools import validation_plan
+
+        consumer = ["kernel/grant/grant_copy_core.c"]
+        for path in ("lib/runtime/memory.c", "lib/runtime/memory.h"):
+            with self.subTest(path=path):
+                self.assertLessEqual(
+                    set(validation_plan.affected_workflows(consumer)),
+                    set(validation_plan.affected_workflows([path])),
+                )
+                self.assertLessEqual(
+                    set(validation_plan.affected_slow_models(consumer)),
+                    set(validation_plan.affected_slow_models([path])),
+                )
+
+    def test_target_copy_ownership_rejects_missing_borrowed_or_unbound_objects(self):
+        from tests.host.selected_grant_validation_evidence import _target_copy_objects
+
+        root = Path(__file__).resolve().parents[2]
+        directory = root / "build/riscv64-grant-test"
+        compiler = "/admitted/clang"
+        sources = ("kernel/grant/grant_copy_core.c", "lib/runtime/memory.c")
+        owners = {"CMakeFiles/micros.dir/" + name + ".obj" for name in sources}
+        commands = [{
+            "directory": str(directory), "file": str(root / name),
+            "output": "CMakeFiles/micros.dir/" + name + ".obj",
+            "command": compiler + " -c " + str(root / name)
+                + " -o CMakeFiles/micros.dir/" + name + ".obj",
+        } for name in sources]
+        self.assertEqual(set(sources), set(_target_copy_objects(root, directory, commands, owners, compiler)))
+        for mutation in ("missing", "duplicate", "compiler", "response-file", "operand", "unlinked"):
+            changed, linked = copy.deepcopy(commands), set(owners)
+            if mutation == "missing":
+                changed.pop()
+            elif mutation == "duplicate":
+                changed.append(changed[0])
+            elif mutation == "compiler":
+                changed[0]["command"] = changed[0]["command"].replace(compiler, "/foreign/clang")
+            elif mutation == "response-file":
+                changed[0]["command"] += " @hidden.rsp"
+            elif mutation == "operand":
+                changed[0]["command"] = changed[0]["command"].replace(" -c ", " -c /wrong/input.c -I ", 1)
+            else:
+                linked.remove(changed[0]["output"])
+            with self.subTest(mutation=mutation), self.assertRaises(ValueError):
+                _target_copy_objects(root, directory, changed, linked, compiler)
+        with tempfile.TemporaryDirectory(prefix="micros-grant-object-") as temporary:
+            build = (Path(temporary) / "build").resolve()
+            target = (Path(temporary) / "objects").resolve()
+            build.mkdir()
+            target.mkdir()
+            (build / "CMakeFiles").symlink_to(target, target_is_directory=True)
+            changed = [{**row, "directory": str(build)} for row in commands]
+            with self.assertRaisesRegex(ValueError, "linked artifact"):
+                _target_copy_objects(root, build, changed, owners, compiler)
+
+    def test_only_the_qualified_memory_provider_can_join_native_inputs(self):
+        from tests.host import native_observations
+        from tools import generate_selected_grant_validation_fixture as generator
+
+        root = Path(__file__).resolve().parents[2]
+        memory = "lib/runtime/memory.c"
+        original = (root / memory).read_bytes()
+        self.assertIn(memory, native_observations.native_inputs(root, "GRANT01"))
+        self.assertIn("lib/runtime/memory.h", native_observations.native_inputs(root, "GRANT01"))
+        for channel in ("ordinary", "work"):
+            self.assertTrue(generator.source_bundle(root, channel)[memory].endswith(original))
+        read = generator.source_bytes
+        for replacement in (
+            original + b"\nvoid unqualified_memory(void) {}\n",
+            original.replace(b'"copy-word-unit"', b'"missing-word-unit"', 1),
+        ):
+            def changed(project, requested):
+                return replacement if requested == root / memory else read(project, requested)
+
+            with self.subTest(replacement=replacement[-60:]), patch.object(generator, "source_bytes", side_effect=changed):
+                with self.assertRaises(ValueError):
+                    generator.source_bundle(root, "work")
+        declared = json.loads((root / "tests/host/native_observations.json").read_text())
+        declared["families"]["GRANT01"]["native_sources"].append("lib/runtime/runtime.c")
+        with patch.object(native_observations, "source_bytes", return_value=json.dumps(declared).encode()):
+            with self.assertRaises(ValueError):
+                native_observations.native_inputs(root, "GRANT01")
+        declared = json.loads((root / "tests/host/native_observations.json").read_text())
+        declared["families"]["GRANT01"]["sites"][memory]["micros_runtime_memcpy"] = [["duplicate"]]
+        with patch.object(native_observations, "source_bytes", return_value=json.dumps(declared).encode()):
+            with self.assertRaisesRegex(ValueError, "duplicate.*observations"):
+                generator.source_bundle(root, "work")
+
     def test_native_headers_cannot_hide_code_or_escape_the_compiled_input_set(self):
         from tools import generate_selected_grant_validation_fixture as generator
 
@@ -130,6 +228,28 @@ class SelectedGrantValidationTest(unittest.TestCase):
             index = next(index for index, row in enumerate(records) if row["name"] == name)
             changed[index]["counts"][owner][kind] = value
             with self.subTest(name=name, owner=owner, kind=kind):
+                self.assertTrue(work_failures(records, changed))
+
+    def test_span_oracle_rejects_byte_fallback_replanning_and_hidden_writes(self):
+        self.assertEqual((1, 8, 64, 1), span_work("span-block"))
+        self.assertEqual((3, 512, 4096, 1), span_work("span-unequal-cross"))
+        self.assertEqual((3, 519, 4096, 1), span_work("span-unaligned-cross"))
+        self.assertEqual((1, 64, 64, 1), span_work("span-different-residues"))
+        records, work = parse_native_output(transcript(), "work")
+        for name, owner, kind, value in (
+            ("span-block", Owner.RUNTIME, Kind.COPY_UNIT, 64),
+            ("span-block", Owner.RUNTIME, Kind.COPY_UNIT, 0),
+            ("span-block", Owner.RUNTIME, Kind.COPIED_BYTE, 65),
+            ("span-unequal-cross", Owner.KERNEL_GRANT, Kind.RANGE_VISIT, 4),
+            ("span-unequal-cross", Owner.KERNEL_GRANT, Kind.INDEX_PROBE, 7),
+            ("span-block", Owner.KERNEL_OBJECTS, Kind.COPY_UNIT, 1),
+            ("span-validate-page", Owner.RUNTIME, Kind.COPY_UNIT, 1),
+            ("span-late-fault", Owner.RUNTIME, Kind.COPIED_BYTE, 1),
+        ):
+            changed = copy.deepcopy(work)
+            index = next(index for index, row in enumerate(records) if row["name"] == name)
+            changed[index]["counts"][owner][kind] = value
+            with self.subTest(name=name, kind=kind):
                 self.assertTrue(work_failures(records, changed))
 
     def test_partial_borrowed_unknown_or_malformed_records_fail(self):
