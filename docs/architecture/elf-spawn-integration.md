@@ -169,6 +169,58 @@ Inactive PM request, VFS bounce, RAMFS scratch, and TTY payload bytes carry
 no live authority. VFS executable/request snapshots, in contrast, must be
 zero after release; their clearing is checked rather than masked.
 
+### Quiescent grant resource equivalence
+
+This is the independently reviewed corrective design Accepted by
+[ADR-0130](../adr/0130-quiescent-grant-resource-equivalence.md); its
+implementation remains behind the separate corrective design merge.
+The [fixed investigation](../research/quiescent-grant-resource-evidence.md)
+distinguishes the failed local candidate from accepted code.
+
+Apply this predicate only to the grant subset of the existing post-init
+rollback/final resource snapshots, when **both** active counts are zero.
+An active record or nonquiescent registry cannot use it.
+
+First validate each snapshot independently:
+
+1. Every slot is FREE or QUARANTINED, with zero authority bytes and null
+   grantor/grantee membership links. Generations are nonzero and within the
+   unchanged token bound.
+2. Every FREE slot has a packable non-`NONE` token. Every QUARANTINED slot
+   obeys the existing terminal-generation rule and has a null free link.
+3. Every endpoint-root row has exactly `MICROS_ENDPOINT_NONE` and
+   `MICROS_GRANT_NONE`; a residual tag is not an empty index.
+4. Starting at the free head, check token shape/range, FREE state and the
+   exact current target generation before following each link. A fixed
+   slot mask rejects duplicate/cyclic membership. Termination must account
+   for every FREE slot and no quarantined slot.
+
+Then compare initialization identity and every slot's FREE/QUARANTINED
+state, not merely totals. FREE generations may advance but never regress;
+QUARANTINED generations remain equal. Available slot identities and zero
+authority are unchanged, with both participant inventories empty.
+
+Only after those checks may the two valid free-chain orders and their
+coherent generation tags differ. They record already permitted LIFO reuse
+and future opaque-token selection, not live grant authority or lost
+capacity. Preserve the raw snapshots: do not copy, sort, clear, rewrite or
+reset producer metadata to force equality. Validation of the complete
+links is required; simply omitting those fields is not equivalent.
+
+The shared resource oracle uses bounded `O(G+P)` cold work and constant
+auxiliary storage, with no production grant helper supplying an expected
+success. Native controls must prove valid reordered/advanced chains are
+accepted and stale links, missing/duplicate slots, cycles, linked
+quarantine, changed availability, dirty authority/roots/role links, live
+grants and generation regression are rejected. Keep all existing other
+resource-family controls.
+
+This does not change ordinary/observed state equality, the independent
+grant model, exact LIFO transition tests or failure-byte comparisons.
+Those still include every head/link/generation and cannot apply this
+cross-history equivalence. All other resource checks, actual rollback/
+exit/wait/drain scenarios, pass markers and stack obligations remain exact.
+
 ## Green sequence and acceptance
 
 The first helper slice has these focused commands:

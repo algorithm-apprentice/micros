@@ -5,7 +5,9 @@
 This is the independently reviewed GRANT02 design Accepted by
 [ADR-0129](../adr/0129-grant-free-lists-and-targeted-cancellation.md).
 Its actual prerequisites, GRANT01 #259 and IPC03 #255, are merged.
-The paired implementation remains pending the separate design merge.
+Design #260 is separately merged. Its uncommitted implementation is blocked
+on the [quiescent resource-witness correction](../adr/0130-quiescent-grant-resource-equivalence.md);
+only that corrective design task is active.
 
 GRANT02 owns B05-F003/F004. The
 [fixed local study](../research/minix-grant-free-lists-and-targeted-cancellation.md)
@@ -311,6 +313,12 @@ seed `0x38a110c5`, forced thirteen-operation prefix, draw schedule, coverage
 and replay trace. Extend the independent model with its own abstract free
 stack and ordered incident membership, not production link helpers or
 captured candidate state. Compare all new heads/links and original fields.
+
+This exact transition/model comparison is distinct from equality of idle
+resources across different valid histories. The
+[quiescent ELF-spawn resource predicate](elf-spawn-integration.md#quiescent-grant-resource-equivalence)
+has a separate corrective design barrier; it must validate every index
+field before applying only its documented cross-history equivalence.
 
 Retain the purposes of all 64 GRANT01 cases. Change only expectations owned
 by this decision:

@@ -68,7 +68,11 @@ GRANT01 and IPC03 predecessors are merged. Its
 [free-list/cancellation contract](../architecture/grant-free-lists-and-targeted-cancellation.md)
 and [ADR-0129](../adr/0129-grant-free-lists-and-targeted-cancellation.md) have
 clean independent design review and are Accepted. Implementation remains
-pending the separate design merge.
+blocked after separately merged design #260: the actual composed rollback
+exposed a quiescent resource-witness gap. The
+[corrective design](../adr/0130-quiescent-grant-resource-equivalence.md) has
+clean independent review and is Accepted; implementation remains blocked
+pending its separate merge. No GRANT02 finding is closed.
 
 Validation simplification #248 follows separate design #247 / ADR-0123.
 It changes no runtime finding, node or edge. Current contracts replace the
@@ -240,7 +244,7 @@ blocking queue.
 | `IPC03` | Runtime correction | `B04-F004` | `IPC01` | Independently reviewed implementation #255 follows the [direct reply binding contract](../architecture/direct-reply-token-binding.md). | Zero token-table visits, exact phase/receiver lifetime, actual return/close authority, independent models, current layout/stack and full acceptance passed. |
 | `IPC04` | Runtime correction | `B04-F006` | `IPC01` | Independently reviewed implementation #257 follows the [head-only sender contract](../architecture/head-only-ipc-sender-queues.md). | Exact linear append, selected/null-terminated splice, full-capacity close, independent models, current target/stack and full acceptance passed. |
 | `GRANT01` | Runtime correction | `B05-F001`, `B05-F002` | `IPC01` | [Accepted selected-grant contract](../architecture/selected-grant-validation.md): local readiness, selected record/participants and denial-only committed-device inspection; implementation #259 is merged. | Actual grant/endpoint/TTY audit and lookup work, preserved syscall/authority/failure semantics and complete current acceptance. |
-| `GRANT02` | Runtime correction | `B05-F003`, `B05-F004` | `GRANT01`, `IPC03` | [Accepted free-list/cancellation contract](../architecture/grant-free-lists-and-targeted-cancellation.md): MINIX free-head allocation and generation-bound incident lists, with exact sparse cancellation witnesses and no capacity scans; implementation awaits the separate design merge. | Allocation/cancellation probe counts, reuse, stale identity, complete index state and close traces. |
+| `GRANT02` | Runtime correction | `B05-F003`, `B05-F004` | `GRANT01`, `IPC03` | [Accepted free-list/cancellation contract](../architecture/grant-free-lists-and-targeted-cancellation.md), design #260; implementation is blocked on the separate [quiescent resource-witness correction](../adr/0130-quiescent-grant-resource-equivalence.md). | Allocation/cancellation probe counts, reuse, stale identity, complete index state, exact idle resource inventory and close traces. |
 | `GRANT03` | Runtime correction | `B05-F005` | `GRANT01`, `COPY01`, `MEM04` | Plan translated spans once and move word/block runs without byte-at-a-time commits. | Cross-page aligned/unaligned transfer counts, faults, overlap policy, and atomic publication. |
 | `BOOT01` | Runtime correction | `B06-F001` | `EV04` | Replace repeated capacity scans and whole-state copies with exact service-slot/binding identity and selected transitions. | Lookup/transition counts over sparse and failed service states. |
 | `BOOT02` | Runtime correction | `B06-F002`, `B06-F003` | `BOOT01`, `MEM04`, `OBJ01`, `OBJ02`, `IPC01`, `GRANT01` | Validate owner-specific command plans once before commit; keep whole-system audits diagnostic-only. | Release/ready/complete/console call counts, rollback, deadline, and target failure cases. |
