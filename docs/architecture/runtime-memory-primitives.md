@@ -15,6 +15,12 @@ the concrete evidence and author entry point. A new staged registry claim is
 not a completed transition; current author evidence and independent
 implementation review remain the acceptance boundary.
 
+The separately gated [GRANT03 design](grant-copy-spans.md) defines this
+existing stateless copy provider as a kernel retained-span consumer.
+It does not change COPY01's algorithm, ABI, exact access footprint or
+compiler adaptations, and does not import the user runtime's forwarding
+symbols or authority into the kernel.
+
 ## Stable interfaces and preconditions
 
 Keep `lib/runtime/memory.h`, `memory_symbols.c`, the prefixed function names

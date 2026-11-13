@@ -13,8 +13,10 @@ The later [selected-grant contract](selected-grant-validation.md) owns
 GRANT01's ordinary validation-boundary correction and its separate phase
 barrier. It retains these coherent registry, copy, adapter and evidence
 owners. The [GRANT02 contract](grant-free-lists-and-targeted-cancellation.md)
-keeps indexing/lifetime in that same cohesive registry owner; GRANT03 still
-owns copy-algorithm changes. Neither requires another decomposition here.
+keeps indexing/lifetime in that same cohesive registry owner. The Accepted
+[GRANT03 contract](grant-copy-spans.md) retains the copy owners and adds
+only the existing stateless COPY01 provider beneath retained-span commit.
+Neither requires another decomposition here.
 
 ```text
 reviewed micros base: 6269d9247de6beafed2448aa0ffd6904de5e8833
