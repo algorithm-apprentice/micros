@@ -1,4 +1,5 @@
 #include "kernel/boot/bootstrap_manifest_internal.h"
+#include "lib/runtime/memory.h"
 
 void bootstrap_manifest_copy_bytes(
     void *destination,
@@ -6,23 +7,12 @@ void bootstrap_manifest_copy_bytes(
     size_t size
 )
 {
-    unsigned char *destination_bytes = destination;
-    const unsigned char *source_bytes = source;
-    size_t index;
-
-    for (index = 0; index < size; ++index) {
-        destination_bytes[index] = source_bytes[index];
-    }
+    (void)micros_runtime_memcpy(destination, source, size);
 }
 
 void bootstrap_manifest_clear_bytes(void *storage, size_t size)
 {
-    unsigned char *bytes = storage;
-    size_t index;
-
-    for (index = 0; index < size; ++index) {
-        bytes[index] = 0;
-    }
+    (void)micros_runtime_memset(storage, 0, size);
 }
 
 bool bootstrap_manifest_bytes_are_zero(const void *storage, size_t size)

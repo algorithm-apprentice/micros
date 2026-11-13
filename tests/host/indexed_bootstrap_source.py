@@ -16,6 +16,20 @@ INDEX_FIELDS = frozenset((
     "entries", "bindings", "ordered_service_ids", "ordered_manifest_indices",
     "processes", "threads", "harts", "endpoints", "profiles", "service_slots", "binding_slots", "grants",
 ))
+MOVEMENT_HELPERS = {
+    "kernel/boot/bootstrap_manifest_common.c": {
+        "bootstrap_manifest_copy_bytes": ("COPY_UNIT", "COPIED_BYTE"),
+        "bootstrap_manifest_clear_bytes": ("CLEAR_UNIT", "CLEARED_BYTE"),
+    },
+    "kernel/boot/bootstrap_control_core.c": {
+        "copy_bytes": ("COPY_UNIT", "COPIED_BYTE"), "clear_bytes": ("CLEAR_UNIT", "CLEARED_BYTE"),
+    },
+    "kernel/boot/bootstrap_runtime_state.c": {
+        "bootstrap_runtime_copy_bytes": ("COPY_UNIT", "COPIED_BYTE"),
+        "bootstrap_runtime_clear_bytes": ("CLEAR_UNIT", "CLEARED_BYTE"),
+    },
+    "kernel/boot/bootstrap_image.c": {"clear_bytes": ("CLEAR_UNIT", "CLEARED_BYTE")},
+}
 RETAINED_AUDITS = (
     ("kernel/boot/bootstrap_control_core.c", "micros_bootstrap_control_publish_controller", "micros_bootstrap_control_validate", 1),
     ("kernel/boot/bootstrap_runtime.c", "micros_bootstrap_runtime_publish_controller", "micros_bootstrap_control_validate", 1),
@@ -64,6 +78,8 @@ def validate_selected_movement(path, text):
         body = c_lexical_text(record.body)
         if (
             re.search(r"\b(?:memcpy|memmove|memset)\s*\(", body)
+            or (name not in MOVEMENT_HELPERS.get(path, {})
+                and re.search(r"\bmicros_runtime_mem(?:cpy|set)\s*\(", body))
             or re.search(r"\bstruct\s+micros_bootstrap_runtime\s+(?!\*)\w+", body)
             or re.search(r"\*\s*runtime\s*=|\bruntime\s*->\s*(?:entries|ordered_service_ids|service_slots)\s*=", body)
         ):
@@ -114,6 +130,13 @@ def validate_native_sites(root, path, text):
         records = {name: records[name] for name in NATIVE_SUBSETS[path]}
     if sites_by_name.keys() != records.keys():
         raise ValueError("BOOT01 declarations omit a compiled function: " + path)
+    if path == "lib/runtime/memory.c":
+        from tests.host.runtime_memory_evidence import validate_green_source
+
+        if any(sites_by_name.values()):
+            raise ValueError("BOOT03 cannot double-count the existing COPY01 provider")
+        validate_green_source(text)
+        return
     if path in declared["families"]["IPC01"]["sites"]:
         original = declared["families"]["IPC01"]["sites"][path]
         for name, rows in original.items():
@@ -149,6 +172,10 @@ def validate_native_sites(root, path, text):
                     scope = enclosing_regions(values, stacks, closings, (*stacks[index], index))
                     if not any(site[1] == "insert" and site[5] == "entry" and site[7] == scope for site in sites):
                         raise ValueError("BOOT01 loop lost its executing primitive: " + name)
+                    for kind in MOVEMENT_HELPERS.get(path, {}).get(name, ()):
+                        if sum(site[1] == "insert" and site[3] == kind and site[4] == 1
+                               and site[5] == "entry" and site[7] == scope for site in sites) != 1:
+                            raise ValueError("BOOT03 byte primitive lost its actual unit/byte observation")
             if value != "[" or index < 3 or values[index - 1] not in INDEX_FIELDS:
                 continue
             if values[index - 2] not in (".", "->"):

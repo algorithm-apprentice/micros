@@ -79,6 +79,10 @@ def _validate_current_evidence(scope, result, kernel):
             raise ValueError("BOOT02 evidence borrowed another configured kernel")
         validate_target_observations(root)
         failures = target_failures(parse_target_output(reported, result.return_code, scope), scope)
+        if scope == "bootstrap-command" and not failures:
+            from tests.host.indexed_bootstrap_evidence import check_target_product
+
+            check_target_product(root)
     elif scope in ("user-address-space", "address-space-handoff"):
         from tests.host.selected_release_handoff_evidence import parse_target_output, target_failures
         from tests.host.work_count_types import Stage

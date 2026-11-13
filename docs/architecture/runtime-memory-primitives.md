@@ -22,7 +22,7 @@ compiler adaptations, and does not import the user runtime's forwarding
 symbols or authority into the kernel.
 The [Accepted BOOT03 contract](bootstrap-memory-transfers.md) uses the same provider
 for existing bootstrap copy/zero-fill helpers. It adds no memory algorithm
-or authority; implementation remains pending the separate design merge.
+or authority; its implementation follows separate design merge #269.
 
 ## Stable interfaces and preconditions
 

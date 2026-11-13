@@ -7,7 +7,8 @@ This is the independently reviewed BOOT03 contract for B06-F004 under
 COPY01 #191 supplies the actual dependency. BOOT02 #268 is the completed
 preferred predecessor; no new DAG edge is introduced.
 Design review is clean and the contract is Accepted.
-Implementation remains pending the separate design merge.
+Design #269 is separately merged; its paired implementation proceeds from
+that main.
 
 The [fixed study](../research/minix-bootstrap-memory-transfers.md) owns
 the seven-helper, 28-caller, 38-caller/callee-row and 46-call census,

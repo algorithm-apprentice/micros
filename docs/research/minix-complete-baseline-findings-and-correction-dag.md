@@ -75,7 +75,7 @@ the seven remaining byte-movement helpers and their existing provider.
 BOOT02 preserved the original model and actual composed/stack evidence,
 with clean independent review before its implementation commit and merge.
 BOOT03 design review is clean and the contract is Accepted; implementation
-remains pending the separate design merge. B06-F004 remains open.
+follows the separate design merge #269. B06-F004 remains open.
 
 Validation simplification #248 follows separate design #247 / ADR-0123.
 It changes no runtime finding, node or edge. Current contracts replace the
@@ -251,7 +251,7 @@ blocking queue.
 | `GRANT03` | Runtime correction | `B05-F005` | `GRANT01`, `COPY01`, `MEM04` | Independently reviewed implementation #264 follows the [retained-span contract](../architecture/grant-copy-spans.md), reusing the unchanged COPY01 provider after complete physical preflight. | Independent exact span/work and byte evidence, actual same-guest kernel artifact proof, preserved composition and complete current acceptance passed. |
 | `BOOT01` | Runtime correction | `B06-F001` | `EV04` | Independently reviewed implementation #266 follows the [indexed-transition contract](../architecture/indexed-bootstrap-transitions.md), with distinct indices and selected plans; command audit cadence and copy primitives remain separately owned. | Independent lookup/transition and actual deadline evidence, original model, composed workflows and complete current acceptance passed. |
 | `BOOT02` | Runtime correction | `B06-F002`, `B06-F003` | `BOOT01`, `MEM04`, `OBJ01`, `OBJ02`, `IPC01`, `GRANT01` | Independently reviewed implementation #268 follows the [selected-command contract](../architecture/selected-bootstrap-command-validation.md), preserving complete diagnostics and required lifecycle barriers. | Native selected/corrupt relations, actual same-guest zero-audit command evidence, rollback/roles/deadlines and complete current acceptance passed. |
-| `BOOT03` | Runtime correction | `B06-F004` | `COPY01` | [Accepted shared-transfer contract](../architecture/bootstrap-memory-transfers.md): delegate the seven existing helpers without changing sizes, translation, verification or publication. Implementation is pending the separate design merge. | Independent actual byte/unit work, exact contents/access/alias boundaries, linked caller/provider proof and all inherited gates. |
+| `BOOT03` | Runtime correction | `B06-F004` | `COPY01` | [Accepted shared-transfer contract](../architecture/bootstrap-memory-transfers.md): delegate the seven existing helpers without changing sizes, translation, verification or publication. Implementation follows separately merged design #269. | Independent actual byte/unit work, exact contents/access/alias boundaries, linked caller/provider proof and all inherited gates. |
 | `VM01` | Runtime correction | `B07-F001` | `BOOT02`, `MEM04`, `GRANT01` | Keep complete kernel/service VM validation diagnostic-only and retain selected transaction subplans. | Per-command Vsvc/Vkh counts and malformed selected-state cases. |
 | `VM02` | Runtime correction | `B02-F008`, `B02-F009`, `B07-F004` | `VM01`, `MEM04` | Build selected-root/frame indexes and ordered uniqueness proofs without all-process or pairwise searches. | Root/frame comparison and owner-lookup counts over sparse/adversarial plans. |
 | `VM03` | Runtime correction | `B07-F002` | `VM01`, `VM02` | Freeze one validated load plan and consume page subplans without multiplying complete validation. | Exact per-page and full load/abort/commit/exit counts. |
