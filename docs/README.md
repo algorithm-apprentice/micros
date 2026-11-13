@@ -39,7 +39,7 @@ entry point. All committed project content is English.
 | PM and executable lifecycle | [PM model](adr/0046-pm-process-lifecycle-and-spawn-metadata.md), [post-handoff spawn](adr/0050-post-handoff-elf-spawn.md), [coordinator](architecture/pm-spawn-coordinator.md), [application runtime](architecture/application-runtime.md), [ELF-spawn integration](architecture/elf-spawn-integration.md) |
 | TTY, RAMFS and VFS | [TTY protocol](adr/0047-tty-console-handoff-and-serial-protocol.md), [RAMFS protocol](adr/0048-ramfs-service-and-vfs-filesystem-protocol.md), [VFS protocol](adr/0049-vfs-service-and-application-io-protocol.md) |
 | Future production user environment | [Init and shell](architecture/init-shell.md), gated by the correction register rather than the presence of its Accepted design |
-| Runtime compiler primitives | [Memory primitives](architecture/runtime-memory-primitives.md) |
+| Runtime compiler primitives | [Memory primitives](architecture/runtime-memory-primitives.md), [bootstrap transfers](architecture/bootstrap-memory-transfers.md) |
 
 ### Source ownership
 
@@ -100,7 +100,7 @@ supersession boundary, not the original historical freeze.
 | Objects/scheduler | [Original scheduler](research/minix-scheduler-and-context-switch.md), [selected object/hart](research/minix-selected-object-and-hart-validation.md), [common return](research/minix-common-scheduler-return.md) |
 | IPC/grants | [Endpoints/IPC](research/minix-endpoint-and-ipc.md), [selected IPC validation](research/minix-selected-ipc-validation.md), [linear deadlock](research/minix-linear-ipc-deadlock.md), [direct reply binding](research/minix-direct-reply-token-binding.md), [head-only sender queues](research/minix-head-only-ipc-sender-queues.md), [IRQ notification](research/minix-irq-notification.md), [grants/safe copy](research/minix-direct-grants-and-safecopy.md), [selected grant validation](research/minix-selected-grant-validation.md), [wired resolution](research/minix-post-handoff-wired-address-resolution.md), [user syscalls](research/minix-user-grant-syscall-boundary.md) |
 | Startup/services | [User runtime](research/minix-user-service-runtime.md), [RS/SEF](research/minix-rs-sef-bootstrap.md), [bootstrap indices](research/minix-indexed-bootstrap-transitions.md), [selected bootstrap commands](research/minix-selected-bootstrap-command-validation.md), [VM](research/minix-vm-bootstrap-and-handoff.md), [PM](research/minix-pm-process-lifecycle.md), [filesystem protocol](research/minix-vfs-mfs-filesystem-protocol.md), [VFS routing](research/minix-vfs-process-descriptor-and-device-routing.md) |
-| Evidence and primitives | [Driver](research/minix-validation-driver-baseline.md), [operation counts](research/minix-operation-count-evidence.md), [stack bounds](research/minix-stack-bound-evidence.md), [copy/fill](research/minix-runtime-memory-primitives.md) |
+| Evidence and primitives | [Driver](research/minix-validation-driver-baseline.md), [operation counts](research/minix-operation-count-evidence.md), [stack bounds](research/minix-stack-bound-evidence.md), [copy/fill](research/minix-runtime-memory-primitives.md), [bootstrap transfers](research/minix-bootstrap-memory-transfers.md) |
 
 Source-organization studies are linked from their corresponding ownership
 maps above. The full [research directory](research/) preserves audit manifests,

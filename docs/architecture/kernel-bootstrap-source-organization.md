@@ -18,8 +18,10 @@ preserved interfaces, evidence identities and validation inheritance.
 
 The Accepted [BOOT01 contract](indexed-bootstrap-transitions.md) keeps
 these owners while replacing service-ID scans and whole-runtime mutation
-plans. BOOT02 separately owns command audit cadence; BOOT03 owns copy/fill
-algorithms. Current metadata upkeep follows ADR-0123, not the historical
+plans. BOOT02 separately owns command audit cadence; BOOT03's
+[Accepted shared-transfer contract](bootstrap-memory-transfers.md) owns copy/fill
+delegation to the existing runtime provider.
+Current metadata upkeep follows ADR-0123, not the historical
 source-transport ceremony below.
 The declarations-only `kernel/boot/bootstrap_transitions_internal.h`
 belongs to the portable transition owner. Portable control, target
