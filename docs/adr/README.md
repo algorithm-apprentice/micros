@@ -148,3 +148,4 @@ to make the project appear more consistent than it was.
 | [0130](0130-quiescent-grant-resource-equivalence.md) | Quiescent grant resource equivalence | Accepted |
 | [0131](0131-retained-grant-copy-spans.md) | Retained grant copy spans | Accepted |
 | [0132](0132-indexed-bootstrap-transitions.md) | Indexed bootstrap transitions | Accepted |
+| [0133](0133-selected-bootstrap-command-validation.md) | Selected bootstrap command validation | Accepted |

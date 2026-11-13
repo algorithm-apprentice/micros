@@ -25,6 +25,11 @@ The declarations-only `kernel/boot/bootstrap_transitions_internal.h`
 belongs to the portable transition owner. Portable control and target
 diagnostics consume its checked lookup and selected plans without adding
 another runtime owner.
+The [Accepted BOOT02 contract](selected-bootstrap-command-validation.md)
+keeps those owners while replacing B06's complete command-audit boundary.
+Its narrowly consumed scheduler, VM, TTY and UART point helpers remain
+with their existing mechanism owners; no executable change belongs to
+that design phase.
 
 ## Reviewed base and scope
 
