@@ -98,7 +98,7 @@ def fatal_source_fixture(root):
 
 
 def compile_selected_mapping_fixture(
-    root, indirect=False, unit="kernel/memory/user_address_space_mapping.c", unknown=False,
+    root, indirect=False, unit="kernel/memory/user_address_space_mapping.c", unknown=False, inline_header=False,
 ):
     from tools.stack_bound_artifacts import load_c_object
     from tools.stack_bound_bindings import reference_source
@@ -145,8 +145,21 @@ def compile_selected_mapping_fixture(
     )
     if unknown:
         body = body.replace("selected_table_is_distinct", "foreign_table_check")
+    helper_header = "kernel/memory/selected_fixture_internal.h"
+    if inline_header:
+        from tests.host.c_source_records import function_records
+
+        record = function_records(body)["selected_slot_is_required"]
+        definition = record.signature + "{" + record.body + "}"
+        path = root / helper_header
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_text(definition.replace("static bool", "static inline bool", 1) + "\n")
+        body = body.replace(definition, '#include "' + helper_header + '"\n', 1)
     source, output = compile_fixture(root, body)
-    evidence = load_c_object(output, source, variant="fixture", image="kernel.elf", translation_unit=unit)
+    evidence = load_c_object(
+        output, source, variant="fixture", image="kernel.elf", translation_unit=unit,
+        dependencies=(root / helper_header,) if inline_header else (),
+    )
     symbols = function_symbols(load_object(output))
     keys = {frame.function.symbol: frame.function for frame in evidence.frames}
     catalog = LinkedCatalog(
@@ -159,7 +172,11 @@ def compile_selected_mapping_fixture(
               for call in evidence.calls if call.target_symbol is not None),
         tuple(call for call in evidence.calls if call.target_symbol is None),
         tuple((frame.function, "fixture.obj") for frame in evidence.frames),
-        tuple(SourceOrigin(origin.function, unit, origin.line) for origin in evidence.origins),
+        tuple(SourceOrigin(
+            origin.function,
+            helper_header if inline_header and origin.function.symbol == "selected_slot_is_required" else unit,
+            origin.line,
+        ) for origin in evidence.origins),
     )
     group = next(group for group in GROUPS if unit.startswith(group.source_prefix))
     header = reference_source(str(ROOT), group.header)
@@ -707,6 +724,43 @@ class StackBoundEvidenceTest(unittest.TestCase):
 
             with patch("tools.stack_bound_bindings.reference_source", side_effect=fixed_header):
                 self.assertEqual(((), ()), bind_current_callbacks(root, root, catalog))
+
+    def test_callback_free_header_helpers_keep_current_type_and_machine_checks(self):
+        from tools.stack_bound_bindings import bind_current_callbacks
+
+        with tempfile.TemporaryDirectory(prefix="micros-stack-current-header-") as directory:
+            root = Path(directory)
+            catalog, _, header = compile_selected_mapping_fixture(root, inline_header=True)
+            helper = root / "kernel/memory/selected_fixture_internal.h"
+            original = helper.read_text()
+            with patch(
+                "tools.stack_bound_bindings.reference_source",
+                side_effect=lambda _, path: header if path == "include/micros/user_address_space.h" else "",
+            ):
+                self.assertEqual(((), ()), bind_current_callbacks(root, root, catalog))
+                for content in (
+                    original.replace("return true;", "micros_user_mapping_visitor visitor = 0; return visitor != 0;"),
+                    original.replace("return true;", "return walk->visitor(0, 0, 0, 0);"),
+                    original.replace("selected_slot_is_required", "foreign_header_function"),
+                ):
+                    helper.write_text(content)
+                    with self.subTest(content=content), self.assertRaisesRegex(StackEvidenceError, "callback|source"):
+                        bind_current_callbacks(root, root, catalog)
+
+    def test_header_helper_machine_indirect_call_cannot_hide_behind_empty_pending(self):
+        from tools.stack_bound_bindings import bind_current_callbacks
+
+        with tempfile.TemporaryDirectory(prefix="micros-stack-header-indirect-") as directory:
+            root = Path(directory)
+            catalog, _, header = compile_selected_mapping_fixture(root, inline_header=True, indirect=True)
+            self.assertEqual(1, len(catalog.pending))
+            with patch(
+                "tools.stack_bound_bindings.reference_source",
+                side_effect=lambda _, path: header if path == "include/micros/user_address_space.h" else "",
+            ):
+                for current in (catalog, replace(catalog, pending=())):
+                    with self.subTest(pending=current.pending), self.assertRaisesRegex(StackEvidenceError, "indirect"):
+                        bind_current_callbacks(root, root, current)
 
     def test_every_callback_header_retains_its_qualified_type_declaration(self):
         from tools.stack_bound_bindings import reference_source, require_callback_type_scope

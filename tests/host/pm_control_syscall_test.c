@@ -242,6 +242,7 @@ static bool initialize_authority_resolution_fixture(
     fixture->objects.processes[fixture->state.process.slot]
         .privilege_profile = MICROS_PRIVILEGE_PROFILE_PM;
     fixture->bootstrap.entry_count = 1;
+    fixture->bootstrap.binding_slots[fixture->state.service_id] = 1;
     fixture->bootstrap.plan.pm_service_id =
         fixture->state.service_id;
     binding = &fixture->bootstrap.bindings[0];

@@ -4278,6 +4278,7 @@ if(MICROS_BUILD_HOST_TESTS)
         tests/qemu/selected_ipc_work.h
         arch/riscv64/interrupt.h
         kernel/boot/bootstrap_control_internal.h
+        kernel/boot/bootstrap_transitions_internal.h
         kernel/grant/grant_copy_internal.h
         kernel/grant/grant_runtime_internal.h
         kernel/grant/grant_syscall.h
@@ -4378,6 +4379,107 @@ if(MICROS_BUILD_HOST_TESTS)
         "$<TARGET_FILE:selected_grant_validation_ordinary>")
     set_tests_properties(selected-grant-validation PROPERTIES LABELS slow)
     add_dependencies(test-unit selected_grant_validation_ordinary selected_grant_validation_test)
+
+    set(BOOT01_NATIVE_ROOT "${CMAKE_CURRENT_BINARY_DIR}/indexed-bootstrap")
+    set(BOOT01_NATIVE_INPUTS ${IPC01_NATIVE_INPUTS}
+        kernel/boot/bootstrap_control_core.c
+        kernel/boot/bootstrap_transitions.c
+        kernel/boot/bootstrap_manifest_common.c
+        kernel/boot/bootstrap_runtime_state.c
+        kernel/boot/bootstrap_diagnostics.c
+        kernel/tty/tty_handoff_core.c
+        kernel/tty/tty_handoff_runtime_state.c
+        kernel/tty/tty_handoff_runtime.c)
+    list(REMOVE_ITEM BOOT01_NATIVE_INPUTS
+        kernel/ipc/ipc_buffer.c kernel/ipc/ipc_abi.c kernel/scheduler/scheduler_completion.c)
+    set(BOOT01_NATIVE_HEADERS ${IPC01_NATIVE_HEADERS}
+        kernel/boot/bootstrap_control_internal.h
+        kernel/boot/bootstrap_manifest_internal.h
+        kernel/boot/bootstrap_transitions_internal.h
+        arch/riscv64/panic_context.h
+        arch/riscv64/platform.h
+        include/micros/frame_allocator.h
+        include/micros/frame_ownership.h
+        include/micros/kernel_object_runtime.h
+        include/micros/panic.h
+        include/micros/spawn.h
+        include/micros/vm.h
+        include/micros/vm_bootstrap.h
+        kernel/boot/bootstrap_image.h
+        kernel/boot/bootstrap_runtime.h
+        kernel/boot/bootstrap_runtime_internal.h
+        kernel/tty/tty_handoff_core.h
+        kernel/tty/tty_handoff_runtime.h
+        kernel/tty/tty_handoff_runtime_internal.h
+        kernel/vm/vm_snapshot.h)
+    set(BOOT01_NATIVE_DEPENDENCIES ${BOOT01_NATIVE_INPUTS} ${BOOT01_NATIVE_HEADERS})
+    list(TRANSFORM BOOT01_NATIVE_DEPENDENCIES PREPEND "${CMAKE_CURRENT_SOURCE_DIR}/")
+    set(BOOT01_NATIVE_OUTPUTS)
+    foreach(boot01_channel IN ITEMS ordinary work)
+        set(BOOT01_SOURCES_${boot01_channel})
+        foreach(boot01_source IN LISTS BOOT01_NATIVE_INPUTS)
+            list(APPEND BOOT01_SOURCES_${boot01_channel}
+                "${BOOT01_NATIVE_ROOT}/${boot01_channel}/${boot01_source}")
+        endforeach()
+        list(APPEND BOOT01_NATIVE_OUTPUTS ${BOOT01_SOURCES_${boot01_channel}})
+        foreach(boot01_header IN LISTS BOOT01_NATIVE_HEADERS)
+            list(APPEND BOOT01_NATIVE_OUTPUTS "${BOOT01_NATIVE_ROOT}/${boot01_channel}/${boot01_header}")
+        endforeach()
+    endforeach()
+    add_custom_command(
+        OUTPUT ${BOOT01_NATIVE_OUTPUTS}
+        COMMAND "${MICROS_PYTHON}" ${MICROS_PYTHON_ARGS}
+            "${CMAKE_CURRENT_SOURCE_DIR}/tools/generate_indexed_bootstrap_fixture.py"
+        DEPENDS ${BOOT01_NATIVE_DEPENDENCIES}
+            tests/host/indexed_bootstrap_test.c
+            tests/host/bootstrap_control_fixture.c
+            tests/host/bootstrap_control_test_internal.h
+            tests/host/indexed_bootstrap_evidence.py
+            tests/host/indexed_bootstrap_source.py
+            tests/host/selected_ipc_validation_evidence.py
+            tests/host/selected_ipc_validation_source.py
+            tests/host/native_observations.py
+            tests/host/native_observations.json
+            tests/host/source_snapshot.py
+            tests/host/c_source_records.py
+            tests/host/work_count_lexical.py
+            tests/host/work_count_projection.py
+            tests/host/work_count_types.py
+            tools/generate_indexed_bootstrap_fixture.py
+        WORKING_DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}"
+        VERBATIM
+    )
+    add_executable(indexed_bootstrap_ordinary ${BOOT01_SOURCES_ordinary}
+        tests/host/indexed_bootstrap_test.c tests/host/bootstrap_control_fixture.c)
+    add_executable(indexed_bootstrap_test ${BOOT01_SOURCES_work}
+        tests/host/indexed_bootstrap_test.c tests/host/bootstrap_control_fixture.c tests/work/work_counts.c)
+    foreach(boot01_channel IN ITEMS ordinary work)
+        if(boot01_channel STREQUAL ordinary)
+            set(boot01_target indexed_bootstrap_ordinary)
+        else()
+            set(boot01_target indexed_bootstrap_test)
+        endif()
+        target_include_directories(${boot01_target} PRIVATE
+            "${BOOT01_NATIVE_ROOT}/${boot01_channel}"
+            "${BOOT01_NATIVE_ROOT}/${boot01_channel}/include"
+            "${CMAKE_CURRENT_SOURCE_DIR}" "${CMAKE_CURRENT_SOURCE_DIR}/include")
+        target_compile_features(${boot01_target} PRIVATE c_std_17)
+        target_compile_options(${boot01_target} PRIVATE
+            -Wall -Wextra -Werror -Wpedantic -Wmissing-prototypes -Wstrict-prototypes -fno-builtin)
+        if(MICROS_ENABLE_SANITIZERS AND CMAKE_C_COMPILER_ID MATCHES "Clang|GNU")
+            target_compile_options(${boot01_target} PRIVATE -fno-omit-frame-pointer -fsanitize=address,undefined)
+            target_link_options(${boot01_target} PRIVATE -fsanitize=address,undefined)
+        endif()
+    endforeach()
+    target_compile_definitions(indexed_bootstrap_test PRIVATE
+        MICROS_TEST_WORK_COUNTS=1 MICROS_INDEXED_BOOTSTRAP_LAUNCHER=1
+        "MICROS_INDEXED_BOOTSTRAP_PYTHON=\"${MICROS_PYTHON}\""
+        "MICROS_INDEXED_BOOTSTRAP_DRIVER=\"${CMAKE_CURRENT_SOURCE_DIR}/tools/check_indexed_bootstrap.py\""
+        "MICROS_INDEXED_BOOTSTRAP_ROOT=\"${CMAKE_CURRENT_SOURCE_DIR}\"")
+    add_test(NAME indexed-bootstrap COMMAND indexed_bootstrap_test
+        "$<TARGET_FILE:indexed_bootstrap_ordinary>")
+    set_tests_properties(indexed-bootstrap PROPERTIES LABELS slow)
+    add_dependencies(test-unit indexed_bootstrap_ordinary indexed_bootstrap_test)
 
     include("${CMAKE_CURRENT_SOURCE_DIR}/tests/stack/StackEvidence.cmake")
     include("${CMAKE_CURRENT_SOURCE_DIR}/tests/work/WorkCounts.cmake")

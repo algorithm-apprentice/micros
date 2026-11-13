@@ -1,5 +1,1149 @@
 {
   "families": {
+    "BOOT01": {
+      "channels": ["work"],
+      "native_sources": ["kernel/boot/bootstrap_control_core.c","kernel/boot/bootstrap_diagnostics.c","kernel/boot/bootstrap_manifest_common.c","kernel/boot/bootstrap_runtime_state.c","kernel/boot/bootstrap_transitions.c","kernel/endpoint/endpoint.c","kernel/endpoint/endpoint_close.c","kernel/endpoint/endpoint_codec.c","kernel/endpoint/endpoint_completion_validation.c","kernel/endpoint/endpoint_identity.c","kernel/endpoint/endpoint_object_validation.c","kernel/endpoint/endpoint_privilege.c","kernel/endpoint/endpoint_publication.c","kernel/endpoint/endpoint_queue_validation.c","kernel/endpoint/endpoint_registry.c","kernel/ipc/ipc.c","kernel/ipc/ipc_close.c","kernel/ipc/ipc_common.c","kernel/ipc/ipc_completion.c","kernel/ipc/ipc_deadlock.c","kernel/ipc/ipc_notifications.c","kernel/ipc/ipc_queue.c","kernel/ipc/ipc_rendezvous.c","kernel/ipc/ipc_reply.c","kernel/ipc/ipc_tokens.c","kernel/objects/kernel_object_context.c","kernel/objects/kernel_object_hart.c","kernel/objects/kernel_object_identity.c","kernel/objects/kernel_object_process.c","kernel/objects/kernel_object_stack.c","kernel/objects/kernel_object_state.c","kernel/objects/kernel_object_thread.c","kernel/objects/kernel_object_validation.c","kernel/objects/kernel_objects.c","kernel/scheduler/scheduler_core.c","kernel/scheduler/scheduler_core_accounting.c","kernel/scheduler/scheduler_core_ipc.c","kernel/scheduler/scheduler_core_ipc_transition.c","kernel/scheduler/scheduler_core_policy.c","kernel/scheduler/scheduler_core_queue.c","kernel/scheduler/scheduler_core_return.c","kernel/scheduler/scheduler_core_return_plan.c","kernel/scheduler/scheduler_core_validate.c","kernel/tty/tty_handoff_core.c","kernel/tty/tty_handoff_runtime.c","kernel/tty/tty_handoff_runtime_state.c"],
+      "sites": {
+        "kernel/boot/bootstrap_control_core.c": {
+          "binding_index_is_valid": [
+            [["work"],["boot01/kernel/boot/bootstrap_control_core.c/binding_index_is_valid/index-8","wrap","KERNEL_BOOT","INDEX_PROBE",1,"value","0",[],0,3]],
+            [["work"],["boot01/kernel/boot/bootstrap_control_core.c/binding_index_is_valid/loop-34","insert","KERNEL_BOOT","RECORD_VISIT",1,"entry","",[["for ( index = 0 ; index < state -> entry_count ; ++ index ) {",0]],0,0]],
+            [["work"],["boot01/kernel/boot/bootstrap_control_core.c/binding_index_is_valid/index-41","wrap","KERNEL_BOOT","INDEX_PROBE",1,"value","index",[["for ( index = 0 ; index < state -> entry_count ; ++ index ) {",0]],0,2]],
+            [["work"],["boot01/kernel/boot/bootstrap_control_core.c/binding_index_is_valid/index-60","wrap","KERNEL_BOOT","INDEX_PROBE",1,"value","service_id",[["for ( index = 0 ; index < state -> entry_count ; ++ index ) {",0]],4,5]],
+            [["work"],["boot01/kernel/boot/bootstrap_control_core.c/binding_index_is_valid/loop-87","insert","KERNEL_BOOT","RECORD_VISIT",1,"entry","",[["for ( index = 1 ; index <= MICROS_BOOTSTRAP_SERVICE_ID_LIMIT ; ++ index ) {",0]],0,0]],
+            [["work"],["boot01/kernel/boot/bootstrap_control_core.c/binding_index_is_valid/index-94","wrap","KERNEL_BOOT","INDEX_PROBE",1,"value","index",[["for ( index = 1 ; index <= MICROS_BOOTSTRAP_SERVICE_ID_LIMIT ; ++ index ) {",0]],0,2]],
+            [["work"],["boot01/kernel/boot/bootstrap_control_core.c/binding_index_is_valid/index-114","wrap","KERNEL_BOOT","INDEX_PROBE",1,"value","slot - 1",[["for ( index = 1 ; index <= MICROS_BOOTSTRAP_SERVICE_ID_LIMIT ; ++ index ) {",0]],0,1]]
+          ],
+          "binding_matches_manifest": [
+            [["work"],["boot01/kernel/boot/bootstrap_control_core.c/binding_matches_manifest/index-81","wrap","KERNEL_BOOT","INDEX_PROBE",1,"value","binding -> manifest_index",[],1,2]]
+          ],
+          "binding_matches_objects": [
+            [["work"],["boot01/kernel/boot/bootstrap_control_core.c/binding_matches_objects/index-12","wrap","KERNEL_BOOT","INDEX_PROBE",1,"value","binding -> manifest_index",[],0,1]]
+          ],
+          "bytes_are_zero": [
+            [["work"],["boot01/kernel/boot/bootstrap_control_core.c/bytes_are_zero/loop-24","insert","KERNEL_BOOT","COMPARISON",1,"entry","",[["for ( index = 0 ; index < size ; ++ index ) {",0]],0,0]]
+          ],
+          "clear_bytes": [
+            [["work"],["boot01/kernel/boot/bootstrap_control_core.c/clear_bytes/loop-23","insert","KERNEL_BOOT","CLEARED_BYTE",1,"entry","",[["for ( index = 0 ; index < size ; ++ index ) {",0]],0,0]]
+          ],
+          "control_release": [
+            [["work"],["boot01/kernel/boot/bootstrap_control_core.c/control_release/index-106","wrap","KERNEL_BOOT","INDEX_PROBE",1,"value","binding -> manifest_index",[],0,1]]
+          ],
+          "copy_bytes": [
+            [["work"],["boot01/kernel/boot/bootstrap_control_core.c/copy_bytes/loop-31","insert","KERNEL_BOOT","COPIED_BYTE",1,"entry","",[["for ( index = 0 ; index < size ; ++ index ) {",0]],0,0]]
+          ],
+          "find_ready_pm_endpoint": [
+            [["work"],["boot01/kernel/boot/bootstrap_control_core.c/find_ready_pm_endpoint/loop-43","insert","KERNEL_BOOT","RECORD_VISIT",1,"entry","",[["for ( index = 0 ; index < state -> entry_count ; ++ index ) {",0]],0,0]],
+            [["work"],["boot01/kernel/boot/bootstrap_control_core.c/find_ready_pm_endpoint/index-56","wrap","KERNEL_BOOT","INDEX_PROBE",1,"value","index",[["for ( index = 0 ; index < state -> entry_count ; ++ index ) {",0]],0,1]],
+            [["work"],["boot01/kernel/boot/bootstrap_control_core.c/find_ready_pm_endpoint/index-180","wrap","KERNEL_BOOT","INDEX_PROBE",1,"value","binding -> manifest_index",[],0,1]]
+          ],
+          "launcher_has_grant_dependency": [
+            [["work"],["boot01/kernel/boot/bootstrap_control_core.c/launcher_has_grant_dependency/loop-27","insert","KERNEL_BOOT","RECORD_VISIT",1,"entry","",[["for ( index = 0 ; index < MICROS_GRANT_CAPACITY ; ++ index ) {",0]],0,0]],
+            [["work"],["boot01/kernel/boot/bootstrap_control_core.c/launcher_has_grant_dependency/index-38","wrap","KERNEL_BOOT","INDEX_PROBE",1,"value","index",[["for ( index = 0 ; index < MICROS_GRANT_CAPACITY ; ++ index ) {",0]],0,1]]
+          ],
+          "map_endpoint_error": [],
+          "map_notification_error": [],
+          "micros_bootstrap_control_commit_complete_prevalidated": [],
+          "micros_bootstrap_control_commit_ready_prevalidated": [],
+          "micros_bootstrap_control_find_binding": [],
+          "micros_bootstrap_control_prepare_complete": [
+            [["work"],["boot01/kernel/boot/bootstrap_control_core.c/micros_bootstrap_control_prepare_complete/index-292","wrap","KERNEL_BOOT","INDEX_PROBE",1,"value","0",[],1,2]]
+          ],
+          "micros_bootstrap_control_prepare_ready": [
+            [["work"],["boot01/kernel/boot/bootstrap_control_core.c/micros_bootstrap_control_prepare_ready/index-113","wrap","KERNEL_BOOT","INDEX_PROBE",1,"value","binding -> manifest_index",[],0,1]],
+            [["work"],["boot01/kernel/boot/bootstrap_control_core.c/micros_bootstrap_control_prepare_ready/index-206","wrap","KERNEL_BOOT","INDEX_PROBE",1,"value","0",[],1,4]]
+          ],
+          "micros_bootstrap_control_publish_controller": [
+            [["work"],["boot01/kernel/boot/bootstrap_control_core.c/micros_bootstrap_control_publish_controller/index-147","wrap","KERNEL_BOOT","INDEX_PROBE",1,"value","controller -> manifest_index",[],0,1]]
+          ],
+          "micros_bootstrap_control_release": [],
+          "micros_bootstrap_control_release_console": [],
+          "micros_bootstrap_control_state_prepare": [
+            [["work"],["boot01/kernel/boot/bootstrap_control_core.c/micros_bootstrap_control_state_prepare/loop-175","insert","KERNEL_BOOT","RECORD_VISIT",1,"entry","",[["for ( index = 0 ; index < binding_count ; ++ index ) {",0]],0,0]],
+            [["work"],["boot01/kernel/boot/bootstrap_control_core.c/micros_bootstrap_control_state_prepare/index-186","wrap","KERNEL_BOOT","INDEX_PROBE",1,"value","index",[["for ( index = 0 ; index < binding_count ; ++ index ) {",0]],0,2]],
+            [["work"],["boot01/kernel/boot/bootstrap_control_core.c/micros_bootstrap_control_state_prepare/index-246","wrap","KERNEL_BOOT","INDEX_PROBE",1,"value","binding -> service_id",[["for ( index = 0 ; index < binding_count ; ++ index ) {",0]],1,2]]
+          ],
+          "micros_bootstrap_control_validate": [
+            [["work"],["boot01/kernel/boot/bootstrap_control_core.c/micros_bootstrap_control_validate/audit","insert","KERNEL_BOOT","COMPLETE_VALIDATOR_CALL",1,"entry","",[],0,0]],
+            [["work"],["boot01/kernel/boot/bootstrap_control_core.c/micros_bootstrap_control_validate/loop-205","insert","KERNEL_BOOT","RECORD_VISIT",1,"entry","",[["for ( index = 0 ; index < state -> entry_count ; ++ index ) {",0]],0,0]],
+            [["work"],["boot01/kernel/boot/bootstrap_control_core.c/micros_bootstrap_control_validate/index-217","wrap","KERNEL_BOOT","INDEX_PROBE",1,"value","index",[["for ( index = 0 ; index < state -> entry_count ; ++ index ) {",0]],0,2]],
+            [["work"],["boot01/kernel/boot/bootstrap_control_core.c/micros_bootstrap_control_validate/index-231","wrap","KERNEL_BOOT","INDEX_PROBE",1,"value","index",[["for ( index = 0 ; index < state -> entry_count ; ++ index ) {",0]],1,2]]
+          ],
+          "process_handles_equal": [],
+          "read_u32_le": [],
+          "staged_launcher_acknowledgments_are_valid": [
+            [["work"],["boot01/kernel/boot/bootstrap_control_core.c/staged_launcher_acknowledgments_are_valid/loop-16","insert","KERNEL_BOOT","RECORD_VISIT",1,"entry","",[["for ( thread_index = 0 ; thread_index < MICROS_THREAD_CAPACITY ; ++ thread_index ) {",0]],0,0]],
+            [["work"],["boot01/kernel/boot/bootstrap_control_core.c/staged_launcher_acknowledgments_are_valid/index-27","wrap","KERNEL_BOOT","INDEX_PROBE",1,"value","thread_index",[["for ( thread_index = 0 ; thread_index < MICROS_THREAD_CAPACITY ; ++ thread_index ) {",0]],0,1]],
+            [["work"],["boot01/kernel/boot/bootstrap_control_core.c/staged_launcher_acknowledgments_are_valid/loop-169","insert","KERNEL_BOOT","RECORD_VISIT",1,"entry","",[["for ( thread_index = 0 ; thread_index < MICROS_THREAD_CAPACITY ; ++ thread_index ) {",0],["for ( payload_index = 20 ; payload_index < sizeof ( message -> payload ) ; ++ payload_index ) {",0]],0,0]]
+          ],
+          "thread_handles_equal": [],
+          "write_u32_le": []
+        },
+        "kernel/boot/bootstrap_control_internal.h": {
+          "micros_bootstrap_control_find_binding_bounded": [
+            [["work"],["boot01/kernel/boot/bootstrap_control_internal.h/micros_bootstrap_control_find_binding_bounded/index-45","wrap","KERNEL_BOOT","INDEX_PROBE",1,"value","service_id",[],2,5]],
+            [["work"],["boot01/kernel/boot/bootstrap_control_internal.h/micros_bootstrap_control_find_binding_bounded/index-72","wrap","KERNEL_BOOT","INDEX_PROBE",1,"value","slot - 1",[],0,1]]
+          ]
+        },
+        "kernel/boot/bootstrap_diagnostics.c": {
+          "diagnostic_phase_name": [],
+          "diagnostic_reason_name": [],
+          "diagnostic_state_name": [],
+          "micros_bootstrap_runtime_check_deadline": [],
+          "micros_bootstrap_runtime_fail": [],
+          "micros_bootstrap_runtime_record_failure": []
+        },
+        "kernel/boot/bootstrap_manifest_common.c": {
+          "bootstrap_manifest_bytes_are_zero": [
+            [["work"],["boot01/kernel/boot/bootstrap_manifest_common.c/bootstrap_manifest_bytes_are_zero/loop-24","insert","KERNEL_BOOT","COMPARISON",1,"entry","",[["for ( index = 0 ; index < size ; ++ index ) {",0]],0,0]]
+          ],
+          "bootstrap_manifest_clear_bytes": [
+            [["work"],["boot01/kernel/boot/bootstrap_manifest_common.c/bootstrap_manifest_clear_bytes/loop-23","insert","KERNEL_BOOT","CLEARED_BYTE",1,"entry","",[["for ( index = 0 ; index < size ; ++ index ) {",0]],0,0]]
+          ],
+          "bootstrap_manifest_copy_bytes": [
+            [["work"],["boot01/kernel/boot/bootstrap_manifest_common.c/bootstrap_manifest_copy_bytes/loop-31","insert","KERNEL_BOOT","COPIED_BYTE",1,"entry","",[["for ( index = 0 ; index < size ; ++ index ) {",0]],0,0]]
+          ],
+          "bootstrap_manifest_fixed_name_is_canonical": [
+            [["work"],["boot01/kernel/boot/bootstrap_manifest_common.c/bootstrap_manifest_fixed_name_is_canonical/loop-35","insert","KERNEL_BOOT","COMPARISON",1,"entry","",[["for ( index = 0 ; index < MICROS_BOOTSTRAP_NAME_SIZE ; ++ index ) {",0]],0,0]]
+          ],
+          "bootstrap_manifest_fixed_name_matches_literal": [
+            [["work"],["boot01/kernel/boot/bootstrap_manifest_common.c/bootstrap_manifest_fixed_name_matches_literal/loop-14","insert","KERNEL_BOOT","COMPARISON",1,"entry","",[["while ( literal [ index ] != '\\0' ) {",0]],0,0]],
+            [["work"],["boot01/kernel/boot/bootstrap_manifest_common.c/bootstrap_manifest_fixed_name_matches_literal/loop-50","insert","KERNEL_BOOT","COMPARISON",1,"entry","",[["for ( ; index < MICROS_BOOTSTRAP_NAME_SIZE ; ++ index ) {",0]],0,0]]
+          ],
+          "bootstrap_manifest_fixed_names_equal": [
+            [["work"],["boot01/kernel/boot/bootstrap_manifest_common.c/bootstrap_manifest_fixed_names_equal/loop-16","insert","KERNEL_BOOT","COMPARISON",1,"entry","",[["for ( index = 0 ; index < MICROS_BOOTSTRAP_NAME_SIZE ; ++ index ) {",0]],0,0]]
+          ],
+          "bootstrap_manifest_pointer_is_aligned": []
+        },
+        "kernel/boot/bootstrap_runtime_state.c": {
+          "bootstrap_runtime_context": []
+        },
+        "kernel/boot/bootstrap_transitions.c": {
+          "bootstrap_runtime_commit_prevalidated": [
+            [["work"],["boot01/kernel/boot/bootstrap_transitions.c/bootstrap_runtime_commit_prevalidated/index-6","wrap","KERNEL_BOOT","INDEX_PROBE",1,"value","plan -> entry_index",[],0,1]]
+          ],
+          "bootstrap_runtime_find_entry": [
+            [["work"],["boot01/kernel/boot/bootstrap_transitions.c/bootstrap_runtime_find_entry/index-20","wrap","KERNEL_BOOT","INDEX_PROBE",1,"value","index",[],2,3]]
+          ],
+          "bootstrap_runtime_prepare_complete": [
+            [["work"],["boot01/kernel/boot/bootstrap_transitions.c/bootstrap_runtime_prepare_complete/loop-92","insert","KERNEL_BOOT","RECORD_VISIT",1,"entry","",[["for ( index = 0 ; index < runtime -> entry_count ; ++ index ) {",0]],0,0]],
+            [["work"],["boot01/kernel/boot/bootstrap_transitions.c/bootstrap_runtime_prepare_complete/index-98","wrap","KERNEL_BOOT","INDEX_PROBE",1,"value","index",[["for ( index = 0 ; index < runtime -> entry_count ; ++ index ) {",0]],0,2]],
+            [["work"],["boot01/kernel/boot/bootstrap_transitions.c/bootstrap_runtime_prepare_complete/index-109","wrap","KERNEL_BOOT","INDEX_PROBE",1,"value","index",[["for ( index = 0 ; index < runtime -> entry_count ; ++ index ) {",0]],1,2]],
+            [["work"],["boot01/kernel/boot/bootstrap_transitions.c/bootstrap_runtime_prepare_complete/index-150","wrap","KERNEL_BOOT","INDEX_PROBE",1,"value","controller_index",[],2,4]]
+          ],
+          "bootstrap_runtime_prepare_ready": [
+            [["work"],["boot01/kernel/boot/bootstrap_transitions.c/bootstrap_runtime_prepare_ready/index-91","wrap","KERNEL_BOOT","INDEX_PROBE",1,"value","index",[],2,4]]
+          ],
+          "bootstrap_runtime_prepare_release": [
+            [["work"],["boot01/kernel/boot/bootstrap_transitions.c/bootstrap_runtime_prepare_release/index-94","wrap","KERNEL_BOOT","INDEX_PROBE",1,"value","runtime -> next_order_index",[],1,2]],
+            [["work"],["boot01/kernel/boot/bootstrap_transitions.c/bootstrap_runtime_prepare_release/index-113","wrap","KERNEL_BOOT","INDEX_PROBE",1,"value","index",[],2,4]],
+            [["work"],["boot01/kernel/boot/bootstrap_transitions.c/bootstrap_runtime_prepare_release/loop-178","insert","KERNEL_BOOT","RECORD_VISIT",1,"entry","",[["while ( prerequisites != 0 ) {",0]],0,0]],
+            [["work"],["boot01/kernel/boot/bootstrap_transitions.c/bootstrap_runtime_prepare_release/index-217","wrap","KERNEL_BOOT","INDEX_PROBE",1,"value","dependency_index",[["while ( prerequisites != 0 ) {",0]],2,3]]
+          ],
+          "bootstrap_runtime_validate_index": [
+            [["work"],["boot01/kernel/boot/bootstrap_transitions.c/bootstrap_runtime_validate_index/audit","insert","KERNEL_BOOT","COMPLETE_VALIDATOR_CALL",1,"entry","",[],0,0]],
+            [["work"],["boot01/kernel/boot/bootstrap_transitions.c/bootstrap_runtime_validate_index/index-24","wrap","KERNEL_BOOT","INDEX_PROBE",1,"value","0",[],1,4]],
+            [["work"],["boot01/kernel/boot/bootstrap_transitions.c/bootstrap_runtime_validate_index/loop-50","insert","KERNEL_BOOT","RECORD_VISIT",1,"entry","",[["for ( index = 0 ; index < runtime -> entry_count ; ++ index ) {",0]],0,0]],
+            [["work"],["boot01/kernel/boot/bootstrap_transitions.c/bootstrap_runtime_validate_index/index-57","wrap","KERNEL_BOOT","INDEX_PROBE",1,"value","index",[["for ( index = 0 ; index < runtime -> entry_count ; ++ index ) {",0]],0,2]],
+            [["work"],["boot01/kernel/boot/bootstrap_transitions.c/bootstrap_runtime_validate_index/index-76","wrap","KERNEL_BOOT","INDEX_PROBE",1,"value","service_id",[["for ( index = 0 ; index < runtime -> entry_count ; ++ index ) {",0]],4,5]],
+            [["work"],["boot01/kernel/boot/bootstrap_transitions.c/bootstrap_runtime_validate_index/loop-103","insert","KERNEL_BOOT","RECORD_VISIT",1,"entry","",[["for ( index = 1 ; index <= MICROS_BOOTSTRAP_SERVICE_ID_LIMIT ; ++ index ) {",0]],0,0]],
+            [["work"],["boot01/kernel/boot/bootstrap_transitions.c/bootstrap_runtime_validate_index/index-110","wrap","KERNEL_BOOT","INDEX_PROBE",1,"value","index",[["for ( index = 1 ; index <= MICROS_BOOTSTRAP_SERVICE_ID_LIMIT ; ++ index ) {",0]],0,2]],
+            [["work"],["boot01/kernel/boot/bootstrap_transitions.c/bootstrap_runtime_validate_index/index-130","wrap","KERNEL_BOOT","INDEX_PROBE",1,"value","slot - 1",[["for ( index = 1 ; index <= MICROS_BOOTSTRAP_SERVICE_ID_LIMIT ; ++ index ) {",0]],0,1]]
+          ],
+          "initialize_transition_plan": [
+            [["work"],["boot01/kernel/boot/bootstrap_transitions.c/initialize_transition_plan/index-60","wrap","KERNEL_BOOT","INDEX_PROBE",1,"value","index",[],1,2]]
+          ],
+          "lowest_prerequisite_id": [],
+          "micros_bootstrap_classify_ready": [],
+          "micros_bootstrap_runtime_accept_ready": [],
+          "micros_bootstrap_runtime_complete": [],
+          "micros_bootstrap_runtime_initialize": [
+            [["work"],["boot01/kernel/boot/bootstrap_transitions.c/micros_bootstrap_runtime_initialize/index-137","wrap","KERNEL_BOOT","INDEX_PROBE",1,"value","0",[],3,6]],
+            [["work"],["boot01/kernel/boot/bootstrap_transitions.c/micros_bootstrap_runtime_initialize/loop-193","insert","KERNEL_BOOT","RECORD_VISIT",1,"entry","",[["for ( index = 0 ; index < plan -> entry_count ; ++ index ) {",0]],0,0]],
+            [["work"],["boot01/kernel/boot/bootstrap_transitions.c/micros_bootstrap_runtime_initialize/index-204","wrap","KERNEL_BOOT","INDEX_PROBE",1,"value","index",[["for ( index = 0 ; index < plan -> entry_count ; ++ index ) {",0]],0,5]],
+            [["work"],["boot01/kernel/boot/bootstrap_transitions.c/micros_bootstrap_runtime_initialize/index-217","wrap","KERNEL_BOOT","INDEX_PROBE",1,"value","index",[["for ( index = 0 ; index < plan -> entry_count ; ++ index ) {",0]],1,5]],
+            [["work"],["boot01/kernel/boot/bootstrap_transitions.c/micros_bootstrap_runtime_initialize/index-238","wrap","KERNEL_BOOT","INDEX_PROBE",1,"value","manifest_entry -> service_id",[["for ( index = 0 ; index < plan -> entry_count ; ++ index ) {",0]],2,5]],
+            [["work"],["boot01/kernel/boot/bootstrap_transitions.c/micros_bootstrap_runtime_initialize/index-254","wrap","KERNEL_BOOT","INDEX_PROBE",1,"value","manifest_entry -> service_id",[["for ( index = 0 ; index < plan -> entry_count ; ++ index ) {",0]],3,5]],
+            [["work"],["boot01/kernel/boot/bootstrap_transitions.c/micros_bootstrap_runtime_initialize/index-347","wrap","KERNEL_BOOT","INDEX_PROBE",1,"value","index",[["for ( index = 0 ; index < plan -> entry_count ; ++ index ) {",0]],3,5]],
+            [["work"],["boot01/kernel/boot/bootstrap_transitions.c/micros_bootstrap_runtime_initialize/index-354","wrap","KERNEL_BOOT","INDEX_PROBE",1,"value","index",[["for ( index = 0 ; index < plan -> entry_count ; ++ index ) {",0]],4,5]],
+            [["work"],["boot01/kernel/boot/bootstrap_transitions.c/micros_bootstrap_runtime_initialize/loop-374","insert","KERNEL_BOOT","RECORD_VISIT",1,"entry","",[["for ( index = 0 ; index < plan -> entry_count ; ++ index ) {",1]],0,0]],
+            [["work"],["boot01/kernel/boot/bootstrap_transitions.c/micros_bootstrap_runtime_initialize/index-381","wrap","KERNEL_BOOT","INDEX_PROBE",1,"value","index",[["for ( index = 0 ; index < plan -> entry_count ; ++ index ) {",1]],0,1]],
+            [["work"],["boot01/kernel/boot/bootstrap_transitions.c/micros_bootstrap_runtime_initialize/index-401","wrap","KERNEL_BOOT","INDEX_PROBE",1,"value","service_id",[["for ( index = 0 ; index < plan -> entry_count ; ++ index ) {",1]],3,5]]
+          ],
+          "micros_bootstrap_runtime_release": [],
+          "micros_bootstrap_runtime_release_retaining_deadline": [],
+          "runtime_release": [],
+          "runtime_slot": [
+            [["work"],["boot01/kernel/boot/bootstrap_transitions.c/runtime_slot/index-46","wrap","KERNEL_BOOT","INDEX_PROBE",1,"value","service_id",[],2,5]],
+            [["work"],["boot01/kernel/boot/bootstrap_transitions.c/runtime_slot/index-72","wrap","KERNEL_BOOT","INDEX_PROBE",1,"value","slot - 1",[],0,2]]
+          ]
+        },
+        "kernel/endpoint/endpoint.c": {
+          "micros_endpoint_authorize_kernel_operation": [
+            [["work"],["boot01-shared/ipc01/kernel/endpoint/endpoint.c/micros_endpoint_authorize_kernel_operation/index-47","wrap","KERNEL_ENDPOINT","INDEX_PROBE",1,"value","record -> owner . slot",[],0,1]]
+          ],
+          "micros_endpoint_authorize_operation": [
+            [["work"],["boot01-shared/ipc01/kernel/endpoint/endpoint.c/micros_endpoint_authorize_operation/index-47","wrap","KERNEL_ENDPOINT","INDEX_PROBE",1,"value","record -> owner . slot",[],0,1]]
+          ],
+          "micros_endpoint_authorize_target": [
+            [["work"],["boot01-shared/ipc01/kernel/endpoint/endpoint.c/micros_endpoint_authorize_target/index-103","wrap","KERNEL_ENDPOINT","INDEX_PROBE",1,"value","source_record -> owner . slot",[],0,1]],
+            [["work"],["boot01-shared/ipc01/kernel/endpoint/endpoint.c/micros_endpoint_authorize_target/index-117","wrap","KERNEL_ENDPOINT","INDEX_PROBE",1,"value","target_record -> owner . slot",[],0,1]]
+          ],
+          "micros_endpoint_resolve_active": [],
+          "micros_endpoint_resolve_internal": []
+        },
+        "kernel/endpoint/endpoint_close.c": {
+          "micros_endpoint_close": [],
+          "micros_endpoint_close_commit_prevalidated": [
+            [["work"],["boot01-shared/ipc01/kernel/endpoint/endpoint_close.c/micros_endpoint_close_commit_prevalidated/index-6","wrap","KERNEL_ENDPOINT","INDEX_PROBE",1,"value","owner . slot",[],0,3]],
+            [["work"],["boot01-shared/ipc01/kernel/endpoint/endpoint_close.c/micros_endpoint_close_commit_prevalidated/index-16","wrap","KERNEL_ENDPOINT","INDEX_PROBE",1,"value","owner . slot",[],1,3]],
+            [["work"],["boot01-shared/ipc01/kernel/endpoint/endpoint_close.c/micros_endpoint_close_commit_prevalidated/index-29","wrap","KERNEL_ENDPOINT","INDEX_PROBE",1,"value","owner . slot",[],2,3]]
+          ],
+          "micros_endpoint_commit_source_only_prevalidated": [
+            [["work"],["boot01-shared/ipc01/kernel/endpoint/endpoint_close.c/micros_endpoint_commit_source_only_prevalidated/index-18","wrap","KERNEL_ENDPOINT","INDEX_PROBE",1,"value","owner . slot",[],0,1]]
+          ],
+          "micros_endpoint_preflight_source_only": [],
+          "micros_endpoint_preflight_source_only_for_teardown": [],
+          "micros_endpoint_seal_source_only": [],
+          "preflight_foreign_references": [
+            [["work"],["boot01-shared/ipc01/kernel/endpoint/endpoint_close.c/preflight_foreign_references/loop-14","insert","KERNEL_ENDPOINT","RECORD_VISIT",1,"entry","",[["for ( size_t index = 0 ; index < MICROS_THREAD_CAPACITY ; ++ index ) {",0]],0,0]],
+            [["work"],["boot01-shared/ipc01/kernel/endpoint/endpoint_close.c/preflight_foreign_references/index-25","wrap","KERNEL_ENDPOINT","INDEX_PROBE",1,"value","index",[["for ( size_t index = 0 ; index < MICROS_THREAD_CAPACITY ; ++ index ) {",0]],0,2]]
+          ],
+          "preflight_pending_source_references": [
+            [["work"],["boot01-shared/ipc01/kernel/endpoint/endpoint_close.c/preflight_pending_source_references/loop-28","insert","KERNEL_ENDPOINT","RECORD_VISIT",1,"entry","",[["for ( size_t index = 0 ; index < MICROS_PROCESS_CAPACITY ; ++ index ) {",0]],0,0]],
+            [["work"],["boot01-shared/ipc01/kernel/endpoint/endpoint_close.c/preflight_pending_source_references/index-39","wrap","KERNEL_ENDPOINT","INDEX_PROBE",1,"value","index",[["for ( size_t index = 0 ; index < MICROS_PROCESS_CAPACITY ; ++ index ) {",0]],0,1]],
+            [["work"],["boot01-shared/ipc01/kernel/endpoint/endpoint_close.c/preflight_pending_source_references/index-68","wrap","KERNEL_ENDPOINT","INDEX_PROBE",1,"value","source -> owner . slot",[["for ( size_t index = 0 ; index < MICROS_PROCESS_CAPACITY ; ++ index ) {",0]],0,1]]
+          ],
+          "preflight_plain_source_only": [],
+          "resolve_teardown_endpoint": []
+        },
+        "kernel/endpoint/endpoint_codec.c": {
+          "endpoint_bytes_are_zero": [
+            [["work"],["boot01-shared/ipc01/kernel/endpoint/endpoint_codec.c/endpoint_bytes_are_zero/loop-24","insert","KERNEL_ENDPOINT","COMPARISON",1,"entry","",[["for ( index = 0 ; index < size ; ++ index ) {",0]],0,0]]
+          ],
+          "endpoint_bytes_equal": [
+            [["work"],["boot01-shared/ipc01/kernel/endpoint/endpoint_codec.c/endpoint_bytes_equal/loop-32","insert","KERNEL_ENDPOINT","COMPARISON",1,"entry","",[["for ( index = 0 ; index < size ; ++ index ) {",0]],0,0]]
+          ],
+          "endpoint_canonicalize_profile": [
+            [["work"],["boot01-shared/ipc01/kernel/endpoint/endpoint_codec.c/endpoint_canonicalize_profile/loop-84","insert","KERNEL_ENDPOINT","COMPARISON",1,"entry","",[["for ( index = 0 ; index < MICROS_PRIVILEGE_PROFILE_NAME_SIZE ; ++ index ) {",0]],0,0]]
+          ],
+          "endpoint_clear_bytes": [
+            [["work"],["boot01-shared/ipc01/kernel/endpoint/endpoint_codec.c/endpoint_clear_bytes/loop-23","insert","KERNEL_ENDPOINT","CLEARED_BYTE",1,"entry","",[["for ( index = 0 ; index < size ; ++ index ) {",0]],0,0]]
+          ],
+          "endpoint_clear_endpoint_record": [
+            [["work"],["boot01-shared/ipc01/kernel/endpoint/endpoint_codec.c/endpoint_clear_endpoint_record/clear-unit-104","insert","KERNEL_ENDPOINT","CLEAR_UNIT",1,"entry","",[["for ( index = 0 ; index < MICROS_PROCESS_CAPACITY ; ++ index ) {",0]],0,0]],
+            [["work"],["boot01-shared/ipc01/kernel/endpoint/endpoint_codec.c/endpoint_clear_endpoint_record/clear-bytes-104","insert","KERNEL_ENDPOINT","CLEARED_BYTE",8,"entry","",[["for ( index = 0 ; index < MICROS_PROCESS_CAPACITY ; ++ index ) {",0]],0,0]],
+            [["work"],["boot01-shared/ipc01/kernel/endpoint/endpoint_codec.c/endpoint_clear_endpoint_record/index-108","wrap","KERNEL_ENDPOINT","INDEX_PROBE",1,"value","index",[["for ( index = 0 ; index < MICROS_PROCESS_CAPACITY ; ++ index ) {",0]],0,1]]
+          ],
+          "endpoint_copy_bytes": [
+            [["work"],["boot01-shared/ipc01/kernel/endpoint/endpoint_codec.c/endpoint_copy_bytes/loop-31","insert","KERNEL_ENDPOINT","COPIED_BYTE",1,"entry","",[["for ( index = 0 ; index < size ; ++ index ) {",0]],0,0]]
+          ],
+          "endpoint_ipc_state_is_zero": [
+            [["work"],["boot01-shared/ipc01/kernel/endpoint/endpoint_codec.c/endpoint_ipc_state_is_zero/loop-83","insert","KERNEL_ENDPOINT","RECORD_VISIT",1,"entry","",[["for ( index = 0 ; index < MICROS_PROCESS_CAPACITY ; ++ index ) {",0]],0,0]],
+            [["work"],["boot01-shared/ipc01/kernel/endpoint/endpoint_codec.c/endpoint_ipc_state_is_zero/index-89","wrap","KERNEL_ENDPOINT","INDEX_PROBE",1,"value","index",[["for ( index = 0 ; index < MICROS_PROCESS_CAPACITY ; ++ index ) {",0]],0,1]]
+          ],
+          "endpoint_names_equal": [
+            [["work"],["boot01-shared/ipc01/kernel/endpoint/endpoint_codec.c/endpoint_names_equal/loop-16","insert","KERNEL_ENDPOINT","COMPARISON",1,"entry","",[["for ( index = 0 ; index < MICROS_PRIVILEGE_PROFILE_NAME_SIZE ; ++ index ) {",0]],0,0]]
+          ],
+          "endpoint_pending_notification_state_is_shallow_valid": [
+            [["work"],["boot01-shared/ipc01/kernel/endpoint/endpoint_codec.c/endpoint_pending_notification_state_is_shallow_valid/loop-16","insert","KERNEL_ENDPOINT","RECORD_VISIT",1,"entry","",[["for ( index = 0 ; index < MICROS_PROCESS_CAPACITY ; ++ index ) {",0]],0,0]],
+            [["work"],["boot01-shared/ipc01/kernel/endpoint/endpoint_codec.c/endpoint_pending_notification_state_is_shallow_valid/index-45","wrap","KERNEL_ENDPOINT","INDEX_PROBE",1,"value","index",[["for ( index = 0 ; index < MICROS_PROCESS_CAPACITY ; ++ index ) {",0]],1,2]]
+          ],
+          "endpoint_profile_is_zero": [
+            [["work"],["boot01-shared/ipc01/kernel/endpoint/endpoint_codec.c/endpoint_profile_is_zero/loop-34","insert","KERNEL_ENDPOINT","COMPARISON",1,"entry","",[["for ( index = 0 ; index < sizeof ( * profile ) ; ++ index ) {",0]],0,0]]
+          ],
+          "endpoint_queue_pair_is_shallow_valid": [],
+          "endpoint_record_is_zero": [
+            [["work"],["boot01-shared/ipc01/kernel/endpoint/endpoint_codec.c/endpoint_record_is_zero/loop-111","insert","KERNEL_ENDPOINT","RECORD_VISIT",1,"entry","",[["for ( index = 0 ; index < MICROS_PROCESS_CAPACITY ; ++ index ) {",0]],0,0]],
+            [["work"],["boot01-shared/ipc01/kernel/endpoint/endpoint_codec.c/endpoint_record_is_zero/index-117","wrap","KERNEL_ENDPOINT","INDEX_PROBE",1,"value","index",[["for ( index = 0 ; index < MICROS_PROCESS_CAPACITY ; ++ index ) {",0]],0,1]]
+          ],
+          "endpoint_storage_is_zero": [
+            [["work"],["boot01-shared/ipc01/kernel/endpoint/endpoint_codec.c/endpoint_storage_is_zero/loop-34","insert","KERNEL_ENDPOINT","COMPARISON",1,"entry","",[["for ( index = 0 ; index < sizeof ( * registry ) ; ++ index ) {",0]],0,0]]
+          ],
+          "endpoint_thread_handle_is_zero": [],
+          "thread_handle_is_shallow_valid": []
+        },
+        "kernel/endpoint/endpoint_completion_validation.c": {
+          "endpoint_delivery_state_is_clear": [],
+          "endpoint_reply_wait_state_is_valid": [
+            [["work"],["boot01-shared/ipc01/kernel/endpoint/endpoint_completion_validation.c/endpoint_reply_wait_state_is_valid/index-10","wrap","KERNEL_ENDPOINT","INDEX_PROBE",1,"value","thread -> owner . slot",[],0,1]]
+          ],
+          "endpoint_source_only_process_threads_are_valid": [
+            [["work"],["boot01-shared/ipc01/kernel/endpoint/endpoint_completion_validation.c/endpoint_source_only_process_threads_are_valid/loop-30","insert","KERNEL_ENDPOINT","RECORD_VISIT",1,"entry","",[["for ( index = 0 ; index < MICROS_THREAD_CAPACITY ; ++ index ) {",0]],0,0]],
+            [["work"],["boot01-shared/ipc01/kernel/endpoint/endpoint_completion_validation.c/endpoint_source_only_process_threads_are_valid/index-41","wrap","KERNEL_ENDPOINT","INDEX_PROBE",1,"value","index",[["for ( index = 0 ; index < MICROS_THREAD_CAPACITY ; ++ index ) {",0]],0,1]]
+          ],
+          "endpoint_staged_delivery_selected_is_valid": [],
+          "endpoint_staged_delivery_state_is_valid": [
+            [["work"],["boot01-shared/ipc01/kernel/endpoint/endpoint_completion_validation.c/endpoint_staged_delivery_state_is_valid/index-12","wrap","KERNEL_ENDPOINT","INDEX_PROBE",1,"value","thread -> owner . slot",[["{",0]],0,2]],
+            [["work"],["boot01-shared/ipc01/kernel/endpoint/endpoint_completion_validation.c/endpoint_staged_delivery_state_is_valid/index-27","wrap","KERNEL_ENDPOINT","INDEX_PROBE",1,"value","thread -> owner . slot",[["{",0]],1,2]]
+          ],
+          "endpoint_staged_error_state_is_valid": [
+            [["work"],["boot01-shared/ipc01/kernel/endpoint/endpoint_completion_validation.c/endpoint_staged_error_state_is_valid/index-10","wrap","KERNEL_ENDPOINT","INDEX_PROBE",1,"value","thread -> owner . slot",[],0,1]]
+          ],
+          "endpoint_staged_no_message_success_state_is_valid": [
+            [["work"],["boot01-shared/ipc01/kernel/endpoint/endpoint_completion_validation.c/endpoint_staged_no_message_success_state_is_valid/index-10","wrap","KERNEL_ENDPOINT","INDEX_PROBE",1,"value","thread -> owner . slot",[],0,1]]
+          ],
+          "micros_endpoint_select_staged_request": [
+            [["work"],["boot01-shared/ipc01/kernel/endpoint/endpoint_completion_validation.c/micros_endpoint_select_staged_request/index-49","wrap","KERNEL_ENDPOINT","INDEX_PROBE",1,"value","receiver -> owner . slot",[],0,1]]
+          ],
+          "micros_endpoint_staged_request_matches": [
+            [["work"],["boot01-shared/ipc01/kernel/endpoint/endpoint_completion_validation.c/micros_endpoint_staged_request_matches/index-57","wrap","KERNEL_ENDPOINT","INDEX_PROBE",1,"value","receiver -> owner . slot",[],0,1]]
+          ],
+          "notification_message_is_valid": [
+            [["work"],["boot01-shared/ipc01/kernel/endpoint/endpoint_completion_validation.c/notification_message_is_valid/loop-43","insert","KERNEL_ENDPOINT","COMPARISON",1,"entry","",[["for ( index = 0 ; index < sizeof ( uint64_t ) ; ++ index ) {",0]],0,0]],
+            [["work"],["boot01-shared/ipc01/kernel/endpoint/endpoint_completion_validation.c/notification_message_is_valid/loop-83","insert","KERNEL_ENDPOINT","COMPARISON",1,"entry","",[["for ( index = sizeof ( uint64_t ) ; index < sizeof ( message -> payload ) ; ++ index ) {",0]],0,0]]
+          ],
+          "read_u32_le": [],
+          "source_only_message_is_valid": [
+            [["work"],["boot01-shared/ipc01/kernel/endpoint/endpoint_completion_validation.c/source_only_message_is_valid/loop-118","insert","KERNEL_ENDPOINT","COMPARISON",1,"entry","",[["for ( index = 20 ; index < sizeof ( message -> payload ) ; ++ index ) {",0]],0,0]]
+          ],
+          "staged_delivery_fields_are_valid": [],
+          "staged_reply_token_binding_is_valid": [
+            [["work"],["boot01-shared/ipc01/kernel/endpoint/endpoint_completion_validation.c/staged_reply_token_binding_is_valid/index-77","wrap","KERNEL_ENDPOINT","INDEX_PROBE",1,"value","slot",[["{",2]],1,2]]
+          ]
+        },
+        "kernel/endpoint/endpoint_identity.c": {
+          "endpoint_preflight_process": [],
+          "endpoint_preflight_registry": [
+            [["work"],["boot01-shared/ipc01/kernel/endpoint/endpoint_identity.c/endpoint_preflight_registry/index-41","wrap","KERNEL_ENDPOINT","INDEX_PROBE",1,"value","0",[],1,2]]
+          ],
+          "endpoint_process_handles_equal": [],
+          "endpoint_process_has_current_thread": [
+            [["work"],["boot01-shared/ipc01/kernel/endpoint/endpoint_identity.c/endpoint_process_has_current_thread/loop-16","insert","KERNEL_ENDPOINT","RECORD_VISIT",1,"entry","",[["for ( index = 0 ; index < MICROS_HART_CAPACITY ; ++ index ) {",0]],0,0]],
+            [["work"],["boot01-shared/ipc01/kernel/endpoint/endpoint_identity.c/endpoint_process_has_current_thread/index-27","wrap","KERNEL_ENDPOINT","INDEX_PROBE",1,"value","index",[["for ( index = 0 ; index < MICROS_HART_CAPACITY ; ++ index ) {",0]],0,1]],
+            [["work"],["boot01-shared/ipc01/kernel/endpoint/endpoint_identity.c/endpoint_process_has_current_thread/index-63","wrap","KERNEL_ENDPOINT","INDEX_PROBE",1,"value","hart -> current_thread . slot",[["for ( index = 0 ; index < MICROS_HART_CAPACITY ; ++ index ) {",0]],0,1]]
+          ],
+          "endpoint_process_resolve_error": [],
+          "endpoint_record_resolve_validated": [
+            [["work"],["boot01-shared/ipc01/kernel/endpoint/endpoint_identity.c/endpoint_record_resolve_validated/index-54","wrap","KERNEL_ENDPOINT","INDEX_PROBE",1,"value","owner . slot",[],1,2]]
+          ],
+          "endpoint_require_initialized": [],
+          "endpoint_thread_handles_equal": [],
+          "micros_endpoint_names_slot": [],
+          "micros_endpoint_next_reply_token": [],
+          "micros_endpoint_pack": [],
+          "micros_endpoint_reply_token_slot": [],
+          "micros_endpoint_select": [
+            [["work"],["boot01-shared/ipc01/kernel/endpoint/endpoint_identity.c/micros_endpoint_select/index-101","wrap","KERNEL_ENDPOINT","INDEX_PROBE",1,"value","requested . slot",[],1,3]]
+          ],
+          "micros_endpoint_unpack": [],
+          "selected_process_is_valid": [
+            [["work"],["boot01-shared/ipc01/kernel/endpoint/endpoint_identity.c/selected_process_is_valid/index-49","wrap","KERNEL_ENDPOINT","INDEX_PROBE",1,"value","process -> privilege_profile",[],1,3]]
+          ],
+          "selected_process_metadata_is_valid": []
+        },
+        "kernel/endpoint/endpoint_object_validation.c": {
+          "endpoint_preflight_owned_threads": [
+            [["work"],["boot01-shared/ipc01/kernel/endpoint/endpoint_object_validation.c/endpoint_preflight_owned_threads/loop-19","insert","KERNEL_ENDPOINT","RECORD_VISIT",1,"entry","",[["for ( size_t index = 0 ; index < MICROS_HART_CAPACITY ; ++ index ) {",0]],0,0]],
+            [["work"],["boot01-shared/ipc01/kernel/endpoint/endpoint_object_validation.c/endpoint_preflight_owned_threads/index-30","wrap","KERNEL_ENDPOINT","INDEX_PROBE",1,"value","index",[["for ( size_t index = 0 ; index < MICROS_HART_CAPACITY ; ++ index ) {",0]],0,2]],
+            [["work"],["boot01-shared/ipc01/kernel/endpoint/endpoint_object_validation.c/endpoint_preflight_owned_threads/loop-141","insert","KERNEL_ENDPOINT","RECORD_VISIT",1,"entry","",[["for ( size_t index = 0 ; index < MICROS_THREAD_CAPACITY ; ++ index ) {",0]],0,0]],
+            [["work"],["boot01-shared/ipc01/kernel/endpoint/endpoint_object_validation.c/endpoint_preflight_owned_threads/index-152","wrap","KERNEL_ENDPOINT","INDEX_PROBE",1,"value","index",[["for ( size_t index = 0 ; index < MICROS_THREAD_CAPACITY ; ++ index ) {",0]],0,2]],
+            [["work"],["boot01-shared/ipc01/kernel/endpoint/endpoint_object_validation.c/endpoint_preflight_owned_threads/index-263","wrap","KERNEL_ENDPOINT","INDEX_PROBE",1,"value","process . slot",[],0,1]]
+          ],
+          "micros_endpoint_registry_validate_objects": [
+            [["work"],["boot01-shared/ipc01/kernel/endpoint/endpoint_object_validation.c/micros_endpoint_registry_validate_objects/audit","insert","KERNEL_ENDPOINT","COMPLETE_VALIDATOR_CALL",1,"entry","",[],0,0]],
+            [["work"],["boot01-shared/ipc01/kernel/endpoint/endpoint_object_validation.c/micros_endpoint_registry_validate_objects/loop-89","insert","KERNEL_ENDPOINT","RECORD_VISIT",1,"entry","",[["for ( index = 0 ; index < MICROS_THREAD_CAPACITY ; ++ index ) {",0]],0,0]]
+          ],
+          "micros_endpoint_thread_ipc_state_is_valid": [
+            [["work"],["boot01-shared/ipc01/kernel/endpoint/endpoint_object_validation.c/micros_endpoint_thread_ipc_state_is_valid/index-48","wrap","KERNEL_ENDPOINT","INDEX_PROBE",1,"value","thread -> owner . slot",[],0,1]]
+          ],
+          "process_relationships_are_canonical": [
+            [["work"],["boot01-shared/ipc01/kernel/endpoint/endpoint_object_validation.c/process_relationships_are_canonical/loop-16","insert","KERNEL_ENDPOINT","RECORD_VISIT",1,"entry","",[["for ( index = 0 ; index < MICROS_PROCESS_CAPACITY ; ++ index ) {",0]],0,0]],
+            [["work"],["boot01-shared/ipc01/kernel/endpoint/endpoint_object_validation.c/process_relationships_are_canonical/index-27","wrap","KERNEL_ENDPOINT","INDEX_PROBE",1,"value","index",[["for ( index = 0 ; index < MICROS_PROCESS_CAPACITY ; ++ index ) {",0]],0,2]],
+            [["work"],["boot01-shared/ipc01/kernel/endpoint/endpoint_object_validation.c/process_relationships_are_canonical/index-41","wrap","KERNEL_ENDPOINT","INDEX_PROBE",1,"value","index",[["for ( index = 0 ; index < MICROS_PROCESS_CAPACITY ; ++ index ) {",0]],1,2]]
+          ],
+          "thread_has_no_ipc_flags": [],
+          "thread_relationships_are_canonical": [
+            [["work"],["boot01-shared/ipc01/kernel/endpoint/endpoint_object_validation.c/thread_relationships_are_canonical/loop-16","insert","KERNEL_ENDPOINT","RECORD_VISIT",1,"entry","",[["for ( index = 0 ; index < MICROS_THREAD_CAPACITY ; ++ index ) {",0]],0,0]],
+            [["work"],["boot01-shared/ipc01/kernel/endpoint/endpoint_object_validation.c/thread_relationships_are_canonical/index-27","wrap","KERNEL_ENDPOINT","INDEX_PROBE",1,"value","index",[["for ( index = 0 ; index < MICROS_THREAD_CAPACITY ; ++ index ) {",0]],0,3]],
+            [["work"],["boot01-shared/ipc01/kernel/endpoint/endpoint_object_validation.c/thread_relationships_are_canonical/index-250","wrap","KERNEL_ENDPOINT","INDEX_PROBE",1,"value","thread -> owner . slot",[["for ( index = 0 ; index < MICROS_THREAD_CAPACITY ; ++ index ) {",0]],0,1]]
+          ]
+        },
+        "kernel/endpoint/endpoint_privilege.c": {
+          "micros_privilege_profile_allows_kernel_operation": [],
+          "micros_privilege_profile_allows_operation": [],
+          "micros_privilege_profile_allows_target": [],
+          "micros_privilege_profile_resolve": [
+            [["work"],["boot01-shared/ipc01/kernel/endpoint/endpoint_privilege.c/micros_privilege_profile_resolve/profile","insert","KERNEL_ENDPOINT","RANGE_VISIT",1,"entry","",[],0,0]],
+            [["work"],["boot01-shared/ipc01/kernel/endpoint/endpoint_privilege.c/micros_privilege_profile_resolve/index-64","wrap","KERNEL_ENDPOINT","INDEX_PROBE",1,"value","profile_id",[],2,4]]
+          ]
+        },
+        "kernel/endpoint/endpoint_publication.c": {
+          "micros_endpoint_activate": [
+            [["work"],["boot01-shared/ipc01/kernel/endpoint/endpoint_publication.c/micros_endpoint_activate/index-104","wrap","KERNEL_ENDPOINT","INDEX_PROBE",1,"value","selected . record -> owner . slot",[],0,1]]
+          ],
+          "micros_endpoint_commit_publish_prevalidated": [
+            [["work"],["boot01-shared/ipc01/kernel/endpoint/endpoint_publication.c/micros_endpoint_commit_publish_prevalidated/index-18","wrap","KERNEL_ENDPOINT","INDEX_PROBE",1,"value","owner . slot",[],0,2]],
+            [["work"],["boot01-shared/ipc01/kernel/endpoint/endpoint_publication.c/micros_endpoint_commit_publish_prevalidated/index-31","wrap","KERNEL_ENDPOINT","INDEX_PROBE",1,"value","owner . slot",[],1,2]]
+          ],
+          "micros_endpoint_install_profile": [
+            [["work"],["boot01-shared/ipc01/kernel/endpoint/endpoint_publication.c/micros_endpoint_install_profile/index-71","wrap","KERNEL_ENDPOINT","INDEX_PROBE",1,"value","process_handle . slot",[],0,1]]
+          ],
+          "micros_endpoint_preflight_publish": [],
+          "micros_endpoint_reserve": [
+            [["work"],["boot01-shared/ipc01/kernel/endpoint/endpoint_publication.c/micros_endpoint_reserve/index-73","wrap","KERNEL_ENDPOINT","INDEX_PROBE",1,"value","process_handle . slot",[],0,2]],
+            [["work"],["boot01-shared/ipc01/kernel/endpoint/endpoint_publication.c/micros_endpoint_reserve/index-85","wrap","KERNEL_ENDPOINT","INDEX_PROBE",1,"value","process_handle . slot",[],1,2]]
+          ]
+        },
+        "kernel/endpoint/endpoint_queue_validation.c": {
+          "endpoint_has_matchable_work": [
+            [["work"],["boot01-shared/ipc01/kernel/endpoint/endpoint_queue_validation.c/endpoint_has_matchable_work/loop-38","insert","KERNEL_ENDPOINT","RECORD_VISIT",1,"entry","",[["for ( receiver_steps = 0 ; receiver_steps < MICROS_THREAD_CAPACITY ; ++ receiver_steps ) {",0]],0,0]],
+            [["work"],["boot01-shared/ipc01/kernel/endpoint/endpoint_queue_validation.c/endpoint_has_matchable_work/index-49","wrap","KERNEL_ENDPOINT","INDEX_PROBE",1,"value","receiver_handle . slot",[["for ( receiver_steps = 0 ; receiver_steps < MICROS_THREAD_CAPACITY ; ++ receiver_steps ) {",0]],0,1]],
+            [["work"],["boot01-shared/ipc01/kernel/endpoint/endpoint_queue_validation.c/endpoint_has_matchable_work/loop-104","insert","KERNEL_ENDPOINT","RECORD_VISIT",1,"entry","",[["for ( receiver_steps = 0 ; receiver_steps < MICROS_THREAD_CAPACITY ; ++ receiver_steps ) {",0],["if ( ! endpoint_thread_handle_is_zero ( sender_handle ) ) {",0],["for ( sender_steps = 0 ; sender_steps < MICROS_THREAD_CAPACITY ; ++ sender_steps ) {",0]],0,0]],
+            [["work"],["boot01-shared/ipc01/kernel/endpoint/endpoint_queue_validation.c/endpoint_has_matchable_work/index-115","wrap","KERNEL_ENDPOINT","INDEX_PROBE",1,"value","sender_handle . slot",[["for ( receiver_steps = 0 ; receiver_steps < MICROS_THREAD_CAPACITY ; ++ receiver_steps ) {",0],["if ( ! endpoint_thread_handle_is_zero ( sender_handle ) ) {",0],["for ( sender_steps = 0 ; sender_steps < MICROS_THREAD_CAPACITY ; ++ sender_steps ) {",0]],0,1]]
+          ],
+          "endpoint_pending_notification_state_is_valid": [
+            [["work"],["boot01-shared/ipc01/kernel/endpoint/endpoint_queue_validation.c/endpoint_pending_notification_state_is_valid/loop-29","insert","KERNEL_ENDPOINT","RECORD_VISIT",1,"entry","",[["for ( index = 0 ; index < MICROS_PROCESS_CAPACITY ; ++ index ) {",0]],0,0]],
+            [["work"],["boot01-shared/ipc01/kernel/endpoint/endpoint_queue_validation.c/endpoint_pending_notification_state_is_valid/index-69","wrap","KERNEL_ENDPOINT","INDEX_PROBE",1,"value","index",[["for ( index = 0 ; index < MICROS_PROCESS_CAPACITY ; ++ index ) {",0]],1,3]]
+          ],
+          "endpoint_preflight_record": [],
+          "endpoint_queue_is_valid": [
+            [["work"],["boot01-shared/ipc01/kernel/endpoint/endpoint_queue_validation.c/endpoint_queue_is_valid/loop-41","insert","KERNEL_ENDPOINT","RECORD_VISIT",1,"entry","",[["for ( steps = 0 ; steps < MICROS_THREAD_CAPACITY ; ++ steps ) {",0]],0,0]]
+          ],
+          "micros_endpoint_queue_member_is_valid": [
+            [["work"],["boot01-shared/ipc01/kernel/endpoint/endpoint_queue_validation.c/micros_endpoint_queue_member_is_valid/index-168","wrap","KERNEL_ENDPOINT","INDEX_PROBE",1,"value","thread -> owner . slot",[["if ( kind == MICROS_IPC_QUEUE_SENDER ) {",0]],0,1]]
+          ],
+          "receiver_matches_pending_notification": [
+            [["work"],["boot01-shared/ipc01/kernel/endpoint/endpoint_queue_validation.c/receiver_matches_pending_notification/index-94","wrap","KERNEL_ENDPOINT","INDEX_PROBE",1,"value","source . slot",[],2,3]]
+          ],
+          "receiver_queue_state_is_valid": [],
+          "selected_queue_is_valid": [
+            [["work"],["boot01-shared/ipc01/kernel/endpoint/endpoint_queue_validation.c/selected_queue_is_valid/loop-77","insert","KERNEL_ENDPOINT","RECORD_VISIT",1,"entry","",[["for ( size_t steps = 0 ; steps < MICROS_THREAD_CAPACITY ; ++ steps ) {",0]],0,0]]
+          ],
+          "sender_queue_state_is_valid": [
+            [["work"],["boot01-shared/ipc01/kernel/endpoint/endpoint_queue_validation.c/sender_queue_state_is_valid/index-10","wrap","KERNEL_ENDPOINT","INDEX_PROBE",1,"value","thread -> owner . slot",[],0,1]]
+          ]
+        },
+        "kernel/endpoint/endpoint_registry.c": {
+          "candidate_targets_are_closed": [
+            [["work"],["boot01-shared/ipc01/kernel/endpoint/endpoint_registry.c/candidate_targets_are_closed/loop-16","insert","KERNEL_ENDPOINT","RECORD_VISIT",1,"entry","",[["for ( source_index = 1 ; source_index < MICROS_PRIVILEGE_PROFILE_CAPACITY ; ++ source_index ) {",0]],0,0]]
+          ],
+          "endpoint_records_are_canonical": [
+            [["work"],["boot01-shared/ipc01/kernel/endpoint/endpoint_registry.c/endpoint_records_are_canonical/loop-16","insert","KERNEL_ENDPOINT","RECORD_VISIT",1,"entry","",[["for ( index = 0 ; index < MICROS_PROCESS_CAPACITY ; ++ index ) {",0]],0,0]],
+            [["work"],["boot01-shared/ipc01/kernel/endpoint/endpoint_registry.c/endpoint_records_are_canonical/index-27","wrap","KERNEL_ENDPOINT","INDEX_PROBE",1,"value","index",[["for ( index = 0 ; index < MICROS_PROCESS_CAPACITY ; ++ index ) {",0]],0,2]]
+          ],
+          "micros_endpoint_registry_initialize": [],
+          "micros_endpoint_registry_validate": [
+            [["work"],["boot01-shared/ipc01/kernel/endpoint/endpoint_registry.c/micros_endpoint_registry_validate/audit","insert","KERNEL_ENDPOINT","COMPLETE_VALIDATOR_CALL",1,"entry","",[],0,0]],
+            [["work"],["boot01-shared/ipc01/kernel/endpoint/endpoint_registry.c/micros_endpoint_registry_validate/index-59","wrap","KERNEL_ENDPOINT","INDEX_PROBE",1,"value","0",[],1,2]]
+          ],
+          "prepare_profile_candidates": [
+            [["work"],["boot01-shared/ipc01/kernel/endpoint/endpoint_registry.c/prepare_profile_candidates/loop-19","insert","KERNEL_ENDPOINT","RECORD_VISIT",1,"entry","",[["for ( source_index = 0 ; source_index < profile_count ; ++ source_index ) {",0]],0,0]],
+            [["work"],["boot01-shared/ipc01/kernel/endpoint/endpoint_registry.c/prepare_profile_candidates/loop-82","insert","KERNEL_ENDPOINT","RECORD_VISIT",1,"entry","",[["for ( source_index = 0 ; source_index < profile_count ; ++ source_index ) {",0],["for ( other_index = 0 ; other_index < source_index ; ++ other_index ) {",0]],0,0]]
+          ],
+          "profile_table_is_canonical": [
+            [["work"],["boot01-shared/ipc01/kernel/endpoint/endpoint_registry.c/profile_table_is_canonical/loop-29","insert","KERNEL_ENDPOINT","RECORD_VISIT",1,"entry","",[["for ( index = 1 ; index < MICROS_PRIVILEGE_PROFILE_CAPACITY ; ++ index ) {",0]],0,0]],
+            [["work"],["boot01-shared/ipc01/kernel/endpoint/endpoint_registry.c/profile_table_is_canonical/index-40","wrap","KERNEL_ENDPOINT","INDEX_PROBE",1,"value","index",[["for ( index = 1 ; index < MICROS_PRIVILEGE_PROFILE_CAPACITY ; ++ index ) {",0]],0,3]],
+            [["work"],["boot01-shared/ipc01/kernel/endpoint/endpoint_registry.c/profile_table_is_canonical/loop-123","insert","KERNEL_ENDPOINT","RECORD_VISIT",1,"entry","",[["for ( index = 1 ; index < MICROS_PRIVILEGE_PROFILE_CAPACITY ; ++ index ) {",0],["for ( other_index = 1 ; other_index < index ; ++ other_index ) {",0]],0,0]],
+            [["work"],["boot01-shared/ipc01/kernel/endpoint/endpoint_registry.c/profile_table_is_canonical/index-134","wrap","KERNEL_ENDPOINT","INDEX_PROBE",1,"value","other_index",[["for ( index = 1 ; index < MICROS_PRIVILEGE_PROFILE_CAPACITY ; ++ index ) {",0],["for ( other_index = 1 ; other_index < index ; ++ other_index ) {",0]],0,1]],
+            [["work"],["boot01-shared/ipc01/kernel/endpoint/endpoint_registry.c/profile_table_is_canonical/loop-204","insert","KERNEL_ENDPOINT","RECORD_VISIT",1,"entry","",[["for ( index = 1 ; index < MICROS_PRIVILEGE_PROFILE_CAPACITY ; ++ index ) {",1]],0,0]],
+            [["work"],["boot01-shared/ipc01/kernel/endpoint/endpoint_registry.c/profile_table_is_canonical/index-215","wrap","KERNEL_ENDPOINT","INDEX_PROBE",1,"value","index",[["for ( index = 1 ; index < MICROS_PRIVILEGE_PROFILE_CAPACITY ; ++ index ) {",1]],0,1]]
+          ],
+          "publish_profile_table": []
+        },
+        "kernel/ipc/ipc.c": {
+          "micros_ipc_call": [],
+          "micros_ipc_receive": [],
+          "micros_ipc_send": [],
+          "prepare_authorized_sender": [],
+          "send_selected": []
+        },
+        "kernel/ipc/ipc_close.c": {
+          "add_close_transition": [
+            [["work"],["boot01-shared/ipc01/kernel/ipc/ipc_close.c/add_close_transition/index-27","wrap","KERNEL_IPC","INDEX_PROBE",1,"value","plan -> transition_count",[],1,5]],
+            [["work"],["boot01-shared/ipc01/kernel/ipc/ipc_close.c/add_close_transition/index-40","wrap","KERNEL_IPC","INDEX_PROBE",1,"value","plan -> transition_count",[],2,5]],
+            [["work"],["boot01-shared/ipc01/kernel/ipc/ipc_close.c/add_close_transition/index-53","wrap","KERNEL_IPC","INDEX_PROBE",1,"value","plan -> transition_count",[],3,5]]
+          ],
+          "clear_thread_ipc_state_for_close": [],
+          "commit_close_queue": [
+            [["work"],["boot01-shared/ipc01/kernel/ipc/ipc_close.c/commit_close_queue/loop-43","insert","KERNEL_IPC","LINK_TRAVERSE",1,"entry","",[["for ( steps = 0 ; steps < MICROS_THREAD_CAPACITY ; ++ steps ) {",0]],0,0]],
+            [["work"],["boot01-shared/ipc01/kernel/ipc/ipc_close.c/commit_close_queue/index-70","wrap","KERNEL_IPC","INDEX_PROBE",1,"value","current . slot",[["for ( steps = 0 ; steps < MICROS_THREAD_CAPACITY ; ++ steps ) {",0]],0,2]],
+            [["work"],["boot01-shared/ipc01/kernel/ipc/ipc_close.c/commit_close_queue/index-88","wrap","KERNEL_IPC","INDEX_PROBE",1,"value","current . slot",[["for ( steps = 0 ; steps < MICROS_THREAD_CAPACITY ; ++ steps ) {",0]],1,2]],
+            [["work"],["boot01-shared/ipc01/kernel/ipc/ipc_close.c/commit_close_queue/index-115","wrap","KERNEL_IPC","INDEX_PROBE",1,"value","retained_tail . slot",[["for ( steps = 0 ; steps < MICROS_THREAD_CAPACITY ; ++ steps ) {",0],["if ( ! plan -> threads [ current . slot ] . remove_from_queue ) {",0],["else {",0]],0,1]],
+            [["work"],["boot01-shared/ipc01/kernel/ipc/ipc_close.c/commit_close_queue/index-148","wrap","KERNEL_IPC","INDEX_PROBE",1,"value","retained_tail . slot",[["if ( ! ipc_thread_handle_is_zero ( retained_tail ) ) {",0]],0,1]]
+          ],
+          "commit_endpoint_close": [
+            [["work"],["boot01-shared/ipc01/kernel/ipc/ipc_close.c/commit_endpoint_close/loop-30","insert","KERNEL_IPC","RECORD_VISIT",1,"entry","",[["for ( index = 0 ; index < MICROS_PROCESS_CAPACITY ; ++ index ) {",0]],0,0]],
+            [["work"],["boot01-shared/ipc01/kernel/ipc/ipc_close.c/commit_endpoint_close/index-40","wrap","KERNEL_IPC","INDEX_PROBE",1,"value","index",[["for ( index = 0 ; index < MICROS_PROCESS_CAPACITY ; ++ index ) {",0]],0,1]],
+            [["work"],["boot01-shared/ipc01/kernel/ipc/ipc_close.c/commit_endpoint_close/loop-89","insert","KERNEL_IPC","RECORD_VISIT",1,"entry","",[["for ( index = 0 ; index < MICROS_THREAD_CAPACITY ; ++ index ) {",0]],0,0]],
+            [["work"],["boot01-shared/ipc01/kernel/ipc/ipc_close.c/commit_endpoint_close/index-99","wrap","KERNEL_IPC","INDEX_PROBE",1,"value","index",[["for ( index = 0 ; index < MICROS_THREAD_CAPACITY ; ++ index ) {",0]],0,3]],
+            [["work"],["boot01-shared/ipc01/kernel/ipc/ipc_close.c/commit_endpoint_close/index-108","wrap","KERNEL_IPC","INDEX_PROBE",1,"value","index",[["for ( index = 0 ; index < MICROS_THREAD_CAPACITY ; ++ index ) {",0]],1,3]],
+            [["work"],["boot01-shared/ipc01/kernel/ipc/ipc_close.c/commit_endpoint_close/index-129","wrap","KERNEL_IPC","INDEX_PROBE",1,"value","index",[["for ( index = 0 ; index < MICROS_THREAD_CAPACITY ; ++ index ) {",0]],2,3]],
+            [["work"],["boot01-shared/ipc01/kernel/ipc/ipc_close.c/commit_endpoint_close/loop-158","insert","KERNEL_IPC","RECORD_VISIT",1,"entry","",[["for ( index = 0 ; index < MICROS_PROCESS_CAPACITY ; ++ index ) {",1]],0,0]],
+            [["work"],["boot01-shared/ipc01/kernel/ipc/ipc_close.c/commit_endpoint_close/index-168","wrap","KERNEL_IPC","INDEX_PROBE",1,"value","index",[["for ( index = 0 ; index < MICROS_PROCESS_CAPACITY ; ++ index ) {",1]],0,1]],
+            [["work"],["boot01-shared/ipc01/kernel/ipc/ipc_close.c/commit_endpoint_close/index-182","wrap","KERNEL_IPC","INDEX_PROBE",1,"value","plan -> owner . slot",[["for ( index = 0 ; index < MICROS_PROCESS_CAPACITY ; ++ index ) {",1]],0,1]],
+            [["work"],["boot01-shared/ipc01/kernel/ipc/ipc_close.c/commit_endpoint_close/index-196","wrap","KERNEL_IPC","INDEX_PROBE",1,"value","plan -> owner . slot",[],1,3]],
+            [["work"],["boot01-shared/ipc01/kernel/ipc/ipc_close.c/commit_endpoint_close/index-211","wrap","KERNEL_IPC","INDEX_PROBE",1,"value","plan -> owner . slot",[],2,3]],
+            [["work"],["boot01-shared/ipc01/kernel/ipc/ipc_close.c/commit_endpoint_close/loop-236","insert","KERNEL_IPC","RECORD_VISIT",1,"entry","",[["for ( index = 0 ; index < MICROS_PROCESS_CAPACITY ; ++ index ) {",2]],0,0]],
+            [["work"],["boot01-shared/ipc01/kernel/ipc/ipc_close.c/commit_endpoint_close/index-240","wrap","KERNEL_IPC","INDEX_PROBE",1,"value","plan -> owner . slot",[["for ( index = 0 ; index < MICROS_PROCESS_CAPACITY ; ++ index ) {",2]],0,1]],
+            [["work"],["boot01-shared/ipc01/kernel/ipc/ipc_close.c/commit_endpoint_close/index-249","wrap","KERNEL_IPC","INDEX_PROBE",1,"value","index",[["for ( index = 0 ; index < MICROS_PROCESS_CAPACITY ; ++ index ) {",2]],0,1]]
+          ],
+          "micros_ipc_endpoint_close": [],
+          "preflight_close_notifications": [
+            [["work"],["boot01-shared/ipc01/kernel/ipc/ipc_close.c/preflight_close_notifications/index-30","wrap","KERNEL_IPC","INDEX_PROBE",1,"value","plan -> owner . slot",[],1,2]],
+            [["work"],["boot01-shared/ipc01/kernel/ipc/ipc_close.c/preflight_close_notifications/loop-57","insert","KERNEL_IPC","RECORD_VISIT",1,"entry","",[["for ( index = 0 ; index < MICROS_PROCESS_CAPACITY ; ++ index ) {",0]],0,0]],
+            [["work"],["boot01-shared/ipc01/kernel/ipc/ipc_close.c/preflight_close_notifications/index-68","wrap","KERNEL_IPC","INDEX_PROBE",1,"value","index",[["for ( index = 0 ; index < MICROS_PROCESS_CAPACITY ; ++ index ) {",0]],0,1]],
+            [["work"],["boot01-shared/ipc01/kernel/ipc/ipc_close.c/preflight_close_notifications/index-97","wrap","KERNEL_IPC","INDEX_PROBE",1,"value","plan -> owner . slot",[["for ( index = 0 ; index < MICROS_PROCESS_CAPACITY ; ++ index ) {",0]],0,3]],
+            [["work"],["boot01-shared/ipc01/kernel/ipc/ipc_close.c/preflight_close_notifications/index-152","wrap","KERNEL_IPC","INDEX_PROBE",1,"value","plan -> owner . slot",[["for ( index = 0 ; index < MICROS_PROCESS_CAPACITY ; ++ index ) {",0]],1,3]],
+            [["work"],["boot01-shared/ipc01/kernel/ipc/ipc_close.c/preflight_close_notifications/index-167","wrap","KERNEL_IPC","INDEX_PROBE",1,"value","plan -> owner . slot",[["for ( index = 0 ; index < MICROS_PROCESS_CAPACITY ; ++ index ) {",0]],2,3]]
+          ],
+          "preflight_close_queue": [
+            [["work"],["boot01-shared/ipc01/kernel/ipc/ipc_close.c/preflight_close_queue/loop-78","insert","KERNEL_IPC","LINK_TRAVERSE",1,"entry","",[["for ( steps = 0 ; steps < MICROS_THREAD_CAPACITY ; ++ steps ) {",0]],0,0]]
+          ],
+          "preflight_close_queues": [
+            [["work"],["boot01-shared/ipc01/kernel/ipc/ipc_close.c/preflight_close_queues/loop-22","insert","KERNEL_IPC","RECORD_VISIT",1,"entry","",[["for ( index = 0 ; index < MICROS_THREAD_CAPACITY ; ++ index ) {",0]],0,0]],
+            [["work"],["boot01-shared/ipc01/kernel/ipc/ipc_close.c/preflight_close_queues/loop-44","insert","KERNEL_IPC","RECORD_VISIT",1,"entry","",[["for ( index = 0 ; index < MICROS_PROCESS_CAPACITY ; ++ index ) {",0]],0,0]],
+            [["work"],["boot01-shared/ipc01/kernel/ipc/ipc_close.c/preflight_close_queues/index-61","wrap","KERNEL_IPC","INDEX_PROBE",1,"value","index",[["for ( index = 0 ; index < MICROS_PROCESS_CAPACITY ; ++ index ) {",0]],0,5]],
+            [["work"],["boot01-shared/ipc01/kernel/ipc/ipc_close.c/preflight_close_queues/index-68","wrap","KERNEL_IPC","INDEX_PROBE",1,"value","index",[["for ( index = 0 ; index < MICROS_PROCESS_CAPACITY ; ++ index ) {",0]],1,5]],
+            [["work"],["boot01-shared/ipc01/kernel/ipc/ipc_close.c/preflight_close_queues/index-112","wrap","KERNEL_IPC","INDEX_PROBE",1,"value","index",[["for ( index = 0 ; index < MICROS_PROCESS_CAPACITY ; ++ index ) {",0]],2,5]],
+            [["work"],["boot01-shared/ipc01/kernel/ipc/ipc_close.c/preflight_close_queues/index-119","wrap","KERNEL_IPC","INDEX_PROBE",1,"value","index",[["for ( index = 0 ; index < MICROS_PROCESS_CAPACITY ; ++ index ) {",0]],3,5]],
+            [["work"],["boot01-shared/ipc01/kernel/ipc/ipc_close.c/preflight_close_queues/index-128","wrap","KERNEL_IPC","INDEX_PROBE",1,"value","index",[["for ( index = 0 ; index < MICROS_PROCESS_CAPACITY ; ++ index ) {",0]],4,5]],
+            [["work"],["boot01-shared/ipc01/kernel/ipc/ipc_close.c/preflight_close_queues/loop-164","insert","KERNEL_IPC","RECORD_VISIT",1,"entry","",[["for ( index = 0 ; index < MICROS_THREAD_CAPACITY ; ++ index ) {",1]],0,0]],
+            [["work"],["boot01-shared/ipc01/kernel/ipc/ipc_close.c/preflight_close_queues/index-170","wrap","KERNEL_IPC","INDEX_PROBE",1,"value","index",[["for ( index = 0 ; index < MICROS_THREAD_CAPACITY ; ++ index ) {",1]],0,2]]
+          ],
+          "preflight_close_threads": [
+            [["work"],["boot01-shared/ipc01/kernel/ipc/ipc_close.c/preflight_close_threads/loop-21","insert","KERNEL_IPC","RECORD_VISIT",1,"entry","",[["for ( index = 0 ; index < MICROS_THREAD_CAPACITY ; ++ index ) {",0]],0,0]],
+            [["work"],["boot01-shared/ipc01/kernel/ipc/ipc_close.c/preflight_close_threads/index-32","wrap","KERNEL_IPC","INDEX_PROBE",1,"value","index",[["for ( index = 0 ; index < MICROS_THREAD_CAPACITY ; ++ index ) {",0]],0,4]],
+            [["work"],["boot01-shared/ipc01/kernel/ipc/ipc_close.c/preflight_close_threads/index-324","wrap","KERNEL_IPC","INDEX_PROBE",1,"value","index",[["for ( index = 0 ; index < MICROS_THREAD_CAPACITY ; ++ index ) {",0],["if ( owned ) {",1],["if ( ! micros_thread_ipc_state_is_clear ( thread ) ) {",0]],0,1]],
+            [["work"],["boot01-shared/ipc01/kernel/ipc/ipc_close.c/preflight_close_threads/index-336","wrap","KERNEL_IPC","INDEX_PROBE",1,"value","index",[["for ( index = 0 ; index < MICROS_THREAD_CAPACITY ; ++ index ) {",0],["if ( owned ) {",1]],0,1]],
+            [["work"],["boot01-shared/ipc01/kernel/ipc/ipc_close.c/preflight_close_threads/index-362","wrap","KERNEL_IPC","INDEX_PROBE",1,"value","index",[["for ( index = 0 ; index < MICROS_THREAD_CAPACITY ; ++ index ) {",0],["if ( queued_sender || queued_receiver || reply_wait ) {",0]],0,2]],
+            [["work"],["boot01-shared/ipc01/kernel/ipc/ipc_close.c/preflight_close_threads/index-373","wrap","KERNEL_IPC","INDEX_PROBE",1,"value","index",[["for ( index = 0 ; index < MICROS_THREAD_CAPACITY ; ++ index ) {",0],["if ( queued_sender || queued_receiver || reply_wait ) {",0]],1,2]],
+            [["work"],["boot01-shared/ipc01/kernel/ipc/ipc_close.c/preflight_close_threads/index-408","wrap","KERNEL_IPC","INDEX_PROBE",1,"value","index",[["for ( index = 0 ; index < MICROS_THREAD_CAPACITY ; ++ index ) {",0]],2,4]],
+            [["work"],["boot01-shared/ipc01/kernel/ipc/ipc_close.c/preflight_close_threads/index-426","wrap","KERNEL_IPC","INDEX_PROBE",1,"value","index",[["for ( index = 0 ; index < MICROS_THREAD_CAPACITY ; ++ index ) {",0]],3,4]],
+            [["work"],["boot01-shared/ipc01/kernel/ipc/ipc_close.c/preflight_close_threads/index-471","wrap","KERNEL_IPC","INDEX_PROBE",1,"value","plan -> owner . slot",[],0,1]]
+          ],
+          "preflight_endpoint_close": [
+            [["work"],["boot01-shared/ipc01/kernel/ipc/ipc_close.c/preflight_endpoint_close/loop-76","insert","KERNEL_IPC","CLEARED_BYTE",1,"entry","",[["for ( index = 0 ; index < sizeof ( * plan ) ; ++ index ) {",0]],0,0]]
+          ],
+          "stage_dead_endpoint_for_close": [],
+          "thread_has_endpoint_reference": [],
+          "thread_has_staged_reference": [],
+          "thread_mentions_closing_slot": []
+        },
+        "kernel/ipc/ipc_common.c": {
+          "ipc_admit_active_endpoint": [],
+          "ipc_admit_held_thread": [
+            [["work"],["boot01-shared/ipc01/kernel/ipc/ipc_common.c/ipc_admit_held_thread/index-102","wrap","KERNEL_IPC","INDEX_PROBE",1,"value","thread -> owner . slot",[],0,1]],
+            [["work"],["boot01-shared/ipc01/kernel/ipc/ipc_common.c/ipc_admit_held_thread/index-201","wrap","KERNEL_IPC","INDEX_PROBE",1,"value","handle . slot",[],0,1]]
+          ],
+          "ipc_admit_operation_thread": [],
+          "ipc_canonicalize_message": [
+            [["work"],["boot01-shared/ipc01/kernel/ipc/ipc_common.c/ipc_canonicalize_message/loop-41","insert","KERNEL_IPC","COPIED_BYTE",1,"entry","",[["for ( index = 0 ; index < sizeof ( destination -> payload ) ; ++ index ) {",0]],0,0]]
+          ],
+          "ipc_clear_bytes": [
+            [["work"],["boot01-shared/ipc01/kernel/ipc/ipc_common.c/ipc_clear_bytes/loop-23","insert","KERNEL_IPC","CLEARED_BYTE",1,"entry","",[["for ( index = 0 ; index < size ; ++ index ) {",0]],0,0]]
+          ],
+          "ipc_clear_message": [
+            [["work"],["boot01-shared/ipc01/kernel/ipc/ipc_common.c/ipc_clear_message/loop-32","insert","KERNEL_IPC","CLEARED_BYTE",1,"entry","",[["for ( index = 0 ; index < sizeof ( * message ) ; ++ index ) {",0]],0,0]]
+          ],
+          "ipc_copy_bytes": [
+            [["work"],["boot01-shared/ipc01/kernel/ipc/ipc_common.c/ipc_copy_bytes/loop-31","insert","KERNEL_IPC","COPIED_BYTE",1,"entry","",[["for ( index = 0 ; index < size ; ++ index ) {",0]],0,0]]
+          ],
+          "ipc_endpoint_error_to_ipc": [],
+          "ipc_process_handles_equal": [],
+          "ipc_scheduler_error_to_ipc": [],
+          "ipc_thread_handle_is_zero": [],
+          "ipc_thread_handles_equal": [],
+          "ipc_thread_is_current": [],
+          "micros_ipc_thread_has_staged_kernel_notification": [],
+          "thread_is_held_and_clear": []
+        },
+        "kernel/ipc/ipc_completion.c": {
+          "ipc_clear_delivered_sender": [],
+          "ipc_stage_delivery": [],
+          "ipc_stage_no_message_completion": [],
+          "micros_ipc_stage_no_message_completion": [
+            [["work"],["boot01-shared/ipc01/kernel/ipc/ipc_completion.c/micros_ipc_stage_no_message_completion/index-128","wrap","KERNEL_IPC","INDEX_PROBE",1,"value","resolved -> owner . slot",[],0,1]],
+            [["work"],["boot01-shared/ipc01/kernel/ipc/ipc_completion.c/micros_ipc_stage_no_message_completion/index-188","wrap","KERNEL_IPC","INDEX_PROBE",1,"value","thread_handle . slot",[],0,1]]
+          ]
+        },
+        "kernel/ipc/ipc_deadlock.c": {
+          "blocked_dependency": [],
+          "ipc_preflight_deadlock": [
+            [["work"],["boot01-shared/ipc01/kernel/ipc/ipc_deadlock.c/ipc_preflight_deadlock/visited_low","insert","KERNEL_IPC","CLEARED_BYTE",8,"after","uint64_t visited_low = 0 ;",[],0,1]],
+            [["work"],["boot01-shared/ipc01/kernel/ipc/ipc_deadlock.c/ipc_preflight_deadlock/visited_high","insert","KERNEL_IPC","CLEARED_BYTE",8,"after","uint64_t visited_high = 0 ;",[],0,1]],
+            [["work"],["boot01-shared/ipc01/kernel/ipc/ipc_deadlock.c/ipc_preflight_deadlock/loop-83","insert","KERNEL_IPC","LINK_TRAVERSE",1,"entry","",[["for ( steps = 0 ; steps < MICROS_THREAD_CAPACITY ; ++ steps ) {",0]],0,0]],
+            [["work"],["boot01-shared/ipc01/kernel/ipc/ipc_deadlock.c/ipc_preflight_deadlock/visited-word","wrap","KERNEL_IPC","BITMAP_WORD_LOAD",1,"value","* visited",[["for ( steps = 0 ; steps < MICROS_THREAD_CAPACITY ; ++ steps ) {",0]],1,3]]
+          ],
+          "resolve_dependency_endpoint": [],
+          "resolve_sole_live_thread": [
+            [["work"],["boot01-shared/ipc01/kernel/ipc/ipc_deadlock.c/resolve_sole_live_thread/index-41","wrap","KERNEL_IPC","INDEX_PROBE",1,"value","owner . slot",[],1,2]]
+          ],
+          "root_thread_index_is_valid": []
+        },
+        "kernel/ipc/ipc_notifications.c": {
+          "canonicalize_notification": [
+            [["work"],["boot01-shared/ipc01/kernel/ipc/ipc_notifications.c/canonicalize_notification/loop-36","insert","KERNEL_IPC","COPIED_BYTE",1,"entry","",[["for ( index = 0 ; index < sizeof ( event_mask ) ; ++ index ) {",0]],0,0]]
+          ],
+          "coalesce_notification": [
+            [["work"],["boot01-shared/ipc01/kernel/ipc/ipc_notifications.c/coalesce_notification/index-30","wrap","KERNEL_IPC","INDEX_PROBE",1,"value","source_slot",[],0,2]]
+          ],
+          "deliver_notification_to_receiver": [],
+          "ipc_consume_pending_notification": [
+            [["work"],["boot01-shared/ipc01/kernel/ipc/ipc_notifications.c/ipc_consume_pending_notification/index-19","wrap","KERNEL_IPC","INDEX_PROBE",1,"value","plan -> source_slot",[["else {",0]],0,2]]
+          ],
+          "ipc_find_pending_notification": [
+            [["work"],["boot01-shared/ipc01/kernel/ipc/ipc_notifications.c/ipc_find_pending_notification/bitmap-95","wrap","KERNEL_IPC","BITMAP_WORD_LOAD",1,"value","destination -> pending_notification_sources",[["if ( source_filter != MICROS_ENDPOINT_ANY ) {",0]],0,1]],
+            [["work"],["boot01-shared/ipc01/kernel/ipc/ipc_notifications.c/ipc_find_pending_notification/index-119","wrap","KERNEL_IPC","INDEX_PROBE",1,"value","source_slot",[["if ( source_filter != MICROS_ENDPOINT_ANY ) {",0]],2,3]],
+            [["work"],["boot01-shared/ipc01/kernel/ipc/ipc_notifications.c/ipc_find_pending_notification/bitmap-220","wrap","KERNEL_IPC","BITMAP_WORD_LOAD",1,"value","destination -> pending_notification_sources",[["else {",0],["for ( source_slot = 0 ; source_slot < MICROS_PROCESS_CAPACITY ; ++ source_slot ) {",0]],0,1]],
+            [["work"],["boot01-shared/ipc01/kernel/ipc/ipc_notifications.c/ipc_find_pending_notification/index-258","wrap","KERNEL_IPC","INDEX_PROBE",1,"value","source_slot",[["else {",0]],4,6]],
+            [["work"],["boot01-shared/ipc01/kernel/ipc/ipc_notifications.c/ipc_find_pending_notification/index-307","wrap","KERNEL_IPC","INDEX_PROBE",1,"value","source_slot",[],1,6]],
+            [["work"],["boot01-shared/ipc01/kernel/ipc/ipc_notifications.c/ipc_find_pending_notification/index-371","wrap","KERNEL_IPC","INDEX_PROBE",1,"value","source_slot",[],5,6]]
+          ],
+          "micros_ipc_commit_kernel_notification_prevalidated": [
+            [["work"],["boot01-shared/ipc01/kernel/ipc/ipc_notifications.c/micros_ipc_commit_kernel_notification_prevalidated/index-9","wrap","KERNEL_IPC","INDEX_PROBE",1,"value","plan -> destination_slot",[],0,1]],
+            [["work"],["boot01-shared/ipc01/kernel/ipc/ipc_notifications.c/micros_ipc_commit_kernel_notification_prevalidated/index-31","wrap","KERNEL_IPC","INDEX_PROBE",1,"value","plan -> receiver . slot",[["if ( plan -> deliver_to_receiver ) {",0]],0,1]]
+          ],
+          "micros_ipc_inject_kernel_notification": [],
+          "micros_ipc_notify": [
+            [["work"],["boot01-shared/ipc01/kernel/ipc/ipc_notifications.c/micros_ipc_notify/index-83","wrap","KERNEL_IPC","INDEX_PROBE",1,"value","target . record -> owner . slot",[],0,1]],
+            [["work"],["boot01-shared/ipc01/kernel/ipc/ipc_notifications.c/micros_ipc_notify/index-174","wrap","KERNEL_IPC","INDEX_PROBE",1,"value","receiver . handle . slot",[["if ( error == MICROS_IPC_OK ) {",0]],0,1]],
+            [["work"],["boot01-shared/ipc01/kernel/ipc/ipc_notifications.c/micros_ipc_notify/index-223","wrap","KERNEL_IPC","INDEX_PROBE",1,"value","source_slot",[],3,5]]
+          ],
+          "micros_ipc_prepare_kernel_notification": [],
+          "resolve_notification_destination": []
+        },
+        "kernel/ipc/ipc_queue.c": {
+          "ipc_append_thread": [],
+          "ipc_prepare_queue_append": [
+            [["work"],["boot01-shared/ipc01/kernel/ipc/ipc_queue.c/ipc_prepare_queue_append/index-88","wrap","KERNEL_IPC","INDEX_PROBE",1,"value","handle . slot",[["if ( kind != MICROS_IPC_QUEUE_SENDER || first == NULL ) {",0]],0,1]],
+            [["work"],["boot01-shared/ipc01/kernel/ipc/ipc_queue.c/ipc_prepare_queue_append/loop-112","insert","KERNEL_IPC","LINK_TRAVERSE",1,"entry","",[["for ( size_t steps = 0 ; steps < MICROS_THREAD_CAPACITY ; ++ steps ) {",0]],0,0]],
+            [["work"],["boot01-shared/ipc01/kernel/ipc/ipc_queue.c/ipc_prepare_queue_append/index-166","wrap","KERNEL_IPC","INDEX_PROBE",1,"value","handle . slot",[["for ( size_t steps = 0 ; steps < MICROS_THREAD_CAPACITY ; ++ steps ) {",0],["if ( ipc_thread_handle_is_zero ( thread -> ipc_next ) ) {",0]],0,1]]
+          ],
+          "ipc_select_queue": [
+            [["work"],["boot01-shared/ipc01/kernel/ipc/ipc_queue.c/ipc_select_queue/queue-search","insert","KERNEL_IPC","RANGE_VISIT",1,"entry","",[],0,0]],
+            [["work"],["boot01-shared/ipc01/kernel/ipc/ipc_queue.c/ipc_select_queue/loop-128","insert","KERNEL_IPC","LINK_TRAVERSE",1,"entry","",[["for ( size_t steps = 0 ; steps < MICROS_THREAD_CAPACITY ; ++ steps ) {",0]],0,0]]
+          ],
+          "ipc_unlink_thread": [
+            [["work"],["boot01-shared/ipc01/kernel/ipc/ipc_queue.c/ipc_unlink_thread/index-9","wrap","KERNEL_IPC","INDEX_PROBE",1,"value","matched . slot",[],0,1]],
+            [["work"],["boot01-shared/ipc01/kernel/ipc/ipc_queue.c/ipc_unlink_thread/index-36","wrap","KERNEL_IPC","INDEX_PROBE",1,"value","previous . slot",[["else {",0]],0,1]]
+          ],
+          "preflight_queue_endpoints": [],
+          "successor_reenters_prefix": [
+            [["work"],["boot01-shared/ipc01/kernel/ipc/ipc_queue.c/successor_reenters_prefix/loop-20","insert","KERNEL_IPC","LINK_TRAVERSE",1,"entry","",[["for ( size_t index = 0 ; index < count ; ++ index ) {",0]],0,0]],
+            [["work"],["boot01-shared/ipc01/kernel/ipc/ipc_queue.c/successor_reenters_prefix/index-40","wrap","KERNEL_IPC","INDEX_PROBE",1,"value","current . slot",[["for ( size_t index = 0 ; index < count ; ++ index ) {",0]],0,1]]
+          ]
+        },
+        "kernel/ipc/ipc_rendezvous.c": {
+          "ipc_deliver_selected_receive": [
+            [["work"],["boot01-shared/ipc01/kernel/ipc/ipc_rendezvous.c/ipc_deliver_selected_receive/index-9","wrap","KERNEL_IPC","INDEX_PROBE",1,"value","selection -> receiver . endpoint . record -> owner . slot",[],0,1]],
+            [["work"],["boot01-shared/ipc01/kernel/ipc/ipc_rendezvous.c/ipc_deliver_selected_receive/index-107","wrap","KERNEL_IPC","INDEX_PROBE",1,"value","selection -> sender . handle . slot",[["else {",0]],0,1]]
+          ],
+          "ipc_deliver_selected_sender": [
+            [["work"],["boot01-shared/ipc01/kernel/ipc/ipc_rendezvous.c/ipc_deliver_selected_sender/index-9","wrap","KERNEL_IPC","INDEX_PROBE",1,"value","destination -> record -> owner . slot",[],0,1]],
+            [["work"],["boot01-shared/ipc01/kernel/ipc/ipc_rendezvous.c/ipc_deliver_selected_sender/index-28","wrap","KERNEL_IPC","INDEX_PROBE",1,"value","selected -> handle . slot",[],0,1]]
+          ],
+          "ipc_publish_receive_wait": [
+            [["work"],["boot01-shared/ipc01/kernel/ipc/ipc_rendezvous.c/ipc_publish_receive_wait/index-9","wrap","KERNEL_IPC","INDEX_PROBE",1,"value","selection -> receiver . endpoint . record -> owner . slot",[],0,1]]
+          ],
+          "ipc_publish_sender_wait": [
+            [["work"],["boot01-shared/ipc01/kernel/ipc/ipc_rendezvous.c/ipc_publish_sender_wait/index-9","wrap","KERNEL_IPC","INDEX_PROBE",1,"value","destination -> record -> owner . slot",[],0,1]]
+          ],
+          "ipc_select_receive": [],
+          "micros_ipc_receiver_commit_delivery": [],
+          "micros_ipc_receiver_enqueue": [],
+          "micros_ipc_sender_commit_delivery": [],
+          "micros_ipc_sender_enqueue": [],
+          "resolve_receive_destination": [],
+          "resolve_sender_destination": []
+        },
+        "kernel/ipc/ipc_reply.c": {
+          "commit_reply_receive_scheduler": [],
+          "micros_ipc_reply": [],
+          "micros_ipc_reply_expected_caller": [],
+          "micros_ipc_reply_receive": [],
+          "publish_reply_receive": [
+            [["work"],["boot01-shared/ipc01/kernel/ipc/ipc_reply.c/publish_reply_receive/index-20","wrap","KERNEL_IPC","INDEX_PROBE",1,"value","receive -> receiver . endpoint . record -> owner . slot",[],0,1]],
+            [["work"],["boot01-shared/ipc01/kernel/ipc/ipc_reply.c/publish_reply_receive/index-105","wrap","KERNEL_IPC","INDEX_PROBE",1,"value","receive -> sender . handle . slot",[["if ( receive -> choice == IPC_RECEIVE_SENDER ) {",0]],0,1]]
+          ]
+        },
+        "kernel/ipc/ipc_tokens.c": {
+          "ipc_commit_reply_delivery": [],
+          "ipc_preflight_reply": [],
+          "resolve_reply_waiter": [
+            [["work"],["boot01-shared/ipc01/kernel/ipc/ipc_tokens.c/resolve_reply_waiter/index-40","wrap","KERNEL_IPC","INDEX_PROBE",1,"value","slot",[["if ( micros_endpoint_reply_token_slot ( reply_token , & slot ) ) {",0]],0,1]],
+            [["work"],["boot01-shared/ipc01/kernel/ipc/ipc_tokens.c/resolve_reply_waiter/index-123","wrap","KERNEL_IPC","INDEX_PROBE",1,"value","matched -> owner . slot",[],0,1]]
+          ]
+        },
+        "kernel/objects/kernel_object_context.c": {
+          "kernel_object_context_stack_avoids_harts": [
+            [["work"],["boot01-shared/ipc01/kernel/objects/kernel_object_context.c/kernel_object_context_stack_avoids_harts/loop-16","insert","KERNEL_OBJECTS","RECORD_VISIT",1,"entry","",[["for ( index = 0 ; index < MICROS_HART_CAPACITY ; ++ index ) {",0]],0,0]],
+            [["work"],["boot01-shared/ipc01/kernel/objects/kernel_object_context.c/kernel_object_context_stack_avoids_harts/index-27","wrap","KERNEL_OBJECTS","INDEX_PROBE",1,"value","index",[["for ( index = 0 ; index < MICROS_HART_CAPACITY ; ++ index ) {",0]],0,1]]
+          ],
+          "kernel_object_context_stack_avoids_threads": [
+            [["work"],["boot01-shared/ipc01/kernel/objects/kernel_object_context.c/kernel_object_context_stack_avoids_threads/loop-16","insert","KERNEL_OBJECTS","RECORD_VISIT",1,"entry","",[["for ( index = 0 ; index < MICROS_THREAD_CAPACITY ; ++ index ) {",0]],0,0]],
+            [["work"],["boot01-shared/ipc01/kernel/objects/kernel_object_context.c/kernel_object_context_stack_avoids_threads/index-27","wrap","KERNEL_OBJECTS","INDEX_PROBE",1,"value","index",[["for ( index = 0 ; index < MICROS_THREAD_CAPACITY ; ++ index ) {",0]],0,1]]
+          ],
+          "micros_thread_attach_execution_context": [],
+          "micros_thread_capture_execution_context": [],
+          "micros_thread_detach_execution_context": [
+            [["work"],["boot01-shared/ipc01/kernel/objects/kernel_object_context.c/micros_thread_detach_execution_context/loop-105","insert","KERNEL_OBJECTS","RECORD_VISIT",1,"entry","",[["for ( index = 0 ; index < MICROS_HART_CAPACITY ; ++ index ) {",0]],0,0]],
+            [["work"],["boot01-shared/ipc01/kernel/objects/kernel_object_context.c/micros_thread_detach_execution_context/index-116","wrap","KERNEL_OBJECTS","INDEX_PROBE",1,"value","index",[["for ( index = 0 ; index < MICROS_HART_CAPACITY ; ++ index ) {",0]],0,1]]
+          ],
+          "micros_thread_inspect_execution_context": []
+        },
+        "kernel/objects/kernel_object_hart.c": {
+          "kernel_object_hart_stacks_avoid_harts": [
+            [["work"],["boot01-shared/ipc01/kernel/objects/kernel_object_hart.c/kernel_object_hart_stacks_avoid_harts/loop-16","insert","KERNEL_OBJECTS","RECORD_VISIT",1,"entry","",[["for ( index = 0 ; index < MICROS_HART_CAPACITY ; ++ index ) {",0]],0,0]],
+            [["work"],["boot01-shared/ipc01/kernel/objects/kernel_object_hart.c/kernel_object_hart_stacks_avoid_harts/index-27","wrap","KERNEL_OBJECTS","INDEX_PROBE",1,"value","index",[["for ( index = 0 ; index < MICROS_HART_CAPACITY ; ++ index ) {",0]],0,1]]
+          ],
+          "kernel_object_hart_stacks_avoid_threads": [
+            [["work"],["boot01-shared/ipc01/kernel/objects/kernel_object_hart.c/kernel_object_hart_stacks_avoid_threads/loop-16","insert","KERNEL_OBJECTS","RECORD_VISIT",1,"entry","",[["for ( index = 0 ; index < MICROS_THREAD_CAPACITY ; ++ index ) {",0]],0,0]],
+            [["work"],["boot01-shared/ipc01/kernel/objects/kernel_object_hart.c/kernel_object_hart_stacks_avoid_threads/index-27","wrap","KERNEL_OBJECTS","INDEX_PROBE",1,"value","index",[["for ( index = 0 ; index < MICROS_THREAD_CAPACITY ; ++ index ) {",0]],0,1]]
+          ],
+          "micros_hart_current_thread": [],
+          "micros_hart_install_trap_stacks": [],
+          "micros_hart_register": [
+            [["work"],["boot01-shared/ipc01/kernel/objects/kernel_object_hart.c/micros_hart_register/loop-53","insert","KERNEL_OBJECTS","RECORD_VISIT",1,"entry","",[["for ( index = 0 ; index < MICROS_HART_CAPACITY ; ++ index ) {",0]],0,0]],
+            [["work"],["boot01-shared/ipc01/kernel/objects/kernel_object_hart.c/micros_hart_register/index-64","wrap","KERNEL_OBJECTS","INDEX_PROBE",1,"value","index",[["for ( index = 0 ; index < MICROS_HART_CAPACITY ; ++ index ) {",0]],0,1]],
+            [["work"],["boot01-shared/ipc01/kernel/objects/kernel_object_hart.c/micros_hart_register/loop-116","insert","KERNEL_OBJECTS","RECORD_VISIT",1,"entry","",[["for ( index = 0 ; index < MICROS_HART_CAPACITY ; ++ index ) {",1]],0,0]],
+            [["work"],["boot01-shared/ipc01/kernel/objects/kernel_object_hart.c/micros_hart_register/index-126","wrap","KERNEL_OBJECTS","INDEX_PROBE",1,"value","index",[["for ( index = 0 ; index < MICROS_HART_CAPACITY ; ++ index ) {",1]],0,2]]
+          ],
+          "micros_hart_resolve": [
+            [["work"],["boot01-shared/ipc01/kernel/objects/kernel_object_hart.c/micros_hart_resolve/index-62","wrap","KERNEL_OBJECTS","INDEX_PROBE",1,"value","handle . slot",[],0,1]]
+          ],
+          "micros_hart_resolve_context": [
+            [["work"],["boot01-shared/ipc01/kernel/objects/kernel_object_hart.c/micros_hart_resolve_context/index-120","wrap","KERNEL_OBJECTS","INDEX_PROBE",1,"value","index",[],2,3]]
+          ]
+        },
+        "kernel/objects/kernel_object_identity.c": {
+          "kernel_object_hart_handle_is_null": [],
+          "kernel_object_hart_handle_is_valid": [],
+          "kernel_object_process_handle_is_valid": [],
+          "kernel_object_process_thread_index_is_valid": [
+            [["work"],["boot01-shared/ipc01/kernel/objects/kernel_object_identity.c/kernel_object_process_thread_index_is_valid/index-95","wrap","KERNEL_OBJECTS","INDEX_PROBE",1,"value","process -> sole_thread . slot",[],0,1]]
+          ],
+          "kernel_object_require_initialized": [],
+          "kernel_object_resolve_hart_mutable": [
+            [["work"],["boot01-shared/ipc01/kernel/objects/kernel_object_identity.c/kernel_object_resolve_hart_mutable/index-24","wrap","KERNEL_OBJECTS","INDEX_PROBE",1,"value","handle . slot",[],0,1]]
+          ],
+          "kernel_object_resolve_process_mutable": [
+            [["work"],["boot01-shared/ipc01/kernel/objects/kernel_object_identity.c/kernel_object_resolve_process_mutable/index-24","wrap","KERNEL_OBJECTS","INDEX_PROBE",1,"value","handle . slot",[],0,1]]
+          ],
+          "kernel_object_resolve_thread_mutable": [
+            [["work"],["boot01-shared/ipc01/kernel/objects/kernel_object_identity.c/kernel_object_resolve_thread_mutable/index-24","wrap","KERNEL_OBJECTS","INDEX_PROBE",1,"value","handle . slot",[],0,1]]
+          ],
+          "kernel_object_thread_handle_is_null": [],
+          "kernel_object_thread_handle_is_valid": [],
+          "kernel_object_thread_handles_equal": [],
+          "micros_process_next_generation": [],
+          "micros_thread_next_generation": []
+        },
+        "kernel/objects/kernel_object_process.c": {
+          "micros_process_attach_address_space": [],
+          "micros_process_create": [
+            [["work"],["boot01-shared/ipc01/kernel/objects/kernel_object_process.c/micros_process_create/loop-53","insert","KERNEL_OBJECTS","RECORD_VISIT",1,"entry","",[["for ( index = 0 ; index < MICROS_PROCESS_CAPACITY ; ++ index ) {",0]],0,0]],
+            [["work"],["boot01-shared/ipc01/kernel/objects/kernel_object_process.c/micros_process_create/index-63","wrap","KERNEL_OBJECTS","INDEX_PROBE",1,"value","index",[["for ( index = 0 ; index < MICROS_PROCESS_CAPACITY ; ++ index ) {",0]],0,2]]
+          ],
+          "micros_process_create_at": [
+            [["work"],["boot01-shared/ipc01/kernel/objects/kernel_object_process.c/micros_process_create_at/index-55","wrap","KERNEL_OBJECTS","INDEX_PROBE",1,"value","slot",[],1,6]]
+          ],
+          "micros_process_detach_address_space": [],
+          "micros_process_release": [],
+          "micros_process_resolve": [
+            [["work"],["boot01-shared/ipc01/kernel/objects/kernel_object_process.c/micros_process_resolve/index-62","wrap","KERNEL_OBJECTS","INDEX_PROBE",1,"value","handle . slot",[],0,1]]
+          ]
+        },
+        "kernel/objects/kernel_object_stack.c": {
+          "kernel_object_ranges_overlap": [],
+          "kernel_object_stack_range_is_valid": [],
+          "kernel_object_trap_anchor_stacks_are_valid": []
+        },
+        "kernel/objects/kernel_object_state.c": {
+          "bytes_are_zero": [
+            [["work"],["boot01-shared/ipc01/kernel/objects/kernel_object_state.c/bytes_are_zero/loop-24","insert","KERNEL_OBJECTS","COMPARISON",1,"entry","",[["for ( index = 0 ; index < size ; ++ index ) {",0]],0,0]]
+          ],
+          "clear_bytes": [
+            [["work"],["boot01-shared/ipc01/kernel/objects/kernel_object_state.c/clear_bytes/loop-23","insert","KERNEL_OBJECTS","CLEARED_BYTE",1,"entry","",[["for ( index = 0 ; index < size ; ++ index ) {",0]],0,0]]
+          ],
+          "kernel_object_clear_thread_ipc_state": [],
+          "kernel_object_clear_thread_scheduler_metadata": [],
+          "kernel_object_clear_user_context": [
+            [["work"],["boot01-shared/ipc01/kernel/objects/kernel_object_state.c/kernel_object_clear_user_context/loop-32","insert","KERNEL_OBJECTS","CLEARED_BYTE",1,"entry","",[["for ( index = 0 ; index < sizeof ( * context ) ; ++ index ) {",0]],0,0]]
+          ],
+          "kernel_object_copy_user_context": [
+            [["work"],["boot01-shared/ipc01/kernel/objects/kernel_object_state.c/kernel_object_copy_user_context/loop-46","insert","KERNEL_OBJECTS","COPIED_BYTE",1,"entry","",[["for ( index = 0 ; index < sizeof ( * destination ) ; ++ index ) {",0]],0,0]]
+          ],
+          "kernel_object_storage_is_zero": [],
+          "kernel_object_thread_scheduler_metadata_is_zero": [],
+          "kernel_object_timer_state_is_initial": [],
+          "kernel_object_trap_anchor_is_zero": [],
+          "kernel_object_user_context_is_zero": [
+            [["work"],["boot01-shared/ipc01/kernel/objects/kernel_object_state.c/kernel_object_user_context_is_zero/loop-34","insert","KERNEL_OBJECTS","RECORD_VISIT",1,"entry","",[["for ( index = 0 ; index < sizeof ( * context ) ; ++ index ) {",0]],0,0]]
+          ],
+          "micros_thread_ipc_state_is_clear": []
+        },
+        "kernel/objects/kernel_object_thread.c": {
+          "micros_thread_create": [
+            [["work"],["boot01-shared/ipc01/kernel/objects/kernel_object_thread.c/micros_thread_create/loop-113","insert","KERNEL_OBJECTS","RECORD_VISIT",1,"entry","",[["for ( index = 0 ; index < MICROS_THREAD_CAPACITY ; ++ index ) {",0]],0,0]],
+            [["work"],["boot01-shared/ipc01/kernel/objects/kernel_object_thread.c/micros_thread_create/index-123","wrap","KERNEL_OBJECTS","INDEX_PROBE",1,"value","index",[["for ( index = 0 ; index < MICROS_THREAD_CAPACITY ; ++ index ) {",0]],0,2]]
+          ],
+          "micros_thread_release": [
+            [["work"],["boot01-shared/ipc01/kernel/objects/kernel_object_thread.c/micros_thread_release/loop-122","insert","KERNEL_OBJECTS","RECORD_VISIT",1,"entry","",[["for ( index = 0 ; index < MICROS_HART_CAPACITY ; ++ index ) {",0]],0,0]],
+            [["work"],["boot01-shared/ipc01/kernel/objects/kernel_object_thread.c/micros_thread_release/index-133","wrap","KERNEL_OBJECTS","INDEX_PROBE",1,"value","index",[["for ( index = 0 ; index < MICROS_HART_CAPACITY ; ++ index ) {",0]],0,1]]
+          ],
+          "micros_thread_resolve": [
+            [["work"],["boot01-shared/ipc01/kernel/objects/kernel_object_thread.c/micros_thread_resolve/index-62","wrap","KERNEL_OBJECTS","INDEX_PROBE",1,"value","handle . slot",[],0,1]]
+          ],
+          "select_release_survivor": [
+            [["work"],["boot01-shared/ipc01/kernel/objects/kernel_object_thread.c/select_release_survivor/loop-24","insert","KERNEL_OBJECTS","RECORD_VISIT",1,"entry","",[["for ( size_t index = 0 ; index < MICROS_THREAD_CAPACITY ; ++ index ) {",0]],0,0]],
+            [["work"],["boot01-shared/ipc01/kernel/objects/kernel_object_thread.c/select_release_survivor/index-35","wrap","KERNEL_OBJECTS","INDEX_PROBE",1,"value","index",[["for ( size_t index = 0 ; index < MICROS_THREAD_CAPACITY ; ++ index ) {",0]],0,2]]
+          ]
+        },
+        "kernel/objects/kernel_object_validation.c": {
+          "kernel_object_validation_current_binding_matches": [
+            [["work"],["boot01-shared/ipc01/kernel/objects/kernel_object_validation.c/kernel_object_validation_current_binding_matches/index-53","wrap","KERNEL_OBJECTS","INDEX_PROBE",1,"value","hart -> current_thread . slot",[["if ( hart -> current_thread . generation != 0 ) {",0]],1,3]]
+          ],
+          "kernel_object_validation_free_hart_is_clear": [
+            [["work"],["boot01-shared/ipc01/kernel/objects/kernel_object_validation.c/kernel_object_validation_free_hart_is_clear/loop-125","insert","KERNEL_OBJECTS","RECORD_VISIT",1,"entry","",[["for ( priority = 0 ; priority < MICROS_SCHEDULER_PRIORITY_COUNT ; ++ priority ) {",0]],0,0]],
+            [["work"],["boot01-shared/ipc01/kernel/objects/kernel_object_validation.c/kernel_object_validation_free_hart_is_clear/index-131","wrap","KERNEL_OBJECTS","INDEX_PROBE",1,"value","priority",[["for ( priority = 0 ; priority < MICROS_SCHEDULER_PRIORITY_COUNT ; ++ priority ) {",0]],0,2]],
+            [["work"],["boot01-shared/ipc01/kernel/objects/kernel_object_validation.c/kernel_object_validation_free_hart_is_clear/index-142","wrap","KERNEL_OBJECTS","INDEX_PROBE",1,"value","priority",[["for ( priority = 0 ; priority < MICROS_SCHEDULER_PRIORITY_COUNT ; ++ priority ) {",0]],1,2]]
+          ],
+          "kernel_object_validation_hart_slots_match": [
+            [["work"],["boot01-shared/ipc01/kernel/objects/kernel_object_validation.c/kernel_object_validation_hart_slots_match/loop-16","insert","KERNEL_OBJECTS","RECORD_VISIT",1,"entry","",[["for ( index = 0 ; index < MICROS_HART_CAPACITY ; ++ index ) {",0]],0,0]],
+            [["work"],["boot01-shared/ipc01/kernel/objects/kernel_object_validation.c/kernel_object_validation_hart_slots_match/index-27","wrap","KERNEL_OBJECTS","INDEX_PROBE",1,"value","index",[["for ( index = 0 ; index < MICROS_HART_CAPACITY ; ++ index ) {",0]],0,3]],
+            [["work"],["boot01-shared/ipc01/kernel/objects/kernel_object_validation.c/kernel_object_validation_hart_slots_match/loop-103","insert","KERNEL_OBJECTS","RECORD_VISIT",1,"entry","",[["for ( index = 0 ; index < MICROS_HART_CAPACITY ; ++ index ) {",0],["for ( other_index = 0 ; other_index < index ; ++ other_index ) {",0]],0,0]],
+            [["work"],["boot01-shared/ipc01/kernel/objects/kernel_object_validation.c/kernel_object_validation_hart_slots_match/index-114","wrap","KERNEL_OBJECTS","INDEX_PROBE",1,"value","other_index",[["for ( index = 0 ; index < MICROS_HART_CAPACITY ; ++ index ) {",0],["for ( other_index = 0 ; other_index < index ; ++ other_index ) {",0]],0,1]]
+          ],
+          "kernel_object_validation_hart_stack_state_matches": [],
+          "kernel_object_validation_process_counts_match": [
+            [["work"],["boot01-shared/ipc01/kernel/objects/kernel_object_validation.c/kernel_object_validation_process_counts_match/loop-16","insert","KERNEL_OBJECTS","RECORD_VISIT",1,"entry","",[["for ( index = 0 ; index < MICROS_PROCESS_CAPACITY ; ++ index ) {",0]],0,0]],
+            [["work"],["boot01-shared/ipc01/kernel/objects/kernel_object_validation.c/kernel_object_validation_process_counts_match/index-27","wrap","KERNEL_OBJECTS","INDEX_PROBE",1,"value","index",[["for ( index = 0 ; index < MICROS_PROCESS_CAPACITY ; ++ index ) {",0]],0,3]]
+          ],
+          "kernel_object_validation_process_slots_match": [
+            [["work"],["boot01-shared/ipc01/kernel/objects/kernel_object_validation.c/kernel_object_validation_process_slots_match/loop-16","insert","KERNEL_OBJECTS","RECORD_VISIT",1,"entry","",[["for ( index = 0 ; index < MICROS_PROCESS_CAPACITY ; ++ index ) {",0]],0,0]],
+            [["work"],["boot01-shared/ipc01/kernel/objects/kernel_object_validation.c/kernel_object_validation_process_slots_match/index-27","wrap","KERNEL_OBJECTS","INDEX_PROBE",1,"value","index",[["for ( index = 0 ; index < MICROS_PROCESS_CAPACITY ; ++ index ) {",0]],0,1]]
+          ],
+          "kernel_object_validation_stack_accumulate": [],
+          "kernel_object_validation_stack_base": [],
+          "kernel_object_validation_stack_exceptions_avoid": [
+            [["work"],["boot01-shared/ipc01/kernel/objects/kernel_object_validation.c/kernel_object_validation_stack_exceptions_avoid/loop-23","insert","KERNEL_OBJECTS","RECORD_VISIT",1,"entry","",[["for ( index = 0 ; index < MICROS_THREAD_CAPACITY + 2 * MICROS_HART_CAPACITY ; ++ index ) {",0]],0,0]],
+            [["work"],["boot01-shared/ipc01/kernel/objects/kernel_object_validation.c/kernel_object_validation_stack_exceptions_avoid/loop-118","insert","KERNEL_OBJECTS","RECORD_VISIT",1,"entry","",[["for ( index = 0 ; index < MICROS_THREAD_CAPACITY + 2 * MICROS_HART_CAPACITY ; ++ index ) {",0],["for ( other = 0 ; other < MICROS_THREAD_CAPACITY + 2 * MICROS_HART_CAPACITY ; ++ other ) {",0]],0,0]]
+          ],
+          "kernel_object_validation_stack_is_regular": [],
+          "kernel_object_validation_stack_next_regular": [
+            [["work"],["boot01-shared/ipc01/kernel/objects/kernel_object_validation.c/kernel_object_validation_stack_next_regular/loop-37","insert","KERNEL_OBJECTS","RECORD_VISIT",1,"entry","",[["for ( ; cursor -> slot < limit ; ++ cursor -> slot ) {",0]],0,0]]
+          ],
+          "kernel_object_validation_stack_range_at": [
+            [["work"],["boot01-shared/ipc01/kernel/objects/kernel_object_validation.c/kernel_object_validation_stack_range_at/index-17","wrap","KERNEL_OBJECTS","INDEX_PROBE",1,"value","slot",[["if ( cohort == 0 ) {",0]],0,1]],
+            [["work"],["boot01-shared/ipc01/kernel/objects/kernel_object_validation.c/kernel_object_validation_stack_range_at/index-66","wrap","KERNEL_OBJECTS","INDEX_PROBE",1,"value","slot",[["else {",0]],0,1]]
+          ],
+          "kernel_object_validation_stack_regulars_avoid": [
+            [["work"],["boot01-shared/ipc01/kernel/objects/kernel_object_validation.c/kernel_object_validation_stack_regulars_avoid/loop-28","insert","KERNEL_OBJECTS","RECORD_VISIT",1,"entry","",[["for ( cohort = 0 ; cohort < 3 ; ++ cohort ) {",0]],0,0]],
+            [["work"],["boot01-shared/ipc01/kernel/objects/kernel_object_validation.c/kernel_object_validation_stack_regulars_avoid/loop-59","insert","KERNEL_OBJECTS","RECORD_VISIT",1,"entry","",[["for ( ; ; ) {",0]],0,0]],
+            [["work"],["boot01-shared/ipc01/kernel/objects/kernel_object_validation.c/kernel_object_validation_stack_regulars_avoid/loop-78","insert","KERNEL_OBJECTS","RECORD_VISIT",1,"entry","",[["for ( ; ; ) {",0],["for ( cohort = 0 ; cohort < 3 ; ++ cohort ) {",0]],0,0]]
+          ],
+          "kernel_object_validation_stack_stride": [],
+          "kernel_object_validation_thread_context_matches": [],
+          "kernel_object_validation_thread_slots_match": [
+            [["work"],["boot01-shared/ipc01/kernel/objects/kernel_object_validation.c/kernel_object_validation_thread_slots_match/loop-16","insert","KERNEL_OBJECTS","RECORD_VISIT",1,"entry","",[["for ( index = 0 ; index < MICROS_THREAD_CAPACITY ; ++ index ) {",0]],0,0]],
+            [["work"],["boot01-shared/ipc01/kernel/objects/kernel_object_validation.c/kernel_object_validation_thread_slots_match/index-27","wrap","KERNEL_OBJECTS","INDEX_PROBE",1,"value","index",[["for ( index = 0 ; index < MICROS_THREAD_CAPACITY ; ++ index ) {",0]],0,1]],
+            [["work"],["boot01-shared/ipc01/kernel/objects/kernel_object_validation.c/kernel_object_validation_thread_slots_match/index-143","wrap","KERNEL_OBJECTS","INDEX_PROBE",1,"value","thread -> owner . slot",[["for ( index = 0 ; index < MICROS_THREAD_CAPACITY ; ++ index ) {",0],["switch ( thread -> slot_state ) {",0]],0,3]],
+            [["work"],["boot01-shared/ipc01/kernel/objects/kernel_object_validation.c/kernel_object_validation_thread_slots_match/index-158","wrap","KERNEL_OBJECTS","INDEX_PROBE",1,"value","thread -> owner . slot",[["for ( index = 0 ; index < MICROS_THREAD_CAPACITY ; ++ index ) {",0],["switch ( thread -> slot_state ) {",0]],1,3]]
+          ],
+          "micros_kernel_objects_validate_base": [
+            [["work"],["boot01-shared/ipc01/kernel/objects/kernel_object_validation.c/micros_kernel_objects_validate_base/audit","insert","KERNEL_OBJECTS","COMPLETE_VALIDATOR_CALL",1,"entry","",[],0,0]],
+            [["work"],["boot01-shared/ipc01/kernel/objects/kernel_object_validation.c/micros_kernel_objects_validate_base/loop-120","insert","KERNEL_OBJECTS","RECORD_VISIT",1,"entry","",[["for ( index = 0 ; index < MICROS_PROCESS_CAPACITY ; ++ index ) {",0]],0,0]],
+            [["work"],["boot01-shared/ipc01/kernel/objects/kernel_object_validation.c/micros_kernel_objects_validate_base/loop-142","insert","KERNEL_OBJECTS","RECORD_VISIT",1,"entry","",[["for ( index = 0 ; index < MICROS_THREAD_CAPACITY ; ++ index ) {",0]],0,0]]
+          ]
+        },
+        "kernel/objects/kernel_objects.c": {
+          "micros_kernel_objects_initialize": [
+            [["work"],["boot01-shared/ipc01/kernel/objects/kernel_objects.c/micros_kernel_objects_initialize/loop-94","insert","KERNEL_OBJECTS","RECORD_VISIT",1,"entry","",[["for ( index = 0 ; index < MICROS_PROCESS_CAPACITY ; ++ index ) {",0]],0,0]],
+            [["work"],["boot01-shared/ipc01/kernel/objects/kernel_objects.c/micros_kernel_objects_initialize/index-98","wrap","KERNEL_OBJECTS","INDEX_PROBE",1,"value","index",[["for ( index = 0 ; index < MICROS_PROCESS_CAPACITY ; ++ index ) {",0]],0,1]]
+          ],
+          "micros_kernel_objects_validate": [
+            [["work"],["boot01-shared/ipc01/kernel/objects/kernel_objects.c/micros_kernel_objects_validate/audit","insert","KERNEL_OBJECTS","COMPLETE_VALIDATOR_CALL",1,"entry","",[],0,0]]
+          ]
+        },
+        "kernel/scheduler/scheduler_core.c": {
+          "scheduler_core_add_overflows": [],
+          "scheduler_core_bitmap_clear": [
+            [["work"],["boot01-shared/ipc01/kernel/scheduler/scheduler_core.c/scheduler_core_bitmap_clear/loop-22","insert","KERNEL_SCHEDULER","RECORD_VISIT",1,"entry","",[["for ( index = 0 ; index < ( MICROS_THREAD_CAPACITY + 63 ) / 64 ; ++ index ) {",0]],0,0]]
+          ],
+          "scheduler_core_bitmap_set": [],
+          "scheduler_core_bitmap_test": [],
+          "scheduler_core_hart_handle_is_null": [],
+          "scheduler_core_hart_handles_equal": [],
+          "scheduler_core_hart_has_assigned_thread": [
+            [["work"],["boot01-shared/ipc01/kernel/scheduler/scheduler_core.c/scheduler_core_hart_has_assigned_thread/loop-16","insert","KERNEL_SCHEDULER","RECORD_VISIT",1,"entry","",[["for ( index = 0 ; index < MICROS_THREAD_CAPACITY ; ++ index ) {",0]],0,0]],
+            [["work"],["boot01-shared/ipc01/kernel/scheduler/scheduler_core.c/scheduler_core_hart_has_assigned_thread/index-27","wrap","KERNEL_SCHEDULER","INDEX_PROBE",1,"value","index",[["for ( index = 0 ; index < MICROS_THREAD_CAPACITY ; ++ index ) {",0]],0,1]]
+          ],
+          "scheduler_core_null_thread_handle": [],
+          "scheduler_core_preflight_hart": [
+            [["work"],["boot01-shared/ipc01/kernel/scheduler/scheduler_core.c/scheduler_core_preflight_hart/index-168","wrap","KERNEL_SCHEDULER","INDEX_PROBE",1,"value","current -> scheduler_priority",[["if ( ! scheduler_core_thread_handle_is_null ( hart -> current_thread ) ) {",0]],0,1]]
+          ],
+          "scheduler_core_preflight_queue_endpoints": [
+            [["work"],["boot01-shared/ipc01/kernel/scheduler/scheduler_core.c/scheduler_core_preflight_queue_endpoints/index-46","wrap","KERNEL_SCHEDULER","INDEX_PROBE",1,"value","priority",[],1,6]],
+            [["work"],["boot01-shared/ipc01/kernel/scheduler/scheduler_core.c/scheduler_core_preflight_queue_endpoints/index-55","wrap","KERNEL_SCHEDULER","INDEX_PROBE",1,"value","priority",[],2,6]]
+          ],
+          "scheduler_core_preflight_queue_record": [],
+          "scheduler_core_preflight_registry": [],
+          "scheduler_core_preflight_thread": [],
+          "scheduler_core_preflight_thread_operation": [],
+          "scheduler_core_resolve_hart_mutable": [
+            [["work"],["boot01-shared/ipc01/kernel/scheduler/scheduler_core.c/scheduler_core_resolve_hart_mutable/index-55","wrap","KERNEL_SCHEDULER","INDEX_PROBE",1,"value","handle . slot",[],0,1]]
+          ],
+          "scheduler_core_resolve_thread_mutable": [
+            [["work"],["boot01-shared/ipc01/kernel/scheduler/scheduler_core.c/scheduler_core_resolve_thread_mutable/index-55","wrap","KERNEL_SCHEDULER","INDEX_PROBE",1,"value","handle . slot",[],0,1]]
+          ],
+          "scheduler_core_thread_handle_is_null": [],
+          "scheduler_core_thread_handles_equal": [],
+          "scheduler_core_thread_is_current": [],
+          "selected_hart_accounting_is_valid": [],
+          "selected_hart_stacks_are_valid": [],
+          "selected_thread_context_is_valid": [],
+          "selected_thread_policy_is_valid": []
+        },
+        "kernel/scheduler/scheduler_core_accounting.c": {
+          "micros_scheduler_account_enter_idle": [],
+          "micros_scheduler_account_enter_thread": [
+            [["work"],["boot01-shared/ipc01/kernel/scheduler/scheduler_core_accounting.c/micros_scheduler_account_enter_thread/index-134","wrap","KERNEL_SCHEDULER","INDEX_PROBE",1,"value","thread -> scheduler_priority",[],1,2]]
+          ],
+          "micros_scheduler_account_idle_trap": [],
+          "micros_scheduler_account_user_trap": [
+            [["work"],["boot01-shared/ipc01/kernel/scheduler/scheduler_core_accounting.c/micros_scheduler_account_user_trap/index-135","wrap","KERNEL_SCHEDULER","INDEX_PROBE",1,"value","thread -> scheduler_priority",[],1,2]]
+          ],
+          "micros_scheduler_accounting_initialize": []
+        },
+        "kernel/scheduler/scheduler_core_ipc.c": {
+          "clear_current_ipc_guard": [],
+          "current_ipc_guard_is_zero": [],
+          "ipc_blocked_flags_are_valid": [],
+          "micros_scheduler_begin_current_ipc": [],
+          "micros_scheduler_commit_current_ipc": [],
+          "micros_scheduler_preflight_current_ipc": [
+            [["work"],["boot01-shared/ipc01/kernel/scheduler/scheduler_core_ipc.c/micros_scheduler_preflight_current_ipc/index-123","wrap","KERNEL_SCHEDULER","INDEX_PROBE",1,"value","thread -> scheduler_priority",[],0,1]]
+          ],
+          "micros_scheduler_rollback_current_ipc": []
+        },
+        "kernel/scheduler/scheduler_core_ipc_transition.c": {
+          "commit_transition_candidates": [
+            [["work"],["boot01-shared/ipc01/kernel/scheduler/scheduler_core_ipc_transition.c/commit_transition_candidates/loop-16","insert","KERNEL_SCHEDULER","RECORD_VISIT",1,"entry","",[["for ( index = 0 ; index < request_count ; ++ index ) {",0]],0,0]]
+          ],
+          "ipc_transition_clear_flags_are_valid": [],
+          "ipc_transition_set_flags_are_valid": [],
+          "micros_scheduler_commit_ipc_call_delivery": [],
+          "micros_scheduler_commit_ipc_reply_receive_delivery": [],
+          "micros_scheduler_commit_ipc_reply_receive_wait": [],
+          "micros_scheduler_commit_ipc_transitions": [],
+          "micros_scheduler_commit_ipc_wake": [],
+          "micros_scheduler_commit_ipc_wake_pair": [],
+          "micros_scheduler_commit_ipc_wake_prevalidated": [
+            [["work"],["boot01-shared/ipc01/kernel/scheduler/scheduler_core_ipc_transition.c/micros_scheduler_commit_ipc_wake_prevalidated/index-9","wrap","KERNEL_SCHEDULER","INDEX_PROBE",1,"value","plan -> thread . slot",[],0,1]],
+            [["work"],["boot01-shared/ipc01/kernel/scheduler/scheduler_core_ipc_transition.c/micros_scheduler_commit_ipc_wake_prevalidated/index-42","wrap","KERNEL_SCHEDULER","INDEX_PROBE",1,"value","plan -> hart . slot",[["if ( plan -> resulting_flags == 0 ) {",0]],0,1]]
+          ],
+          "micros_scheduler_prepare_ipc_wake": [],
+          "preflight_transition_candidates": [
+            [["work"],["boot01-shared/ipc01/kernel/scheduler/scheduler_core_ipc_transition.c/preflight_transition_candidates/loop-20","insert","KERNEL_SCHEDULER","RECORD_VISIT",1,"entry","",[["for ( index = 0 ; index < request_count ; ++ index ) {",0]],0,0]]
+          ],
+          "preflight_transition_shapes": [
+            [["work"],["boot01-shared/ipc01/kernel/scheduler/scheduler_core_ipc_transition.c/preflight_transition_shapes/loop-19","insert","KERNEL_SCHEDULER","RECORD_VISIT",1,"entry","",[["for ( index = 0 ; index < request_count ; ++ index ) {",0]],0,0]],
+            [["work"],["boot01-shared/ipc01/kernel/scheduler/scheduler_core_ipc_transition.c/preflight_transition_shapes/loop-80","insert","KERNEL_SCHEDULER","RECORD_VISIT",1,"entry","",[["for ( index = 0 ; index < request_count ; ++ index ) {",0],["for ( other_index = 0 ; other_index < index ; ++ other_index ) {",0]],0,0]]
+          ],
+          "preflight_transition_stamps": [
+            [["work"],["boot01-shared/ipc01/kernel/scheduler/scheduler_core_ipc_transition.c/preflight_transition_stamps/loop-25","insert","KERNEL_SCHEDULER","RECORD_VISIT",1,"entry","",[["for ( index = 0 ; index < request_count ; ++ index ) {",0]],0,0]],
+            [["work"],["boot01-shared/ipc01/kernel/scheduler/scheduler_core_ipc_transition.c/preflight_transition_stamps/loop-128","insert","KERNEL_SCHEDULER","RECORD_VISIT",1,"entry","",[["for ( index = 0 ; index < request_count ; ++ index ) {",1]],0,0]]
+          ]
+        },
+        "kernel/scheduler/scheduler_core_policy.c": {
+          "micros_hart_pick_ready": [],
+          "micros_thread_install_policy": [],
+          "micros_thread_runtime_flags_set": [],
+          "micros_thread_runtime_flags_unset": [],
+          "micros_thread_scheduler_admit": [],
+          "micros_thread_scheduler_admit_preflight": [],
+          "micros_thread_scheduler_hold": [],
+          "micros_thread_scheduler_remove": []
+        },
+        "kernel/scheduler/scheduler_core_queue.c": {
+          "preflight_dequeue_successor": [
+            [["work"],["boot01-shared/ipc01/kernel/scheduler/scheduler_core_queue.c/preflight_dequeue_successor/index-32","wrap","KERNEL_SCHEDULER","INDEX_PROBE",1,"value","thread -> scheduler_priority",[],0,3]],
+            [["work"],["boot01-shared/ipc01/kernel/scheduler/scheduler_core_queue.c/preflight_dequeue_successor/index-106","wrap","KERNEL_SCHEDULER","INDEX_PROBE",1,"value","thread -> scheduler_priority",[],2,3]],
+            [["work"],["boot01-shared/ipc01/kernel/scheduler/scheduler_core_queue.c/preflight_dequeue_successor/loop-125","insert","KERNEL_SCHEDULER","RECORD_VISIT",1,"entry","",[["for ( index = 1 ; index < steps ; ++ index ) {",0]],0,0]],
+            [["work"],["boot01-shared/ipc01/kernel/scheduler/scheduler_core_queue.c/preflight_dequeue_successor/index-145","wrap","KERNEL_SCHEDULER","INDEX_PROBE",1,"value","cursor . slot",[["for ( index = 1 ; index < steps ; ++ index ) {",0]],0,1]]
+          ],
+          "queue_enqueue_tail_raw": [
+            [["work"],["boot01-shared/ipc01/kernel/scheduler/scheduler_core_queue.c/queue_enqueue_tail_raw/index-9","wrap","KERNEL_SCHEDULER","INDEX_PROBE",1,"value","thread_handle . slot",[],0,1]],
+            [["work"],["boot01-shared/ipc01/kernel/scheduler/scheduler_core_queue.c/queue_enqueue_tail_raw/index-43","wrap","KERNEL_SCHEDULER","INDEX_PROBE",1,"value","priority",[],1,4]],
+            [["work"],["boot01-shared/ipc01/kernel/scheduler/scheduler_core_queue.c/queue_enqueue_tail_raw/index-52","wrap","KERNEL_SCHEDULER","INDEX_PROBE",1,"value","priority",[["if ( scheduler_core_thread_handle_is_null ( hart -> ready_head [ priority ] ) ) {",0]],0,2]],
+            [["work"],["boot01-shared/ipc01/kernel/scheduler/scheduler_core_queue.c/queue_enqueue_tail_raw/index-61","wrap","KERNEL_SCHEDULER","INDEX_PROBE",1,"value","priority",[["if ( scheduler_core_thread_handle_is_null ( hart -> ready_head [ priority ] ) ) {",0]],1,2]],
+            [["work"],["boot01-shared/ipc01/kernel/scheduler/scheduler_core_queue.c/queue_enqueue_tail_raw/index-73","wrap","KERNEL_SCHEDULER","INDEX_PROBE",1,"value","hart -> ready_tail [ priority ] . slot",[],0,1]],
+            [["work"],["boot01-shared/ipc01/kernel/scheduler/scheduler_core_queue.c/queue_enqueue_tail_raw/index-77","wrap","KERNEL_SCHEDULER","INDEX_PROBE",1,"value","priority",[],2,4]],
+            [["work"],["boot01-shared/ipc01/kernel/scheduler/scheduler_core_queue.c/queue_enqueue_tail_raw/index-91","wrap","KERNEL_SCHEDULER","INDEX_PROBE",1,"value","priority",[],3,4]]
+          ],
+          "scheduler_core_preflight_tail_enqueue": [
+            [["work"],["boot01-shared/ipc01/kernel/scheduler/scheduler_core_queue.c/scheduler_core_preflight_tail_enqueue/index-47","wrap","KERNEL_SCHEDULER","INDEX_PROBE",1,"value","hart -> current_thread . slot",[["if ( ! scheduler_core_thread_handle_is_null ( hart -> current_thread ) ) {",0]],0,1]]
+          ],
+          "scheduler_core_queue_dequeue": [
+            [["work"],["boot01-shared/ipc01/kernel/scheduler/scheduler_core_queue.c/scheduler_core_queue_dequeue/index-64","wrap","KERNEL_SCHEDULER","INDEX_PROBE",1,"value","thread_handle . slot",[],0,1]],
+            [["work"],["boot01-shared/ipc01/kernel/scheduler/scheduler_core_queue.c/scheduler_core_queue_dequeue/index-119","wrap","KERNEL_SCHEDULER","INDEX_PROBE",1,"value","priority",[],4,5]],
+            [["work"],["boot01-shared/ipc01/kernel/scheduler/scheduler_core_queue.c/scheduler_core_queue_dequeue/loop-131","insert","KERNEL_SCHEDULER","RECORD_VISIT",1,"entry","",[["while ( ! scheduler_core_thread_handle_is_null ( cursor ) ) {",0]],0,0]],
+            [["work"],["boot01-shared/ipc01/kernel/scheduler/scheduler_core_queue.c/scheduler_core_queue_dequeue/index-224","wrap","KERNEL_SCHEDULER","INDEX_PROBE",1,"value","priority",[["while ( ! scheduler_core_thread_handle_is_null ( cursor ) ) {",0],["if ( scheduler_core_thread_handles_equal ( cursor , thread_handle ) ) {",0],["if ( scheduler_core_thread_handle_is_null ( previous ) ) {",0]],0,1]],
+            [["work"],["boot01-shared/ipc01/kernel/scheduler/scheduler_core_queue.c/scheduler_core_queue_dequeue/index-238","wrap","KERNEL_SCHEDULER","INDEX_PROBE",1,"value","previous . slot",[["while ( ! scheduler_core_thread_handle_is_null ( cursor ) ) {",0],["if ( scheduler_core_thread_handles_equal ( cursor , thread_handle ) ) {",0],["else {",0]],0,1]],
+            [["work"],["boot01-shared/ipc01/kernel/scheduler/scheduler_core_queue.c/scheduler_core_queue_dequeue/index-258","wrap","KERNEL_SCHEDULER","INDEX_PROBE",1,"value","priority",[["while ( ! scheduler_core_thread_handle_is_null ( cursor ) ) {",0],["if ( scheduler_core_thread_handles_equal ( cursor , thread_handle ) ) {",0]],0,2]],
+            [["work"],["boot01-shared/ipc01/kernel/scheduler/scheduler_core_queue.c/scheduler_core_queue_dequeue/index-269","wrap","KERNEL_SCHEDULER","INDEX_PROBE",1,"value","priority",[["while ( ! scheduler_core_thread_handle_is_null ( cursor ) ) {",0],["if ( scheduler_core_thread_handles_equal ( cursor , thread_handle ) ) {",0],["if ( scheduler_core_thread_handles_equal ( hart -> ready_tail [ priority ] , thread_handle ) ) {",0]],0,1]],
+            [["work"],["boot01-shared/ipc01/kernel/scheduler/scheduler_core_queue.c/scheduler_core_queue_dequeue/index-283","wrap","KERNEL_SCHEDULER","INDEX_PROBE",1,"value","priority",[["while ( ! scheduler_core_thread_handle_is_null ( cursor ) ) {",0],["if ( scheduler_core_thread_handles_equal ( cursor , thread_handle ) ) {",0]],1,2]],
+            [["work"],["boot01-shared/ipc01/kernel/scheduler/scheduler_core_queue.c/scheduler_core_queue_dequeue/index-292","wrap","KERNEL_SCHEDULER","INDEX_PROBE",1,"value","priority",[["while ( ! scheduler_core_thread_handle_is_null ( cursor ) ) {",0],["if ( scheduler_core_thread_handles_equal ( cursor , thread_handle ) ) {",0],["if ( scheduler_core_thread_handle_is_null ( hart -> ready_head [ priority ] ) ) {",0]],0,1]]
+          ],
+          "scheduler_core_queue_enqueue_head_prevalidated": [
+            [["work"],["boot01-shared/ipc01/kernel/scheduler/scheduler_core_queue.c/scheduler_core_queue_enqueue_head_prevalidated/index-9","wrap","KERNEL_SCHEDULER","INDEX_PROBE",1,"value","thread_handle . slot",[],0,1]],
+            [["work"],["boot01-shared/ipc01/kernel/scheduler/scheduler_core_queue.c/scheduler_core_queue_enqueue_head_prevalidated/index-29","wrap","KERNEL_SCHEDULER","INDEX_PROBE",1,"value","priority",[],1,4]],
+            [["work"],["boot01-shared/ipc01/kernel/scheduler/scheduler_core_queue.c/scheduler_core_queue_enqueue_head_prevalidated/index-48","wrap","KERNEL_SCHEDULER","INDEX_PROBE",1,"value","priority",[],2,4]],
+            [["work"],["boot01-shared/ipc01/kernel/scheduler/scheduler_core_queue.c/scheduler_core_queue_enqueue_head_prevalidated/index-61","wrap","KERNEL_SCHEDULER","INDEX_PROBE",1,"value","priority",[],3,4]],
+            [["work"],["boot01-shared/ipc01/kernel/scheduler/scheduler_core_queue.c/scheduler_core_queue_enqueue_head_prevalidated/index-70","wrap","KERNEL_SCHEDULER","INDEX_PROBE",1,"value","priority",[["if ( scheduler_core_thread_handle_is_null ( hart -> ready_tail [ priority ] ) ) {",0]],0,1]]
+          ],
+          "scheduler_core_queue_enqueue_tail_prevalidated": [
+            [["work"],["boot01-shared/ipc01/kernel/scheduler/scheduler_core_queue.c/scheduler_core_queue_enqueue_tail_prevalidated/index-9","wrap","KERNEL_SCHEDULER","INDEX_PROBE",1,"value","thread_handle . slot",[],0,1]],
+            [["work"],["boot01-shared/ipc01/kernel/scheduler/scheduler_core_queue.c/scheduler_core_queue_enqueue_tail_prevalidated/index-44","wrap","KERNEL_SCHEDULER","INDEX_PROBE",1,"value","hart -> current_thread . slot",[["if ( ! scheduler_core_thread_handle_is_null ( hart -> current_thread ) ) {",0]],0,1]],
+            [["work"],["boot01-shared/ipc01/kernel/scheduler/scheduler_core_queue.c/scheduler_core_queue_enqueue_tail_prevalidated/index-97","wrap","KERNEL_SCHEDULER","INDEX_PROBE",1,"value","priority",[["if ( ! scheduler_core_thread_handle_is_null ( hart -> current_thread ) ) {",0],["if ( ! scheduler_core_thread_handles_equal ( hart -> current_thread , thread_handle ) && current -> scheduler_assigned && current -> runtime_flags == 0 && current -> scheduler_preemptible && current -> scheduler_priority > thread -> scheduler_priority ) {",0]],1,3]],
+            [["work"],["boot01-shared/ipc01/kernel/scheduler/scheduler_core_queue.c/scheduler_core_queue_enqueue_tail_prevalidated/index-112","wrap","KERNEL_SCHEDULER","INDEX_PROBE",1,"value","priority",[["if ( ! scheduler_core_thread_handle_is_null ( hart -> current_thread ) ) {",0],["if ( ! scheduler_core_thread_handles_equal ( hart -> current_thread , thread_handle ) && current -> scheduler_assigned && current -> runtime_flags == 0 && current -> scheduler_preemptible && current -> scheduler_priority > thread -> scheduler_priority ) {",0]],2,3]],
+            [["work"],["boot01-shared/ipc01/kernel/scheduler/scheduler_core_queue.c/scheduler_core_queue_enqueue_tail_prevalidated/index-125","wrap","KERNEL_SCHEDULER","INDEX_PROBE",1,"value","priority",[["if ( ! scheduler_core_thread_handle_is_null ( hart -> current_thread ) ) {",0],["if ( ! scheduler_core_thread_handles_equal ( hart -> current_thread , thread_handle ) && current -> scheduler_assigned && current -> runtime_flags == 0 && current -> scheduler_preemptible && current -> scheduler_priority > thread -> scheduler_priority ) {",0],["if ( scheduler_core_thread_handles_equal ( hart -> ready_tail [ priority ] , hart -> current_thread ) ) {",0]],0,1]]
+          ],
+          "scheduler_core_queue_pick": [
+            [["work"],["boot01-shared/ipc01/kernel/scheduler/scheduler_core_queue.c/scheduler_core_queue_pick/loop-20","insert","KERNEL_SCHEDULER","RECORD_VISIT",1,"entry","",[["for ( priority = 0 ; priority < MICROS_SCHEDULER_PRIORITY_COUNT ; ++ priority ) {",0]],0,0]],
+            [["work"],["boot01-shared/ipc01/kernel/scheduler/scheduler_core_queue.c/scheduler_core_queue_pick/index-54","wrap","KERNEL_SCHEDULER","INDEX_PROBE",1,"value","priority",[["for ( priority = 0 ; priority < MICROS_SCHEDULER_PRIORITY_COUNT ; ++ priority ) {",0]],1,2]],
+            [["work"],["boot01-shared/ipc01/kernel/scheduler/scheduler_core_queue.c/scheduler_core_queue_pick/index-66","wrap","KERNEL_SCHEDULER","INDEX_PROBE",1,"value","priority",[["for ( priority = 0 ; priority < MICROS_SCHEDULER_PRIORITY_COUNT ; ++ priority ) {",0],["if ( ! scheduler_core_thread_handle_is_null ( hart -> ready_head [ priority ] ) ) {",0]],0,1]]
+          ]
+        },
+        "kernel/scheduler/scheduler_core_return.c": {
+          "micros_hart_commit_user_return": [],
+          "micros_scheduler_apply_return_plan": [
+            [["work"],["boot01-shared/ipc01/kernel/scheduler/scheduler_core_return.c/micros_scheduler_apply_return_plan/index-9","wrap","KERNEL_SCHEDULER","INDEX_PROBE",1,"value","plan -> hart . slot",[],0,1]],
+            [["work"],["boot01-shared/ipc01/kernel/scheduler/scheduler_core_return.c/micros_scheduler_apply_return_plan/index-36","wrap","KERNEL_SCHEDULER","INDEX_PROBE",1,"value","plan -> outgoing . slot",[["if ( plan -> repair_preempted ) {",0]],0,1]],
+            [["work"],["boot01-shared/ipc01/kernel/scheduler/scheduler_core_return.c/micros_scheduler_apply_return_plan/index-65","wrap","KERNEL_SCHEDULER","INDEX_PROBE",1,"value","plan -> outgoing . slot",[["if ( plan -> renew_current ) {",0]],0,1]],
+            [["work"],["boot01-shared/ipc01/kernel/scheduler/scheduler_core_return.c/micros_scheduler_apply_return_plan/loop-90","insert","KERNEL_SCHEDULER","RECORD_VISIT",1,"entry","",[["for ( index = 0 ; index < plan -> queue_count ; ++ index ) {",0]],0,0]],
+            [["work"],["boot01-shared/ipc01/kernel/scheduler/scheduler_core_return.c/micros_scheduler_apply_return_plan/loop-131","insert","KERNEL_SCHEDULER","RECORD_VISIT",1,"entry","",[["for ( index = 0 ; index < plan -> queue_count ; ++ index ) {",0],["for ( renewed = 0 ; renewed < queue -> renew_count ; ++ renewed ) {",0]],0,0]],
+            [["work"],["boot01-shared/ipc01/kernel/scheduler/scheduler_core_return.c/micros_scheduler_apply_return_plan/index-141","wrap","KERNEL_SCHEDULER","INDEX_PROBE",1,"value","cursor . slot",[["for ( index = 0 ; index < plan -> queue_count ; ++ index ) {",0],["for ( renewed = 0 ; renewed < queue -> renew_count ; ++ renewed ) {",0]],0,1]],
+            [["work"],["boot01-shared/ipc01/kernel/scheduler/scheduler_core_return.c/micros_scheduler_apply_return_plan/index-170","wrap","KERNEL_SCHEDULER","INDEX_PROBE",1,"value","plan -> outgoing . slot",[["if ( plan -> publish_current ) {",0]],0,1]],
+            [["work"],["boot01-shared/ipc01/kernel/scheduler/scheduler_core_return.c/micros_scheduler_apply_return_plan/loop-198","insert","KERNEL_SCHEDULER","RECORD_VISIT",1,"entry","",[["for ( index = 0 ; index < plan -> queue_count ; ++ index ) {",1]],0,0]],
+            [["work"],["boot01-shared/ipc01/kernel/scheduler/scheduler_core_return.c/micros_scheduler_apply_return_plan/loop-231","insert","KERNEL_SCHEDULER","RECORD_VISIT",1,"entry","",[["for ( index = 0 ; index < plan -> queue_count ; ++ index ) {",1],["for ( patch = 0 ; patch < queue -> patch_count ; ++ patch ) {",0]],0,0]],
+            [["work"],["boot01-shared/ipc01/kernel/scheduler/scheduler_core_return.c/micros_scheduler_apply_return_plan/index-235","wrap","KERNEL_SCHEDULER","INDEX_PROBE",1,"value","queue -> patches [ patch ] . thread . slot",[["for ( index = 0 ; index < plan -> queue_count ; ++ index ) {",1],["for ( patch = 0 ; patch < queue -> patch_count ; ++ patch ) {",0]],0,1]],
+            [["work"],["boot01-shared/ipc01/kernel/scheduler/scheduler_core_return.c/micros_scheduler_apply_return_plan/index-263","wrap","KERNEL_SCHEDULER","INDEX_PROBE",1,"value","queue -> priority",[["for ( index = 0 ; index < plan -> queue_count ; ++ index ) {",1]],0,2]],
+            [["work"],["boot01-shared/ipc01/kernel/scheduler/scheduler_core_return.c/micros_scheduler_apply_return_plan/index-276","wrap","KERNEL_SCHEDULER","INDEX_PROBE",1,"value","queue -> priority",[["for ( index = 0 ; index < plan -> queue_count ; ++ index ) {",1]],1,2]],
+            [["work"],["boot01-shared/ipc01/kernel/scheduler/scheduler_core_return.c/micros_scheduler_apply_return_plan/index-344","wrap","KERNEL_SCHEDULER","INDEX_PROBE",1,"value","plan -> selected . slot",[["else {",0]],0,1]]
+          ],
+          "plans_equal": [
+            [["work"],["boot01-shared/ipc01/kernel/scheduler/scheduler_core_return.c/plans_equal/loop-113","insert","KERNEL_SCHEDULER","RECORD_VISIT",1,"entry","",[["for ( index = 0 ; index < 2 ; ++ index ) {",0]],0,0]]
+          ],
+          "queue_deltas_equal": [
+            [["work"],["boot01-shared/ipc01/kernel/scheduler/scheduler_core_return.c/queue_deltas_equal/loop-107","insert","KERNEL_SCHEDULER","RECORD_VISIT",1,"entry","",[["for ( index = 0 ; index < 3 ; ++ index ) {",0]],0,0]]
+          ],
+          "renew_return_thread": []
+        },
+        "kernel/scheduler/scheduler_core_return_plan.c": {
+          "clear_return_candidate": [
+            [["work"],["boot01-shared/ipc01/kernel/scheduler/scheduler_core_return_plan.c/clear_return_candidate/loop-32","insert","KERNEL_SCHEDULER","RECORD_VISIT",1,"entry","",[["for ( index = 0 ; index < sizeof ( * candidate ) ; ++ index ) {",0]],0,0]]
+          ],
+          "finish_return_queue": [
+            [["work"],["boot01-shared/ipc01/kernel/scheduler/scheduler_core_return_plan.c/finish_return_queue/index-30","wrap","KERNEL_SCHEDULER","INDEX_PROBE",1,"value","candidate -> outgoing . slot",[["if ( candidate -> publish_current ) {",0]],0,1]]
+          ],
+          "micros_hart_plan_user_return": [
+            [["work"],["boot01-shared/ipc01/kernel/scheduler/scheduler_core_return_plan.c/micros_hart_plan_user_return/loop-143","insert","KERNEL_SCHEDULER","RECORD_VISIT",1,"entry","",[["for ( index = 0 ; index < candidate . queue_count ; ++ index ) {",0]],0,0]]
+          ],
+          "pick_return_queue": [
+            [["work"],["boot01-shared/ipc01/kernel/scheduler/scheduler_core_return_plan.c/pick_return_queue/loop-20","insert","KERNEL_SCHEDULER","RECORD_VISIT",1,"entry","",[["for ( priority = 0 ; priority < MICROS_SCHEDULER_PRIORITY_COUNT ; ++ priority ) {",0]],0,0]],
+            [["work"],["boot01-shared/ipc01/kernel/scheduler/scheduler_core_return_plan.c/pick_return_queue/index-90","wrap","KERNEL_SCHEDULER","INDEX_PROBE",1,"value","priority",[["for ( priority = 0 ; priority < MICROS_SCHEDULER_PRIORITY_COUNT ; ++ priority ) {",0],["else {",0]],1,2]]
+          ],
+          "preflight_return_plan": [],
+          "prepare_return_queue": [
+            [["work"],["boot01-shared/ipc01/kernel/scheduler/scheduler_core_return_plan.c/prepare_return_queue/index-109","wrap","KERNEL_SCHEDULER","INDEX_PROBE",1,"value","priority",[],4,6]],
+            [["work"],["boot01-shared/ipc01/kernel/scheduler/scheduler_core_return_plan.c/prepare_return_queue/index-120","wrap","KERNEL_SCHEDULER","INDEX_PROBE",1,"value","priority",[],5,6]]
+          ],
+          "publish_return_candidate": [
+            [["work"],["boot01-shared/ipc01/kernel/scheduler/scheduler_core_return_plan.c/publish_return_candidate/loop-46","insert","KERNEL_SCHEDULER","RECORD_VISIT",1,"entry","",[["for ( index = 0 ; index < sizeof ( * candidate ) ; ++ index ) {",0]],0,0]]
+          ],
+          "repair_preempted_candidate": [
+            [["work"],["boot01-shared/ipc01/kernel/scheduler/scheduler_core_return_plan.c/repair_preempted_candidate/index-43","wrap","KERNEL_SCHEDULER","INDEX_PROBE",1,"value","candidate -> outgoing . slot",[],0,1]]
+          ],
+          "return_queue_at_priority": [],
+          "rotate_return_head": [
+            [["work"],["boot01-shared/ipc01/kernel/scheduler/scheduler_core_return_plan.c/rotate_return_head/index-134","wrap","KERNEL_SCHEDULER","INDEX_PROBE",1,"value","candidate -> outgoing . slot",[["else {",0],["if ( scheduler_core_thread_handles_equal ( selected , queue -> before_tail ) ) {",0],["if ( candidate -> publish_current ) {",0]],0,1]]
+          ],
+          "select_and_renew_candidate": [
+            [["work"],["boot01-shared/ipc01/kernel/scheduler/scheduler_core_return_plan.c/select_and_renew_candidate/index-29","wrap","KERNEL_SCHEDULER","INDEX_PROBE",1,"value","candidate -> outgoing . slot",[],0,1]],
+            [["work"],["boot01-shared/ipc01/kernel/scheduler/scheduler_core_return_plan.c/select_and_renew_candidate/index-53","wrap","KERNEL_SCHEDULER","INDEX_PROBE",1,"value","candidate -> outgoing . slot",[["if ( ! scheduler_core_thread_handle_is_null ( candidate -> outgoing ) && objects -> threads [ candidate -> outgoing . slot ] . runtime_flags == 0 ) {",0]],0,1]],
+            [["work"],["boot01-shared/ipc01/kernel/scheduler/scheduler_core_return_plan.c/select_and_renew_candidate/loop-101","insert","KERNEL_SCHEDULER","RECORD_VISIT",1,"entry","",[["while ( cursor != NULL ) {",0]],0,0]],
+            [["work"],["boot01-shared/ipc01/kernel/scheduler/scheduler_core_return_plan.c/select_and_renew_candidate/index-148","wrap","KERNEL_SCHEDULER","INDEX_PROBE",1,"value","selected . slot",[["while ( cursor != NULL ) {",0],["if ( current ) {",0]],0,1]]
+          ],
+          "set_return_patch": [
+            [["work"],["boot01-shared/ipc01/kernel/scheduler/scheduler_core_return_plan.c/set_return_patch/loop-18","insert","KERNEL_SCHEDULER","RECORD_VISIT",1,"entry","",[["for ( index = 0 ; index < queue -> patch_count ; ++ index ) {",0]],0,0]]
+          ]
+        },
+        "kernel/scheduler/scheduler_core_validate.c": {
+          "initialize_validation_witnesses": [
+            [["work"],["boot01-shared/ipc01/kernel/scheduler/scheduler_core_validate.c/initialize_validation_witnesses/loop-16","insert","KERNEL_SCHEDULER","RECORD_VISIT",1,"entry","",[["for ( thread_index = 0 ; thread_index < MICROS_THREAD_CAPACITY ; ++ thread_index ) {",0]],0,0]]
+          ],
+          "micros_scheduler_core_validate": [
+            [["work"],["boot01-shared/ipc01/kernel/scheduler/scheduler_core_validate.c/micros_scheduler_core_validate/audit","insert","KERNEL_SCHEDULER","COMPLETE_VALIDATOR_CALL",1,"entry","",[],0,0]]
+          ],
+          "validate_current_binding": [
+            [["work"],["boot01-shared/ipc01/kernel/scheduler/scheduler_core_validate.c/validate_current_binding/index-83","wrap","KERNEL_SCHEDULER","INDEX_PROBE",1,"value","thread -> scheduler_priority",[],0,1]]
+          ],
+          "validate_hart_accounting": [
+            [["work"],["boot01-shared/ipc01/kernel/scheduler/scheduler_core_validate.c/validate_hart_accounting/index-87","wrap","KERNEL_SCHEDULER","INDEX_PROBE",1,"value","hart -> current_thread . slot",[["if ( hart -> accounting_owner == MICROS_SCHEDULER_ACCOUNTING_THREAD ) {",0]],1,2]]
+          ],
+          "validate_hart_queues": [
+            [["work"],["boot01-shared/ipc01/kernel/scheduler/scheduler_core_validate.c/validate_hart_queues/loop-16","insert","KERNEL_SCHEDULER","RECORD_VISIT",1,"entry","",[["for ( priority = 0 ; priority < MICROS_SCHEDULER_PRIORITY_COUNT ; ++ priority ) {",0]],0,0]],
+            [["work"],["boot01-shared/ipc01/kernel/scheduler/scheduler_core_validate.c/validate_hart_queues/index-24","wrap","KERNEL_SCHEDULER","INDEX_PROBE",1,"value","priority",[["for ( priority = 0 ; priority < MICROS_SCHEDULER_PRIORITY_COUNT ; ++ priority ) {",0]],0,3]],
+            [["work"],["boot01-shared/ipc01/kernel/scheduler/scheduler_core_validate.c/validate_hart_queues/index-53","wrap","KERNEL_SCHEDULER","INDEX_PROBE",1,"value","priority",[["for ( priority = 0 ; priority < MICROS_SCHEDULER_PRIORITY_COUNT ; ++ priority ) {",0]],1,3]],
+            [["work"],["boot01-shared/ipc01/kernel/scheduler/scheduler_core_validate.c/validate_hart_queues/loop-71","insert","KERNEL_SCHEDULER","RECORD_VISIT",1,"entry","",[["for ( priority = 0 ; priority < MICROS_SCHEDULER_PRIORITY_COUNT ; ++ priority ) {",0],["while ( ! scheduler_core_thread_handle_is_null ( cursor ) ) {",0]],0,0]],
+            [["work"],["boot01-shared/ipc01/kernel/scheduler/scheduler_core_validate.c/validate_hart_queues/index-109","wrap","KERNEL_SCHEDULER","INDEX_PROBE",1,"value","cursor . slot",[["for ( priority = 0 ; priority < MICROS_SCHEDULER_PRIORITY_COUNT ; ++ priority ) {",0],["while ( ! scheduler_core_thread_handle_is_null ( cursor ) ) {",0]],2,4]],
+            [["work"],["boot01-shared/ipc01/kernel/scheduler/scheduler_core_validate.c/validate_hart_queues/index-198","wrap","KERNEL_SCHEDULER","INDEX_PROBE",1,"value","priority",[["for ( priority = 0 ; priority < MICROS_SCHEDULER_PRIORITY_COUNT ; ++ priority ) {",0]],2,3]]
+          ],
+          "validate_harts": [
+            [["work"],["boot01-shared/ipc01/kernel/scheduler/scheduler_core_validate.c/validate_harts/loop-20","insert","KERNEL_SCHEDULER","RECORD_VISIT",1,"entry","",[["for ( hart_index = 0 ; hart_index < MICROS_HART_CAPACITY ; ++ hart_index ) {",0]],0,0]],
+            [["work"],["boot01-shared/ipc01/kernel/scheduler/scheduler_core_validate.c/validate_harts/index-31","wrap","KERNEL_SCHEDULER","INDEX_PROBE",1,"value","hart_index",[["for ( hart_index = 0 ; hart_index < MICROS_HART_CAPACITY ; ++ hart_index ) {",0]],0,1]],
+            [["work"],["boot01-shared/ipc01/kernel/scheduler/scheduler_core_validate.c/validate_harts/index-162","wrap","KERNEL_SCHEDULER","INDEX_PROBE",1,"value","hart -> current_thread . slot",[["for ( hart_index = 0 ; hart_index < MICROS_HART_CAPACITY ; ++ hart_index ) {",0],["if ( ! scheduler_core_thread_handle_is_null ( hart -> current_thread ) ) {",0]],2,4]]
+          ],
+          "validate_threads": [
+            [["work"],["boot01-shared/ipc01/kernel/scheduler/scheduler_core_validate.c/validate_threads/loop-16","insert","KERNEL_SCHEDULER","RECORD_VISIT",1,"entry","",[["for ( thread_index = 0 ; thread_index < MICROS_THREAD_CAPACITY ; ++ thread_index ) {",0]],0,0]],
+            [["work"],["boot01-shared/ipc01/kernel/scheduler/scheduler_core_validate.c/validate_threads/index-27","wrap","KERNEL_SCHEDULER","INDEX_PROBE",1,"value","thread_index",[["for ( thread_index = 0 ; thread_index < MICROS_THREAD_CAPACITY ; ++ thread_index ) {",0]],0,5]]
+          ]
+        },
+        "kernel/tty/tty_handoff_core.c": {
+          "console_phase_has_device_mapping": [],
+          "console_phase_is_preowned": [],
+          "device_authority_is_valid": [],
+          "micros_tty_device_leaf_classify": [],
+          "micros_tty_device_leaf_required": [],
+          "micros_tty_device_range_intersects": [],
+          "micros_tty_handoff_accept_ready": [],
+          "micros_tty_handoff_begin": [],
+          "micros_tty_handoff_claim": [],
+          "micros_tty_handoff_commit": [],
+          "micros_tty_handoff_complete": [],
+          "micros_tty_handoff_deadline_expired": [],
+          "micros_tty_handoff_initialize": [],
+          "micros_tty_handoff_mark_mapped": [],
+          "micros_tty_handoff_panic": [],
+          "micros_tty_handoff_release": [],
+          "micros_tty_handoff_validate": [],
+          "process_is_valid": [],
+          "processes_equal": [],
+          "zero_bytes": [
+            [["work"],["boot01-shared/grant01/kernel/tty/tty_handoff_core.c/zero_bytes/loop-22","insert","KERNEL_TTY","CLEARED_BYTE",1,"entry","",[["for ( index = 0 ; index < size ; ++ index ) {",0]],0,0]]
+          ]
+        },
+        "kernel/tty/tty_handoff_runtime.c": {
+          "micros_tty_handoff_runtime_deadline_expired": [],
+          "micros_tty_handoff_runtime_state": []
+        },
+        "kernel/tty/tty_handoff_runtime_state.c": {
+          "tty_handoff_clear_bytes": [
+            [["work"],["boot01-shared/grant01/kernel/tty/tty_handoff_runtime_state.c/tty_handoff_clear_bytes/loop-22","insert","KERNEL_TTY","CLEARED_BYTE",1,"entry","",[["for ( index = 0 ; index < size ; ++ index ) {",0]],0,0]]
+          ],
+          "tty_handoff_context": [],
+          "tty_handoff_copy_bytes": [
+            [["work"],["boot01-shared/grant01/kernel/tty/tty_handoff_runtime_state.c/tty_handoff_copy_bytes/loop-29","insert","KERNEL_TTY","COPIED_BYTE",1,"entry","",[["for ( index = 0 ; index < size ; ++ index ) {",0]],0,0]]
+          ]
+        }
+      },
+      "subsets": {
+        "kernel/boot/bootstrap_runtime_state.c": ["bootstrap_runtime_context"],
+        "kernel/tty/tty_handoff_runtime.c": ["micros_tty_handoff_runtime_state","micros_tty_handoff_runtime_deadline_expired"]
+      }
+    },
     "GRANT01": {
       "channels": ["work"],
       "native_sources": ["kernel/boot/bootstrap_control_core.c","kernel/endpoint/endpoint.c","kernel/endpoint/endpoint_close.c","kernel/endpoint/endpoint_codec.c","kernel/endpoint/endpoint_completion_validation.c","kernel/endpoint/endpoint_identity.c","kernel/endpoint/endpoint_object_validation.c","kernel/endpoint/endpoint_privilege.c","kernel/endpoint/endpoint_publication.c","kernel/endpoint/endpoint_queue_validation.c","kernel/endpoint/endpoint_registry.c","kernel/grant/grant.c","kernel/grant/grant_abi.c","kernel/grant/grant_copy.c","kernel/grant/grant_copy_core.c","kernel/grant/grant_copy_range.c","kernel/grant/grant_runtime.c","kernel/grant/grant_syscall.c","kernel/grant/grant_syscall_core.c","kernel/ipc/ipc_runtime.c","kernel/objects/kernel_object_context.c","kernel/objects/kernel_object_hart.c","kernel/objects/kernel_object_identity.c","kernel/objects/kernel_object_process.c","kernel/objects/kernel_object_stack.c","kernel/objects/kernel_object_state.c","kernel/objects/kernel_object_thread.c","kernel/objects/kernel_object_validation.c","kernel/objects/kernel_objects.c","kernel/scheduler/scheduler_core.c","kernel/scheduler/scheduler_core_accounting.c","kernel/scheduler/scheduler_core_ipc.c","kernel/scheduler/scheduler_core_ipc_transition.c","kernel/scheduler/scheduler_core_policy.c","kernel/scheduler/scheduler_core_queue.c","kernel/scheduler/scheduler_core_return.c","kernel/scheduler/scheduler_core_return_plan.c","kernel/scheduler/scheduler_core_validate.c","kernel/tty/tty_handoff_core.c","kernel/tty/tty_handoff_runtime_state.c","kernel/tty/tty_handoff_runtime_validate.c","lib/runtime/memory.c"],
@@ -9,9 +1153,8 @@
         },
         "kernel/boot/bootstrap_control_internal.h": {
           "micros_bootstrap_control_find_binding_bounded": [
-            [["work"],["grant01/kernel/boot/bootstrap_control_internal.h/micros_bootstrap_control_find_binding_bounded/loop-35","insert","KERNEL_BOOT","RECORD_VISIT",1,"entry","",[["for ( index = 0 ; index < state -> entry_count ; ++ index ) {",0]],0,0]],
-            [["work"],["grant01/kernel/boot/bootstrap_control_internal.h/micros_bootstrap_control_find_binding_bounded/index-41","wrap","KERNEL_BOOT","INDEX_PROBE",1,"value","index",[["for ( index = 0 ; index < state -> entry_count ; ++ index ) {",0]],0,1]],
-            [["work"],["grant01/kernel/boot/bootstrap_control_internal.h/micros_bootstrap_control_find_binding_bounded/index-55","wrap","KERNEL_BOOT","INDEX_PROBE",1,"value","index",[["for ( index = 0 ; index < state -> entry_count ; ++ index ) {",0],["if ( state -> bindings [ index ] . service_id == service_id ) {",0]],0,1]]
+            [["work"],["grant01-boot01/kernel/boot/bootstrap_control_internal.h/micros_bootstrap_control_find_binding_bounded/index-45","wrap","KERNEL_BOOT","INDEX_PROBE",1,"value","service_id",[],2,5]],
+            [["work"],["grant01-boot01/kernel/boot/bootstrap_control_internal.h/micros_bootstrap_control_find_binding_bounded/index-72","wrap","KERNEL_BOOT","INDEX_PROBE",1,"value","slot - 1",[],0,1]]
           ]
         },
         "kernel/endpoint/endpoint.c": {
@@ -4309,7 +5452,8 @@
         },
         "kernel/boot/bootstrap_control_internal.h": {
           "micros_bootstrap_control_find_binding_bounded": [
-            [["aggregate","context"],["mem04-e8d3afec75f4e014ce7f","insert","KERNEL_BOOT","INDEX_PROBE",1,"entry","",[["for ( index = 0 ; index < state -> entry_count ; ++ index ) {",0]],0,0]]
+            [["aggregate","context"],["mem04-boot01/kernel/boot/bootstrap_control_internal.h/micros_bootstrap_control_find_binding_bounded/index-45","wrap","KERNEL_BOOT","INDEX_PROBE",1,"value","service_id",[],2,5]],
+            [["aggregate","context"],["mem04-boot01/kernel/boot/bootstrap_control_internal.h/micros_bootstrap_control_find_binding_bounded/index-72","wrap","KERNEL_BOOT","INDEX_PROBE",1,"value","slot - 1",[],0,1]]
           ]
         },
         "kernel/endpoint/endpoint.c": {
@@ -5839,7 +6983,8 @@
         },
         "kernel/boot/bootstrap_control_internal.h": {
           "micros_bootstrap_control_find_binding_bounded": [
-            [["aggregate","context"],["mem05-current-64fe8d1c28374c28fa53","insert","KERNEL_BOOT","INDEX_PROBE",1,"entry","",[["for ( index = 0 ; index < state -> entry_count ; ++ index ) {",0]],0,0]]
+            [["aggregate","context"],["mem05-boot01/kernel/boot/bootstrap_control_internal.h/micros_bootstrap_control_find_binding_bounded/index-45","wrap","KERNEL_BOOT","INDEX_PROBE",1,"value","service_id",[],2,5]],
+            [["aggregate","context"],["mem05-boot01/kernel/boot/bootstrap_control_internal.h/micros_bootstrap_control_find_binding_bounded/index-72","wrap","KERNEL_BOOT","INDEX_PROBE",1,"value","slot - 1",[],0,1]]
           ]
         },
         "kernel/endpoint/endpoint.c": {
@@ -8683,8 +9828,192 @@
       "storage": []
     },
     "kernel/boot/bootstrap_control_core.c": {
-      "complete": 0,
+      "complete": 1,
       "functions": {
+        "binding_index_is_valid": {
+          "accesses": [
+            ["binding_slots [ 0 ]",[]],
+            ["bindings [ index ]",[["for ( index = 0 ; index < state -> entry_count ; ++ index ) {",0]]],
+            ["binding_slots [ service_id ]",[["for ( index = 0 ; index < state -> entry_count ; ++ index ) {",0]]],
+            ["binding_slots [ index ]",[["for ( index = 1 ; index <= MICROS_BOOTSTRAP_SERVICE_ID_LIMIT ; ++ index ) {",0]]],
+            ["bindings [ slot - 1 ]",[["for ( index = 1 ; index <= MICROS_BOOTSTRAP_SERVICE_ID_LIMIT ; ++ index ) {",0]]]
+          ],
+          "aliases": [],
+          "calls": [],
+          "directives": [],
+          "guards": [],
+          "loops": [
+            ["for ( index = 0 ; index < state -> entry_count ; ++ index ) {",[]],
+            ["for ( index = 1 ; index <= MICROS_BOOTSTRAP_SERVICE_ID_LIMIT ; ++ index ) {",[]]
+          ],
+          "signature": "static bool binding_index_is_valid ( const struct micros_bootstrap_control_state * state )",
+          "storage": []
+        },
+        "binding_matches_manifest": {
+          "accesses": [
+            ["entries [ binding -> manifest_index ]",[]]
+          ],
+          "aliases": [
+            ["entries",["["]]
+          ],
+          "calls": ["micros_endpoint_unpack","process_handles_equal"],
+          "directives": [],
+          "guards": [],
+          "loops": [],
+          "signature": "static bool binding_matches_manifest ( const struct micros_bootstrap_control_state * state , const struct micros_bootstrap_binding * binding )",
+          "storage": []
+        },
+        "binding_matches_objects": {
+          "accesses": [
+            ["entries [ binding -> manifest_index ]",[]]
+          ],
+          "aliases": [
+            ["entries",["["]],
+            ["transitions",[","]]
+          ],
+          "calls": ["bootstrap_runtime_find_entry","micros_endpoint_resolve_internal","micros_process_resolve","micros_thread_resolve","process_handles_equal"],
+          "directives": [],
+          "guards": [],
+          "loops": [],
+          "signature": "static bool binding_matches_objects ( const struct micros_bootstrap_control_state * state , const struct micros_bootstrap_binding * binding , const struct micros_endpoint_registry * registry , const struct micros_kernel_objects * objects )",
+          "storage": []
+        },
+        "bytes_are_zero": {
+          "accesses": [
+            ["bytes [ index ]",[["for ( index = 0 ; index < size ; ++ index ) {",0]]]
+          ],
+          "aliases": [],
+          "calls": [],
+          "directives": [],
+          "guards": [],
+          "loops": [
+            ["for ( index = 0 ; index < size ; ++ index ) {",[]]
+          ],
+          "signature": "static bool bytes_are_zero ( const void * storage , size_t size )",
+          "storage": []
+        },
+        "clear_bytes": {
+          "accesses": [
+            ["bytes [ index ]",[["for ( index = 0 ; index < size ; ++ index ) {",0]]]
+          ],
+          "aliases": [],
+          "calls": [],
+          "directives": [],
+          "guards": [],
+          "loops": [
+            ["for ( index = 0 ; index < size ; ++ index ) {",[]]
+          ],
+          "signature": "static void clear_bytes ( void * storage , size_t size )",
+          "storage": []
+        },
+        "control_release": {
+          "accesses": [
+            ["entries [ binding -> manifest_index ]",[]]
+          ],
+          "aliases": [
+            ["entries",["["]],
+            ["transitions",[","]],
+            ["transitions",[","]]
+          ],
+          "calls": ["bootstrap_runtime_commit_prevalidated","bootstrap_runtime_prepare_release","map_endpoint_error","micros_bootstrap_control_find_binding","micros_bootstrap_control_validate","micros_endpoint_commit_publish_prevalidated","micros_endpoint_preflight_publish","micros_thread_scheduler_admit","micros_thread_scheduler_admit_preflight"],
+          "directives": [],
+          "guards": [],
+          "loops": [],
+          "signature": "static enum micros_bootstrap_error control_release ( struct micros_bootstrap_control_state * state , struct micros_endpoint_registry * registry , struct micros_kernel_objects * objects , struct micros_hart_handle hart , uint32_t service_id , uint64_t now , uint64_t retained_deadline , bool retain_deadline , bool role_gate_ready )",
+          "storage": []
+        },
+        "copy_bytes": {
+          "accesses": [
+            ["output [ index ]",[["for ( index = 0 ; index < size ; ++ index ) {",0]]],
+            ["input [ index ]",[["for ( index = 0 ; index < size ; ++ index ) {",0]]]
+          ],
+          "aliases": [],
+          "calls": [],
+          "directives": [],
+          "guards": [],
+          "loops": [
+            ["for ( index = 0 ; index < size ; ++ index ) {",[]]
+          ],
+          "signature": "static void copy_bytes ( void * destination , const void * source , size_t size )",
+          "storage": []
+        },
+        "find_ready_pm_endpoint": {
+          "accesses": [
+            ["entries [ index ]",[["for ( index = 0 ; index < state -> entry_count ; ++ index ) {",0]]],
+            ["entries [ binding -> manifest_index ]",[]]
+          ],
+          "aliases": [
+            ["entries",["["]],
+            ["transitions",[","]],
+            ["entries",["["]]
+          ],
+          "calls": ["bootstrap_runtime_find_entry","micros_bootstrap_control_find_binding"],
+          "directives": [],
+          "guards": [],
+          "loops": [
+            ["for ( index = 0 ; index < state -> entry_count ; ++ index ) {",[]]
+          ],
+          "signature": "static enum micros_bootstrap_error find_ready_pm_endpoint ( const struct micros_bootstrap_control_state * state , micros_endpoint_t * endpoint )",
+          "storage": []
+        },
+        "launcher_has_grant_dependency": {
+          "accesses": [
+            ["grants [ index ]",[["for ( index = 0 ; index < MICROS_GRANT_CAPACITY ; ++ index ) {",0]]]
+          ],
+          "aliases": [],
+          "calls": [],
+          "directives": [],
+          "guards": [],
+          "loops": [
+            ["for ( index = 0 ; index < MICROS_GRANT_CAPACITY ; ++ index ) {",[]]
+          ],
+          "signature": "static bool launcher_has_grant_dependency ( const struct micros_grant_registry * grants , micros_endpoint_t launcher )",
+          "storage": []
+        },
+        "map_endpoint_error": {
+          "accesses": [],
+          "aliases": [],
+          "calls": [],
+          "directives": [],
+          "guards": [],
+          "loops": [],
+          "signature": "static enum micros_bootstrap_error map_endpoint_error ( enum micros_endpoint_error error )",
+          "storage": []
+        },
+        "map_notification_error": {
+          "accesses": [],
+          "aliases": [],
+          "calls": [],
+          "directives": [],
+          "guards": [],
+          "loops": [],
+          "signature": "static enum micros_bootstrap_error map_notification_error ( enum micros_ipc_error error )",
+          "storage": []
+        },
+        "micros_bootstrap_control_commit_complete_prevalidated": {
+          "accesses": [],
+          "aliases": [
+            ["transitions",[","]]
+          ],
+          "calls": ["bootstrap_runtime_commit_prevalidated","clear_bytes","micros_ipc_commit_kernel_notification_prevalidated"],
+          "directives": [],
+          "guards": [],
+          "loops": [],
+          "signature": "void micros_bootstrap_control_commit_complete_prevalidated ( struct micros_bootstrap_control_state * state , struct micros_endpoint_registry * registry , struct micros_kernel_objects * objects , struct micros_bootstrap_complete_plan * plan )",
+          "storage": []
+        },
+        "micros_bootstrap_control_commit_ready_prevalidated": {
+          "accesses": [],
+          "aliases": [
+            ["transitions",[","]]
+          ],
+          "calls": ["bootstrap_runtime_commit_prevalidated","clear_bytes"],
+          "directives": [],
+          "guards": [],
+          "loops": [],
+          "signature": "void micros_bootstrap_control_commit_ready_prevalidated ( struct micros_bootstrap_control_state * state , struct micros_bootstrap_ready_plan * plan )",
+          "storage": []
+        },
         "micros_bootstrap_control_find_binding": {
           "accesses": [],
           "aliases": [],
@@ -8693,6 +10022,190 @@
           "guards": [],
           "loops": [],
           "signature": "const struct micros_bootstrap_binding * micros_bootstrap_control_find_binding ( const struct micros_bootstrap_control_state * state , uint32_t service_id )",
+          "storage": []
+        },
+        "micros_bootstrap_control_prepare_complete": {
+          "accesses": [
+            ["bindings [ 0 ]",[]]
+          ],
+          "aliases": [
+            ["transitions",["."]],
+            ["transitions",[","]]
+          ],
+          "calls": ["bootstrap_runtime_prepare_complete","clear_bytes","copy_bytes","find_ready_pm_endpoint","launcher_has_grant_dependency","map_notification_error","micros_bootstrap_control_find_binding","micros_bootstrap_control_validate","micros_endpoint_preflight_source_only","micros_ipc_prepare_kernel_notification","micros_thread_ipc_state_is_clear","micros_thread_resolve","staged_launcher_acknowledgments_are_valid"],
+          "directives": [],
+          "guards": [],
+          "loops": [],
+          "signature": "enum micros_bootstrap_error micros_bootstrap_control_prepare_complete ( const struct micros_bootstrap_control_state * state , const struct micros_endpoint_registry * registry , const struct micros_kernel_objects * objects , const struct micros_grant_registry * grants , struct micros_bootstrap_complete_plan * plan )",
+          "storage": []
+        },
+        "micros_bootstrap_control_prepare_ready": {
+          "accesses": [
+            ["entries [ binding -> manifest_index ]",[]],
+            ["bindings [ 0 ]",[]],
+            ["payload [ 0 ]",[]],
+            ["payload [ 4 ]",[]],
+            ["payload [ 8 ]",[]],
+            ["payload [ 12 ]",[]],
+            ["payload [ 16 ]",[]]
+          ],
+          "aliases": [
+            ["entries",["["]],
+            ["transitions",[","]]
+          ],
+          "calls": ["bootstrap_runtime_prepare_ready","clear_bytes","copy_bytes","micros_bootstrap_control_find_binding","micros_bootstrap_control_validate","write_u32_le"],
+          "directives": [],
+          "guards": [],
+          "loops": [],
+          "signature": "enum micros_bootstrap_error micros_bootstrap_control_prepare_ready ( const struct micros_bootstrap_control_state * state , const struct micros_endpoint_registry * registry , const struct micros_kernel_objects * objects , uint32_t service_id , micros_endpoint_t endpoint , uint64_t now , bool role_gate_ready , struct micros_bootstrap_ready_plan * plan )",
+          "storage": []
+        },
+        "micros_bootstrap_control_publish_controller": {
+          "accesses": [
+            ["entries [ controller -> manifest_index ]",[]]
+          ],
+          "aliases": [
+            ["entries",["["]],
+            ["transitions",[","]],
+            ["transitions",[")"]]
+          ],
+          "calls": ["clear_bytes","copy_bytes","micros_bootstrap_control_find_binding","micros_bootstrap_control_validate","micros_bootstrap_runtime_initialize","micros_endpoint_resolve_internal","micros_process_resolve","micros_thread_resolve"],
+          "directives": [],
+          "guards": [],
+          "loops": [],
+          "signature": "enum micros_bootstrap_error micros_bootstrap_control_publish_controller ( struct micros_bootstrap_control_state * state , const struct micros_endpoint_registry * registry , const struct micros_kernel_objects * objects )",
+          "storage": []
+        },
+        "micros_bootstrap_control_release": {
+          "accesses": [],
+          "aliases": [],
+          "calls": ["control_release"],
+          "directives": [],
+          "guards": [],
+          "loops": [],
+          "signature": "enum micros_bootstrap_error micros_bootstrap_control_release ( struct micros_bootstrap_control_state * state , struct micros_endpoint_registry * registry , struct micros_kernel_objects * objects , struct micros_hart_handle hart , uint32_t service_id , uint64_t now , bool role_gate_ready )",
+          "storage": []
+        },
+        "micros_bootstrap_control_release_console": {
+          "accesses": [],
+          "aliases": [],
+          "calls": ["control_release"],
+          "directives": [],
+          "guards": [],
+          "loops": [],
+          "signature": "enum micros_bootstrap_error micros_bootstrap_control_release_console ( struct micros_bootstrap_control_state * state , struct micros_endpoint_registry * registry , struct micros_kernel_objects * objects , struct micros_hart_handle hart , uint32_t service_id , uint64_t now , uint64_t retained_deadline , bool role_gate_ready )",
+          "storage": []
+        },
+        "micros_bootstrap_control_state_prepare": {
+          "accesses": [
+            ["bindings [ 0 ]",[]],
+            ["bindings [ index ]",[["for ( index = 0 ; index < binding_count ; ++ index ) {",0]]],
+            ["binding_slots [ binding -> service_id ]",[["for ( index = 0 ; index < binding_count ; ++ index ) {",0]]]
+          ],
+          "aliases": [],
+          "calls": ["binding_matches_manifest","bytes_are_zero","clear_bytes","copy_bytes"],
+          "directives": [],
+          "guards": [],
+          "loops": [
+            ["for ( index = 0 ; index < binding_count ; ++ index ) {",[]]
+          ],
+          "signature": "enum micros_bootstrap_error micros_bootstrap_control_state_prepare ( struct micros_bootstrap_control_state * state , const struct micros_bootstrap_manifest * manifest , const struct micros_bootstrap_manifest_plan * plan , const struct micros_bootstrap_binding * bindings , size_t binding_count )",
+          "storage": []
+        },
+        "micros_bootstrap_control_validate": {
+          "accesses": [
+            ["bindings [ index ]",[["for ( index = 0 ; index < state -> entry_count ; ++ index ) {",0]]],
+            ["bindings [ index ]",[["for ( index = 0 ; index < state -> entry_count ; ++ index ) {",0]]]
+          ],
+          "aliases": [
+            ["transitions",[","]],
+            ["transitions",[")"]],
+            ["transitions",["."]],
+            ["transitions",["."]],
+            ["transitions",[")"]],
+            ["transitions",["."]]
+          ],
+          "calls": ["binding_index_is_valid","binding_matches_manifest","binding_matches_objects","bootstrap_runtime_validate_index","bytes_are_zero","micros_bootstrap_control_find_binding","micros_endpoint_registry_validate_objects","micros_kernel_objects_validate","process_handles_equal","staged_launcher_acknowledgments_are_valid","thread_handles_equal"],
+          "directives": [],
+          "guards": [],
+          "loops": [
+            ["for ( index = 0 ; index < state -> entry_count ; ++ index ) {",[]]
+          ],
+          "signature": "enum micros_bootstrap_error micros_bootstrap_control_validate ( const struct micros_bootstrap_control_state * state , const struct micros_endpoint_registry * registry , const struct micros_kernel_objects * objects )",
+          "storage": []
+        },
+        "process_handles_equal": {
+          "accesses": [],
+          "aliases": [],
+          "calls": [],
+          "directives": [],
+          "guards": [],
+          "loops": [],
+          "signature": "static bool process_handles_equal ( struct micros_process_handle left , struct micros_process_handle right )",
+          "storage": []
+        },
+        "read_u32_le": {
+          "accesses": [
+            ["bytes [ 0 ]",[]],
+            ["bytes [ 1 ]",[]],
+            ["bytes [ 2 ]",[]],
+            ["bytes [ 3 ]",[]]
+          ],
+          "aliases": [],
+          "calls": [],
+          "directives": [],
+          "guards": [],
+          "loops": [],
+          "signature": "static uint32_t read_u32_le ( const unsigned char * bytes )",
+          "storage": []
+        },
+        "staged_launcher_acknowledgments_are_valid": {
+          "accesses": [
+            ["threads [ thread_index ]",[["for ( thread_index = 0 ; thread_index < MICROS_THREAD_CAPACITY ; ++ thread_index ) {",0]]],
+            ["payload [ 0 ]",[["for ( thread_index = 0 ; thread_index < MICROS_THREAD_CAPACITY ; ++ thread_index ) {",0]]],
+            ["payload [ 8 ]",[["for ( thread_index = 0 ; thread_index < MICROS_THREAD_CAPACITY ; ++ thread_index ) {",0]]],
+            ["payload [ 12 ]",[["for ( thread_index = 0 ; thread_index < MICROS_THREAD_CAPACITY ; ++ thread_index ) {",0]]],
+            ["payload [ payload_index ]",[["for ( thread_index = 0 ; thread_index < MICROS_THREAD_CAPACITY ; ++ thread_index ) {",0],["for ( payload_index = 20 ; payload_index < sizeof ( message -> payload ) ; ++ payload_index ) {",0]]],
+            ["payload [ 4 ]",[["for ( thread_index = 0 ; thread_index < MICROS_THREAD_CAPACITY ; ++ thread_index ) {",0]]],
+            ["payload [ 16 ]",[["for ( thread_index = 0 ; thread_index < MICROS_THREAD_CAPACITY ; ++ thread_index ) {",0]]]
+          ],
+          "aliases": [
+            ["threads",["["]],
+            ["transitions",[","]]
+          ],
+          "calls": ["bootstrap_runtime_find_entry","micros_bootstrap_control_find_binding","read_u32_le"],
+          "directives": [],
+          "guards": [],
+          "loops": [
+            ["for ( thread_index = 0 ; thread_index < MICROS_THREAD_CAPACITY ; ++ thread_index ) {",[]],
+            ["for ( payload_index = 20 ; payload_index < sizeof ( message -> payload ) ; ++ payload_index ) {",[["for ( thread_index = 0 ; thread_index < MICROS_THREAD_CAPACITY ; ++ thread_index ) {",0]]]
+          ],
+          "signature": "static bool staged_launcher_acknowledgments_are_valid ( const struct micros_bootstrap_control_state * state , const struct micros_kernel_objects * objects , micros_endpoint_t launcher )",
+          "storage": []
+        },
+        "thread_handles_equal": {
+          "accesses": [],
+          "aliases": [],
+          "calls": [],
+          "directives": [],
+          "guards": [],
+          "loops": [],
+          "signature": "static bool thread_handles_equal ( struct micros_thread_handle left , struct micros_thread_handle right )",
+          "storage": []
+        },
+        "write_u32_le": {
+          "accesses": [
+            ["bytes [ 0 ]",[]],
+            ["bytes [ 1 ]",[]],
+            ["bytes [ 2 ]",[]],
+            ["bytes [ 3 ]",[]]
+          ],
+          "aliases": [],
+          "calls": [],
+          "directives": [],
+          "guards": [],
+          "loops": [],
+          "signature": "static void write_u32_le ( unsigned char * bytes , uint32_t value )",
           "storage": []
         }
       },
@@ -8703,17 +10216,540 @@
       "functions": {
         "micros_bootstrap_control_find_binding_bounded": {
           "accesses": [
-            ["bindings [ index ]",[["for ( index = 0 ; index < state -> entry_count ; ++ index ) {",0]]],
-            ["bindings [ index ]",[["for ( index = 0 ; index < state -> entry_count ; ++ index ) {",0],["if ( state -> bindings [ index ] . service_id == service_id ) {",0]]]
+            ["binding_slots [ service_id ]",[]],
+            ["bindings [ slot - 1 ]",[]]
           ],
           "aliases": [],
           "calls": [],
           "directives": [],
           "guards": ["ifndef MICROS_KERNEL_BOOTSTRAP_CONTROL_INTERNAL_H"],
-          "loops": [
-            ["for ( index = 0 ; index < state -> entry_count ; ++ index ) {",[]]
-          ],
+          "loops": [],
           "signature": "static inline const struct micros_bootstrap_binding * micros_bootstrap_control_find_binding_bounded ( const struct micros_bootstrap_control_state * state , uint32_t service_id )",
+          "storage": []
+        }
+      },
+      "storage": []
+    },
+    "kernel/boot/bootstrap_diagnostics.c": {
+      "complete": 1,
+      "functions": {
+        "diagnostic_phase_name": {
+          "accesses": [],
+          "aliases": [],
+          "calls": [],
+          "directives": [],
+          "guards": [],
+          "loops": [],
+          "signature": "static const char * diagnostic_phase_name ( enum micros_bootstrap_phase phase )",
+          "storage": []
+        },
+        "diagnostic_reason_name": {
+          "accesses": [],
+          "aliases": [],
+          "calls": [],
+          "directives": [],
+          "guards": [],
+          "loops": [],
+          "signature": "static const char * diagnostic_reason_name ( enum micros_bootstrap_diagnostic_reason reason )",
+          "storage": []
+        },
+        "diagnostic_state_name": {
+          "accesses": [],
+          "aliases": [
+            ["transitions",[","]]
+          ],
+          "calls": ["bootstrap_runtime_find_entry","micros_bootstrap_control_find_binding"],
+          "directives": [],
+          "guards": [],
+          "loops": [],
+          "signature": "static const char * diagnostic_state_name ( const struct bootstrap_runtime_context * runtime , uint32_t service_id )",
+          "storage": []
+        },
+        "micros_bootstrap_runtime_check_deadline": {
+          "accesses": [],
+          "aliases": [
+            ["transitions",["."]],
+            ["transitions",["."]],
+            ["transitions",[","]]
+          ],
+          "calls": ["bootstrap_runtime_context","bootstrap_runtime_find_entry","micros_bootstrap_control_find_binding","micros_bootstrap_runtime_fail","micros_tty_handoff_runtime_deadline_expired","micros_tty_handoff_runtime_state"],
+          "directives": [],
+          "guards": [],
+          "loops": [],
+          "signature": "void micros_bootstrap_runtime_check_deadline ( uint64_t now )",
+          "storage": []
+        },
+        "micros_bootstrap_runtime_fail": {
+          "accesses": [],
+          "aliases": [],
+          "calls": ["bootstrap_runtime_panic_runtime","micros_bootstrap_runtime_record_failure"],
+          "directives": [],
+          "guards": [],
+          "loops": [],
+          "signature": "_Noreturn void micros_bootstrap_runtime_fail ( enum micros_bootstrap_diagnostic_reason reason , uint32_t service_id , micros_endpoint_t endpoint , uint64_t detail )",
+          "storage": []
+        },
+        "micros_bootstrap_runtime_record_failure": {
+          "accesses": [],
+          "aliases": [
+            ["transitions",["."]]
+          ],
+          "calls": ["bootstrap_runtime_context","diagnostic_phase_name","diagnostic_reason_name","diagnostic_state_name","micros_panic_seize","uart_flush","uart_write","uart_write_hex64"],
+          "directives": [],
+          "guards": [],
+          "loops": [],
+          "signature": "void micros_bootstrap_runtime_record_failure ( enum micros_bootstrap_diagnostic_reason reason , uint32_t service_id , micros_endpoint_t endpoint , uint64_t detail )",
+          "storage": []
+        }
+      },
+      "storage": []
+    },
+    "kernel/boot/bootstrap_manifest_common.c": {
+      "complete": 1,
+      "functions": {
+        "bootstrap_manifest_bytes_are_zero": {
+          "accesses": [
+            ["bytes [ index ]",[["for ( index = 0 ; index < size ; ++ index ) {",0]]]
+          ],
+          "aliases": [],
+          "calls": [],
+          "directives": [],
+          "guards": [],
+          "loops": [
+            ["for ( index = 0 ; index < size ; ++ index ) {",[]]
+          ],
+          "signature": "bool bootstrap_manifest_bytes_are_zero ( const void * storage , size_t size )",
+          "storage": []
+        },
+        "bootstrap_manifest_clear_bytes": {
+          "accesses": [
+            ["bytes [ index ]",[["for ( index = 0 ; index < size ; ++ index ) {",0]]]
+          ],
+          "aliases": [],
+          "calls": [],
+          "directives": [],
+          "guards": [],
+          "loops": [
+            ["for ( index = 0 ; index < size ; ++ index ) {",[]]
+          ],
+          "signature": "void bootstrap_manifest_clear_bytes ( void * storage , size_t size )",
+          "storage": []
+        },
+        "bootstrap_manifest_copy_bytes": {
+          "accesses": [
+            ["destination_bytes [ index ]",[["for ( index = 0 ; index < size ; ++ index ) {",0]]],
+            ["source_bytes [ index ]",[["for ( index = 0 ; index < size ; ++ index ) {",0]]]
+          ],
+          "aliases": [],
+          "calls": [],
+          "directives": [],
+          "guards": [],
+          "loops": [
+            ["for ( index = 0 ; index < size ; ++ index ) {",[]]
+          ],
+          "signature": "void bootstrap_manifest_copy_bytes ( void * destination , const void * source , size_t size )",
+          "storage": []
+        },
+        "bootstrap_manifest_fixed_name_is_canonical": {
+          "accesses": [
+            ["name [ 0 ]",[]],
+            ["name [ index ]",[["for ( index = 0 ; index < MICROS_BOOTSTRAP_NAME_SIZE ; ++ index ) {",0]]]
+          ],
+          "aliases": [],
+          "calls": [],
+          "directives": [],
+          "guards": [],
+          "loops": [
+            ["for ( index = 0 ; index < MICROS_BOOTSTRAP_NAME_SIZE ; ++ index ) {",[]]
+          ],
+          "signature": "bool bootstrap_manifest_fixed_name_is_canonical ( const char name [ MICROS_BOOTSTRAP_NAME_SIZE ] )",
+          "storage": []
+        },
+        "bootstrap_manifest_fixed_name_matches_literal": {
+          "accesses": [
+            ["literal [ index ]",[]],
+            ["name [ index ]",[["while ( literal [ index ] != '\\0' ) {",0]]],
+            ["literal [ index ]",[["while ( literal [ index ] != '\\0' ) {",0]]],
+            ["name [ index ]",[["for ( ; index < MICROS_BOOTSTRAP_NAME_SIZE ; ++ index ) {",0]]]
+          ],
+          "aliases": [],
+          "calls": [],
+          "directives": [],
+          "guards": [],
+          "loops": [
+            ["while ( literal [ index ] != '\\0' ) {",[]],
+            ["for ( ; index < MICROS_BOOTSTRAP_NAME_SIZE ; ++ index ) {",[]]
+          ],
+          "signature": "bool bootstrap_manifest_fixed_name_matches_literal ( const char name [ MICROS_BOOTSTRAP_NAME_SIZE ] , const char * literal )",
+          "storage": []
+        },
+        "bootstrap_manifest_fixed_names_equal": {
+          "accesses": [
+            ["left [ index ]",[["for ( index = 0 ; index < MICROS_BOOTSTRAP_NAME_SIZE ; ++ index ) {",0]]],
+            ["right [ index ]",[["for ( index = 0 ; index < MICROS_BOOTSTRAP_NAME_SIZE ; ++ index ) {",0]]]
+          ],
+          "aliases": [],
+          "calls": [],
+          "directives": [],
+          "guards": [],
+          "loops": [
+            ["for ( index = 0 ; index < MICROS_BOOTSTRAP_NAME_SIZE ; ++ index ) {",[]]
+          ],
+          "signature": "bool bootstrap_manifest_fixed_names_equal ( const char left [ MICROS_BOOTSTRAP_NAME_SIZE ] , const char right [ MICROS_BOOTSTRAP_NAME_SIZE ] )",
+          "storage": []
+        },
+        "bootstrap_manifest_pointer_is_aligned": {
+          "accesses": [],
+          "aliases": [],
+          "calls": [],
+          "directives": [],
+          "guards": [],
+          "loops": [],
+          "signature": "bool bootstrap_manifest_pointer_is_aligned ( const void * pointer , size_t alignment )",
+          "storage": []
+        }
+      },
+      "storage": []
+    },
+    "kernel/boot/bootstrap_runtime_state.c": {
+      "complete": 1,
+      "functions": {
+        "bootstrap_runtime_bytes_equal": {
+          "accesses": [
+            ["left_bytes [ index ]",[["for ( index = 0 ; index < size ; ++ index ) {",0]]],
+            ["right_bytes [ index ]",[["for ( index = 0 ; index < size ; ++ index ) {",0]]]
+          ],
+          "aliases": [],
+          "calls": [],
+          "directives": [],
+          "guards": [],
+          "loops": [
+            ["for ( index = 0 ; index < size ; ++ index ) {",[]]
+          ],
+          "signature": "bool bootstrap_runtime_bytes_equal ( const void * left , const void * right , size_t size )",
+          "storage": []
+        },
+        "bootstrap_runtime_clear_bytes": {
+          "accesses": [
+            ["bytes [ index ]",[["for ( index = 0 ; index < size ; ++ index ) {",0]]]
+          ],
+          "aliases": [],
+          "calls": [],
+          "directives": [],
+          "guards": [],
+          "loops": [
+            ["for ( index = 0 ; index < size ; ++ index ) {",[]]
+          ],
+          "signature": "void bootstrap_runtime_clear_bytes ( void * storage , size_t size )",
+          "storage": []
+        },
+        "bootstrap_runtime_context": {
+          "accesses": [],
+          "aliases": [],
+          "calls": [],
+          "directives": [],
+          "guards": [],
+          "loops": [],
+          "signature": "struct bootstrap_runtime_context * bootstrap_runtime_context ( void )",
+          "storage": []
+        },
+        "bootstrap_runtime_copy_bytes": {
+          "accesses": [
+            ["output [ index ]",[["for ( index = 0 ; index < size ; ++ index ) {",0]]],
+            ["input [ index ]",[["for ( index = 0 ; index < size ; ++ index ) {",0]]]
+          ],
+          "aliases": [],
+          "calls": [],
+          "directives": [],
+          "guards": [],
+          "loops": [
+            ["for ( index = 0 ; index < size ; ++ index ) {",[]]
+          ],
+          "signature": "void bootstrap_runtime_copy_bytes ( void * destination , const void * source , size_t size )",
+          "storage": []
+        },
+        "bootstrap_runtime_panic_runtime": {
+          "accesses": [],
+          "aliases": [],
+          "calls": ["MICROS_PANIC","micros_kernel_object_runtime_boot_hart"],
+          "directives": [],
+          "guards": [],
+          "loops": [],
+          "signature": "_Noreturn void bootstrap_runtime_panic_runtime ( const char * reason )",
+          "storage": []
+        },
+        "bootstrap_runtime_set_preparation_diagnostic": {
+          "accesses": [],
+          "aliases": [],
+          "calls": [],
+          "directives": [],
+          "guards": [],
+          "loops": [],
+          "signature": "void bootstrap_runtime_set_preparation_diagnostic ( struct bootstrap_runtime_context * runtime , enum micros_bootstrap_diagnostic_reason reason , uint32_t service_id , micros_endpoint_t endpoint , uint64_t detail )",
+          "storage": []
+        },
+        "micros_bootstrap_runtime_authoritative_state": {
+          "accesses": [],
+          "aliases": [],
+          "calls": [],
+          "directives": [],
+          "guards": [],
+          "loops": [],
+          "signature": "struct micros_bootstrap_control_state * micros_bootstrap_runtime_authoritative_state ( void )",
+          "storage": []
+        },
+        "micros_bootstrap_runtime_is_active_controller": {
+          "accesses": [],
+          "aliases": [],
+          "calls": [],
+          "directives": [],
+          "guards": [],
+          "loops": [],
+          "signature": "bool micros_bootstrap_runtime_is_active_controller ( struct micros_process_handle process )",
+          "storage": []
+        },
+        "micros_bootstrap_runtime_state": {
+          "accesses": [],
+          "aliases": [],
+          "calls": [],
+          "directives": [],
+          "guards": [],
+          "loops": [],
+          "signature": "const struct micros_bootstrap_control_state * micros_bootstrap_runtime_state ( void )",
+          "storage": []
+        }
+      },
+      "storage": ["static struct bootstrap_runtime_context runtime_context;"]
+    },
+    "kernel/boot/bootstrap_transitions.c": {
+      "complete": 1,
+      "functions": {
+        "bootstrap_runtime_commit_prevalidated": {
+          "accesses": [
+            ["entries [ plan -> entry_index ]",[]]
+          ],
+          "aliases": [
+            ["entries",["["]]
+          ],
+          "calls": ["bootstrap_manifest_copy_bytes"],
+          "directives": [],
+          "guards": [],
+          "loops": [],
+          "signature": "void bootstrap_runtime_commit_prevalidated ( struct micros_bootstrap_runtime * runtime , const struct bootstrap_transition_plan * plan )",
+          "storage": []
+        },
+        "bootstrap_runtime_find_entry": {
+          "accesses": [
+            ["entries [ index ]",[]]
+          ],
+          "aliases": [
+            ["entries",["["]]
+          ],
+          "calls": ["runtime_slot"],
+          "directives": [],
+          "guards": [],
+          "loops": [],
+          "signature": "const struct micros_bootstrap_runtime_entry * bootstrap_runtime_find_entry ( const struct micros_bootstrap_runtime * runtime , uint32_t service_id )",
+          "storage": []
+        },
+        "bootstrap_runtime_prepare_complete": {
+          "accesses": [
+            ["entries [ index ]",[["for ( index = 0 ; index < runtime -> entry_count ; ++ index ) {",0]]],
+            ["entries [ index ]",[["for ( index = 0 ; index < runtime -> entry_count ; ++ index ) {",0]]],
+            ["entries [ controller_index ]",[]]
+          ],
+          "aliases": [
+            ["entries",["["]],
+            ["entries",["["]],
+            ["entries",["["]]
+          ],
+          "calls": ["bootstrap_manifest_copy_bytes","initialize_transition_plan","runtime_slot"],
+          "directives": [],
+          "guards": [],
+          "loops": [
+            ["for ( index = 0 ; index < runtime -> entry_count ; ++ index ) {",[]]
+          ],
+          "signature": "enum micros_bootstrap_error bootstrap_runtime_prepare_complete ( const struct micros_bootstrap_runtime * runtime , struct bootstrap_transition_plan * plan )",
+          "storage": []
+        },
+        "bootstrap_runtime_prepare_ready": {
+          "accesses": [
+            ["entries [ index ]",[]]
+          ],
+          "aliases": [
+            ["entries",["["]]
+          ],
+          "calls": ["bootstrap_manifest_copy_bytes","initialize_transition_plan","runtime_slot"],
+          "directives": [],
+          "guards": [],
+          "loops": [],
+          "signature": "enum micros_bootstrap_error bootstrap_runtime_prepare_ready ( const struct micros_bootstrap_runtime * runtime , uint32_t service_id , uint64_t now , struct bootstrap_transition_plan * plan )",
+          "storage": []
+        },
+        "bootstrap_runtime_prepare_release": {
+          "accesses": [
+            ["ordered_service_ids [ runtime -> next_order_index ]",[]],
+            ["entries [ index ]",[]],
+            ["entries [ dependency_index ]",[["while ( prerequisites != 0 ) {",0]]]
+          ],
+          "aliases": [
+            ["entries",["["]],
+            ["entries",["["]]
+          ],
+          "calls": ["bootstrap_manifest_copy_bytes","initialize_transition_plan","lowest_prerequisite_id","runtime_slot"],
+          "directives": [],
+          "guards": [],
+          "loops": [
+            ["while ( prerequisites != 0 ) {",[]]
+          ],
+          "signature": "enum micros_bootstrap_error bootstrap_runtime_prepare_release ( const struct micros_bootstrap_runtime * runtime , uint32_t service_id , uint64_t now , uint64_t retained_deadline , bool retain_deadline , struct bootstrap_transition_plan * plan )",
+          "storage": []
+        },
+        "bootstrap_runtime_validate_index": {
+          "accesses": [
+            ["service_slots [ 0 ]",[]],
+            ["entries [ index ]",[["for ( index = 0 ; index < runtime -> entry_count ; ++ index ) {",0]]],
+            ["service_slots [ service_id ]",[["for ( index = 0 ; index < runtime -> entry_count ; ++ index ) {",0]]],
+            ["service_slots [ index ]",[["for ( index = 1 ; index <= MICROS_BOOTSTRAP_SERVICE_ID_LIMIT ; ++ index ) {",0]]],
+            ["entries [ slot - 1 ]",[["for ( index = 1 ; index <= MICROS_BOOTSTRAP_SERVICE_ID_LIMIT ; ++ index ) {",0]]]
+          ],
+          "aliases": [
+            ["entries",["["]],
+            ["entries",["["]]
+          ],
+          "calls": [],
+          "directives": [],
+          "guards": [],
+          "loops": [
+            ["for ( index = 0 ; index < runtime -> entry_count ; ++ index ) {",[]],
+            ["for ( index = 1 ; index <= MICROS_BOOTSTRAP_SERVICE_ID_LIMIT ; ++ index ) {",[]]
+          ],
+          "signature": "bool bootstrap_runtime_validate_index ( const struct micros_bootstrap_runtime * runtime )",
+          "storage": []
+        },
+        "initialize_transition_plan": {
+          "accesses": [
+            ["entries [ index ]",[]]
+          ],
+          "aliases": [
+            ["entries",["["]]
+          ],
+          "calls": ["bootstrap_manifest_clear_bytes","bootstrap_manifest_copy_bytes"],
+          "directives": [],
+          "guards": [],
+          "loops": [],
+          "signature": "static void initialize_transition_plan ( const struct micros_bootstrap_runtime * runtime , uint16_t index , struct bootstrap_transition_plan * plan )",
+          "storage": []
+        },
+        "lowest_prerequisite_id": {
+          "accesses": [],
+          "aliases": [],
+          "calls": [],
+          "directives": [],
+          "guards": [],
+          "loops": [],
+          "signature": "static uint32_t lowest_prerequisite_id ( uint64_t bits )",
+          "storage": []
+        },
+        "micros_bootstrap_classify_ready": {
+          "accesses": [],
+          "aliases": [],
+          "calls": ["bootstrap_runtime_find_entry"],
+          "directives": [],
+          "guards": [],
+          "loops": [],
+          "signature": "enum micros_bootstrap_ready_class micros_bootstrap_classify_ready ( const struct micros_bootstrap_runtime * runtime , uint32_t source_service_id , uint32_t payload_service_id , bool message_shape_valid )",
+          "storage": []
+        },
+        "micros_bootstrap_runtime_accept_ready": {
+          "accesses": [],
+          "aliases": [],
+          "calls": ["bootstrap_runtime_commit_prevalidated","bootstrap_runtime_prepare_ready"],
+          "directives": [],
+          "guards": [],
+          "loops": [],
+          "signature": "enum micros_bootstrap_error micros_bootstrap_runtime_accept_ready ( struct micros_bootstrap_runtime * runtime , uint32_t service_id , uint64_t now )",
+          "storage": []
+        },
+        "micros_bootstrap_runtime_complete": {
+          "accesses": [],
+          "aliases": [],
+          "calls": ["bootstrap_runtime_commit_prevalidated","bootstrap_runtime_prepare_complete"],
+          "directives": [],
+          "guards": [],
+          "loops": [],
+          "signature": "enum micros_bootstrap_error micros_bootstrap_runtime_complete ( struct micros_bootstrap_runtime * runtime )",
+          "storage": []
+        },
+        "micros_bootstrap_runtime_initialize": {
+          "accesses": [
+            ["ordered_service_ids [ 0 ]",[]],
+            ["entries [ index ]",[["for ( index = 0 ; index < plan -> entry_count ; ++ index ) {",0]]],
+            ["entries [ index ]",[["for ( index = 0 ; index < plan -> entry_count ; ++ index ) {",0]]],
+            ["service_slots [ manifest_entry -> service_id ]",[["for ( index = 0 ; index < plan -> entry_count ; ++ index ) {",0]]],
+            ["service_slots [ manifest_entry -> service_id ]",[["for ( index = 0 ; index < plan -> entry_count ; ++ index ) {",0]]],
+            ["ordered_service_ids [ index ]",[["for ( index = 0 ; index < plan -> entry_count ; ++ index ) {",0]]],
+            ["ordered_service_ids [ index ]",[["for ( index = 0 ; index < plan -> entry_count ; ++ index ) {",0]]],
+            ["ordered_service_ids [ index ]",[["for ( index = 0 ; index < plan -> entry_count ; ++ index ) {",1]]],
+            ["service_slots [ service_id ]",[["for ( index = 0 ; index < plan -> entry_count ; ++ index ) {",1]]]
+          ],
+          "aliases": [
+            ["entries",["["]],
+            ["entries",["["]]
+          ],
+          "calls": ["bootstrap_manifest_bytes_are_zero","bootstrap_manifest_clear_bytes","bootstrap_manifest_copy_bytes","bootstrap_manifest_pointer_is_aligned"],
+          "directives": [],
+          "guards": [],
+          "loops": [
+            ["for ( index = 0 ; index < plan -> entry_count ; ++ index ) {",[]],
+            ["for ( index = 0 ; index < plan -> entry_count ; ++ index ) {",[]]
+          ],
+          "signature": "enum micros_bootstrap_error micros_bootstrap_runtime_initialize ( const struct micros_bootstrap_manifest * manifest , const struct micros_bootstrap_manifest_plan * plan , struct micros_bootstrap_runtime * runtime )",
+          "storage": []
+        },
+        "micros_bootstrap_runtime_release": {
+          "accesses": [],
+          "aliases": [],
+          "calls": ["runtime_release"],
+          "directives": [],
+          "guards": [],
+          "loops": [],
+          "signature": "enum micros_bootstrap_error micros_bootstrap_runtime_release ( struct micros_bootstrap_runtime * runtime , uint32_t service_id , uint64_t now )",
+          "storage": []
+        },
+        "micros_bootstrap_runtime_release_retaining_deadline": {
+          "accesses": [],
+          "aliases": [],
+          "calls": ["runtime_release"],
+          "directives": [],
+          "guards": [],
+          "loops": [],
+          "signature": "enum micros_bootstrap_error micros_bootstrap_runtime_release_retaining_deadline ( struct micros_bootstrap_runtime * runtime , uint32_t service_id , uint64_t now , uint64_t deadline )",
+          "storage": []
+        },
+        "runtime_release": {
+          "accesses": [],
+          "aliases": [],
+          "calls": ["bootstrap_runtime_commit_prevalidated","bootstrap_runtime_prepare_release"],
+          "directives": [],
+          "guards": [],
+          "loops": [],
+          "signature": "static enum micros_bootstrap_error runtime_release ( struct micros_bootstrap_runtime * runtime , uint32_t service_id , uint64_t now , uint64_t retained_deadline , bool retain_deadline )",
+          "storage": []
+        },
+        "runtime_slot": {
+          "accesses": [
+            ["service_slots [ service_id ]",[]],
+            ["entries [ slot - 1 ]",[]]
+          ],
+          "aliases": [
+            ["entries",["["]]
+          ],
+          "calls": [],
+          "directives": [],
+          "guards": [],
+          "loops": [],
+          "signature": "static enum micros_bootstrap_error runtime_slot ( const struct micros_bootstrap_runtime * runtime , uint32_t service_id , uint16_t * index )",
           "storage": []
         }
       },
@@ -20020,6 +22056,92 @@
             ["for ( index = 0 ; index < size ; ++ index ) {",[]]
           ],
           "signature": "static void zero_bytes ( void * value , size_t size )",
+          "storage": []
+        }
+      },
+      "storage": []
+    },
+    "kernel/tty/tty_handoff_runtime.c": {
+      "complete": 1,
+      "functions": {
+        "micros_tty_handoff_runtime_authoritative_state": {
+          "accesses": [],
+          "aliases": [],
+          "calls": ["tty_handoff_context"],
+          "directives": [],
+          "guards": [],
+          "loops": [],
+          "signature": "struct micros_tty_handoff_runtime_state * micros_tty_handoff_runtime_authoritative_state ( void )",
+          "storage": []
+        },
+        "micros_tty_handoff_runtime_begin": {
+          "accesses": [],
+          "aliases": [],
+          "calls": ["micros_tty_handoff_runtime_prepare_begin","tty_handoff_context","tty_handoff_copy_bytes"],
+          "directives": [],
+          "guards": [],
+          "loops": [],
+          "signature": "enum micros_tty_handoff_error micros_tty_handoff_runtime_begin ( uint64_t now , uint64_t interval )",
+          "storage": []
+        },
+        "micros_tty_handoff_runtime_bind_bootstrap": {
+          "accesses": [],
+          "aliases": [],
+          "calls": ["tty_handoff_binding_identity_matches","tty_handoff_context"],
+          "directives": [],
+          "guards": [],
+          "loops": [],
+          "signature": "enum micros_tty_handoff_error micros_tty_handoff_runtime_bind_bootstrap ( const struct micros_bootstrap_control_state * bootstrap )",
+          "storage": []
+        },
+        "micros_tty_handoff_runtime_deadline_expired": {
+          "accesses": [],
+          "aliases": [],
+          "calls": ["micros_tty_handoff_deadline_expired","micros_tty_handoff_validate","tty_handoff_context"],
+          "directives": [],
+          "guards": [],
+          "loops": [],
+          "signature": "bool micros_tty_handoff_runtime_deadline_expired ( uint64_t now )",
+          "storage": []
+        },
+        "micros_tty_handoff_runtime_panic": {
+          "accesses": [],
+          "aliases": [],
+          "calls": ["micros_tty_handoff_panic","tty_handoff_context"],
+          "directives": [],
+          "guards": [],
+          "loops": [],
+          "signature": "enum micros_tty_handoff_error micros_tty_handoff_runtime_panic ( void )",
+          "storage": []
+        },
+        "micros_tty_handoff_runtime_prepare": {
+          "accesses": [],
+          "aliases": [],
+          "calls": ["micros_tty_handoff_initialize","tty_handoff_clear_bytes","tty_handoff_context","tty_handoff_copy_bytes","tty_handoff_endpoint_matches_process","tty_handoff_identity_is_valid"],
+          "directives": [],
+          "guards": [],
+          "loops": [],
+          "signature": "enum micros_tty_handoff_error micros_tty_handoff_runtime_prepare ( const struct micros_bootstrap_binding * binding , const struct micros_bootstrap_manifest_entry * entry )",
+          "storage": []
+        },
+        "micros_tty_handoff_runtime_reset": {
+          "accesses": [],
+          "aliases": [],
+          "calls": ["micros_tty_handoff_validate","tty_handoff_clear_bytes","tty_handoff_context"],
+          "directives": [],
+          "guards": [],
+          "loops": [],
+          "signature": "enum micros_tty_handoff_error micros_tty_handoff_runtime_reset ( void )",
+          "storage": []
+        },
+        "micros_tty_handoff_runtime_state": {
+          "accesses": [],
+          "aliases": [],
+          "calls": ["tty_handoff_context"],
+          "directives": [],
+          "guards": [],
+          "loops": [],
+          "signature": "const struct micros_tty_handoff_runtime_state * micros_tty_handoff_runtime_state ( void )",
           "storage": []
         }
       },

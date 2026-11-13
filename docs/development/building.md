@@ -230,6 +230,22 @@ After that build, an artifact-only diagnostic can be repeated directly:
 This checks only the fixed grant kernel and does not replace the guest's
 behavioral acceptance or the complete PR plan.
 
+For indexed bootstrap lookup/transition work, use the same observation
+engine's ordinary/observed pair:
+
+```bash
+cmake --preset host-debug
+cmake --build build/host-debug --target indexed_bootstrap_ordinary indexed_bootstrap_test
+ctest --test-dir build/host-debug --output-on-failure --no-tests=error -R '^indexed-bootstrap$'
+```
+
+The pair belongs to complete `test-unit`, not the fast loop. It separates
+selected bootstrap lookup/copy work from retained full-control audits.
+It also runs the actual deadline/diagnostic code with injected counter
+values, real TTY deadline predicates and bounded output/panic backends.
+It does not replace the original bootstrap model or actual launcher,
+deadline, service-composition and stack gates.
+
 ## Validation planning
 
 Generate a changed-path plan with:

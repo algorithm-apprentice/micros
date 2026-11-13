@@ -88,6 +88,7 @@ SOURCE_SETS = {
 FAMILY_HEADERS = {
     "MICROS_BOOTSTRAP_MANIFEST_SOURCES": (
         'kernel/boot/bootstrap_manifest_internal.h',
+        'kernel/boot/bootstrap_transitions_internal.h',
     ),
     "MICROS_BOOTSTRAP_IMAGE_SOURCES": (),
     "MICROS_BOOTSTRAP_RUNTIME_SOURCES": (
@@ -335,7 +336,7 @@ PERMITTED_OWNER_DEPENDENCIES = {
     PREPARATION_IMAGE: (RUNTIME_STATE,),
     ROLLBACK: (RUNTIME_STATE,),
     RUNTIME_VALIDATION: (RUNTIME_STATE, PREPARATION_IMAGE),
-    DIAGNOSTICS: (RUNTIME_STATE,),
+    DIAGNOSTICS: (RUNTIME_STATE, TRANSITIONS),
     PREPARATION: (RUNTIME_STATE, PREPARATION_IMAGE, ROLLBACK,
                   'kernel/boot/bootstrap_manifest.c', 'kernel/boot/bootstrap_image.c'),
     'kernel/boot/bootstrap_runtime.c': (

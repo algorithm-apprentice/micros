@@ -154,6 +154,7 @@ static bool runtime_tty(void)
     REQUIRE(micros_tty_handoff_commit(&state->handoff) == MICROS_TTY_HANDOFF_OK);
     REQUIRE(micros_tty_handoff_accept_ready(&state->handoff, 2) == MICROS_TTY_HANDOFF_OK);
     fixture->bootstrap.entry_count = 1;
+    fixture->bootstrap.binding_slots[MICROS_TTY_SERVICE_ID] = 1;
     fixture->bootstrap.plan.console_service_id = MICROS_TTY_SERVICE_ID;
     fixture->bootstrap.bindings[0] = (struct micros_bootstrap_binding){
         .service_id = MICROS_TTY_SERVICE_ID, .process = state->process, .thread = state->thread,
@@ -167,6 +168,7 @@ static bool runtime_tty(void)
         .device_length = MICROS_TTY_UART_MAPPED_LENGTH,
     };
     fixture->bootstrap.transitions.entry_count = 1;
+    fixture->bootstrap.transitions.service_slots[MICROS_TTY_SERVICE_ID] = 1;
     fixture->bootstrap.transitions.entries[0] = (struct micros_bootstrap_runtime_entry){
         .service_id = MICROS_TTY_SERVICE_ID, .state = MICROS_BOOTSTRAP_SERVICE_READY,
         .endpoint_state = MICROS_BOOTSTRAP_ENDPOINT_ACTIVE, .profile_installed = true, .scheduler_assigned = true,

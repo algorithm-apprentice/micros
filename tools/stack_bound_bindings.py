@@ -216,7 +216,11 @@ def bind_current_callbacks(root, directory, catalog):
                 raise StackEvidenceError(f"callback source origin: {error}") from error
             if record is None:
                 raise StackEvidenceError("callback catalog has no actual source function")
-            if origin != key.translation_unit:
+            callback_types = r"\b(?:" + "|".join(map(re.escape, group.types)) + r")\b"
+            if origin != key.translation_unit and (
+                not origin.endswith(".h")
+                or re.search(callback_types, record.signature + record.body)
+            ):
                 anchored_function(root, key, origin)
             if key not in machine:
                 path = objects[key]

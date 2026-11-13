@@ -46,6 +46,9 @@ struct bootstrap_runtime_context {
     bool failure_record_emitted;
 };
 
+_Static_assert(sizeof(struct bootstrap_runtime_context) <= 3816,
+               "Bootstrap context exceeds its storage bound");
+
 struct bootstrap_runtime_context *bootstrap_runtime_context(void);
 void bootstrap_runtime_set_preparation_diagnostic(
     struct bootstrap_runtime_context *runtime,

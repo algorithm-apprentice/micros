@@ -69,46 +69,6 @@ static bool staged_launcher_acknowledgments_are_valid(
     micros_endpoint_t launcher
 );
 
-static const struct micros_bootstrap_runtime_entry *
-find_runtime_entry(
-    const struct micros_bootstrap_control_state *state,
-    uint32_t service_id
-)
-{
-    size_t index;
-
-    for (index = 0; index < state->transitions.entry_count; ++index) {
-        if (
-            state->transitions.entries[index].service_id
-                == service_id
-        ) {
-            return &state->transitions.entries[index];
-        }
-    }
-    return NULL;
-}
-
-static struct micros_bootstrap_binding *find_binding_mutable(
-    struct micros_bootstrap_control_state *state,
-    uint32_t service_id
-)
-{
-    size_t index;
-
-    if (
-        state == NULL
-        || state->entry_count > MICROS_BOOTSTRAP_SERVICE_CAPACITY
-    ) {
-        return NULL;
-    }
-    for (index = 0; index < state->entry_count; ++index) {
-        if (state->bindings[index].service_id == service_id) {
-            return &state->bindings[index];
-        }
-    }
-    return NULL;
-}
-
 const struct micros_bootstrap_binding *
 micros_bootstrap_control_find_binding(
     const struct micros_bootstrap_control_state *state,
@@ -153,6 +113,42 @@ static bool binding_matches_manifest(
     );
 }
 
+static bool binding_index_is_valid(
+    const struct micros_bootstrap_control_state *state
+)
+{
+    size_t index;
+
+    if (state->binding_slots[0] != 0) {
+        return false;
+    }
+    for (index = 0; index < state->entry_count; ++index) {
+        uint32_t service_id = state->bindings[index].service_id;
+
+        if (
+            service_id == 0
+            || service_id > MICROS_BOOTSTRAP_SERVICE_ID_LIMIT
+            || state->binding_slots[service_id] != index + 1
+        ) {
+            return false;
+        }
+    }
+    for (index = 1; index <= MICROS_BOOTSTRAP_SERVICE_ID_LIMIT; ++index) {
+        uint8_t slot = state->binding_slots[index];
+
+        if (
+            slot != 0
+            && (
+                slot > state->entry_count
+                || state->bindings[slot - 1].service_id != index
+            )
+        ) {
+            return false;
+        }
+    }
+    return true;
+}
+
 static bool binding_matches_objects(
     const struct micros_bootstrap_control_state *state,
     const struct micros_bootstrap_binding *binding,
@@ -165,8 +161,7 @@ static bool binding_matches_objects(
     const struct micros_process *process;
     const struct micros_thread *thread;
     const struct micros_endpoint_record *endpoint;
-    const struct micros_bootstrap_runtime_entry *transition = NULL;
-    size_t index;
+    const struct micros_bootstrap_runtime_entry *transition;
 
     if (
         micros_process_resolve(objects, binding->process, &process)
@@ -187,15 +182,6 @@ static bool binding_matches_objects(
     ) {
         return false;
     }
-    for (index = 0; index < state->transitions.entry_count; ++index) {
-        if (
-            state->transitions.entries[index].service_id
-                == binding->service_id
-        ) {
-            transition = &state->transitions.entries[index];
-            break;
-        }
-    }
     if (state->phase == MICROS_BOOTSTRAP_PHASE_PREPARING) {
         return (
             process->privilege_profile == 0
@@ -204,6 +190,9 @@ static bool binding_matches_objects(
             && !thread->scheduler_assigned
         );
     }
+    transition = bootstrap_runtime_find_entry(
+        &state->transitions, binding->service_id
+    );
     if (transition == NULL) {
         return false;
     }
@@ -300,6 +289,7 @@ enum micros_bootstrap_error micros_bootstrap_control_state_prepare(
             return MICROS_BOOTSTRAP_ERROR_INVARIANT;
         }
         service_ids |= service_bit;
+        candidate.binding_slots[binding->service_id] = (uint8_t)(index + 1);
     }
     copy_bytes(state, &candidate, sizeof(*state));
     return MICROS_BOOTSTRAP_OK;
@@ -325,6 +315,7 @@ enum micros_bootstrap_error micros_bootstrap_control_validate(
     }
     if (
         state->entry_count == 0
+        || state->entry_count > MICROS_BOOTSTRAP_SERVICE_CAPACITY
         || state->entry_count != state->manifest.header.entry_count
         || state->entry_count != state->plan.entry_count
         || micros_kernel_objects_validate(objects)
@@ -332,6 +323,9 @@ enum micros_bootstrap_error micros_bootstrap_control_validate(
         || micros_endpoint_registry_validate_objects(registry, objects)
             != MICROS_ENDPOINT_OK
     ) {
+        return MICROS_BOOTSTRAP_ERROR_INVARIANT;
+    }
+    if (!binding_index_is_valid(state)) {
         return MICROS_BOOTSTRAP_ERROR_INVARIANT;
     }
     if (
@@ -345,7 +339,11 @@ enum micros_bootstrap_error micros_bootstrap_control_validate(
     }
     if (
         state->phase != MICROS_BOOTSTRAP_PHASE_PREPARING
-        && state->transitions.phase != state->phase
+        && (
+            state->transitions.phase != state->phase
+            || state->transitions.entry_count != state->entry_count
+            || !bootstrap_runtime_validate_index(&state->transitions)
+        )
     ) {
         return MICROS_BOOTSTRAP_ERROR_INVARIANT;
     }
@@ -529,8 +527,8 @@ static enum micros_bootstrap_error control_release(
     bool role_gate_ready
 )
 {
-    struct micros_bootstrap_runtime transitions;
-    struct micros_bootstrap_binding *binding;
+    struct bootstrap_transition_plan transition;
+    const struct micros_bootstrap_binding *binding;
     const struct micros_bootstrap_manifest_entry *entry;
     enum micros_bootstrap_error error;
     enum micros_endpoint_error endpoint_error;
@@ -545,7 +543,7 @@ static enum micros_bootstrap_error control_release(
     ) {
         return MICROS_BOOTSTRAP_ERROR_INVARIANT;
     }
-    binding = find_binding_mutable(state, service_id);
+    binding = micros_bootstrap_control_find_binding(state, service_id);
     if (state->phase != MICROS_BOOTSTRAP_PHASE_RUNNING) {
         return MICROS_BOOTSTRAP_ERROR_STATE;
     }
@@ -561,23 +559,14 @@ static enum micros_bootstrap_error control_release(
     ) {
         return MICROS_BOOTSTRAP_ERROR_STATE;
     }
-    copy_bytes(
-        &transitions,
+    error = bootstrap_runtime_prepare_release(
         &state->transitions,
-        sizeof(transitions)
+        service_id,
+        now,
+        retained_deadline,
+        retain_deadline,
+        &transition
     );
-    error = retain_deadline
-        ? micros_bootstrap_runtime_release_retaining_deadline(
-            &transitions,
-            service_id,
-            now,
-            retained_deadline
-        )
-        : micros_bootstrap_runtime_release(
-            &transitions,
-            service_id,
-            now
-        );
     if (error != MICROS_BOOTSTRAP_OK) {
         return error;
     }
@@ -614,11 +603,7 @@ static enum micros_bootstrap_error control_release(
         binding->endpoint,
         entry->profile_id
     );
-    copy_bytes(
-        &state->transitions,
-        &transitions,
-        sizeof(state->transitions)
-    );
+    bootstrap_runtime_commit_prevalidated(&state->transitions, &transition);
     scheduler_error = micros_thread_scheduler_admit(
         objects,
         hart,
@@ -742,15 +727,11 @@ enum micros_bootstrap_error micros_bootstrap_control_prepare_ready(
         return MICROS_BOOTSTRAP_ERROR_ARGUMENT;
     }
     entry = &state->manifest.entries[binding->manifest_index];
-    copy_bytes(
-        &candidate.transitions,
+    error = bootstrap_runtime_prepare_ready(
         &state->transitions,
-        sizeof(candidate.transitions)
-    );
-    error = micros_bootstrap_runtime_accept_ready(
-        &candidate.transitions,
         service_id,
-        now
+        now,
+        &candidate.transition
     );
     if (error != MICROS_BOOTSTRAP_OK) {
         return error;
@@ -802,11 +783,7 @@ void micros_bootstrap_control_commit_ready_prevalidated(
     struct micros_bootstrap_ready_plan *plan
 )
 {
-    copy_bytes(
-        &state->transitions,
-        &plan->transitions,
-        sizeof(state->transitions)
-    );
+    bootstrap_runtime_commit_prevalidated(&state->transitions, &plan->transition);
     clear_bytes(plan, sizeof(*plan));
 }
 
@@ -854,10 +831,9 @@ static bool staged_launcher_acknowledgments_are_valid(
             &objects->threads[thread_index];
         const struct micros_ipc_message *message;
         const struct micros_bootstrap_binding *binding;
-        const struct micros_bootstrap_runtime_entry *transition = NULL;
+        const struct micros_bootstrap_runtime_entry *transition;
         uint32_t service_id;
         size_t payload_index;
-        size_t transition_index;
 
         if (
             thread->slot_state != MICROS_KERNEL_OBJECT_SLOT_LIVE
@@ -903,20 +879,7 @@ static bool staged_launcher_acknowledgments_are_valid(
         ) {
             return false;
         }
-        for (
-            transition_index = 0;
-            transition_index < state->transitions.entry_count;
-            ++transition_index
-        ) {
-            if (
-                state->transitions.entries[transition_index].service_id
-                    == service_id
-            ) {
-                transition =
-                    &state->transitions.entries[transition_index];
-                break;
-            }
-        }
+        transition = bootstrap_runtime_find_entry(&state->transitions, service_id);
         if (
             transition == NULL
             || transition->state != MICROS_BOOTSTRAP_SERVICE_READY
@@ -959,8 +922,8 @@ static enum micros_bootstrap_error find_ready_pm_endpoint(
         state,
         state->plan.pm_service_id
     );
-    transition = find_runtime_entry(
-        state,
+    transition = bootstrap_runtime_find_entry(
+        &state->transitions,
         state->plan.pm_service_id
     );
     if (
@@ -1064,13 +1027,9 @@ micros_bootstrap_control_prepare_complete(
     if (error != MICROS_BOOTSTRAP_OK) {
         return error;
     }
-    copy_bytes(
-        &candidate.transitions,
+    error = bootstrap_runtime_prepare_complete(
         &state->transitions,
-        sizeof(candidate.transitions)
-    );
-    error = micros_bootstrap_runtime_complete(
-        &candidate.transitions
+        &candidate.transition
     );
     if (error != MICROS_BOOTSTRAP_OK) {
         return error;
@@ -1112,11 +1071,7 @@ void micros_bootstrap_control_commit_complete_prevalidated(
     struct micros_bootstrap_complete_plan *plan
 )
 {
-    copy_bytes(
-        &state->transitions,
-        &plan->transitions,
-        sizeof(state->transitions)
-    );
+    bootstrap_runtime_commit_prevalidated(&state->transitions, &plan->transition);
     state->phase = MICROS_BOOTSTRAP_PHASE_SEALED;
     state->controller_process =
         (struct micros_process_handle){0, 0};
