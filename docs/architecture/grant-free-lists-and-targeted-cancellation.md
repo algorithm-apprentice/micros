@@ -7,8 +7,9 @@ This is the independently reviewed GRANT02 design Accepted by
 Its actual prerequisites, GRANT01 #259 and IPC03 #255, are merged.
 Design #260 and the
 [quiescent resource-witness correction](../adr/0130-quiescent-grant-resource-equivalence.md)
-#261 are separately merged. The paired implementation proceeds from that
-main; neither design alone closes a GRANT02 finding.
+#261 are separately merged. Independently reviewed implementation #262
+implements both contracts; its exact acceptance and publication are
+recorded in that PR.
 
 GRANT02 owns B05-F003/F004. The
 [fixed local study](../research/minix-grant-free-lists-and-targeted-cancellation.md)

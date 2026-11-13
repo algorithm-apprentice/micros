@@ -146,3 +146,4 @@ to make the project appear more consistent than it was.
 | [0128](0128-selected-grant-validation.md) | Selected grant validation | Accepted |
 | [0129](0129-grant-free-lists-and-targeted-cancellation.md) | Grant free lists and targeted cancellation | Accepted |
 | [0130](0130-quiescent-grant-resource-equivalence.md) | Quiescent grant resource equivalence | Accepted |
+| [0131](0131-retained-grant-copy-spans.md) | Retained grant copy spans | Accepted |

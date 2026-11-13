@@ -31,8 +31,8 @@ expands the active pull request.
 ## Current correction progress
 
 The counts in the fixed audit block above describe the original audit, not
-the remaining work. This table is the current closure record through GRANT01
-#259 and validation simplification #248. Each listed runtime outcome completed
+the remaining work. This table is the current closure record through GRANT02
+#262 and validation simplification #248. Each listed runtime outcome completed
 its required evidence and independent review before merge.
 
 | Outcome | Accepted implementation/barrier | Finding closure | Contract or evidence |
@@ -54,25 +54,24 @@ its required evidence and independent review before merge.
 | IPC03 | #255 | B04-F004 | [Direct reply binding implementation](../architecture/direct-reply-token-binding.md#current-implementation-and-evidence-owners) |
 | IPC04 | #257 | B04-F006 | [Head-only sender implementation](../architecture/head-only-ipc-sender-queues.md#current-implementation-and-evidence-owners) |
 | GRANT01 | #259 | B05-F001/F002 | [Selected grant evidence](../architecture/selected-grant-validation.md#current-executable-evidence) |
+| GRANT02 | #262 | B05-F003/F004 | [Indexed lifetime evidence](../architecture/grant-free-lists-and-targeted-cancellation.md#current-implementation-and-evidence-owners) |
 
-Of the original 79 pre-node finding records, these outcomes close 30:
-three evidence-foundation records and twenty-seven runtime records.
-**49 remain: 42 foundation/runtime records before node Q and seven B13
+Of the original 79 pre-node finding records, these outcomes close 32:
+three evidence-foundation records and twenty-nine runtime records.
+**47 remain: 40 foundation/runtime records before node Q and seven B13
 records.** The separately staged B04-F005 is not included in that remaining
 pre-node count. Closing foundation tooling does not certify every still-open
 operation's work bound or the future B13 stack.
 
 All B04 pre-node findings are closed; B04-F005 retains its post-node staged
-replacement point. The next preferred runtime outcome is **GRANT02**, whose
-GRANT01 and IPC03 predecessors are merged. Its
-[free-list/cancellation contract](../architecture/grant-free-lists-and-targeted-cancellation.md)
-and [ADR-0129](../adr/0129-grant-free-lists-and-targeted-cancellation.md) have
-clean independent design review and are Accepted. The actual composed
-rollback exposed a quiescent resource-witness gap after design #260. The
-[corrective design](../adr/0130-quiescent-grant-resource-equivalence.md) has
-clean independent review and is separately merged as #261. Implementation
-has restarted from current main with both designs. No GRANT02 finding is
-closed.
+replacement point. The next preferred runtime outcome is **GRANT03**, whose
+GRANT01, COPY01 and MEM04 predecessors are merged. Its
+[retained-span contract](../architecture/grant-copy-spans.md) and
+[ADR-0131](../adr/0131-retained-grant-copy-spans.md) have clean independent
+review and are Accepted; implementation remains pending the separate
+design merge. GRANT02's actual lifetime/model/work, composed resource and
+full current stack evidence passed before its independent review and
+merge; its corrective-design history remains in #261/#262.
 
 Validation simplification #248 follows separate design #247 / ADR-0123.
 It changes no runtime finding, node or edge. Current contracts replace the
@@ -244,8 +243,8 @@ blocking queue.
 | `IPC03` | Runtime correction | `B04-F004` | `IPC01` | Independently reviewed implementation #255 follows the [direct reply binding contract](../architecture/direct-reply-token-binding.md). | Zero token-table visits, exact phase/receiver lifetime, actual return/close authority, independent models, current layout/stack and full acceptance passed. |
 | `IPC04` | Runtime correction | `B04-F006` | `IPC01` | Independently reviewed implementation #257 follows the [head-only sender contract](../architecture/head-only-ipc-sender-queues.md). | Exact linear append, selected/null-terminated splice, full-capacity close, independent models, current target/stack and full acceptance passed. |
 | `GRANT01` | Runtime correction | `B05-F001`, `B05-F002` | `IPC01` | [Accepted selected-grant contract](../architecture/selected-grant-validation.md): local readiness, selected record/participants and denial-only committed-device inspection; implementation #259 is merged. | Actual grant/endpoint/TTY audit and lookup work, preserved syscall/authority/failure semantics and complete current acceptance. |
-| `GRANT02` | Runtime correction | `B05-F003`, `B05-F004` | `GRANT01`, `IPC03` | [Accepted free-list/cancellation contract](../architecture/grant-free-lists-and-targeted-cancellation.md), design #260, and separately merged [quiescent resource-witness correction](../adr/0130-quiescent-grant-resource-equivalence.md) #261; implementation is in progress. | Allocation/cancellation probe counts, reuse, stale identity, complete index state, exact idle resource inventory and close traces. |
-| `GRANT03` | Runtime correction | `B05-F005` | `GRANT01`, `COPY01`, `MEM04` | Plan translated spans once and move word/block runs without byte-at-a-time commits. | Cross-page aligned/unaligned transfer counts, faults, overlap policy, and atomic publication. |
+| `GRANT02` | Runtime correction | `B05-F003`, `B05-F004` | `GRANT01`, `IPC03` | Independently reviewed implementation #262 follows the [free-list/cancellation contract](../architecture/grant-free-lists-and-targeted-cancellation.md) and [quiescent resource-witness correction](../adr/0130-quiescent-grant-resource-equivalence.md). | Exact LIFO/index/model and sparse close work, malformed inventory controls, actual composed resources and complete current acceptance passed. |
+| `GRANT03` | Runtime correction | `B05-F005` | `GRANT01`, `COPY01`, `MEM04` | [Accepted retained-span contract](../architecture/grant-copy-spans.md): keep complete preflight and the existing zipper, reuse the COPY01 word family and prove actual kernel integration; implementation awaits separate design merge. | Cross-page aligned/unaligned transfer counts, faults, overlap policy, and atomic publication. |
 | `BOOT01` | Runtime correction | `B06-F001` | `EV04` | Replace repeated capacity scans and whole-state copies with exact service-slot/binding identity and selected transitions. | Lookup/transition counts over sparse and failed service states. |
 | `BOOT02` | Runtime correction | `B06-F002`, `B06-F003` | `BOOT01`, `MEM04`, `OBJ01`, `OBJ02`, `IPC01`, `GRANT01` | Validate owner-specific command plans once before commit; keep whole-system audits diagnostic-only. | Release/ready/complete/console call counts, rollback, deadline, and target failure cases. |
 | `BOOT03` | Runtime correction | `B06-F004` | `COPY01` | Use the shared bounded copy/fill family for image, stack, manifest, configuration, and state movement. | Exact bytes/words/blocks moved over every bootstrap object size. |
