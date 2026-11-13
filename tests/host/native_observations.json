@@ -1,5 +1,931 @@
 {
   "families": {
+    "GRANT01": {
+      "channels": ["work"],
+      "native_sources": ["kernel/boot/bootstrap_control_core.c","kernel/endpoint/endpoint.c","kernel/endpoint/endpoint_close.c","kernel/endpoint/endpoint_codec.c","kernel/endpoint/endpoint_completion_validation.c","kernel/endpoint/endpoint_identity.c","kernel/endpoint/endpoint_object_validation.c","kernel/endpoint/endpoint_privilege.c","kernel/endpoint/endpoint_publication.c","kernel/endpoint/endpoint_queue_validation.c","kernel/endpoint/endpoint_registry.c","kernel/grant/grant.c","kernel/grant/grant_abi.c","kernel/grant/grant_copy.c","kernel/grant/grant_copy_core.c","kernel/grant/grant_copy_range.c","kernel/grant/grant_runtime.c","kernel/grant/grant_syscall.c","kernel/grant/grant_syscall_core.c","kernel/ipc/ipc_runtime.c","kernel/objects/kernel_object_context.c","kernel/objects/kernel_object_hart.c","kernel/objects/kernel_object_identity.c","kernel/objects/kernel_object_process.c","kernel/objects/kernel_object_stack.c","kernel/objects/kernel_object_state.c","kernel/objects/kernel_object_thread.c","kernel/objects/kernel_object_validation.c","kernel/objects/kernel_objects.c","kernel/scheduler/scheduler_core.c","kernel/scheduler/scheduler_core_accounting.c","kernel/scheduler/scheduler_core_ipc.c","kernel/scheduler/scheduler_core_ipc_transition.c","kernel/scheduler/scheduler_core_policy.c","kernel/scheduler/scheduler_core_queue.c","kernel/scheduler/scheduler_core_return.c","kernel/scheduler/scheduler_core_return_plan.c","kernel/scheduler/scheduler_core_validate.c","kernel/tty/tty_handoff_core.c","kernel/tty/tty_handoff_runtime_state.c","kernel/tty/tty_handoff_runtime_validate.c"],
+      "sites": {
+        "kernel/boot/bootstrap_control_core.c": {
+          "micros_bootstrap_control_find_binding": []
+        },
+        "kernel/boot/bootstrap_control_internal.h": {
+          "micros_bootstrap_control_find_binding_bounded": [
+            [["work"],["grant01/kernel/boot/bootstrap_control_internal.h/micros_bootstrap_control_find_binding_bounded/loop-35","insert","KERNEL_BOOT","RECORD_VISIT",1,"entry","",[["for ( index = 0 ; index < state -> entry_count ; ++ index ) {",0]],0,0]],
+            [["work"],["grant01/kernel/boot/bootstrap_control_internal.h/micros_bootstrap_control_find_binding_bounded/index-41","wrap","KERNEL_BOOT","INDEX_PROBE",1,"value","index",[["for ( index = 0 ; index < state -> entry_count ; ++ index ) {",0]],0,1]],
+            [["work"],["grant01/kernel/boot/bootstrap_control_internal.h/micros_bootstrap_control_find_binding_bounded/index-55","wrap","KERNEL_BOOT","INDEX_PROBE",1,"value","index",[["for ( index = 0 ; index < state -> entry_count ; ++ index ) {",0],["if ( state -> bindings [ index ] . service_id == service_id ) {",0]],0,1]]
+          ]
+        },
+        "kernel/endpoint/endpoint.c": {
+          "micros_endpoint_authorize_kernel_operation": [
+            [["work"],["grant01-shared/ipc01/kernel/endpoint/endpoint.c/micros_endpoint_authorize_kernel_operation/index-47","wrap","KERNEL_ENDPOINT","INDEX_PROBE",1,"value","record -> owner . slot",[],0,1]]
+          ],
+          "micros_endpoint_authorize_operation": [
+            [["work"],["grant01-shared/ipc01/kernel/endpoint/endpoint.c/micros_endpoint_authorize_operation/index-47","wrap","KERNEL_ENDPOINT","INDEX_PROBE",1,"value","record -> owner . slot",[],0,1]]
+          ],
+          "micros_endpoint_authorize_target": [
+            [["work"],["grant01-shared/ipc01/kernel/endpoint/endpoint.c/micros_endpoint_authorize_target/index-103","wrap","KERNEL_ENDPOINT","INDEX_PROBE",1,"value","source_record -> owner . slot",[],0,1]],
+            [["work"],["grant01-shared/ipc01/kernel/endpoint/endpoint.c/micros_endpoint_authorize_target/index-117","wrap","KERNEL_ENDPOINT","INDEX_PROBE",1,"value","target_record -> owner . slot",[],0,1]]
+          ],
+          "micros_endpoint_resolve_active": [],
+          "micros_endpoint_resolve_internal": []
+        },
+        "kernel/endpoint/endpoint_close.c": {
+          "micros_endpoint_close": [],
+          "micros_endpoint_close_commit_prevalidated": [
+            [["work"],["grant01-shared/ipc01/kernel/endpoint/endpoint_close.c/micros_endpoint_close_commit_prevalidated/index-6","wrap","KERNEL_ENDPOINT","INDEX_PROBE",1,"value","owner . slot",[],0,3]],
+            [["work"],["grant01-shared/ipc01/kernel/endpoint/endpoint_close.c/micros_endpoint_close_commit_prevalidated/index-16","wrap","KERNEL_ENDPOINT","INDEX_PROBE",1,"value","owner . slot",[],1,3]],
+            [["work"],["grant01-shared/ipc01/kernel/endpoint/endpoint_close.c/micros_endpoint_close_commit_prevalidated/index-29","wrap","KERNEL_ENDPOINT","INDEX_PROBE",1,"value","owner . slot",[],2,3]]
+          ],
+          "micros_endpoint_commit_source_only_prevalidated": [
+            [["work"],["grant01-shared/ipc01/kernel/endpoint/endpoint_close.c/micros_endpoint_commit_source_only_prevalidated/index-18","wrap","KERNEL_ENDPOINT","INDEX_PROBE",1,"value","owner . slot",[],0,1]]
+          ],
+          "micros_endpoint_preflight_source_only": [],
+          "micros_endpoint_preflight_source_only_for_teardown": [],
+          "micros_endpoint_seal_source_only": [],
+          "preflight_foreign_references": [
+            [["work"],["grant01-shared/ipc01/kernel/endpoint/endpoint_close.c/preflight_foreign_references/loop-14","insert","KERNEL_ENDPOINT","RECORD_VISIT",1,"entry","",[["for ( size_t index = 0 ; index < MICROS_THREAD_CAPACITY ; ++ index ) {",0]],0,0]],
+            [["work"],["grant01-shared/ipc01/kernel/endpoint/endpoint_close.c/preflight_foreign_references/index-25","wrap","KERNEL_ENDPOINT","INDEX_PROBE",1,"value","index",[["for ( size_t index = 0 ; index < MICROS_THREAD_CAPACITY ; ++ index ) {",0]],0,2]]
+          ],
+          "preflight_pending_source_references": [
+            [["work"],["grant01-shared/ipc01/kernel/endpoint/endpoint_close.c/preflight_pending_source_references/loop-28","insert","KERNEL_ENDPOINT","RECORD_VISIT",1,"entry","",[["for ( size_t index = 0 ; index < MICROS_PROCESS_CAPACITY ; ++ index ) {",0]],0,0]],
+            [["work"],["grant01-shared/ipc01/kernel/endpoint/endpoint_close.c/preflight_pending_source_references/index-39","wrap","KERNEL_ENDPOINT","INDEX_PROBE",1,"value","index",[["for ( size_t index = 0 ; index < MICROS_PROCESS_CAPACITY ; ++ index ) {",0]],0,1]],
+            [["work"],["grant01-shared/ipc01/kernel/endpoint/endpoint_close.c/preflight_pending_source_references/index-68","wrap","KERNEL_ENDPOINT","INDEX_PROBE",1,"value","source -> owner . slot",[["for ( size_t index = 0 ; index < MICROS_PROCESS_CAPACITY ; ++ index ) {",0]],0,1]]
+          ],
+          "preflight_plain_source_only": [],
+          "resolve_teardown_endpoint": []
+        },
+        "kernel/endpoint/endpoint_codec.c": {
+          "endpoint_bytes_are_zero": [
+            [["work"],["grant01-shared/ipc01/kernel/endpoint/endpoint_codec.c/endpoint_bytes_are_zero/loop-24","insert","KERNEL_ENDPOINT","COMPARISON",1,"entry","",[["for ( index = 0 ; index < size ; ++ index ) {",0]],0,0]]
+          ],
+          "endpoint_bytes_equal": [
+            [["work"],["grant01-shared/ipc01/kernel/endpoint/endpoint_codec.c/endpoint_bytes_equal/loop-32","insert","KERNEL_ENDPOINT","COMPARISON",1,"entry","",[["for ( index = 0 ; index < size ; ++ index ) {",0]],0,0]]
+          ],
+          "endpoint_canonicalize_profile": [
+            [["work"],["grant01-shared/ipc01/kernel/endpoint/endpoint_codec.c/endpoint_canonicalize_profile/loop-84","insert","KERNEL_ENDPOINT","COMPARISON",1,"entry","",[["for ( index = 0 ; index < MICROS_PRIVILEGE_PROFILE_NAME_SIZE ; ++ index ) {",0]],0,0]]
+          ],
+          "endpoint_clear_bytes": [
+            [["work"],["grant01-shared/ipc01/kernel/endpoint/endpoint_codec.c/endpoint_clear_bytes/loop-23","insert","KERNEL_ENDPOINT","CLEARED_BYTE",1,"entry","",[["for ( index = 0 ; index < size ; ++ index ) {",0]],0,0]]
+          ],
+          "endpoint_clear_endpoint_record": [
+            [["work"],["grant01-shared/ipc01/kernel/endpoint/endpoint_codec.c/endpoint_clear_endpoint_record/clear-unit-104","insert","KERNEL_ENDPOINT","CLEAR_UNIT",1,"entry","",[["for ( index = 0 ; index < MICROS_PROCESS_CAPACITY ; ++ index ) {",0]],0,0]],
+            [["work"],["grant01-shared/ipc01/kernel/endpoint/endpoint_codec.c/endpoint_clear_endpoint_record/clear-bytes-104","insert","KERNEL_ENDPOINT","CLEARED_BYTE",8,"entry","",[["for ( index = 0 ; index < MICROS_PROCESS_CAPACITY ; ++ index ) {",0]],0,0]],
+            [["work"],["grant01-shared/ipc01/kernel/endpoint/endpoint_codec.c/endpoint_clear_endpoint_record/index-108","wrap","KERNEL_ENDPOINT","INDEX_PROBE",1,"value","index",[["for ( index = 0 ; index < MICROS_PROCESS_CAPACITY ; ++ index ) {",0]],0,1]]
+          ],
+          "endpoint_copy_bytes": [
+            [["work"],["grant01-shared/ipc01/kernel/endpoint/endpoint_codec.c/endpoint_copy_bytes/loop-31","insert","KERNEL_ENDPOINT","COPIED_BYTE",1,"entry","",[["for ( index = 0 ; index < size ; ++ index ) {",0]],0,0]]
+          ],
+          "endpoint_ipc_state_is_zero": [
+            [["work"],["grant01-shared/ipc01/kernel/endpoint/endpoint_codec.c/endpoint_ipc_state_is_zero/loop-83","insert","KERNEL_ENDPOINT","RECORD_VISIT",1,"entry","",[["for ( index = 0 ; index < MICROS_PROCESS_CAPACITY ; ++ index ) {",0]],0,0]],
+            [["work"],["grant01-shared/ipc01/kernel/endpoint/endpoint_codec.c/endpoint_ipc_state_is_zero/index-89","wrap","KERNEL_ENDPOINT","INDEX_PROBE",1,"value","index",[["for ( index = 0 ; index < MICROS_PROCESS_CAPACITY ; ++ index ) {",0]],0,1]]
+          ],
+          "endpoint_names_equal": [
+            [["work"],["grant01-shared/ipc01/kernel/endpoint/endpoint_codec.c/endpoint_names_equal/loop-16","insert","KERNEL_ENDPOINT","COMPARISON",1,"entry","",[["for ( index = 0 ; index < MICROS_PRIVILEGE_PROFILE_NAME_SIZE ; ++ index ) {",0]],0,0]]
+          ],
+          "endpoint_pending_notification_state_is_shallow_valid": [
+            [["work"],["grant01-shared/ipc01/kernel/endpoint/endpoint_codec.c/endpoint_pending_notification_state_is_shallow_valid/loop-16","insert","KERNEL_ENDPOINT","RECORD_VISIT",1,"entry","",[["for ( index = 0 ; index < MICROS_PROCESS_CAPACITY ; ++ index ) {",0]],0,0]],
+            [["work"],["grant01-shared/ipc01/kernel/endpoint/endpoint_codec.c/endpoint_pending_notification_state_is_shallow_valid/index-45","wrap","KERNEL_ENDPOINT","INDEX_PROBE",1,"value","index",[["for ( index = 0 ; index < MICROS_PROCESS_CAPACITY ; ++ index ) {",0]],1,2]]
+          ],
+          "endpoint_profile_is_zero": [
+            [["work"],["grant01-shared/ipc01/kernel/endpoint/endpoint_codec.c/endpoint_profile_is_zero/loop-34","insert","KERNEL_ENDPOINT","COMPARISON",1,"entry","",[["for ( index = 0 ; index < sizeof ( * profile ) ; ++ index ) {",0]],0,0]]
+          ],
+          "endpoint_queue_pair_is_shallow_valid": [],
+          "endpoint_record_is_zero": [
+            [["work"],["grant01-shared/ipc01/kernel/endpoint/endpoint_codec.c/endpoint_record_is_zero/loop-111","insert","KERNEL_ENDPOINT","RECORD_VISIT",1,"entry","",[["for ( index = 0 ; index < MICROS_PROCESS_CAPACITY ; ++ index ) {",0]],0,0]],
+            [["work"],["grant01-shared/ipc01/kernel/endpoint/endpoint_codec.c/endpoint_record_is_zero/index-117","wrap","KERNEL_ENDPOINT","INDEX_PROBE",1,"value","index",[["for ( index = 0 ; index < MICROS_PROCESS_CAPACITY ; ++ index ) {",0]],0,1]]
+          ],
+          "endpoint_storage_is_zero": [
+            [["work"],["grant01-shared/ipc01/kernel/endpoint/endpoint_codec.c/endpoint_storage_is_zero/loop-34","insert","KERNEL_ENDPOINT","COMPARISON",1,"entry","",[["for ( index = 0 ; index < sizeof ( * registry ) ; ++ index ) {",0]],0,0]]
+          ],
+          "endpoint_thread_handle_is_zero": [],
+          "thread_handle_is_shallow_valid": []
+        },
+        "kernel/endpoint/endpoint_completion_validation.c": {
+          "endpoint_delivery_state_is_clear": [],
+          "endpoint_reply_wait_state_is_valid": [
+            [["work"],["grant01-shared/ipc01/kernel/endpoint/endpoint_completion_validation.c/endpoint_reply_wait_state_is_valid/index-10","wrap","KERNEL_ENDPOINT","INDEX_PROBE",1,"value","thread -> owner . slot",[],0,1]]
+          ],
+          "endpoint_source_only_process_threads_are_valid": [
+            [["work"],["grant01-shared/ipc01/kernel/endpoint/endpoint_completion_validation.c/endpoint_source_only_process_threads_are_valid/loop-30","insert","KERNEL_ENDPOINT","RECORD_VISIT",1,"entry","",[["for ( index = 0 ; index < MICROS_THREAD_CAPACITY ; ++ index ) {",0]],0,0]],
+            [["work"],["grant01-shared/ipc01/kernel/endpoint/endpoint_completion_validation.c/endpoint_source_only_process_threads_are_valid/index-41","wrap","KERNEL_ENDPOINT","INDEX_PROBE",1,"value","index",[["for ( index = 0 ; index < MICROS_THREAD_CAPACITY ; ++ index ) {",0]],0,1]]
+          ],
+          "endpoint_staged_delivery_selected_is_valid": [],
+          "endpoint_staged_delivery_state_is_valid": [
+            [["work"],["grant01-shared/ipc01/kernel/endpoint/endpoint_completion_validation.c/endpoint_staged_delivery_state_is_valid/index-12","wrap","KERNEL_ENDPOINT","INDEX_PROBE",1,"value","thread -> owner . slot",[["{",0]],0,2]],
+            [["work"],["grant01-shared/ipc01/kernel/endpoint/endpoint_completion_validation.c/endpoint_staged_delivery_state_is_valid/index-27","wrap","KERNEL_ENDPOINT","INDEX_PROBE",1,"value","thread -> owner . slot",[["{",0]],1,2]]
+          ],
+          "endpoint_staged_error_state_is_valid": [
+            [["work"],["grant01-shared/ipc01/kernel/endpoint/endpoint_completion_validation.c/endpoint_staged_error_state_is_valid/index-10","wrap","KERNEL_ENDPOINT","INDEX_PROBE",1,"value","thread -> owner . slot",[],0,1]]
+          ],
+          "endpoint_staged_no_message_success_state_is_valid": [
+            [["work"],["grant01-shared/ipc01/kernel/endpoint/endpoint_completion_validation.c/endpoint_staged_no_message_success_state_is_valid/index-10","wrap","KERNEL_ENDPOINT","INDEX_PROBE",1,"value","thread -> owner . slot",[],0,1]]
+          ],
+          "micros_endpoint_select_staged_request": [
+            [["work"],["grant01-shared/ipc01/kernel/endpoint/endpoint_completion_validation.c/micros_endpoint_select_staged_request/index-49","wrap","KERNEL_ENDPOINT","INDEX_PROBE",1,"value","receiver -> owner . slot",[],0,1]]
+          ],
+          "micros_endpoint_staged_request_matches": [
+            [["work"],["grant01-shared/ipc01/kernel/endpoint/endpoint_completion_validation.c/micros_endpoint_staged_request_matches/index-57","wrap","KERNEL_ENDPOINT","INDEX_PROBE",1,"value","receiver -> owner . slot",[],0,1]]
+          ],
+          "notification_message_is_valid": [
+            [["work"],["grant01-shared/ipc01/kernel/endpoint/endpoint_completion_validation.c/notification_message_is_valid/loop-43","insert","KERNEL_ENDPOINT","COMPARISON",1,"entry","",[["for ( index = 0 ; index < sizeof ( uint64_t ) ; ++ index ) {",0]],0,0]],
+            [["work"],["grant01-shared/ipc01/kernel/endpoint/endpoint_completion_validation.c/notification_message_is_valid/loop-83","insert","KERNEL_ENDPOINT","COMPARISON",1,"entry","",[["for ( index = sizeof ( uint64_t ) ; index < sizeof ( message -> payload ) ; ++ index ) {",0]],0,0]]
+          ],
+          "read_u32_le": [],
+          "source_only_message_is_valid": [
+            [["work"],["grant01-shared/ipc01/kernel/endpoint/endpoint_completion_validation.c/source_only_message_is_valid/loop-118","insert","KERNEL_ENDPOINT","COMPARISON",1,"entry","",[["for ( index = 20 ; index < sizeof ( message -> payload ) ; ++ index ) {",0]],0,0]]
+          ],
+          "staged_delivery_fields_are_valid": [],
+          "staged_reply_token_binding_is_valid": [
+            [["work"],["grant01-shared/ipc01/kernel/endpoint/endpoint_completion_validation.c/staged_reply_token_binding_is_valid/index-77","wrap","KERNEL_ENDPOINT","INDEX_PROBE",1,"value","slot",[["{",2]],1,2]]
+          ]
+        },
+        "kernel/endpoint/endpoint_identity.c": {
+          "endpoint_preflight_process": [],
+          "endpoint_preflight_registry": [
+            [["work"],["grant01-shared/ipc01/kernel/endpoint/endpoint_identity.c/endpoint_preflight_registry/index-41","wrap","KERNEL_ENDPOINT","INDEX_PROBE",1,"value","0",[],1,2]]
+          ],
+          "endpoint_process_handles_equal": [],
+          "endpoint_process_has_current_thread": [
+            [["work"],["grant01-shared/ipc01/kernel/endpoint/endpoint_identity.c/endpoint_process_has_current_thread/loop-16","insert","KERNEL_ENDPOINT","RECORD_VISIT",1,"entry","",[["for ( index = 0 ; index < MICROS_HART_CAPACITY ; ++ index ) {",0]],0,0]],
+            [["work"],["grant01-shared/ipc01/kernel/endpoint/endpoint_identity.c/endpoint_process_has_current_thread/index-27","wrap","KERNEL_ENDPOINT","INDEX_PROBE",1,"value","index",[["for ( index = 0 ; index < MICROS_HART_CAPACITY ; ++ index ) {",0]],0,1]],
+            [["work"],["grant01-shared/ipc01/kernel/endpoint/endpoint_identity.c/endpoint_process_has_current_thread/index-63","wrap","KERNEL_ENDPOINT","INDEX_PROBE",1,"value","hart -> current_thread . slot",[["for ( index = 0 ; index < MICROS_HART_CAPACITY ; ++ index ) {",0]],0,1]]
+          ],
+          "endpoint_process_resolve_error": [],
+          "endpoint_record_resolve_validated": [
+            [["work"],["grant01-shared/ipc01/kernel/endpoint/endpoint_identity.c/endpoint_record_resolve_validated/index-54","wrap","KERNEL_ENDPOINT","INDEX_PROBE",1,"value","owner . slot",[],1,2]]
+          ],
+          "endpoint_require_initialized": [],
+          "endpoint_thread_handles_equal": [],
+          "micros_endpoint_names_slot": [],
+          "micros_endpoint_next_reply_token": [],
+          "micros_endpoint_pack": [],
+          "micros_endpoint_reply_token_slot": [],
+          "micros_endpoint_select": [
+            [["work"],["grant01-shared/ipc01/kernel/endpoint/endpoint_identity.c/micros_endpoint_select/index-101","wrap","KERNEL_ENDPOINT","INDEX_PROBE",1,"value","requested . slot",[],1,3]]
+          ],
+          "micros_endpoint_unpack": [],
+          "selected_process_is_valid": [
+            [["work"],["grant01-shared/ipc01/kernel/endpoint/endpoint_identity.c/selected_process_is_valid/index-49","wrap","KERNEL_ENDPOINT","INDEX_PROBE",1,"value","process -> privilege_profile",[],1,3]]
+          ],
+          "selected_process_metadata_is_valid": []
+        },
+        "kernel/endpoint/endpoint_object_validation.c": {
+          "endpoint_preflight_owned_threads": [
+            [["work"],["grant01-shared/ipc01/kernel/endpoint/endpoint_object_validation.c/endpoint_preflight_owned_threads/loop-19","insert","KERNEL_ENDPOINT","RECORD_VISIT",1,"entry","",[["for ( size_t index = 0 ; index < MICROS_HART_CAPACITY ; ++ index ) {",0]],0,0]],
+            [["work"],["grant01-shared/ipc01/kernel/endpoint/endpoint_object_validation.c/endpoint_preflight_owned_threads/index-30","wrap","KERNEL_ENDPOINT","INDEX_PROBE",1,"value","index",[["for ( size_t index = 0 ; index < MICROS_HART_CAPACITY ; ++ index ) {",0]],0,2]],
+            [["work"],["grant01-shared/ipc01/kernel/endpoint/endpoint_object_validation.c/endpoint_preflight_owned_threads/loop-141","insert","KERNEL_ENDPOINT","RECORD_VISIT",1,"entry","",[["for ( size_t index = 0 ; index < MICROS_THREAD_CAPACITY ; ++ index ) {",0]],0,0]],
+            [["work"],["grant01-shared/ipc01/kernel/endpoint/endpoint_object_validation.c/endpoint_preflight_owned_threads/index-152","wrap","KERNEL_ENDPOINT","INDEX_PROBE",1,"value","index",[["for ( size_t index = 0 ; index < MICROS_THREAD_CAPACITY ; ++ index ) {",0]],0,2]],
+            [["work"],["grant01-shared/ipc01/kernel/endpoint/endpoint_object_validation.c/endpoint_preflight_owned_threads/index-263","wrap","KERNEL_ENDPOINT","INDEX_PROBE",1,"value","process . slot",[],0,1]]
+          ],
+          "micros_endpoint_registry_validate_objects": [
+            [["work"],["grant01-shared/ipc01/kernel/endpoint/endpoint_object_validation.c/micros_endpoint_registry_validate_objects/audit","insert","KERNEL_ENDPOINT","COMPLETE_VALIDATOR_CALL",1,"entry","",[],0,0]],
+            [["work"],["grant01-shared/ipc01/kernel/endpoint/endpoint_object_validation.c/micros_endpoint_registry_validate_objects/loop-89","insert","KERNEL_ENDPOINT","RECORD_VISIT",1,"entry","",[["for ( index = 0 ; index < MICROS_THREAD_CAPACITY ; ++ index ) {",0]],0,0]]
+          ],
+          "micros_endpoint_thread_ipc_state_is_valid": [
+            [["work"],["grant01-shared/ipc01/kernel/endpoint/endpoint_object_validation.c/micros_endpoint_thread_ipc_state_is_valid/index-48","wrap","KERNEL_ENDPOINT","INDEX_PROBE",1,"value","thread -> owner . slot",[],0,1]]
+          ],
+          "process_relationships_are_canonical": [
+            [["work"],["grant01-shared/ipc01/kernel/endpoint/endpoint_object_validation.c/process_relationships_are_canonical/loop-16","insert","KERNEL_ENDPOINT","RECORD_VISIT",1,"entry","",[["for ( index = 0 ; index < MICROS_PROCESS_CAPACITY ; ++ index ) {",0]],0,0]],
+            [["work"],["grant01-shared/ipc01/kernel/endpoint/endpoint_object_validation.c/process_relationships_are_canonical/index-27","wrap","KERNEL_ENDPOINT","INDEX_PROBE",1,"value","index",[["for ( index = 0 ; index < MICROS_PROCESS_CAPACITY ; ++ index ) {",0]],0,2]],
+            [["work"],["grant01-shared/ipc01/kernel/endpoint/endpoint_object_validation.c/process_relationships_are_canonical/index-41","wrap","KERNEL_ENDPOINT","INDEX_PROBE",1,"value","index",[["for ( index = 0 ; index < MICROS_PROCESS_CAPACITY ; ++ index ) {",0]],1,2]]
+          ],
+          "thread_has_no_ipc_flags": [],
+          "thread_relationships_are_canonical": [
+            [["work"],["grant01-shared/ipc01/kernel/endpoint/endpoint_object_validation.c/thread_relationships_are_canonical/loop-16","insert","KERNEL_ENDPOINT","RECORD_VISIT",1,"entry","",[["for ( index = 0 ; index < MICROS_THREAD_CAPACITY ; ++ index ) {",0]],0,0]],
+            [["work"],["grant01-shared/ipc01/kernel/endpoint/endpoint_object_validation.c/thread_relationships_are_canonical/index-27","wrap","KERNEL_ENDPOINT","INDEX_PROBE",1,"value","index",[["for ( index = 0 ; index < MICROS_THREAD_CAPACITY ; ++ index ) {",0]],0,3]],
+            [["work"],["grant01-shared/ipc01/kernel/endpoint/endpoint_object_validation.c/thread_relationships_are_canonical/index-250","wrap","KERNEL_ENDPOINT","INDEX_PROBE",1,"value","thread -> owner . slot",[["for ( index = 0 ; index < MICROS_THREAD_CAPACITY ; ++ index ) {",0]],0,1]]
+          ]
+        },
+        "kernel/endpoint/endpoint_privilege.c": {
+          "micros_privilege_profile_allows_kernel_operation": [],
+          "micros_privilege_profile_allows_operation": [],
+          "micros_privilege_profile_allows_target": [],
+          "micros_privilege_profile_resolve": [
+            [["work"],["grant01-shared/ipc01/kernel/endpoint/endpoint_privilege.c/micros_privilege_profile_resolve/profile","insert","KERNEL_ENDPOINT","RANGE_VISIT",1,"entry","",[],0,0]],
+            [["work"],["grant01-shared/ipc01/kernel/endpoint/endpoint_privilege.c/micros_privilege_profile_resolve/index-64","wrap","KERNEL_ENDPOINT","INDEX_PROBE",1,"value","profile_id",[],2,4]]
+          ]
+        },
+        "kernel/endpoint/endpoint_publication.c": {
+          "micros_endpoint_activate": [
+            [["work"],["grant01-shared/ipc01/kernel/endpoint/endpoint_publication.c/micros_endpoint_activate/index-104","wrap","KERNEL_ENDPOINT","INDEX_PROBE",1,"value","selected . record -> owner . slot",[],0,1]]
+          ],
+          "micros_endpoint_commit_publish_prevalidated": [
+            [["work"],["grant01-shared/ipc01/kernel/endpoint/endpoint_publication.c/micros_endpoint_commit_publish_prevalidated/index-18","wrap","KERNEL_ENDPOINT","INDEX_PROBE",1,"value","owner . slot",[],0,2]],
+            [["work"],["grant01-shared/ipc01/kernel/endpoint/endpoint_publication.c/micros_endpoint_commit_publish_prevalidated/index-31","wrap","KERNEL_ENDPOINT","INDEX_PROBE",1,"value","owner . slot",[],1,2]]
+          ],
+          "micros_endpoint_install_profile": [
+            [["work"],["grant01-shared/ipc01/kernel/endpoint/endpoint_publication.c/micros_endpoint_install_profile/index-71","wrap","KERNEL_ENDPOINT","INDEX_PROBE",1,"value","process_handle . slot",[],0,1]]
+          ],
+          "micros_endpoint_preflight_publish": [],
+          "micros_endpoint_reserve": [
+            [["work"],["grant01-shared/ipc01/kernel/endpoint/endpoint_publication.c/micros_endpoint_reserve/index-73","wrap","KERNEL_ENDPOINT","INDEX_PROBE",1,"value","process_handle . slot",[],0,2]],
+            [["work"],["grant01-shared/ipc01/kernel/endpoint/endpoint_publication.c/micros_endpoint_reserve/index-85","wrap","KERNEL_ENDPOINT","INDEX_PROBE",1,"value","process_handle . slot",[],1,2]]
+          ]
+        },
+        "kernel/endpoint/endpoint_queue_validation.c": {
+          "endpoint_has_matchable_work": [
+            [["work"],["grant01-shared/ipc01/kernel/endpoint/endpoint_queue_validation.c/endpoint_has_matchable_work/loop-38","insert","KERNEL_ENDPOINT","RECORD_VISIT",1,"entry","",[["for ( receiver_steps = 0 ; receiver_steps < MICROS_THREAD_CAPACITY ; ++ receiver_steps ) {",0]],0,0]],
+            [["work"],["grant01-shared/ipc01/kernel/endpoint/endpoint_queue_validation.c/endpoint_has_matchable_work/index-49","wrap","KERNEL_ENDPOINT","INDEX_PROBE",1,"value","receiver_handle . slot",[["for ( receiver_steps = 0 ; receiver_steps < MICROS_THREAD_CAPACITY ; ++ receiver_steps ) {",0]],0,1]],
+            [["work"],["grant01-shared/ipc01/kernel/endpoint/endpoint_queue_validation.c/endpoint_has_matchable_work/loop-104","insert","KERNEL_ENDPOINT","RECORD_VISIT",1,"entry","",[["for ( receiver_steps = 0 ; receiver_steps < MICROS_THREAD_CAPACITY ; ++ receiver_steps ) {",0],["if ( ! endpoint_thread_handle_is_zero ( sender_handle ) ) {",0],["for ( sender_steps = 0 ; sender_steps < MICROS_THREAD_CAPACITY ; ++ sender_steps ) {",0]],0,0]],
+            [["work"],["grant01-shared/ipc01/kernel/endpoint/endpoint_queue_validation.c/endpoint_has_matchable_work/index-115","wrap","KERNEL_ENDPOINT","INDEX_PROBE",1,"value","sender_handle . slot",[["for ( receiver_steps = 0 ; receiver_steps < MICROS_THREAD_CAPACITY ; ++ receiver_steps ) {",0],["if ( ! endpoint_thread_handle_is_zero ( sender_handle ) ) {",0],["for ( sender_steps = 0 ; sender_steps < MICROS_THREAD_CAPACITY ; ++ sender_steps ) {",0]],0,1]]
+          ],
+          "endpoint_pending_notification_state_is_valid": [
+            [["work"],["grant01-shared/ipc01/kernel/endpoint/endpoint_queue_validation.c/endpoint_pending_notification_state_is_valid/loop-29","insert","KERNEL_ENDPOINT","RECORD_VISIT",1,"entry","",[["for ( index = 0 ; index < MICROS_PROCESS_CAPACITY ; ++ index ) {",0]],0,0]],
+            [["work"],["grant01-shared/ipc01/kernel/endpoint/endpoint_queue_validation.c/endpoint_pending_notification_state_is_valid/index-69","wrap","KERNEL_ENDPOINT","INDEX_PROBE",1,"value","index",[["for ( index = 0 ; index < MICROS_PROCESS_CAPACITY ; ++ index ) {",0]],1,3]]
+          ],
+          "endpoint_preflight_record": [],
+          "endpoint_queue_is_valid": [
+            [["work"],["grant01-shared/ipc01/kernel/endpoint/endpoint_queue_validation.c/endpoint_queue_is_valid/loop-41","insert","KERNEL_ENDPOINT","RECORD_VISIT",1,"entry","",[["for ( steps = 0 ; steps < MICROS_THREAD_CAPACITY ; ++ steps ) {",0]],0,0]]
+          ],
+          "micros_endpoint_queue_member_is_valid": [
+            [["work"],["grant01-shared/ipc01/kernel/endpoint/endpoint_queue_validation.c/micros_endpoint_queue_member_is_valid/index-168","wrap","KERNEL_ENDPOINT","INDEX_PROBE",1,"value","thread -> owner . slot",[["if ( kind == MICROS_IPC_QUEUE_SENDER ) {",0]],0,1]]
+          ],
+          "receiver_matches_pending_notification": [
+            [["work"],["grant01-shared/ipc01/kernel/endpoint/endpoint_queue_validation.c/receiver_matches_pending_notification/index-94","wrap","KERNEL_ENDPOINT","INDEX_PROBE",1,"value","source . slot",[],2,3]]
+          ],
+          "receiver_queue_state_is_valid": [],
+          "selected_queue_is_valid": [
+            [["work"],["grant01-shared/ipc01/kernel/endpoint/endpoint_queue_validation.c/selected_queue_is_valid/loop-77","insert","KERNEL_ENDPOINT","RECORD_VISIT",1,"entry","",[["for ( size_t steps = 0 ; steps < MICROS_THREAD_CAPACITY ; ++ steps ) {",0]],0,0]]
+          ],
+          "sender_queue_state_is_valid": [
+            [["work"],["grant01-shared/ipc01/kernel/endpoint/endpoint_queue_validation.c/sender_queue_state_is_valid/index-10","wrap","KERNEL_ENDPOINT","INDEX_PROBE",1,"value","thread -> owner . slot",[],0,1]]
+          ]
+        },
+        "kernel/endpoint/endpoint_registry.c": {
+          "candidate_targets_are_closed": [
+            [["work"],["grant01-shared/ipc01/kernel/endpoint/endpoint_registry.c/candidate_targets_are_closed/loop-16","insert","KERNEL_ENDPOINT","RECORD_VISIT",1,"entry","",[["for ( source_index = 1 ; source_index < MICROS_PRIVILEGE_PROFILE_CAPACITY ; ++ source_index ) {",0]],0,0]]
+          ],
+          "endpoint_records_are_canonical": [
+            [["work"],["grant01-shared/ipc01/kernel/endpoint/endpoint_registry.c/endpoint_records_are_canonical/loop-16","insert","KERNEL_ENDPOINT","RECORD_VISIT",1,"entry","",[["for ( index = 0 ; index < MICROS_PROCESS_CAPACITY ; ++ index ) {",0]],0,0]],
+            [["work"],["grant01-shared/ipc01/kernel/endpoint/endpoint_registry.c/endpoint_records_are_canonical/index-27","wrap","KERNEL_ENDPOINT","INDEX_PROBE",1,"value","index",[["for ( index = 0 ; index < MICROS_PROCESS_CAPACITY ; ++ index ) {",0]],0,2]]
+          ],
+          "micros_endpoint_registry_initialize": [],
+          "micros_endpoint_registry_validate": [
+            [["work"],["grant01-shared/ipc01/kernel/endpoint/endpoint_registry.c/micros_endpoint_registry_validate/audit","insert","KERNEL_ENDPOINT","COMPLETE_VALIDATOR_CALL",1,"entry","",[],0,0]],
+            [["work"],["grant01-shared/ipc01/kernel/endpoint/endpoint_registry.c/micros_endpoint_registry_validate/index-59","wrap","KERNEL_ENDPOINT","INDEX_PROBE",1,"value","0",[],1,2]]
+          ],
+          "prepare_profile_candidates": [
+            [["work"],["grant01-shared/ipc01/kernel/endpoint/endpoint_registry.c/prepare_profile_candidates/loop-19","insert","KERNEL_ENDPOINT","RECORD_VISIT",1,"entry","",[["for ( source_index = 0 ; source_index < profile_count ; ++ source_index ) {",0]],0,0]],
+            [["work"],["grant01-shared/ipc01/kernel/endpoint/endpoint_registry.c/prepare_profile_candidates/loop-82","insert","KERNEL_ENDPOINT","RECORD_VISIT",1,"entry","",[["for ( source_index = 0 ; source_index < profile_count ; ++ source_index ) {",0],["for ( other_index = 0 ; other_index < source_index ; ++ other_index ) {",0]],0,0]]
+          ],
+          "profile_table_is_canonical": [
+            [["work"],["grant01-shared/ipc01/kernel/endpoint/endpoint_registry.c/profile_table_is_canonical/loop-29","insert","KERNEL_ENDPOINT","RECORD_VISIT",1,"entry","",[["for ( index = 1 ; index < MICROS_PRIVILEGE_PROFILE_CAPACITY ; ++ index ) {",0]],0,0]],
+            [["work"],["grant01-shared/ipc01/kernel/endpoint/endpoint_registry.c/profile_table_is_canonical/index-40","wrap","KERNEL_ENDPOINT","INDEX_PROBE",1,"value","index",[["for ( index = 1 ; index < MICROS_PRIVILEGE_PROFILE_CAPACITY ; ++ index ) {",0]],0,3]],
+            [["work"],["grant01-shared/ipc01/kernel/endpoint/endpoint_registry.c/profile_table_is_canonical/loop-123","insert","KERNEL_ENDPOINT","RECORD_VISIT",1,"entry","",[["for ( index = 1 ; index < MICROS_PRIVILEGE_PROFILE_CAPACITY ; ++ index ) {",0],["for ( other_index = 1 ; other_index < index ; ++ other_index ) {",0]],0,0]],
+            [["work"],["grant01-shared/ipc01/kernel/endpoint/endpoint_registry.c/profile_table_is_canonical/index-134","wrap","KERNEL_ENDPOINT","INDEX_PROBE",1,"value","other_index",[["for ( index = 1 ; index < MICROS_PRIVILEGE_PROFILE_CAPACITY ; ++ index ) {",0],["for ( other_index = 1 ; other_index < index ; ++ other_index ) {",0]],0,1]],
+            [["work"],["grant01-shared/ipc01/kernel/endpoint/endpoint_registry.c/profile_table_is_canonical/loop-204","insert","KERNEL_ENDPOINT","RECORD_VISIT",1,"entry","",[["for ( index = 1 ; index < MICROS_PRIVILEGE_PROFILE_CAPACITY ; ++ index ) {",1]],0,0]],
+            [["work"],["grant01-shared/ipc01/kernel/endpoint/endpoint_registry.c/profile_table_is_canonical/index-215","wrap","KERNEL_ENDPOINT","INDEX_PROBE",1,"value","index",[["for ( index = 1 ; index < MICROS_PRIVILEGE_PROFILE_CAPACITY ; ++ index ) {",1]],0,1]]
+          ],
+          "publish_profile_table": []
+        },
+        "kernel/grant/grant.c": {
+          "authority_is_zero": [],
+          "bytes_are_zero": [
+            [["work"],["grant01/kernel/grant/grant.c/bytes_are_zero/loop-24","insert","KERNEL_GRANT","COMPARISON",1,"entry","",[["for ( index = 0 ; index < size ; ++ index ) {",0]],0,0]]
+          ],
+          "clear_bytes": [
+            [["work"],["grant01/kernel/grant/grant.c/clear_bytes/loop-23","insert","KERNEL_GRANT","CLEARED_BYTE",1,"entry","",[["for ( index = 0 ; index < size ; ++ index ) {",0]],0,0]]
+          ],
+          "clear_record_authority": [],
+          "copy_bytes": [
+            [["work"],["grant01/kernel/grant/grant.c/copy_bytes/loop-31","insert","KERNEL_GRANT","COPIED_BYTE",1,"entry","",[["for ( index = 0 ; index < size ; ++ index ) {",0]],0,0]]
+          ],
+          "map_endpoint_error": [],
+          "micros_grant_commit_create_prevalidated": [
+            [["work"],["grant01/kernel/grant/grant.c/micros_grant_commit_create_prevalidated/index-6","wrap","KERNEL_GRANT","INDEX_PROBE",1,"value","plan -> slot",[],0,1]]
+          ],
+          "micros_grant_commit_endpoint_cancel": [
+            [["work"],["grant01/kernel/grant/grant.c/micros_grant_commit_endpoint_cancel/loop-106","insert","KERNEL_GRANT","RECORD_VISIT",1,"entry","",[["for ( index = 0 ; index < MICROS_GRANT_CAPACITY ; ++ index ) {",0]],0,0]],
+            [["work"],["grant01/kernel/grant/grant.c/micros_grant_commit_endpoint_cancel/index-117","wrap","KERNEL_GRANT","INDEX_PROBE",1,"value","index",[["for ( index = 0 ; index < MICROS_GRANT_CAPACITY ; ++ index ) {",0]],0,4]],
+            [["work"],["grant01/kernel/grant/grant.c/micros_grant_commit_endpoint_cancel/index-192","wrap","KERNEL_GRANT","INDEX_PROBE",1,"value","index",[["for ( index = 0 ; index < MICROS_GRANT_CAPACITY ; ++ index ) {",0]],2,4]],
+            [["work"],["grant01/kernel/grant/grant.c/micros_grant_commit_endpoint_cancel/index-209","wrap","KERNEL_GRANT","INDEX_PROBE",1,"value","index",[["for ( index = 0 ; index < MICROS_GRANT_CAPACITY ; ++ index ) {",0]],3,4]],
+            [["work"],["grant01/kernel/grant/grant.c/micros_grant_commit_endpoint_cancel/loop-249","insert","KERNEL_GRANT","RECORD_VISIT",1,"entry","",[["for ( index = 0 ; index < MICROS_GRANT_CAPACITY ; ++ index ) {",1]],0,0]],
+            [["work"],["grant01/kernel/grant/grant.c/micros_grant_commit_endpoint_cancel/index-276","wrap","KERNEL_GRANT","INDEX_PROBE",1,"value","index",[["for ( index = 0 ; index < MICROS_GRANT_CAPACITY ; ++ index ) {",1],["if ( ( plan -> selected_slots & ( UINT64_C ( 1 ) << index ) ) != 0 ) {",0]],0,2]]
+          ],
+          "micros_grant_create": [],
+          "micros_grant_inspect": [],
+          "micros_grant_pack": [],
+          "micros_grant_preflight_context": [],
+          "micros_grant_prepare_copy_authority": [],
+          "micros_grant_prepare_create": [
+            [["work"],["grant01/kernel/grant/grant.c/micros_grant_prepare_create/loop-197","insert","KERNEL_GRANT","RECORD_VISIT",1,"entry","",[["for ( slot = 0 ; slot < MICROS_GRANT_CAPACITY ; ++ slot ) {",0]],0,0]],
+            [["work"],["grant01/kernel/grant/grant.c/micros_grant_prepare_create/index-206","wrap","KERNEL_GRANT","INDEX_PROBE",1,"value","slot",[["for ( slot = 0 ; slot < MICROS_GRANT_CAPACITY ; ++ slot ) {",0]],0,4]],
+            [["work"],["grant01/kernel/grant/grant.c/micros_grant_prepare_create/index-229","wrap","KERNEL_GRANT","INDEX_PROBE",1,"value","slot",[["for ( slot = 0 ; slot < MICROS_GRANT_CAPACITY ; ++ slot ) {",0]],2,4]],
+            [["work"],["grant01/kernel/grant/grant.c/micros_grant_prepare_create/index-254","wrap","KERNEL_GRANT","INDEX_PROBE",1,"value","slot",[["for ( slot = 0 ; slot < MICROS_GRANT_CAPACITY ; ++ slot ) {",0]],3,4]],
+            [["work"],["grant01/kernel/grant/grant.c/micros_grant_prepare_create/index-308","wrap","KERNEL_GRANT","INDEX_PROBE",1,"value","slot",[],6,9]],
+            [["work"],["grant01/kernel/grant/grant.c/micros_grant_prepare_create/index-374","wrap","KERNEL_GRANT","INDEX_PROBE",1,"value","slot",[["{",10]],0,1]]
+          ],
+          "micros_grant_prepare_endpoint_cancel": [
+            [["work"],["grant01/kernel/grant/grant.c/micros_grant_prepare_endpoint_cancel/loop-168","insert","KERNEL_GRANT","RECORD_VISIT",1,"entry","",[["for ( index = 0 ; index < MICROS_GRANT_CAPACITY ; ++ index ) {",0]],0,0]],
+            [["work"],["grant01/kernel/grant/grant.c/micros_grant_prepare_endpoint_cancel/index-179","wrap","KERNEL_GRANT","INDEX_PROBE",1,"value","index",[["for ( index = 0 ; index < MICROS_GRANT_CAPACITY ; ++ index ) {",0]],0,1]],
+            [["work"],["grant01/kernel/grant/grant.c/micros_grant_prepare_endpoint_cancel/index-220","wrap","KERNEL_GRANT","INDEX_PROBE",1,"value","index",[["for ( index = 0 ; index < MICROS_GRANT_CAPACITY ; ++ index ) {",0],["if ( record -> state == MICROS_GRANT_SLOT_ACTIVE && ( record -> grantor_endpoint == endpoint || record -> grantee_endpoint == endpoint ) ) {",0]],1,2]]
+          ],
+          "micros_grant_registry_initialize": [
+            [["work"],["grant01/kernel/grant/grant.c/micros_grant_registry_initialize/loop-65","insert","KERNEL_GRANT","RECORD_VISIT",1,"entry","",[["for ( index = 0 ; index < MICROS_GRANT_CAPACITY ; ++ index ) {",0]],0,0]],
+            [["work"],["grant01/kernel/grant/grant.c/micros_grant_registry_initialize/index-69","wrap","KERNEL_GRANT","INDEX_PROBE",1,"value","index",[["for ( index = 0 ; index < MICROS_GRANT_CAPACITY ; ++ index ) {",0]],0,2]],
+            [["work"],["grant01/kernel/grant/grant.c/micros_grant_registry_initialize/index-80","wrap","KERNEL_GRANT","INDEX_PROBE",1,"value","index",[["for ( index = 0 ; index < MICROS_GRANT_CAPACITY ; ++ index ) {",0]],1,2]]
+          ],
+          "micros_grant_registry_validate": [
+            [["work"],["grant01/kernel/grant/grant.c/micros_grant_registry_validate/audit","insert","KERNEL_GRANT","COMPLETE_VALIDATOR_CALL",1,"entry","",[],0,0]],
+            [["work"],["grant01/kernel/grant/grant.c/micros_grant_registry_validate/loop-69","insert","KERNEL_GRANT","RECORD_VISIT",1,"entry","",[["for ( index = 0 ; index < MICROS_GRANT_CAPACITY ; ++ index ) {",0]],0,0]],
+            [["work"],["grant01/kernel/grant/grant.c/micros_grant_registry_validate/index-80","wrap","KERNEL_GRANT","INDEX_PROBE",1,"value","index",[["for ( index = 0 ; index < MICROS_GRANT_CAPACITY ; ++ index ) {",0]],0,1]]
+          ],
+          "micros_grant_revoke": [
+            [["work"],["grant01/kernel/grant/grant.c/micros_grant_revoke/index-56","wrap","KERNEL_GRANT","INDEX_PROBE",1,"value","slot",[],2,4]]
+          ],
+          "micros_grant_unpack": [],
+          "permissions_are_valid": [],
+          "preflight_selected_record": [
+            [["work"],["grant01/kernel/grant/grant.c/preflight_selected_record/index-12","wrap","KERNEL_GRANT","INDEX_PROBE",1,"value","slot",[["{",0]],0,1]]
+          ],
+          "process_handles_equal": [],
+          "range_is_valid": [],
+          "resolve_active_process_endpoint": [],
+          "resolve_live_process_endpoint": [],
+          "resolve_owned_record": [],
+          "resolve_selected_active_participant": [],
+          "retire_record": [],
+          "validate_record_storage": [],
+          "validate_registry_storage": [
+            [["work"],["grant01/kernel/grant/grant.c/validate_registry_storage/audit","insert","KERNEL_GRANT","COMPLETE_VALIDATOR_CALL",1,"entry","",[],0,0]],
+            [["work"],["grant01/kernel/grant/grant.c/validate_registry_storage/loop-45","insert","KERNEL_GRANT","RECORD_VISIT",1,"entry","",[["for ( index = 0 ; index < MICROS_GRANT_CAPACITY ; ++ index ) {",0]],0,0]],
+            [["work"],["grant01/kernel/grant/grant.c/validate_registry_storage/index-56","wrap","KERNEL_GRANT","INDEX_PROBE",1,"value","index",[["for ( index = 0 ; index < MICROS_GRANT_CAPACITY ; ++ index ) {",0]],0,3]],
+            [["work"],["grant01/kernel/grant/grant.c/validate_registry_storage/index-79","wrap","KERNEL_GRANT","INDEX_PROBE",1,"value","index",[["for ( index = 0 ; index < MICROS_GRANT_CAPACITY ; ++ index ) {",0]],2,3]]
+          ]
+        },
+        "kernel/grant/grant_abi.c": {
+          "micros_grant_abi_map_error": []
+        },
+        "kernel/grant/grant_copy.c": {
+          "grant_copy_execute": [],
+          "grant_copy_local_range_is_valid": [],
+          "grant_copy_prepare_participant_plans": [],
+          "grant_copy_prepare_remote_plan": [],
+          "micros_grant_copy_from": [],
+          "micros_grant_copy_to": [],
+          "micros_grant_validate_range": []
+        },
+        "kernel/grant/grant_copy_core.c": {
+          "chunks_overlap": [],
+          "micros_grant_copy_commit": [
+            [["work"],["grant01/kernel/grant/grant_copy_core.c/micros_grant_copy_commit/loop-31","insert","KERNEL_GRANT","COPY_UNIT",1,"entry","",[["while ( copied < length ) {",0]],0,0]],
+            [["work"],["grant01/kernel/grant/grant_copy_core.c/micros_grant_copy_commit/index-42","wrap","KERNEL_GRANT","INDEX_PROBE",1,"value","source_index",[["while ( copied < length ) {",0]],0,1]],
+            [["work"],["grant01/kernel/grant/grant_copy_core.c/micros_grant_copy_commit/index-56","wrap","KERNEL_GRANT","INDEX_PROBE",1,"value","destination_index",[["while ( copied < length ) {",0]],0,1]],
+            [["work"],["grant01/kernel/grant/grant_copy_core.c/micros_grant_copy_commit/loop-149","insert","KERNEL_GRANT","COPIED_BYTE",1,"entry","",[["while ( copied < length ) {",0],["for ( index = 0 ; index < count ; ++ index ) {",0]],0,0]]
+          ],
+          "micros_grant_copy_plan_validate": [
+            [["work"],["grant01/kernel/grant/grant_copy_core.c/micros_grant_copy_plan_validate/loop-65","insert","KERNEL_GRANT","RANGE_VISIT",1,"entry","",[["for ( source_index = 0 ; source_index < source -> chunk_count ; ++ source_index ) {",0]],0,0]],
+            [["work"],["grant01/kernel/grant/grant_copy_core.c/micros_grant_copy_plan_validate/loop-81","insert","KERNEL_GRANT","RANGE_VISIT",1,"entry","",[["for ( source_index = 0 ; source_index < source -> chunk_count ; ++ source_index ) {",0],["for ( destination_index = 0 ; destination_index < destination -> chunk_count ; ++ destination_index ) {",0]],0,0]],
+            [["work"],["grant01/kernel/grant/grant_copy_core.c/micros_grant_copy_plan_validate/index-90","wrap","KERNEL_GRANT","INDEX_PROBE",1,"value","source_index",[["for ( source_index = 0 ; source_index < source -> chunk_count ; ++ source_index ) {",0],["for ( destination_index = 0 ; destination_index < destination -> chunk_count ; ++ destination_index ) {",0]],0,1]],
+            [["work"],["grant01/kernel/grant/grant_copy_core.c/micros_grant_copy_plan_validate/index-98","wrap","KERNEL_GRANT","INDEX_PROBE",1,"value","destination_index",[["for ( source_index = 0 ; source_index < source -> chunk_count ; ++ source_index ) {",0],["for ( destination_index = 0 ; destination_index < destination -> chunk_count ; ++ destination_index ) {",0]],0,1]]
+          ],
+          "validate_range_plan": [
+            [["work"],["grant01/kernel/grant/grant_copy_core.c/validate_range_plan/loop-72","insert","KERNEL_GRANT","RANGE_VISIT",1,"entry","",[["for ( index = 0 ; index < plan -> chunk_count ; ++ index ) {",0]],0,0]],
+            [["work"],["grant01/kernel/grant/grant_copy_core.c/validate_range_plan/index-83","wrap","KERNEL_GRANT","INDEX_PROBE",1,"value","index",[["for ( index = 0 ; index < plan -> chunk_count ; ++ index ) {",0]],0,1]]
+          ]
+        },
+        "kernel/grant/grant_copy_range.c": {
+          "grant_copy_map_address_error": [],
+          "grant_copy_plan_device_span": [],
+          "grant_copy_plan_range": [
+            [["work"],["grant01/kernel/grant/grant_copy_range.c/grant_copy_plan_range/loop-29","insert","KERNEL_GRANT","RANGE_VISIT",1,"entry","",[["while ( remaining != 0 ) {",0]],0,0]],
+            [["work"],["grant01/kernel/grant/grant_copy_range.c/grant_copy_plan_range/index-186","wrap","KERNEL_GRANT","INDEX_PROBE",1,"value","candidate . chunk_count",[["while ( remaining != 0 ) {",0]],1,3]]
+          ]
+        },
+        "kernel/grant/grant_runtime.c": {
+          "clear_bytes": [
+            [["work"],["grant01/kernel/grant/grant_runtime.c/clear_bytes/loop-23","insert","KERNEL_GRANT","CLEARED_BYTE",1,"entry","",[["for ( index = 0 ; index < size ; ++ index ) {",0]],0,0]]
+          ],
+          "copy_bytes": [
+            [["work"],["grant01/kernel/grant/grant_runtime.c/copy_bytes/loop-31","insert","KERNEL_GRANT","COPIED_BYTE",1,"entry","",[["for ( index = 0 ; index < size ; ++ index ) {",0]],0,0]]
+          ],
+          "micros_grant_runtime_authoritative_registry": [],
+          "micros_grant_runtime_initialize": [],
+          "micros_grant_runtime_registry": [],
+          "micros_grant_runtime_validate": [
+            [["work"],["grant01/kernel/grant/grant_runtime.c/micros_grant_runtime_validate/audit","insert","KERNEL_GRANT","COMPLETE_VALIDATOR_CALL",1,"entry","",[],0,0]]
+          ]
+        },
+        "kernel/grant/grant_syscall.c": {
+          "grant_syscall_create_request": [],
+          "grant_syscall_execute_request": [],
+          "micros_grant_handle_captured_user_ecall": [],
+          "panic_grant_syscall": []
+        },
+        "kernel/grant/grant_syscall_core.c": {
+          "capture_u32": [],
+          "micros_grant_syscall_decode": []
+        },
+        "kernel/ipc/ipc_runtime.c": {
+          "clear_bytes": [
+            [["work"],["grant01/kernel/ipc/ipc_runtime.c/clear_bytes/loop-23","insert","KERNEL_IPC","CLEARED_BYTE",1,"entry","",[["for ( index = 0 ; index < size ; ++ index ) {",0]],0,0]]
+          ],
+          "copy_bytes": [
+            [["work"],["grant01/kernel/ipc/ipc_runtime.c/copy_bytes/loop-31","insert","KERNEL_IPC","COPIED_BYTE",1,"entry","",[["for ( index = 0 ; index < size ; ++ index ) {",0]],0,0]]
+          ],
+          "micros_ipc_runtime_authoritative_registry": [],
+          "micros_ipc_runtime_initialize": [],
+          "micros_ipc_runtime_registry": [],
+          "micros_ipc_runtime_validate": [
+            [["work"],["grant01/kernel/ipc/ipc_runtime.c/micros_ipc_runtime_validate/audit","insert","KERNEL_IPC","COMPLETE_VALIDATOR_CALL",1,"entry","",[],0,0]]
+          ]
+        },
+        "kernel/objects/kernel_object_context.c": {
+          "kernel_object_context_stack_avoids_harts": [
+            [["work"],["grant01-shared/ipc01/kernel/objects/kernel_object_context.c/kernel_object_context_stack_avoids_harts/loop-16","insert","KERNEL_OBJECTS","RECORD_VISIT",1,"entry","",[["for ( index = 0 ; index < MICROS_HART_CAPACITY ; ++ index ) {",0]],0,0]],
+            [["work"],["grant01-shared/ipc01/kernel/objects/kernel_object_context.c/kernel_object_context_stack_avoids_harts/index-27","wrap","KERNEL_OBJECTS","INDEX_PROBE",1,"value","index",[["for ( index = 0 ; index < MICROS_HART_CAPACITY ; ++ index ) {",0]],0,1]]
+          ],
+          "kernel_object_context_stack_avoids_threads": [
+            [["work"],["grant01-shared/ipc01/kernel/objects/kernel_object_context.c/kernel_object_context_stack_avoids_threads/loop-16","insert","KERNEL_OBJECTS","RECORD_VISIT",1,"entry","",[["for ( index = 0 ; index < MICROS_THREAD_CAPACITY ; ++ index ) {",0]],0,0]],
+            [["work"],["grant01-shared/ipc01/kernel/objects/kernel_object_context.c/kernel_object_context_stack_avoids_threads/index-27","wrap","KERNEL_OBJECTS","INDEX_PROBE",1,"value","index",[["for ( index = 0 ; index < MICROS_THREAD_CAPACITY ; ++ index ) {",0]],0,1]]
+          ],
+          "micros_thread_attach_execution_context": [],
+          "micros_thread_capture_execution_context": [],
+          "micros_thread_detach_execution_context": [
+            [["work"],["grant01-shared/ipc01/kernel/objects/kernel_object_context.c/micros_thread_detach_execution_context/loop-105","insert","KERNEL_OBJECTS","RECORD_VISIT",1,"entry","",[["for ( index = 0 ; index < MICROS_HART_CAPACITY ; ++ index ) {",0]],0,0]],
+            [["work"],["grant01-shared/ipc01/kernel/objects/kernel_object_context.c/micros_thread_detach_execution_context/index-116","wrap","KERNEL_OBJECTS","INDEX_PROBE",1,"value","index",[["for ( index = 0 ; index < MICROS_HART_CAPACITY ; ++ index ) {",0]],0,1]]
+          ],
+          "micros_thread_inspect_execution_context": []
+        },
+        "kernel/objects/kernel_object_hart.c": {
+          "kernel_object_hart_stacks_avoid_harts": [
+            [["work"],["grant01-shared/ipc01/kernel/objects/kernel_object_hart.c/kernel_object_hart_stacks_avoid_harts/loop-16","insert","KERNEL_OBJECTS","RECORD_VISIT",1,"entry","",[["for ( index = 0 ; index < MICROS_HART_CAPACITY ; ++ index ) {",0]],0,0]],
+            [["work"],["grant01-shared/ipc01/kernel/objects/kernel_object_hart.c/kernel_object_hart_stacks_avoid_harts/index-27","wrap","KERNEL_OBJECTS","INDEX_PROBE",1,"value","index",[["for ( index = 0 ; index < MICROS_HART_CAPACITY ; ++ index ) {",0]],0,1]]
+          ],
+          "kernel_object_hart_stacks_avoid_threads": [
+            [["work"],["grant01-shared/ipc01/kernel/objects/kernel_object_hart.c/kernel_object_hart_stacks_avoid_threads/loop-16","insert","KERNEL_OBJECTS","RECORD_VISIT",1,"entry","",[["for ( index = 0 ; index < MICROS_THREAD_CAPACITY ; ++ index ) {",0]],0,0]],
+            [["work"],["grant01-shared/ipc01/kernel/objects/kernel_object_hart.c/kernel_object_hart_stacks_avoid_threads/index-27","wrap","KERNEL_OBJECTS","INDEX_PROBE",1,"value","index",[["for ( index = 0 ; index < MICROS_THREAD_CAPACITY ; ++ index ) {",0]],0,1]]
+          ],
+          "micros_hart_current_thread": [],
+          "micros_hart_install_trap_stacks": [],
+          "micros_hart_register": [
+            [["work"],["grant01-shared/ipc01/kernel/objects/kernel_object_hart.c/micros_hart_register/loop-53","insert","KERNEL_OBJECTS","RECORD_VISIT",1,"entry","",[["for ( index = 0 ; index < MICROS_HART_CAPACITY ; ++ index ) {",0]],0,0]],
+            [["work"],["grant01-shared/ipc01/kernel/objects/kernel_object_hart.c/micros_hart_register/index-64","wrap","KERNEL_OBJECTS","INDEX_PROBE",1,"value","index",[["for ( index = 0 ; index < MICROS_HART_CAPACITY ; ++ index ) {",0]],0,1]],
+            [["work"],["grant01-shared/ipc01/kernel/objects/kernel_object_hart.c/micros_hart_register/loop-116","insert","KERNEL_OBJECTS","RECORD_VISIT",1,"entry","",[["for ( index = 0 ; index < MICROS_HART_CAPACITY ; ++ index ) {",1]],0,0]],
+            [["work"],["grant01-shared/ipc01/kernel/objects/kernel_object_hart.c/micros_hart_register/index-126","wrap","KERNEL_OBJECTS","INDEX_PROBE",1,"value","index",[["for ( index = 0 ; index < MICROS_HART_CAPACITY ; ++ index ) {",1]],0,2]]
+          ],
+          "micros_hart_resolve": [
+            [["work"],["grant01-shared/ipc01/kernel/objects/kernel_object_hart.c/micros_hart_resolve/index-62","wrap","KERNEL_OBJECTS","INDEX_PROBE",1,"value","handle . slot",[],0,1]]
+          ],
+          "micros_hart_resolve_context": [
+            [["work"],["grant01-shared/ipc01/kernel/objects/kernel_object_hart.c/micros_hart_resolve_context/index-120","wrap","KERNEL_OBJECTS","INDEX_PROBE",1,"value","index",[],2,3]]
+          ]
+        },
+        "kernel/objects/kernel_object_identity.c": {
+          "kernel_object_hart_handle_is_null": [],
+          "kernel_object_hart_handle_is_valid": [],
+          "kernel_object_process_handle_is_valid": [],
+          "kernel_object_process_thread_index_is_valid": [
+            [["work"],["grant01-shared/ipc01/kernel/objects/kernel_object_identity.c/kernel_object_process_thread_index_is_valid/index-95","wrap","KERNEL_OBJECTS","INDEX_PROBE",1,"value","process -> sole_thread . slot",[],0,1]]
+          ],
+          "kernel_object_require_initialized": [],
+          "kernel_object_resolve_hart_mutable": [
+            [["work"],["grant01-shared/ipc01/kernel/objects/kernel_object_identity.c/kernel_object_resolve_hart_mutable/index-24","wrap","KERNEL_OBJECTS","INDEX_PROBE",1,"value","handle . slot",[],0,1]]
+          ],
+          "kernel_object_resolve_process_mutable": [
+            [["work"],["grant01-shared/ipc01/kernel/objects/kernel_object_identity.c/kernel_object_resolve_process_mutable/index-24","wrap","KERNEL_OBJECTS","INDEX_PROBE",1,"value","handle . slot",[],0,1]]
+          ],
+          "kernel_object_resolve_thread_mutable": [
+            [["work"],["grant01-shared/ipc01/kernel/objects/kernel_object_identity.c/kernel_object_resolve_thread_mutable/index-24","wrap","KERNEL_OBJECTS","INDEX_PROBE",1,"value","handle . slot",[],0,1]]
+          ],
+          "kernel_object_thread_handle_is_null": [],
+          "kernel_object_thread_handle_is_valid": [],
+          "kernel_object_thread_handles_equal": [],
+          "micros_process_next_generation": [],
+          "micros_thread_next_generation": []
+        },
+        "kernel/objects/kernel_object_process.c": {
+          "micros_process_attach_address_space": [],
+          "micros_process_create": [
+            [["work"],["grant01-shared/ipc01/kernel/objects/kernel_object_process.c/micros_process_create/loop-53","insert","KERNEL_OBJECTS","RECORD_VISIT",1,"entry","",[["for ( index = 0 ; index < MICROS_PROCESS_CAPACITY ; ++ index ) {",0]],0,0]],
+            [["work"],["grant01-shared/ipc01/kernel/objects/kernel_object_process.c/micros_process_create/index-63","wrap","KERNEL_OBJECTS","INDEX_PROBE",1,"value","index",[["for ( index = 0 ; index < MICROS_PROCESS_CAPACITY ; ++ index ) {",0]],0,2]]
+          ],
+          "micros_process_create_at": [
+            [["work"],["grant01-shared/ipc01/kernel/objects/kernel_object_process.c/micros_process_create_at/index-55","wrap","KERNEL_OBJECTS","INDEX_PROBE",1,"value","slot",[],1,6]]
+          ],
+          "micros_process_detach_address_space": [],
+          "micros_process_release": [],
+          "micros_process_resolve": [
+            [["work"],["grant01-shared/ipc01/kernel/objects/kernel_object_process.c/micros_process_resolve/index-62","wrap","KERNEL_OBJECTS","INDEX_PROBE",1,"value","handle . slot",[],0,1]]
+          ]
+        },
+        "kernel/objects/kernel_object_stack.c": {
+          "kernel_object_ranges_overlap": [],
+          "kernel_object_stack_range_is_valid": [],
+          "kernel_object_trap_anchor_stacks_are_valid": []
+        },
+        "kernel/objects/kernel_object_state.c": {
+          "bytes_are_zero": [
+            [["work"],["grant01-shared/ipc01/kernel/objects/kernel_object_state.c/bytes_are_zero/loop-24","insert","KERNEL_OBJECTS","COMPARISON",1,"entry","",[["for ( index = 0 ; index < size ; ++ index ) {",0]],0,0]]
+          ],
+          "clear_bytes": [
+            [["work"],["grant01-shared/ipc01/kernel/objects/kernel_object_state.c/clear_bytes/loop-23","insert","KERNEL_OBJECTS","CLEARED_BYTE",1,"entry","",[["for ( index = 0 ; index < size ; ++ index ) {",0]],0,0]]
+          ],
+          "kernel_object_clear_thread_ipc_state": [],
+          "kernel_object_clear_thread_scheduler_metadata": [],
+          "kernel_object_clear_user_context": [
+            [["work"],["grant01-shared/ipc01/kernel/objects/kernel_object_state.c/kernel_object_clear_user_context/loop-32","insert","KERNEL_OBJECTS","CLEARED_BYTE",1,"entry","",[["for ( index = 0 ; index < sizeof ( * context ) ; ++ index ) {",0]],0,0]]
+          ],
+          "kernel_object_copy_user_context": [
+            [["work"],["grant01-shared/ipc01/kernel/objects/kernel_object_state.c/kernel_object_copy_user_context/loop-46","insert","KERNEL_OBJECTS","COPIED_BYTE",1,"entry","",[["for ( index = 0 ; index < sizeof ( * destination ) ; ++ index ) {",0]],0,0]]
+          ],
+          "kernel_object_storage_is_zero": [],
+          "kernel_object_thread_scheduler_metadata_is_zero": [],
+          "kernel_object_timer_state_is_initial": [],
+          "kernel_object_trap_anchor_is_zero": [],
+          "kernel_object_user_context_is_zero": [
+            [["work"],["grant01-shared/ipc01/kernel/objects/kernel_object_state.c/kernel_object_user_context_is_zero/loop-34","insert","KERNEL_OBJECTS","RECORD_VISIT",1,"entry","",[["for ( index = 0 ; index < sizeof ( * context ) ; ++ index ) {",0]],0,0]]
+          ],
+          "micros_thread_ipc_state_is_clear": []
+        },
+        "kernel/objects/kernel_object_thread.c": {
+          "micros_thread_create": [
+            [["work"],["grant01-shared/ipc01/kernel/objects/kernel_object_thread.c/micros_thread_create/loop-113","insert","KERNEL_OBJECTS","RECORD_VISIT",1,"entry","",[["for ( index = 0 ; index < MICROS_THREAD_CAPACITY ; ++ index ) {",0]],0,0]],
+            [["work"],["grant01-shared/ipc01/kernel/objects/kernel_object_thread.c/micros_thread_create/index-123","wrap","KERNEL_OBJECTS","INDEX_PROBE",1,"value","index",[["for ( index = 0 ; index < MICROS_THREAD_CAPACITY ; ++ index ) {",0]],0,2]]
+          ],
+          "micros_thread_release": [
+            [["work"],["grant01-shared/ipc01/kernel/objects/kernel_object_thread.c/micros_thread_release/loop-122","insert","KERNEL_OBJECTS","RECORD_VISIT",1,"entry","",[["for ( index = 0 ; index < MICROS_HART_CAPACITY ; ++ index ) {",0]],0,0]],
+            [["work"],["grant01-shared/ipc01/kernel/objects/kernel_object_thread.c/micros_thread_release/index-133","wrap","KERNEL_OBJECTS","INDEX_PROBE",1,"value","index",[["for ( index = 0 ; index < MICROS_HART_CAPACITY ; ++ index ) {",0]],0,1]]
+          ],
+          "micros_thread_resolve": [
+            [["work"],["grant01-shared/ipc01/kernel/objects/kernel_object_thread.c/micros_thread_resolve/index-62","wrap","KERNEL_OBJECTS","INDEX_PROBE",1,"value","handle . slot",[],0,1]]
+          ],
+          "select_release_survivor": [
+            [["work"],["grant01-shared/ipc01/kernel/objects/kernel_object_thread.c/select_release_survivor/loop-24","insert","KERNEL_OBJECTS","RECORD_VISIT",1,"entry","",[["for ( size_t index = 0 ; index < MICROS_THREAD_CAPACITY ; ++ index ) {",0]],0,0]],
+            [["work"],["grant01-shared/ipc01/kernel/objects/kernel_object_thread.c/select_release_survivor/index-35","wrap","KERNEL_OBJECTS","INDEX_PROBE",1,"value","index",[["for ( size_t index = 0 ; index < MICROS_THREAD_CAPACITY ; ++ index ) {",0]],0,2]]
+          ]
+        },
+        "kernel/objects/kernel_object_validation.c": {
+          "kernel_object_validation_current_binding_matches": [
+            [["work"],["grant01-shared/ipc01/kernel/objects/kernel_object_validation.c/kernel_object_validation_current_binding_matches/index-53","wrap","KERNEL_OBJECTS","INDEX_PROBE",1,"value","hart -> current_thread . slot",[["if ( hart -> current_thread . generation != 0 ) {",0]],1,3]]
+          ],
+          "kernel_object_validation_free_hart_is_clear": [
+            [["work"],["grant01-shared/ipc01/kernel/objects/kernel_object_validation.c/kernel_object_validation_free_hart_is_clear/loop-125","insert","KERNEL_OBJECTS","RECORD_VISIT",1,"entry","",[["for ( priority = 0 ; priority < MICROS_SCHEDULER_PRIORITY_COUNT ; ++ priority ) {",0]],0,0]],
+            [["work"],["grant01-shared/ipc01/kernel/objects/kernel_object_validation.c/kernel_object_validation_free_hart_is_clear/index-131","wrap","KERNEL_OBJECTS","INDEX_PROBE",1,"value","priority",[["for ( priority = 0 ; priority < MICROS_SCHEDULER_PRIORITY_COUNT ; ++ priority ) {",0]],0,2]],
+            [["work"],["grant01-shared/ipc01/kernel/objects/kernel_object_validation.c/kernel_object_validation_free_hart_is_clear/index-142","wrap","KERNEL_OBJECTS","INDEX_PROBE",1,"value","priority",[["for ( priority = 0 ; priority < MICROS_SCHEDULER_PRIORITY_COUNT ; ++ priority ) {",0]],1,2]]
+          ],
+          "kernel_object_validation_hart_slots_match": [
+            [["work"],["grant01-shared/ipc01/kernel/objects/kernel_object_validation.c/kernel_object_validation_hart_slots_match/loop-16","insert","KERNEL_OBJECTS","RECORD_VISIT",1,"entry","",[["for ( index = 0 ; index < MICROS_HART_CAPACITY ; ++ index ) {",0]],0,0]],
+            [["work"],["grant01-shared/ipc01/kernel/objects/kernel_object_validation.c/kernel_object_validation_hart_slots_match/index-27","wrap","KERNEL_OBJECTS","INDEX_PROBE",1,"value","index",[["for ( index = 0 ; index < MICROS_HART_CAPACITY ; ++ index ) {",0]],0,3]],
+            [["work"],["grant01-shared/ipc01/kernel/objects/kernel_object_validation.c/kernel_object_validation_hart_slots_match/loop-103","insert","KERNEL_OBJECTS","RECORD_VISIT",1,"entry","",[["for ( index = 0 ; index < MICROS_HART_CAPACITY ; ++ index ) {",0],["for ( other_index = 0 ; other_index < index ; ++ other_index ) {",0]],0,0]],
+            [["work"],["grant01-shared/ipc01/kernel/objects/kernel_object_validation.c/kernel_object_validation_hart_slots_match/index-114","wrap","KERNEL_OBJECTS","INDEX_PROBE",1,"value","other_index",[["for ( index = 0 ; index < MICROS_HART_CAPACITY ; ++ index ) {",0],["for ( other_index = 0 ; other_index < index ; ++ other_index ) {",0]],0,1]]
+          ],
+          "kernel_object_validation_hart_stack_state_matches": [],
+          "kernel_object_validation_process_counts_match": [
+            [["work"],["grant01-shared/ipc01/kernel/objects/kernel_object_validation.c/kernel_object_validation_process_counts_match/loop-16","insert","KERNEL_OBJECTS","RECORD_VISIT",1,"entry","",[["for ( index = 0 ; index < MICROS_PROCESS_CAPACITY ; ++ index ) {",0]],0,0]],
+            [["work"],["grant01-shared/ipc01/kernel/objects/kernel_object_validation.c/kernel_object_validation_process_counts_match/index-27","wrap","KERNEL_OBJECTS","INDEX_PROBE",1,"value","index",[["for ( index = 0 ; index < MICROS_PROCESS_CAPACITY ; ++ index ) {",0]],0,3]]
+          ],
+          "kernel_object_validation_process_slots_match": [
+            [["work"],["grant01-shared/ipc01/kernel/objects/kernel_object_validation.c/kernel_object_validation_process_slots_match/loop-16","insert","KERNEL_OBJECTS","RECORD_VISIT",1,"entry","",[["for ( index = 0 ; index < MICROS_PROCESS_CAPACITY ; ++ index ) {",0]],0,0]],
+            [["work"],["grant01-shared/ipc01/kernel/objects/kernel_object_validation.c/kernel_object_validation_process_slots_match/index-27","wrap","KERNEL_OBJECTS","INDEX_PROBE",1,"value","index",[["for ( index = 0 ; index < MICROS_PROCESS_CAPACITY ; ++ index ) {",0]],0,1]]
+          ],
+          "kernel_object_validation_stack_accumulate": [],
+          "kernel_object_validation_stack_base": [],
+          "kernel_object_validation_stack_exceptions_avoid": [
+            [["work"],["grant01-shared/ipc01/kernel/objects/kernel_object_validation.c/kernel_object_validation_stack_exceptions_avoid/loop-23","insert","KERNEL_OBJECTS","RECORD_VISIT",1,"entry","",[["for ( index = 0 ; index < MICROS_THREAD_CAPACITY + 2 * MICROS_HART_CAPACITY ; ++ index ) {",0]],0,0]],
+            [["work"],["grant01-shared/ipc01/kernel/objects/kernel_object_validation.c/kernel_object_validation_stack_exceptions_avoid/loop-118","insert","KERNEL_OBJECTS","RECORD_VISIT",1,"entry","",[["for ( index = 0 ; index < MICROS_THREAD_CAPACITY + 2 * MICROS_HART_CAPACITY ; ++ index ) {",0],["for ( other = 0 ; other < MICROS_THREAD_CAPACITY + 2 * MICROS_HART_CAPACITY ; ++ other ) {",0]],0,0]]
+          ],
+          "kernel_object_validation_stack_is_regular": [],
+          "kernel_object_validation_stack_next_regular": [
+            [["work"],["grant01-shared/ipc01/kernel/objects/kernel_object_validation.c/kernel_object_validation_stack_next_regular/loop-37","insert","KERNEL_OBJECTS","RECORD_VISIT",1,"entry","",[["for ( ; cursor -> slot < limit ; ++ cursor -> slot ) {",0]],0,0]]
+          ],
+          "kernel_object_validation_stack_range_at": [
+            [["work"],["grant01-shared/ipc01/kernel/objects/kernel_object_validation.c/kernel_object_validation_stack_range_at/index-17","wrap","KERNEL_OBJECTS","INDEX_PROBE",1,"value","slot",[["if ( cohort == 0 ) {",0]],0,1]],
+            [["work"],["grant01-shared/ipc01/kernel/objects/kernel_object_validation.c/kernel_object_validation_stack_range_at/index-66","wrap","KERNEL_OBJECTS","INDEX_PROBE",1,"value","slot",[["else {",0]],0,1]]
+          ],
+          "kernel_object_validation_stack_regulars_avoid": [
+            [["work"],["grant01-shared/ipc01/kernel/objects/kernel_object_validation.c/kernel_object_validation_stack_regulars_avoid/loop-28","insert","KERNEL_OBJECTS","RECORD_VISIT",1,"entry","",[["for ( cohort = 0 ; cohort < 3 ; ++ cohort ) {",0]],0,0]],
+            [["work"],["grant01-shared/ipc01/kernel/objects/kernel_object_validation.c/kernel_object_validation_stack_regulars_avoid/loop-59","insert","KERNEL_OBJECTS","RECORD_VISIT",1,"entry","",[["for ( ; ; ) {",0]],0,0]],
+            [["work"],["grant01-shared/ipc01/kernel/objects/kernel_object_validation.c/kernel_object_validation_stack_regulars_avoid/loop-78","insert","KERNEL_OBJECTS","RECORD_VISIT",1,"entry","",[["for ( ; ; ) {",0],["for ( cohort = 0 ; cohort < 3 ; ++ cohort ) {",0]],0,0]]
+          ],
+          "kernel_object_validation_stack_stride": [],
+          "kernel_object_validation_thread_context_matches": [],
+          "kernel_object_validation_thread_slots_match": [
+            [["work"],["grant01-shared/ipc01/kernel/objects/kernel_object_validation.c/kernel_object_validation_thread_slots_match/loop-16","insert","KERNEL_OBJECTS","RECORD_VISIT",1,"entry","",[["for ( index = 0 ; index < MICROS_THREAD_CAPACITY ; ++ index ) {",0]],0,0]],
+            [["work"],["grant01-shared/ipc01/kernel/objects/kernel_object_validation.c/kernel_object_validation_thread_slots_match/index-27","wrap","KERNEL_OBJECTS","INDEX_PROBE",1,"value","index",[["for ( index = 0 ; index < MICROS_THREAD_CAPACITY ; ++ index ) {",0]],0,1]],
+            [["work"],["grant01-shared/ipc01/kernel/objects/kernel_object_validation.c/kernel_object_validation_thread_slots_match/index-143","wrap","KERNEL_OBJECTS","INDEX_PROBE",1,"value","thread -> owner . slot",[["for ( index = 0 ; index < MICROS_THREAD_CAPACITY ; ++ index ) {",0],["switch ( thread -> slot_state ) {",0]],0,3]],
+            [["work"],["grant01-shared/ipc01/kernel/objects/kernel_object_validation.c/kernel_object_validation_thread_slots_match/index-158","wrap","KERNEL_OBJECTS","INDEX_PROBE",1,"value","thread -> owner . slot",[["for ( index = 0 ; index < MICROS_THREAD_CAPACITY ; ++ index ) {",0],["switch ( thread -> slot_state ) {",0]],1,3]]
+          ],
+          "micros_kernel_objects_validate_base": [
+            [["work"],["grant01-shared/ipc01/kernel/objects/kernel_object_validation.c/micros_kernel_objects_validate_base/audit","insert","KERNEL_OBJECTS","COMPLETE_VALIDATOR_CALL",1,"entry","",[],0,0]],
+            [["work"],["grant01-shared/ipc01/kernel/objects/kernel_object_validation.c/micros_kernel_objects_validate_base/loop-120","insert","KERNEL_OBJECTS","RECORD_VISIT",1,"entry","",[["for ( index = 0 ; index < MICROS_PROCESS_CAPACITY ; ++ index ) {",0]],0,0]],
+            [["work"],["grant01-shared/ipc01/kernel/objects/kernel_object_validation.c/micros_kernel_objects_validate_base/loop-142","insert","KERNEL_OBJECTS","RECORD_VISIT",1,"entry","",[["for ( index = 0 ; index < MICROS_THREAD_CAPACITY ; ++ index ) {",0]],0,0]]
+          ]
+        },
+        "kernel/objects/kernel_objects.c": {
+          "micros_kernel_objects_initialize": [
+            [["work"],["grant01-shared/ipc01/kernel/objects/kernel_objects.c/micros_kernel_objects_initialize/loop-94","insert","KERNEL_OBJECTS","RECORD_VISIT",1,"entry","",[["for ( index = 0 ; index < MICROS_PROCESS_CAPACITY ; ++ index ) {",0]],0,0]],
+            [["work"],["grant01-shared/ipc01/kernel/objects/kernel_objects.c/micros_kernel_objects_initialize/index-98","wrap","KERNEL_OBJECTS","INDEX_PROBE",1,"value","index",[["for ( index = 0 ; index < MICROS_PROCESS_CAPACITY ; ++ index ) {",0]],0,1]]
+          ],
+          "micros_kernel_objects_validate": [
+            [["work"],["grant01-shared/ipc01/kernel/objects/kernel_objects.c/micros_kernel_objects_validate/audit","insert","KERNEL_OBJECTS","COMPLETE_VALIDATOR_CALL",1,"entry","",[],0,0]]
+          ]
+        },
+        "kernel/scheduler/scheduler_core.c": {
+          "scheduler_core_add_overflows": [],
+          "scheduler_core_bitmap_clear": [
+            [["work"],["grant01-shared/ipc01/kernel/scheduler/scheduler_core.c/scheduler_core_bitmap_clear/loop-22","insert","KERNEL_SCHEDULER","RECORD_VISIT",1,"entry","",[["for ( index = 0 ; index < ( MICROS_THREAD_CAPACITY + 63 ) / 64 ; ++ index ) {",0]],0,0]]
+          ],
+          "scheduler_core_bitmap_set": [],
+          "scheduler_core_bitmap_test": [],
+          "scheduler_core_hart_handle_is_null": [],
+          "scheduler_core_hart_handles_equal": [],
+          "scheduler_core_hart_has_assigned_thread": [
+            [["work"],["grant01-shared/ipc01/kernel/scheduler/scheduler_core.c/scheduler_core_hart_has_assigned_thread/loop-16","insert","KERNEL_SCHEDULER","RECORD_VISIT",1,"entry","",[["for ( index = 0 ; index < MICROS_THREAD_CAPACITY ; ++ index ) {",0]],0,0]],
+            [["work"],["grant01-shared/ipc01/kernel/scheduler/scheduler_core.c/scheduler_core_hart_has_assigned_thread/index-27","wrap","KERNEL_SCHEDULER","INDEX_PROBE",1,"value","index",[["for ( index = 0 ; index < MICROS_THREAD_CAPACITY ; ++ index ) {",0]],0,1]]
+          ],
+          "scheduler_core_null_thread_handle": [],
+          "scheduler_core_preflight_hart": [
+            [["work"],["grant01-shared/ipc01/kernel/scheduler/scheduler_core.c/scheduler_core_preflight_hart/index-168","wrap","KERNEL_SCHEDULER","INDEX_PROBE",1,"value","current -> scheduler_priority",[["if ( ! scheduler_core_thread_handle_is_null ( hart -> current_thread ) ) {",0]],0,1]]
+          ],
+          "scheduler_core_preflight_queue_endpoints": [
+            [["work"],["grant01-shared/ipc01/kernel/scheduler/scheduler_core.c/scheduler_core_preflight_queue_endpoints/index-46","wrap","KERNEL_SCHEDULER","INDEX_PROBE",1,"value","priority",[],1,6]],
+            [["work"],["grant01-shared/ipc01/kernel/scheduler/scheduler_core.c/scheduler_core_preflight_queue_endpoints/index-55","wrap","KERNEL_SCHEDULER","INDEX_PROBE",1,"value","priority",[],2,6]]
+          ],
+          "scheduler_core_preflight_queue_record": [],
+          "scheduler_core_preflight_registry": [],
+          "scheduler_core_preflight_thread": [],
+          "scheduler_core_preflight_thread_operation": [],
+          "scheduler_core_resolve_hart_mutable": [
+            [["work"],["grant01-shared/ipc01/kernel/scheduler/scheduler_core.c/scheduler_core_resolve_hart_mutable/index-55","wrap","KERNEL_SCHEDULER","INDEX_PROBE",1,"value","handle . slot",[],0,1]]
+          ],
+          "scheduler_core_resolve_thread_mutable": [
+            [["work"],["grant01-shared/ipc01/kernel/scheduler/scheduler_core.c/scheduler_core_resolve_thread_mutable/index-55","wrap","KERNEL_SCHEDULER","INDEX_PROBE",1,"value","handle . slot",[],0,1]]
+          ],
+          "scheduler_core_thread_handle_is_null": [],
+          "scheduler_core_thread_handles_equal": [],
+          "scheduler_core_thread_is_current": [],
+          "selected_hart_accounting_is_valid": [],
+          "selected_hart_stacks_are_valid": [],
+          "selected_thread_context_is_valid": [],
+          "selected_thread_policy_is_valid": []
+        },
+        "kernel/scheduler/scheduler_core_accounting.c": {
+          "micros_scheduler_account_enter_idle": [],
+          "micros_scheduler_account_enter_thread": [
+            [["work"],["grant01-shared/ipc01/kernel/scheduler/scheduler_core_accounting.c/micros_scheduler_account_enter_thread/index-134","wrap","KERNEL_SCHEDULER","INDEX_PROBE",1,"value","thread -> scheduler_priority",[],1,2]]
+          ],
+          "micros_scheduler_account_idle_trap": [],
+          "micros_scheduler_account_user_trap": [
+            [["work"],["grant01-shared/ipc01/kernel/scheduler/scheduler_core_accounting.c/micros_scheduler_account_user_trap/index-135","wrap","KERNEL_SCHEDULER","INDEX_PROBE",1,"value","thread -> scheduler_priority",[],1,2]]
+          ],
+          "micros_scheduler_accounting_initialize": []
+        },
+        "kernel/scheduler/scheduler_core_ipc.c": {
+          "clear_current_ipc_guard": [],
+          "current_ipc_guard_is_zero": [],
+          "ipc_blocked_flags_are_valid": [],
+          "micros_scheduler_begin_current_ipc": [],
+          "micros_scheduler_commit_current_ipc": [],
+          "micros_scheduler_preflight_current_ipc": [
+            [["work"],["grant01-shared/ipc01/kernel/scheduler/scheduler_core_ipc.c/micros_scheduler_preflight_current_ipc/index-123","wrap","KERNEL_SCHEDULER","INDEX_PROBE",1,"value","thread -> scheduler_priority",[],0,1]]
+          ],
+          "micros_scheduler_rollback_current_ipc": []
+        },
+        "kernel/scheduler/scheduler_core_ipc_transition.c": {
+          "commit_transition_candidates": [
+            [["work"],["grant01-shared/ipc01/kernel/scheduler/scheduler_core_ipc_transition.c/commit_transition_candidates/loop-16","insert","KERNEL_SCHEDULER","RECORD_VISIT",1,"entry","",[["for ( index = 0 ; index < request_count ; ++ index ) {",0]],0,0]]
+          ],
+          "ipc_transition_clear_flags_are_valid": [],
+          "ipc_transition_set_flags_are_valid": [],
+          "micros_scheduler_commit_ipc_call_delivery": [],
+          "micros_scheduler_commit_ipc_reply_receive_delivery": [],
+          "micros_scheduler_commit_ipc_reply_receive_wait": [],
+          "micros_scheduler_commit_ipc_transitions": [],
+          "micros_scheduler_commit_ipc_wake": [],
+          "micros_scheduler_commit_ipc_wake_pair": [],
+          "micros_scheduler_commit_ipc_wake_prevalidated": [
+            [["work"],["grant01-shared/ipc01/kernel/scheduler/scheduler_core_ipc_transition.c/micros_scheduler_commit_ipc_wake_prevalidated/index-9","wrap","KERNEL_SCHEDULER","INDEX_PROBE",1,"value","plan -> thread . slot",[],0,1]],
+            [["work"],["grant01-shared/ipc01/kernel/scheduler/scheduler_core_ipc_transition.c/micros_scheduler_commit_ipc_wake_prevalidated/index-42","wrap","KERNEL_SCHEDULER","INDEX_PROBE",1,"value","plan -> hart . slot",[["if ( plan -> resulting_flags == 0 ) {",0]],0,1]]
+          ],
+          "micros_scheduler_prepare_ipc_wake": [],
+          "preflight_transition_candidates": [
+            [["work"],["grant01-shared/ipc01/kernel/scheduler/scheduler_core_ipc_transition.c/preflight_transition_candidates/loop-20","insert","KERNEL_SCHEDULER","RECORD_VISIT",1,"entry","",[["for ( index = 0 ; index < request_count ; ++ index ) {",0]],0,0]]
+          ],
+          "preflight_transition_shapes": [
+            [["work"],["grant01-shared/ipc01/kernel/scheduler/scheduler_core_ipc_transition.c/preflight_transition_shapes/loop-19","insert","KERNEL_SCHEDULER","RECORD_VISIT",1,"entry","",[["for ( index = 0 ; index < request_count ; ++ index ) {",0]],0,0]],
+            [["work"],["grant01-shared/ipc01/kernel/scheduler/scheduler_core_ipc_transition.c/preflight_transition_shapes/loop-80","insert","KERNEL_SCHEDULER","RECORD_VISIT",1,"entry","",[["for ( index = 0 ; index < request_count ; ++ index ) {",0],["for ( other_index = 0 ; other_index < index ; ++ other_index ) {",0]],0,0]]
+          ],
+          "preflight_transition_stamps": [
+            [["work"],["grant01-shared/ipc01/kernel/scheduler/scheduler_core_ipc_transition.c/preflight_transition_stamps/loop-25","insert","KERNEL_SCHEDULER","RECORD_VISIT",1,"entry","",[["for ( index = 0 ; index < request_count ; ++ index ) {",0]],0,0]],
+            [["work"],["grant01-shared/ipc01/kernel/scheduler/scheduler_core_ipc_transition.c/preflight_transition_stamps/loop-128","insert","KERNEL_SCHEDULER","RECORD_VISIT",1,"entry","",[["for ( index = 0 ; index < request_count ; ++ index ) {",1]],0,0]]
+          ]
+        },
+        "kernel/scheduler/scheduler_core_policy.c": {
+          "micros_hart_pick_ready": [],
+          "micros_thread_install_policy": [],
+          "micros_thread_runtime_flags_set": [],
+          "micros_thread_runtime_flags_unset": [],
+          "micros_thread_scheduler_admit": [],
+          "micros_thread_scheduler_admit_preflight": [],
+          "micros_thread_scheduler_hold": [],
+          "micros_thread_scheduler_remove": []
+        },
+        "kernel/scheduler/scheduler_core_queue.c": {
+          "preflight_dequeue_successor": [
+            [["work"],["grant01-shared/ipc01/kernel/scheduler/scheduler_core_queue.c/preflight_dequeue_successor/index-32","wrap","KERNEL_SCHEDULER","INDEX_PROBE",1,"value","thread -> scheduler_priority",[],0,3]],
+            [["work"],["grant01-shared/ipc01/kernel/scheduler/scheduler_core_queue.c/preflight_dequeue_successor/index-106","wrap","KERNEL_SCHEDULER","INDEX_PROBE",1,"value","thread -> scheduler_priority",[],2,3]],
+            [["work"],["grant01-shared/ipc01/kernel/scheduler/scheduler_core_queue.c/preflight_dequeue_successor/loop-125","insert","KERNEL_SCHEDULER","RECORD_VISIT",1,"entry","",[["for ( index = 1 ; index < steps ; ++ index ) {",0]],0,0]],
+            [["work"],["grant01-shared/ipc01/kernel/scheduler/scheduler_core_queue.c/preflight_dequeue_successor/index-145","wrap","KERNEL_SCHEDULER","INDEX_PROBE",1,"value","cursor . slot",[["for ( index = 1 ; index < steps ; ++ index ) {",0]],0,1]]
+          ],
+          "queue_enqueue_tail_raw": [
+            [["work"],["grant01-shared/ipc01/kernel/scheduler/scheduler_core_queue.c/queue_enqueue_tail_raw/index-9","wrap","KERNEL_SCHEDULER","INDEX_PROBE",1,"value","thread_handle . slot",[],0,1]],
+            [["work"],["grant01-shared/ipc01/kernel/scheduler/scheduler_core_queue.c/queue_enqueue_tail_raw/index-43","wrap","KERNEL_SCHEDULER","INDEX_PROBE",1,"value","priority",[],1,4]],
+            [["work"],["grant01-shared/ipc01/kernel/scheduler/scheduler_core_queue.c/queue_enqueue_tail_raw/index-52","wrap","KERNEL_SCHEDULER","INDEX_PROBE",1,"value","priority",[["if ( scheduler_core_thread_handle_is_null ( hart -> ready_head [ priority ] ) ) {",0]],0,2]],
+            [["work"],["grant01-shared/ipc01/kernel/scheduler/scheduler_core_queue.c/queue_enqueue_tail_raw/index-61","wrap","KERNEL_SCHEDULER","INDEX_PROBE",1,"value","priority",[["if ( scheduler_core_thread_handle_is_null ( hart -> ready_head [ priority ] ) ) {",0]],1,2]],
+            [["work"],["grant01-shared/ipc01/kernel/scheduler/scheduler_core_queue.c/queue_enqueue_tail_raw/index-73","wrap","KERNEL_SCHEDULER","INDEX_PROBE",1,"value","hart -> ready_tail [ priority ] . slot",[],0,1]],
+            [["work"],["grant01-shared/ipc01/kernel/scheduler/scheduler_core_queue.c/queue_enqueue_tail_raw/index-77","wrap","KERNEL_SCHEDULER","INDEX_PROBE",1,"value","priority",[],2,4]],
+            [["work"],["grant01-shared/ipc01/kernel/scheduler/scheduler_core_queue.c/queue_enqueue_tail_raw/index-91","wrap","KERNEL_SCHEDULER","INDEX_PROBE",1,"value","priority",[],3,4]]
+          ],
+          "scheduler_core_preflight_tail_enqueue": [
+            [["work"],["grant01-shared/ipc01/kernel/scheduler/scheduler_core_queue.c/scheduler_core_preflight_tail_enqueue/index-47","wrap","KERNEL_SCHEDULER","INDEX_PROBE",1,"value","hart -> current_thread . slot",[["if ( ! scheduler_core_thread_handle_is_null ( hart -> current_thread ) ) {",0]],0,1]]
+          ],
+          "scheduler_core_queue_dequeue": [
+            [["work"],["grant01-shared/ipc01/kernel/scheduler/scheduler_core_queue.c/scheduler_core_queue_dequeue/index-64","wrap","KERNEL_SCHEDULER","INDEX_PROBE",1,"value","thread_handle . slot",[],0,1]],
+            [["work"],["grant01-shared/ipc01/kernel/scheduler/scheduler_core_queue.c/scheduler_core_queue_dequeue/index-119","wrap","KERNEL_SCHEDULER","INDEX_PROBE",1,"value","priority",[],4,5]],
+            [["work"],["grant01-shared/ipc01/kernel/scheduler/scheduler_core_queue.c/scheduler_core_queue_dequeue/loop-131","insert","KERNEL_SCHEDULER","RECORD_VISIT",1,"entry","",[["while ( ! scheduler_core_thread_handle_is_null ( cursor ) ) {",0]],0,0]],
+            [["work"],["grant01-shared/ipc01/kernel/scheduler/scheduler_core_queue.c/scheduler_core_queue_dequeue/index-224","wrap","KERNEL_SCHEDULER","INDEX_PROBE",1,"value","priority",[["while ( ! scheduler_core_thread_handle_is_null ( cursor ) ) {",0],["if ( scheduler_core_thread_handles_equal ( cursor , thread_handle ) ) {",0],["if ( scheduler_core_thread_handle_is_null ( previous ) ) {",0]],0,1]],
+            [["work"],["grant01-shared/ipc01/kernel/scheduler/scheduler_core_queue.c/scheduler_core_queue_dequeue/index-238","wrap","KERNEL_SCHEDULER","INDEX_PROBE",1,"value","previous . slot",[["while ( ! scheduler_core_thread_handle_is_null ( cursor ) ) {",0],["if ( scheduler_core_thread_handles_equal ( cursor , thread_handle ) ) {",0],["else {",0]],0,1]],
+            [["work"],["grant01-shared/ipc01/kernel/scheduler/scheduler_core_queue.c/scheduler_core_queue_dequeue/index-258","wrap","KERNEL_SCHEDULER","INDEX_PROBE",1,"value","priority",[["while ( ! scheduler_core_thread_handle_is_null ( cursor ) ) {",0],["if ( scheduler_core_thread_handles_equal ( cursor , thread_handle ) ) {",0]],0,2]],
+            [["work"],["grant01-shared/ipc01/kernel/scheduler/scheduler_core_queue.c/scheduler_core_queue_dequeue/index-269","wrap","KERNEL_SCHEDULER","INDEX_PROBE",1,"value","priority",[["while ( ! scheduler_core_thread_handle_is_null ( cursor ) ) {",0],["if ( scheduler_core_thread_handles_equal ( cursor , thread_handle ) ) {",0],["if ( scheduler_core_thread_handles_equal ( hart -> ready_tail [ priority ] , thread_handle ) ) {",0]],0,1]],
+            [["work"],["grant01-shared/ipc01/kernel/scheduler/scheduler_core_queue.c/scheduler_core_queue_dequeue/index-283","wrap","KERNEL_SCHEDULER","INDEX_PROBE",1,"value","priority",[["while ( ! scheduler_core_thread_handle_is_null ( cursor ) ) {",0],["if ( scheduler_core_thread_handles_equal ( cursor , thread_handle ) ) {",0]],1,2]],
+            [["work"],["grant01-shared/ipc01/kernel/scheduler/scheduler_core_queue.c/scheduler_core_queue_dequeue/index-292","wrap","KERNEL_SCHEDULER","INDEX_PROBE",1,"value","priority",[["while ( ! scheduler_core_thread_handle_is_null ( cursor ) ) {",0],["if ( scheduler_core_thread_handles_equal ( cursor , thread_handle ) ) {",0],["if ( scheduler_core_thread_handle_is_null ( hart -> ready_head [ priority ] ) ) {",0]],0,1]]
+          ],
+          "scheduler_core_queue_enqueue_head_prevalidated": [
+            [["work"],["grant01-shared/ipc01/kernel/scheduler/scheduler_core_queue.c/scheduler_core_queue_enqueue_head_prevalidated/index-9","wrap","KERNEL_SCHEDULER","INDEX_PROBE",1,"value","thread_handle . slot",[],0,1]],
+            [["work"],["grant01-shared/ipc01/kernel/scheduler/scheduler_core_queue.c/scheduler_core_queue_enqueue_head_prevalidated/index-29","wrap","KERNEL_SCHEDULER","INDEX_PROBE",1,"value","priority",[],1,4]],
+            [["work"],["grant01-shared/ipc01/kernel/scheduler/scheduler_core_queue.c/scheduler_core_queue_enqueue_head_prevalidated/index-48","wrap","KERNEL_SCHEDULER","INDEX_PROBE",1,"value","priority",[],2,4]],
+            [["work"],["grant01-shared/ipc01/kernel/scheduler/scheduler_core_queue.c/scheduler_core_queue_enqueue_head_prevalidated/index-61","wrap","KERNEL_SCHEDULER","INDEX_PROBE",1,"value","priority",[],3,4]],
+            [["work"],["grant01-shared/ipc01/kernel/scheduler/scheduler_core_queue.c/scheduler_core_queue_enqueue_head_prevalidated/index-70","wrap","KERNEL_SCHEDULER","INDEX_PROBE",1,"value","priority",[["if ( scheduler_core_thread_handle_is_null ( hart -> ready_tail [ priority ] ) ) {",0]],0,1]]
+          ],
+          "scheduler_core_queue_enqueue_tail_prevalidated": [
+            [["work"],["grant01-shared/ipc01/kernel/scheduler/scheduler_core_queue.c/scheduler_core_queue_enqueue_tail_prevalidated/index-9","wrap","KERNEL_SCHEDULER","INDEX_PROBE",1,"value","thread_handle . slot",[],0,1]],
+            [["work"],["grant01-shared/ipc01/kernel/scheduler/scheduler_core_queue.c/scheduler_core_queue_enqueue_tail_prevalidated/index-44","wrap","KERNEL_SCHEDULER","INDEX_PROBE",1,"value","hart -> current_thread . slot",[["if ( ! scheduler_core_thread_handle_is_null ( hart -> current_thread ) ) {",0]],0,1]],
+            [["work"],["grant01-shared/ipc01/kernel/scheduler/scheduler_core_queue.c/scheduler_core_queue_enqueue_tail_prevalidated/index-97","wrap","KERNEL_SCHEDULER","INDEX_PROBE",1,"value","priority",[["if ( ! scheduler_core_thread_handle_is_null ( hart -> current_thread ) ) {",0],["if ( ! scheduler_core_thread_handles_equal ( hart -> current_thread , thread_handle ) && current -> scheduler_assigned && current -> runtime_flags == 0 && current -> scheduler_preemptible && current -> scheduler_priority > thread -> scheduler_priority ) {",0]],1,3]],
+            [["work"],["grant01-shared/ipc01/kernel/scheduler/scheduler_core_queue.c/scheduler_core_queue_enqueue_tail_prevalidated/index-112","wrap","KERNEL_SCHEDULER","INDEX_PROBE",1,"value","priority",[["if ( ! scheduler_core_thread_handle_is_null ( hart -> current_thread ) ) {",0],["if ( ! scheduler_core_thread_handles_equal ( hart -> current_thread , thread_handle ) && current -> scheduler_assigned && current -> runtime_flags == 0 && current -> scheduler_preemptible && current -> scheduler_priority > thread -> scheduler_priority ) {",0]],2,3]],
+            [["work"],["grant01-shared/ipc01/kernel/scheduler/scheduler_core_queue.c/scheduler_core_queue_enqueue_tail_prevalidated/index-125","wrap","KERNEL_SCHEDULER","INDEX_PROBE",1,"value","priority",[["if ( ! scheduler_core_thread_handle_is_null ( hart -> current_thread ) ) {",0],["if ( ! scheduler_core_thread_handles_equal ( hart -> current_thread , thread_handle ) && current -> scheduler_assigned && current -> runtime_flags == 0 && current -> scheduler_preemptible && current -> scheduler_priority > thread -> scheduler_priority ) {",0],["if ( scheduler_core_thread_handles_equal ( hart -> ready_tail [ priority ] , hart -> current_thread ) ) {",0]],0,1]]
+          ],
+          "scheduler_core_queue_pick": [
+            [["work"],["grant01-shared/ipc01/kernel/scheduler/scheduler_core_queue.c/scheduler_core_queue_pick/loop-20","insert","KERNEL_SCHEDULER","RECORD_VISIT",1,"entry","",[["for ( priority = 0 ; priority < MICROS_SCHEDULER_PRIORITY_COUNT ; ++ priority ) {",0]],0,0]],
+            [["work"],["grant01-shared/ipc01/kernel/scheduler/scheduler_core_queue.c/scheduler_core_queue_pick/index-54","wrap","KERNEL_SCHEDULER","INDEX_PROBE",1,"value","priority",[["for ( priority = 0 ; priority < MICROS_SCHEDULER_PRIORITY_COUNT ; ++ priority ) {",0]],1,2]],
+            [["work"],["grant01-shared/ipc01/kernel/scheduler/scheduler_core_queue.c/scheduler_core_queue_pick/index-66","wrap","KERNEL_SCHEDULER","INDEX_PROBE",1,"value","priority",[["for ( priority = 0 ; priority < MICROS_SCHEDULER_PRIORITY_COUNT ; ++ priority ) {",0],["if ( ! scheduler_core_thread_handle_is_null ( hart -> ready_head [ priority ] ) ) {",0]],0,1]]
+          ]
+        },
+        "kernel/scheduler/scheduler_core_return.c": {
+          "micros_hart_commit_user_return": [],
+          "micros_scheduler_apply_return_plan": [
+            [["work"],["grant01-shared/ipc01/kernel/scheduler/scheduler_core_return.c/micros_scheduler_apply_return_plan/index-9","wrap","KERNEL_SCHEDULER","INDEX_PROBE",1,"value","plan -> hart . slot",[],0,1]],
+            [["work"],["grant01-shared/ipc01/kernel/scheduler/scheduler_core_return.c/micros_scheduler_apply_return_plan/index-36","wrap","KERNEL_SCHEDULER","INDEX_PROBE",1,"value","plan -> outgoing . slot",[["if ( plan -> repair_preempted ) {",0]],0,1]],
+            [["work"],["grant01-shared/ipc01/kernel/scheduler/scheduler_core_return.c/micros_scheduler_apply_return_plan/index-65","wrap","KERNEL_SCHEDULER","INDEX_PROBE",1,"value","plan -> outgoing . slot",[["if ( plan -> renew_current ) {",0]],0,1]],
+            [["work"],["grant01-shared/ipc01/kernel/scheduler/scheduler_core_return.c/micros_scheduler_apply_return_plan/loop-90","insert","KERNEL_SCHEDULER","RECORD_VISIT",1,"entry","",[["for ( index = 0 ; index < plan -> queue_count ; ++ index ) {",0]],0,0]],
+            [["work"],["grant01-shared/ipc01/kernel/scheduler/scheduler_core_return.c/micros_scheduler_apply_return_plan/loop-131","insert","KERNEL_SCHEDULER","RECORD_VISIT",1,"entry","",[["for ( index = 0 ; index < plan -> queue_count ; ++ index ) {",0],["for ( renewed = 0 ; renewed < queue -> renew_count ; ++ renewed ) {",0]],0,0]],
+            [["work"],["grant01-shared/ipc01/kernel/scheduler/scheduler_core_return.c/micros_scheduler_apply_return_plan/index-141","wrap","KERNEL_SCHEDULER","INDEX_PROBE",1,"value","cursor . slot",[["for ( index = 0 ; index < plan -> queue_count ; ++ index ) {",0],["for ( renewed = 0 ; renewed < queue -> renew_count ; ++ renewed ) {",0]],0,1]],
+            [["work"],["grant01-shared/ipc01/kernel/scheduler/scheduler_core_return.c/micros_scheduler_apply_return_plan/index-170","wrap","KERNEL_SCHEDULER","INDEX_PROBE",1,"value","plan -> outgoing . slot",[["if ( plan -> publish_current ) {",0]],0,1]],
+            [["work"],["grant01-shared/ipc01/kernel/scheduler/scheduler_core_return.c/micros_scheduler_apply_return_plan/loop-198","insert","KERNEL_SCHEDULER","RECORD_VISIT",1,"entry","",[["for ( index = 0 ; index < plan -> queue_count ; ++ index ) {",1]],0,0]],
+            [["work"],["grant01-shared/ipc01/kernel/scheduler/scheduler_core_return.c/micros_scheduler_apply_return_plan/loop-231","insert","KERNEL_SCHEDULER","RECORD_VISIT",1,"entry","",[["for ( index = 0 ; index < plan -> queue_count ; ++ index ) {",1],["for ( patch = 0 ; patch < queue -> patch_count ; ++ patch ) {",0]],0,0]],
+            [["work"],["grant01-shared/ipc01/kernel/scheduler/scheduler_core_return.c/micros_scheduler_apply_return_plan/index-235","wrap","KERNEL_SCHEDULER","INDEX_PROBE",1,"value","queue -> patches [ patch ] . thread . slot",[["for ( index = 0 ; index < plan -> queue_count ; ++ index ) {",1],["for ( patch = 0 ; patch < queue -> patch_count ; ++ patch ) {",0]],0,1]],
+            [["work"],["grant01-shared/ipc01/kernel/scheduler/scheduler_core_return.c/micros_scheduler_apply_return_plan/index-263","wrap","KERNEL_SCHEDULER","INDEX_PROBE",1,"value","queue -> priority",[["for ( index = 0 ; index < plan -> queue_count ; ++ index ) {",1]],0,2]],
+            [["work"],["grant01-shared/ipc01/kernel/scheduler/scheduler_core_return.c/micros_scheduler_apply_return_plan/index-276","wrap","KERNEL_SCHEDULER","INDEX_PROBE",1,"value","queue -> priority",[["for ( index = 0 ; index < plan -> queue_count ; ++ index ) {",1]],1,2]],
+            [["work"],["grant01-shared/ipc01/kernel/scheduler/scheduler_core_return.c/micros_scheduler_apply_return_plan/index-344","wrap","KERNEL_SCHEDULER","INDEX_PROBE",1,"value","plan -> selected . slot",[["else {",0]],0,1]]
+          ],
+          "plans_equal": [
+            [["work"],["grant01-shared/ipc01/kernel/scheduler/scheduler_core_return.c/plans_equal/loop-113","insert","KERNEL_SCHEDULER","RECORD_VISIT",1,"entry","",[["for ( index = 0 ; index < 2 ; ++ index ) {",0]],0,0]]
+          ],
+          "queue_deltas_equal": [
+            [["work"],["grant01-shared/ipc01/kernel/scheduler/scheduler_core_return.c/queue_deltas_equal/loop-107","insert","KERNEL_SCHEDULER","RECORD_VISIT",1,"entry","",[["for ( index = 0 ; index < 3 ; ++ index ) {",0]],0,0]]
+          ],
+          "renew_return_thread": []
+        },
+        "kernel/scheduler/scheduler_core_return_plan.c": {
+          "clear_return_candidate": [
+            [["work"],["grant01-shared/ipc01/kernel/scheduler/scheduler_core_return_plan.c/clear_return_candidate/loop-32","insert","KERNEL_SCHEDULER","RECORD_VISIT",1,"entry","",[["for ( index = 0 ; index < sizeof ( * candidate ) ; ++ index ) {",0]],0,0]]
+          ],
+          "finish_return_queue": [
+            [["work"],["grant01-shared/ipc01/kernel/scheduler/scheduler_core_return_plan.c/finish_return_queue/index-30","wrap","KERNEL_SCHEDULER","INDEX_PROBE",1,"value","candidate -> outgoing . slot",[["if ( candidate -> publish_current ) {",0]],0,1]]
+          ],
+          "micros_hart_plan_user_return": [
+            [["work"],["grant01-shared/ipc01/kernel/scheduler/scheduler_core_return_plan.c/micros_hart_plan_user_return/loop-143","insert","KERNEL_SCHEDULER","RECORD_VISIT",1,"entry","",[["for ( index = 0 ; index < candidate . queue_count ; ++ index ) {",0]],0,0]]
+          ],
+          "pick_return_queue": [
+            [["work"],["grant01-shared/ipc01/kernel/scheduler/scheduler_core_return_plan.c/pick_return_queue/loop-20","insert","KERNEL_SCHEDULER","RECORD_VISIT",1,"entry","",[["for ( priority = 0 ; priority < MICROS_SCHEDULER_PRIORITY_COUNT ; ++ priority ) {",0]],0,0]],
+            [["work"],["grant01-shared/ipc01/kernel/scheduler/scheduler_core_return_plan.c/pick_return_queue/index-90","wrap","KERNEL_SCHEDULER","INDEX_PROBE",1,"value","priority",[["for ( priority = 0 ; priority < MICROS_SCHEDULER_PRIORITY_COUNT ; ++ priority ) {",0],["else {",0]],1,2]]
+          ],
+          "preflight_return_plan": [],
+          "prepare_return_queue": [
+            [["work"],["grant01-shared/ipc01/kernel/scheduler/scheduler_core_return_plan.c/prepare_return_queue/index-109","wrap","KERNEL_SCHEDULER","INDEX_PROBE",1,"value","priority",[],4,6]],
+            [["work"],["grant01-shared/ipc01/kernel/scheduler/scheduler_core_return_plan.c/prepare_return_queue/index-120","wrap","KERNEL_SCHEDULER","INDEX_PROBE",1,"value","priority",[],5,6]]
+          ],
+          "publish_return_candidate": [
+            [["work"],["grant01-shared/ipc01/kernel/scheduler/scheduler_core_return_plan.c/publish_return_candidate/loop-46","insert","KERNEL_SCHEDULER","RECORD_VISIT",1,"entry","",[["for ( index = 0 ; index < sizeof ( * candidate ) ; ++ index ) {",0]],0,0]]
+          ],
+          "repair_preempted_candidate": [
+            [["work"],["grant01-shared/ipc01/kernel/scheduler/scheduler_core_return_plan.c/repair_preempted_candidate/index-43","wrap","KERNEL_SCHEDULER","INDEX_PROBE",1,"value","candidate -> outgoing . slot",[],0,1]]
+          ],
+          "return_queue_at_priority": [],
+          "rotate_return_head": [
+            [["work"],["grant01-shared/ipc01/kernel/scheduler/scheduler_core_return_plan.c/rotate_return_head/index-134","wrap","KERNEL_SCHEDULER","INDEX_PROBE",1,"value","candidate -> outgoing . slot",[["else {",0],["if ( scheduler_core_thread_handles_equal ( selected , queue -> before_tail ) ) {",0],["if ( candidate -> publish_current ) {",0]],0,1]]
+          ],
+          "select_and_renew_candidate": [
+            [["work"],["grant01-shared/ipc01/kernel/scheduler/scheduler_core_return_plan.c/select_and_renew_candidate/index-29","wrap","KERNEL_SCHEDULER","INDEX_PROBE",1,"value","candidate -> outgoing . slot",[],0,1]],
+            [["work"],["grant01-shared/ipc01/kernel/scheduler/scheduler_core_return_plan.c/select_and_renew_candidate/index-53","wrap","KERNEL_SCHEDULER","INDEX_PROBE",1,"value","candidate -> outgoing . slot",[["if ( ! scheduler_core_thread_handle_is_null ( candidate -> outgoing ) && objects -> threads [ candidate -> outgoing . slot ] . runtime_flags == 0 ) {",0]],0,1]],
+            [["work"],["grant01-shared/ipc01/kernel/scheduler/scheduler_core_return_plan.c/select_and_renew_candidate/loop-101","insert","KERNEL_SCHEDULER","RECORD_VISIT",1,"entry","",[["while ( cursor != NULL ) {",0]],0,0]],
+            [["work"],["grant01-shared/ipc01/kernel/scheduler/scheduler_core_return_plan.c/select_and_renew_candidate/index-148","wrap","KERNEL_SCHEDULER","INDEX_PROBE",1,"value","selected . slot",[["while ( cursor != NULL ) {",0],["if ( current ) {",0]],0,1]]
+          ],
+          "set_return_patch": [
+            [["work"],["grant01-shared/ipc01/kernel/scheduler/scheduler_core_return_plan.c/set_return_patch/loop-18","insert","KERNEL_SCHEDULER","RECORD_VISIT",1,"entry","",[["for ( index = 0 ; index < queue -> patch_count ; ++ index ) {",0]],0,0]]
+          ]
+        },
+        "kernel/scheduler/scheduler_core_validate.c": {
+          "initialize_validation_witnesses": [
+            [["work"],["grant01-shared/ipc01/kernel/scheduler/scheduler_core_validate.c/initialize_validation_witnesses/loop-16","insert","KERNEL_SCHEDULER","RECORD_VISIT",1,"entry","",[["for ( thread_index = 0 ; thread_index < MICROS_THREAD_CAPACITY ; ++ thread_index ) {",0]],0,0]]
+          ],
+          "micros_scheduler_core_validate": [
+            [["work"],["grant01-shared/ipc01/kernel/scheduler/scheduler_core_validate.c/micros_scheduler_core_validate/audit","insert","KERNEL_SCHEDULER","COMPLETE_VALIDATOR_CALL",1,"entry","",[],0,0]]
+          ],
+          "validate_current_binding": [
+            [["work"],["grant01-shared/ipc01/kernel/scheduler/scheduler_core_validate.c/validate_current_binding/index-83","wrap","KERNEL_SCHEDULER","INDEX_PROBE",1,"value","thread -> scheduler_priority",[],0,1]]
+          ],
+          "validate_hart_accounting": [
+            [["work"],["grant01-shared/ipc01/kernel/scheduler/scheduler_core_validate.c/validate_hart_accounting/index-87","wrap","KERNEL_SCHEDULER","INDEX_PROBE",1,"value","hart -> current_thread . slot",[["if ( hart -> accounting_owner == MICROS_SCHEDULER_ACCOUNTING_THREAD ) {",0]],1,2]]
+          ],
+          "validate_hart_queues": [
+            [["work"],["grant01-shared/ipc01/kernel/scheduler/scheduler_core_validate.c/validate_hart_queues/loop-16","insert","KERNEL_SCHEDULER","RECORD_VISIT",1,"entry","",[["for ( priority = 0 ; priority < MICROS_SCHEDULER_PRIORITY_COUNT ; ++ priority ) {",0]],0,0]],
+            [["work"],["grant01-shared/ipc01/kernel/scheduler/scheduler_core_validate.c/validate_hart_queues/index-24","wrap","KERNEL_SCHEDULER","INDEX_PROBE",1,"value","priority",[["for ( priority = 0 ; priority < MICROS_SCHEDULER_PRIORITY_COUNT ; ++ priority ) {",0]],0,3]],
+            [["work"],["grant01-shared/ipc01/kernel/scheduler/scheduler_core_validate.c/validate_hart_queues/index-53","wrap","KERNEL_SCHEDULER","INDEX_PROBE",1,"value","priority",[["for ( priority = 0 ; priority < MICROS_SCHEDULER_PRIORITY_COUNT ; ++ priority ) {",0]],1,3]],
+            [["work"],["grant01-shared/ipc01/kernel/scheduler/scheduler_core_validate.c/validate_hart_queues/loop-71","insert","KERNEL_SCHEDULER","RECORD_VISIT",1,"entry","",[["for ( priority = 0 ; priority < MICROS_SCHEDULER_PRIORITY_COUNT ; ++ priority ) {",0],["while ( ! scheduler_core_thread_handle_is_null ( cursor ) ) {",0]],0,0]],
+            [["work"],["grant01-shared/ipc01/kernel/scheduler/scheduler_core_validate.c/validate_hart_queues/index-109","wrap","KERNEL_SCHEDULER","INDEX_PROBE",1,"value","cursor . slot",[["for ( priority = 0 ; priority < MICROS_SCHEDULER_PRIORITY_COUNT ; ++ priority ) {",0],["while ( ! scheduler_core_thread_handle_is_null ( cursor ) ) {",0]],2,4]],
+            [["work"],["grant01-shared/ipc01/kernel/scheduler/scheduler_core_validate.c/validate_hart_queues/index-198","wrap","KERNEL_SCHEDULER","INDEX_PROBE",1,"value","priority",[["for ( priority = 0 ; priority < MICROS_SCHEDULER_PRIORITY_COUNT ; ++ priority ) {",0]],2,3]]
+          ],
+          "validate_harts": [
+            [["work"],["grant01-shared/ipc01/kernel/scheduler/scheduler_core_validate.c/validate_harts/loop-20","insert","KERNEL_SCHEDULER","RECORD_VISIT",1,"entry","",[["for ( hart_index = 0 ; hart_index < MICROS_HART_CAPACITY ; ++ hart_index ) {",0]],0,0]],
+            [["work"],["grant01-shared/ipc01/kernel/scheduler/scheduler_core_validate.c/validate_harts/index-31","wrap","KERNEL_SCHEDULER","INDEX_PROBE",1,"value","hart_index",[["for ( hart_index = 0 ; hart_index < MICROS_HART_CAPACITY ; ++ hart_index ) {",0]],0,1]],
+            [["work"],["grant01-shared/ipc01/kernel/scheduler/scheduler_core_validate.c/validate_harts/index-162","wrap","KERNEL_SCHEDULER","INDEX_PROBE",1,"value","hart -> current_thread . slot",[["for ( hart_index = 0 ; hart_index < MICROS_HART_CAPACITY ; ++ hart_index ) {",0],["if ( ! scheduler_core_thread_handle_is_null ( hart -> current_thread ) ) {",0]],2,4]]
+          ],
+          "validate_threads": [
+            [["work"],["grant01-shared/ipc01/kernel/scheduler/scheduler_core_validate.c/validate_threads/loop-16","insert","KERNEL_SCHEDULER","RECORD_VISIT",1,"entry","",[["for ( thread_index = 0 ; thread_index < MICROS_THREAD_CAPACITY ; ++ thread_index ) {",0]],0,0]],
+            [["work"],["grant01-shared/ipc01/kernel/scheduler/scheduler_core_validate.c/validate_threads/index-27","wrap","KERNEL_SCHEDULER","INDEX_PROBE",1,"value","thread_index",[["for ( thread_index = 0 ; thread_index < MICROS_THREAD_CAPACITY ; ++ thread_index ) {",0]],0,5]]
+          ]
+        },
+        "kernel/tty/tty_handoff_core.c": {
+          "console_phase_has_device_mapping": [],
+          "console_phase_is_preowned": [],
+          "device_authority_is_valid": [],
+          "micros_tty_device_leaf_classify": [],
+          "micros_tty_device_leaf_required": [],
+          "micros_tty_device_range_intersects": [],
+          "micros_tty_handoff_accept_ready": [],
+          "micros_tty_handoff_begin": [],
+          "micros_tty_handoff_claim": [],
+          "micros_tty_handoff_commit": [],
+          "micros_tty_handoff_complete": [],
+          "micros_tty_handoff_deadline_expired": [],
+          "micros_tty_handoff_initialize": [],
+          "micros_tty_handoff_mark_mapped": [],
+          "micros_tty_handoff_panic": [],
+          "micros_tty_handoff_release": [],
+          "micros_tty_handoff_validate": [],
+          "process_is_valid": [],
+          "processes_equal": [],
+          "zero_bytes": [
+            [["work"],["grant01/kernel/tty/tty_handoff_core.c/zero_bytes/loop-22","insert","KERNEL_TTY","CLEARED_BYTE",1,"entry","",[["for ( index = 0 ; index < size ; ++ index ) {",0]],0,0]]
+          ]
+        },
+        "kernel/tty/tty_handoff_runtime_state.c": {
+          "tty_handoff_clear_bytes": [
+            [["work"],["grant01/kernel/tty/tty_handoff_runtime_state.c/tty_handoff_clear_bytes/loop-22","insert","KERNEL_TTY","CLEARED_BYTE",1,"entry","",[["for ( index = 0 ; index < size ; ++ index ) {",0]],0,0]]
+          ],
+          "tty_handoff_context": [],
+          "tty_handoff_copy_bytes": [
+            [["work"],["grant01/kernel/tty/tty_handoff_runtime_state.c/tty_handoff_copy_bytes/loop-29","insert","KERNEL_TTY","COPIED_BYTE",1,"entry","",[["for ( index = 0 ; index < size ; ++ index ) {",0]],0,0]]
+          ]
+        },
+        "kernel/tty/tty_handoff_runtime_validate.c": {
+          "micros_tty_handoff_runtime_device_authority": [],
+          "micros_tty_handoff_runtime_inspect_device_binding": [],
+          "micros_tty_handoff_runtime_role_ready": [],
+          "micros_tty_handoff_runtime_validate": [
+            [["work"],["grant01/kernel/tty/tty_handoff_runtime_validate.c/micros_tty_handoff_runtime_validate/audit","insert","KERNEL_TTY","COMPLETE_VALIDATOR_CALL",1,"entry","",[],0,0]]
+          ],
+          "tty_handoff_binding_identity_matches": [
+            [["work"],["grant01/kernel/tty/tty_handoff_runtime_validate.c/tty_handoff_binding_identity_matches/index-72","wrap","KERNEL_TTY","INDEX_PROBE",1,"value","binding -> manifest_index",[],1,2]]
+          ],
+          "tty_handoff_classify_live_binding": [],
+          "tty_handoff_endpoint_matches_process": [],
+          "tty_handoff_identity_is_valid": [],
+          "tty_handoff_live_binding_matches": [],
+          "tty_handoff_process_handles_equal": [],
+          "tty_handoff_runtime_entry": [
+            [["work"],["grant01/kernel/tty/tty_handoff_runtime_validate.c/tty_handoff_runtime_entry/loop-35","insert","KERNEL_TTY","RECORD_VISIT",1,"entry","",[["for ( index = 0 ; index < runtime -> entry_count ; ++ index ) {",0]],0,0]],
+            [["work"],["grant01/kernel/tty/tty_handoff_runtime_validate.c/tty_handoff_runtime_entry/index-41","wrap","KERNEL_TTY","INDEX_PROBE",1,"value","index",[["for ( index = 0 ; index < runtime -> entry_count ; ++ index ) {",0]],0,1]],
+            [["work"],["grant01/kernel/tty/tty_handoff_runtime_validate.c/tty_handoff_runtime_entry/index-55","wrap","KERNEL_TTY","INDEX_PROBE",1,"value","index",[["for ( index = 0 ; index < runtime -> entry_count ; ++ index ) {",0],["if ( runtime -> entries [ index ] . service_id == service_id ) {",0]],0,1]]
+          ],
+          "tty_handoff_selected_binding_is_valid": [],
+          "tty_handoff_thread_handles_equal": []
+        }
+      },
+      "subsets": {
+        "kernel/boot/bootstrap_control_core.c": ["micros_bootstrap_control_find_binding"]
+      }
+    },
     "IPC01": {
       "channels": ["work"],
       "native_sources": ["kernel/endpoint/endpoint.c","kernel/endpoint/endpoint_close.c","kernel/endpoint/endpoint_codec.c","kernel/endpoint/endpoint_completion_validation.c","kernel/endpoint/endpoint_identity.c","kernel/endpoint/endpoint_object_validation.c","kernel/endpoint/endpoint_privilege.c","kernel/endpoint/endpoint_publication.c","kernel/endpoint/endpoint_queue_validation.c","kernel/endpoint/endpoint_registry.c","kernel/ipc/ipc.c","kernel/ipc/ipc_abi.c","kernel/ipc/ipc_buffer.c","kernel/ipc/ipc_close.c","kernel/ipc/ipc_common.c","kernel/ipc/ipc_completion.c","kernel/ipc/ipc_deadlock.c","kernel/ipc/ipc_notifications.c","kernel/ipc/ipc_queue.c","kernel/ipc/ipc_rendezvous.c","kernel/ipc/ipc_reply.c","kernel/ipc/ipc_tokens.c","kernel/objects/kernel_object_context.c","kernel/objects/kernel_object_hart.c","kernel/objects/kernel_object_identity.c","kernel/objects/kernel_object_process.c","kernel/objects/kernel_object_stack.c","kernel/objects/kernel_object_state.c","kernel/objects/kernel_object_thread.c","kernel/objects/kernel_object_validation.c","kernel/objects/kernel_objects.c","kernel/scheduler/scheduler_completion.c","kernel/scheduler/scheduler_core.c","kernel/scheduler/scheduler_core_accounting.c","kernel/scheduler/scheduler_core_ipc.c","kernel/scheduler/scheduler_core_ipc_transition.c","kernel/scheduler/scheduler_core_policy.c","kernel/scheduler/scheduler_core_queue.c","kernel/scheduler/scheduler_core_return.c","kernel/scheduler/scheduler_core_return_plan.c","kernel/scheduler/scheduler_core_validate.c"],
@@ -9077,6 +10003,709 @@
           "guards": [],
           "loops": [],
           "signature": "static enum micros_user_execution_error validate_user_mappings ( struct micros_process_handle process , const struct micros_user_context * context )",
+          "storage": []
+        }
+      },
+      "storage": []
+    },
+    "kernel/grant/grant.c": {
+      "complete": 1,
+      "functions": {
+        "authority_is_zero": {
+          "accesses": [],
+          "aliases": [],
+          "calls": ["bytes_are_zero","offsetof"],
+          "directives": [],
+          "guards": [],
+          "loops": [],
+          "signature": "static bool authority_is_zero ( const struct micros_grant_record * record )",
+          "storage": []
+        },
+        "bytes_are_zero": {
+          "accesses": [
+            ["bytes [ index ]",[["for ( index = 0 ; index < size ; ++ index ) {",0]]]
+          ],
+          "aliases": [],
+          "calls": [],
+          "directives": [],
+          "guards": [],
+          "loops": [
+            ["for ( index = 0 ; index < size ; ++ index ) {",[]]
+          ],
+          "signature": "static bool bytes_are_zero ( const void * storage , size_t size )",
+          "storage": []
+        },
+        "clear_bytes": {
+          "accesses": [
+            ["bytes [ index ]",[["for ( index = 0 ; index < size ; ++ index ) {",0]]]
+          ],
+          "aliases": [],
+          "calls": [],
+          "directives": [],
+          "guards": [],
+          "loops": [
+            ["for ( index = 0 ; index < size ; ++ index ) {",[]]
+          ],
+          "signature": "static void clear_bytes ( void * storage , size_t size )",
+          "storage": []
+        },
+        "clear_record_authority": {
+          "accesses": [],
+          "aliases": [],
+          "calls": ["clear_bytes"],
+          "directives": [],
+          "guards": [],
+          "loops": [],
+          "signature": "static void clear_record_authority ( struct micros_grant_record * record )",
+          "storage": []
+        },
+        "copy_bytes": {
+          "accesses": [
+            ["destination_bytes [ index ]",[["for ( index = 0 ; index < size ; ++ index ) {",0]]],
+            ["source_bytes [ index ]",[["for ( index = 0 ; index < size ; ++ index ) {",0]]]
+          ],
+          "aliases": [],
+          "calls": [],
+          "directives": [],
+          "guards": [],
+          "loops": [
+            ["for ( index = 0 ; index < size ; ++ index ) {",[]]
+          ],
+          "signature": "static void copy_bytes ( void * destination , const void * source , size_t size )",
+          "storage": []
+        },
+        "map_endpoint_error": {
+          "accesses": [],
+          "aliases": [],
+          "calls": [],
+          "directives": [],
+          "guards": [],
+          "loops": [],
+          "signature": "static enum micros_grant_error map_endpoint_error ( enum micros_endpoint_error error )",
+          "storage": []
+        },
+        "micros_grant_commit_create_prevalidated": {
+          "accesses": [
+            ["grants [ plan -> slot ]",[]]
+          ],
+          "aliases": [],
+          "calls": ["clear_bytes","copy_bytes"],
+          "directives": [],
+          "guards": [],
+          "loops": [],
+          "signature": "void micros_grant_commit_create_prevalidated ( struct micros_grant_registry * registry , struct micros_grant_create_plan * plan , micros_grant_t * grant )",
+          "storage": []
+        },
+        "micros_grant_commit_endpoint_cancel": {
+          "accesses": [
+            ["grants [ index ]",[["for ( index = 0 ; index < MICROS_GRANT_CAPACITY ; ++ index ) {",0]]],
+            ["expected_generation [ index ]",[["for ( index = 0 ; index < MICROS_GRANT_CAPACITY ; ++ index ) {",0]]],
+            ["expected_generation [ index ]",[["for ( index = 0 ; index < MICROS_GRANT_CAPACITY ; ++ index ) {",0]]],
+            ["grants [ index ]",[["for ( index = 0 ; index < MICROS_GRANT_CAPACITY ; ++ index ) {",1],["if ( ( plan -> selected_slots & ( UINT64_C ( 1 ) << index ) ) != 0 ) {",0]]]
+          ],
+          "aliases": [],
+          "calls": ["micros_endpoint_unpack","retire_record","validate_registry_storage"],
+          "directives": [],
+          "guards": [],
+          "loops": [
+            ["for ( index = 0 ; index < MICROS_GRANT_CAPACITY ; ++ index ) {",[]],
+            ["for ( index = 0 ; index < MICROS_GRANT_CAPACITY ; ++ index ) {",[]]
+          ],
+          "signature": "enum micros_grant_error micros_grant_commit_endpoint_cancel ( struct micros_grant_registry * registry , struct micros_grant_cancel_plan * plan )",
+          "storage": []
+        },
+        "micros_grant_create": {
+          "accesses": [],
+          "aliases": [],
+          "calls": ["micros_grant_commit_create_prevalidated","micros_grant_prepare_create"],
+          "directives": [],
+          "guards": [],
+          "loops": [],
+          "signature": "enum micros_grant_error micros_grant_create ( struct micros_grant_registry * registry , const struct micros_endpoint_registry * endpoint_registry , const struct micros_kernel_objects * objects , struct micros_process_handle grantor , micros_endpoint_t grantee , uintptr_t base , size_t length , uint32_t permissions , micros_grant_t * grant )",
+          "storage": []
+        },
+        "micros_grant_inspect": {
+          "accesses": [],
+          "aliases": [],
+          "calls": ["copy_bytes","resolve_owned_record"],
+          "directives": [],
+          "guards": [],
+          "loops": [],
+          "signature": "enum micros_grant_error micros_grant_inspect ( const struct micros_grant_registry * registry , const struct micros_endpoint_registry * endpoint_registry , const struct micros_kernel_objects * objects , struct micros_process_handle grantor , micros_grant_t grant , struct micros_grant_record * record )",
+          "storage": []
+        },
+        "micros_grant_pack": {
+          "accesses": [],
+          "aliases": [],
+          "calls": [],
+          "directives": [],
+          "guards": [],
+          "loops": [],
+          "signature": "enum micros_grant_error micros_grant_pack ( size_t slot , uint32_t generation , micros_grant_t * grant )",
+          "storage": []
+        },
+        "micros_grant_preflight_context": {
+          "accesses": [],
+          "aliases": [],
+          "calls": ["endpoint_preflight_registry","scheduler_core_preflight_registry"],
+          "directives": [],
+          "guards": [],
+          "loops": [],
+          "signature": "enum micros_grant_error micros_grant_preflight_context ( const struct micros_grant_registry * registry , const struct micros_endpoint_registry * endpoint_registry , const struct micros_kernel_objects * objects )",
+          "storage": []
+        },
+        "micros_grant_prepare_copy_authority": {
+          "accesses": [],
+          "aliases": [],
+          "calls": ["map_endpoint_error","micros_endpoint_resolve_active","micros_grant_preflight_context","micros_grant_unpack","preflight_selected_record","process_handles_equal","resolve_selected_active_participant"],
+          "directives": [],
+          "guards": [],
+          "loops": [],
+          "signature": "enum micros_grant_error micros_grant_prepare_copy_authority ( const struct micros_grant_registry * grant_registry , const struct micros_endpoint_registry * endpoint_registry , const struct micros_kernel_objects * objects , struct micros_process_handle grantee , micros_endpoint_t grantor_endpoint , micros_grant_t grant , size_t grant_offset , size_t length , uint32_t required_permission , struct micros_grant_copy_authority * authority )",
+          "storage": []
+        },
+        "micros_grant_prepare_create": {
+          "accesses": [
+            ["grants [ slot ]",[["for ( slot = 0 ; slot < MICROS_GRANT_CAPACITY ; ++ slot ) {",0]]],
+            ["grants [ slot ]",[["for ( slot = 0 ; slot < MICROS_GRANT_CAPACITY ; ++ slot ) {",0]]],
+            ["grants [ slot ]",[["for ( slot = 0 ; slot < MICROS_GRANT_CAPACITY ; ++ slot ) {",0]]],
+            ["grants [ slot ]",[]],
+            ["grants [ slot ]",[["{",10]]]
+          ],
+          "aliases": [],
+          "calls": ["clear_bytes","copy_bytes","map_endpoint_error","micros_endpoint_resolve_active","micros_grant_pack","micros_grant_preflight_context","permissions_are_valid","range_is_valid","resolve_active_process_endpoint","validate_record_storage"],
+          "directives": [],
+          "guards": [],
+          "loops": [
+            ["for ( slot = 0 ; slot < MICROS_GRANT_CAPACITY ; ++ slot ) {",[]]
+          ],
+          "signature": "enum micros_grant_error micros_grant_prepare_create ( const struct micros_grant_registry * registry , const struct micros_endpoint_registry * endpoint_registry , const struct micros_kernel_objects * objects , struct micros_process_handle grantor , micros_endpoint_t grantee , uintptr_t base , size_t length , uint32_t permissions , struct micros_grant_create_plan * plan )",
+          "storage": []
+        },
+        "micros_grant_prepare_endpoint_cancel": {
+          "accesses": [
+            ["grants [ index ]",[["for ( index = 0 ; index < MICROS_GRANT_CAPACITY ; ++ index ) {",0]]],
+            ["expected_generation [ index ]",[["for ( index = 0 ; index < MICROS_GRANT_CAPACITY ; ++ index ) {",0],["if ( record -> state == MICROS_GRANT_SLOT_ACTIVE && ( record -> grantor_endpoint == endpoint || record -> grantee_endpoint == endpoint ) ) {",0]]]
+          ],
+          "aliases": [],
+          "calls": ["clear_bytes","copy_bytes","map_endpoint_error","micros_endpoint_resolve_internal","micros_grant_registry_validate"],
+          "directives": [],
+          "guards": [],
+          "loops": [
+            ["for ( index = 0 ; index < MICROS_GRANT_CAPACITY ; ++ index ) {",[]]
+          ],
+          "signature": "enum micros_grant_error micros_grant_prepare_endpoint_cancel ( const struct micros_grant_registry * registry , const struct micros_endpoint_registry * endpoint_registry , const struct micros_kernel_objects * objects , micros_endpoint_t endpoint , struct micros_grant_cancel_plan * plan )",
+          "storage": []
+        },
+        "micros_grant_registry_initialize": {
+          "accesses": [
+            ["grants [ index ]",[["for ( index = 0 ; index < MICROS_GRANT_CAPACITY ; ++ index ) {",0]]],
+            ["grants [ index ]",[["for ( index = 0 ; index < MICROS_GRANT_CAPACITY ; ++ index ) {",0]]]
+          ],
+          "aliases": [],
+          "calls": ["bytes_are_zero"],
+          "directives": [],
+          "guards": [],
+          "loops": [
+            ["for ( index = 0 ; index < MICROS_GRANT_CAPACITY ; ++ index ) {",[]]
+          ],
+          "signature": "enum micros_grant_error micros_grant_registry_initialize ( struct micros_grant_registry * registry )",
+          "storage": []
+        },
+        "micros_grant_registry_validate": {
+          "accesses": [
+            ["grants [ index ]",[["for ( index = 0 ; index < MICROS_GRANT_CAPACITY ; ++ index ) {",0]]]
+          ],
+          "aliases": [],
+          "calls": ["micros_endpoint_registry_validate_objects","micros_endpoint_resolve_internal","resolve_live_process_endpoint","validate_registry_storage"],
+          "directives": [],
+          "guards": [],
+          "loops": [
+            ["for ( index = 0 ; index < MICROS_GRANT_CAPACITY ; ++ index ) {",[]]
+          ],
+          "signature": "enum micros_grant_error micros_grant_registry_validate ( const struct micros_grant_registry * registry , const struct micros_endpoint_registry * endpoint_registry , const struct micros_kernel_objects * objects )",
+          "storage": []
+        },
+        "micros_grant_revoke": {
+          "accesses": [
+            ["grants [ slot ]",[]]
+          ],
+          "aliases": [],
+          "calls": ["resolve_owned_record","retire_record"],
+          "directives": [],
+          "guards": [],
+          "loops": [],
+          "signature": "enum micros_grant_error micros_grant_revoke ( struct micros_grant_registry * registry , const struct micros_endpoint_registry * endpoint_registry , const struct micros_kernel_objects * objects , struct micros_process_handle grantor , micros_grant_t grant )",
+          "storage": []
+        },
+        "micros_grant_unpack": {
+          "accesses": [],
+          "aliases": [],
+          "calls": [],
+          "directives": [],
+          "guards": [],
+          "loops": [],
+          "signature": "enum micros_grant_error micros_grant_unpack ( micros_grant_t grant , size_t * slot , uint32_t * generation )",
+          "storage": []
+        },
+        "permissions_are_valid": {
+          "accesses": [],
+          "aliases": [],
+          "calls": [],
+          "directives": [],
+          "guards": [],
+          "loops": [],
+          "signature": "static bool permissions_are_valid ( uint32_t permissions )",
+          "storage": []
+        },
+        "preflight_selected_record": {
+          "accesses": [
+            ["grants [ slot ]",[["{",0]]]
+          ],
+          "aliases": [],
+          "calls": ["micros_endpoint_select","process_handles_equal","validate_record_storage"],
+          "directives": [],
+          "guards": [],
+          "loops": [],
+          "signature": "static enum micros_grant_error preflight_selected_record ( const struct micros_grant_registry * registry , const struct micros_endpoint_registry * endpoints , const struct micros_kernel_objects * objects , size_t slot , struct selected_grant_record * selection )",
+          "storage": []
+        },
+        "process_handles_equal": {
+          "accesses": [],
+          "aliases": [],
+          "calls": [],
+          "directives": [],
+          "guards": [],
+          "loops": [],
+          "signature": "static bool process_handles_equal ( struct micros_process_handle left , struct micros_process_handle right )",
+          "storage": []
+        },
+        "range_is_valid": {
+          "accesses": [],
+          "aliases": [],
+          "calls": [],
+          "directives": [],
+          "guards": [],
+          "loops": [],
+          "signature": "static bool range_is_valid ( uintptr_t base , size_t length )",
+          "storage": []
+        },
+        "resolve_active_process_endpoint": {
+          "accesses": [],
+          "aliases": [],
+          "calls": ["endpoint_preflight_process","map_endpoint_error","micros_endpoint_select","process_handles_equal"],
+          "directives": [],
+          "guards": [],
+          "loops": [],
+          "signature": "static enum micros_grant_error resolve_active_process_endpoint ( const struct micros_endpoint_registry * endpoint_registry , const struct micros_kernel_objects * objects , struct micros_process_handle process_handle , enum micros_grant_error inactive_error , const struct micros_process * * process , const struct micros_endpoint_record * * endpoint )",
+          "storage": []
+        },
+        "resolve_live_process_endpoint": {
+          "accesses": [],
+          "aliases": [],
+          "calls": ["micros_endpoint_resolve_internal","micros_process_resolve","process_handles_equal"],
+          "directives": [],
+          "guards": [],
+          "loops": [],
+          "signature": "static enum micros_grant_error resolve_live_process_endpoint ( const struct micros_endpoint_registry * endpoint_registry , const struct micros_kernel_objects * objects , struct micros_process_handle process_handle , const struct micros_process * * process , const struct micros_endpoint_record * * endpoint )",
+          "storage": []
+        },
+        "resolve_owned_record": {
+          "accesses": [],
+          "aliases": [],
+          "calls": ["micros_grant_preflight_context","micros_grant_unpack","preflight_selected_record","process_handles_equal","resolve_selected_active_participant"],
+          "directives": [],
+          "guards": [],
+          "loops": [],
+          "signature": "static enum micros_grant_error resolve_owned_record ( const struct micros_grant_registry * registry , const struct micros_endpoint_registry * endpoint_registry , const struct micros_kernel_objects * objects , struct micros_process_handle grantor , micros_grant_t grant , size_t * slot , const struct micros_grant_record * * record )",
+          "storage": []
+        },
+        "resolve_selected_active_participant": {
+          "accesses": [],
+          "aliases": [],
+          "calls": ["process_handles_equal","resolve_active_process_endpoint"],
+          "directives": [],
+          "guards": [],
+          "loops": [],
+          "signature": "static enum micros_grant_error resolve_selected_active_participant ( const struct micros_endpoint_registry * registry , const struct micros_kernel_objects * objects , struct micros_process_handle handle , enum micros_grant_error inactive_error , const struct micros_endpoint_selection * selected , const struct micros_process * * process , const struct micros_endpoint_record * * endpoint )",
+          "storage": []
+        },
+        "retire_record": {
+          "accesses": [],
+          "aliases": [],
+          "calls": ["clear_record_authority","micros_grant_pack"],
+          "directives": [],
+          "guards": [],
+          "loops": [],
+          "signature": "static void retire_record ( struct micros_grant_record * record , size_t slot )",
+          "storage": []
+        },
+        "validate_record_storage": {
+          "accesses": [],
+          "aliases": [],
+          "calls": ["authority_is_zero","micros_grant_pack","permissions_are_valid","range_is_valid"],
+          "directives": [],
+          "guards": [],
+          "loops": [],
+          "signature": "static enum micros_grant_error validate_record_storage ( const struct micros_grant_record * record , size_t slot )",
+          "storage": []
+        },
+        "validate_registry_storage": {
+          "accesses": [
+            ["grants [ index ]",[["for ( index = 0 ; index < MICROS_GRANT_CAPACITY ; ++ index ) {",0]]],
+            ["grants [ index ]",[["for ( index = 0 ; index < MICROS_GRANT_CAPACITY ; ++ index ) {",0]]]
+          ],
+          "aliases": [],
+          "calls": ["validate_record_storage"],
+          "directives": [],
+          "guards": [],
+          "loops": [
+            ["for ( index = 0 ; index < MICROS_GRANT_CAPACITY ; ++ index ) {",[]]
+          ],
+          "signature": "static enum micros_grant_error validate_registry_storage ( const struct micros_grant_registry * registry )",
+          "storage": []
+        }
+      },
+      "storage": []
+    },
+    "kernel/grant/grant_abi.c": {
+      "complete": 1,
+      "functions": {
+        "micros_grant_abi_map_error": {
+          "accesses": [],
+          "aliases": [],
+          "calls": [],
+          "directives": [],
+          "guards": [],
+          "loops": [],
+          "signature": "bool micros_grant_abi_map_error ( enum micros_grant_error error , uint64_t * result )",
+          "storage": []
+        }
+      },
+      "storage": []
+    },
+    "kernel/grant/grant_copy.c": {
+      "complete": 1,
+      "functions": {
+        "grant_copy_execute": {
+          "accesses": [],
+          "aliases": [],
+          "calls": ["grant_copy_local_range_is_valid","grant_copy_prepare_participant_plans","micros_frame_ownership_runtime_ledger","micros_grant_copy_commit","micros_grant_copy_plan_validate","micros_grant_prepare_copy_authority","micros_tty_handoff_runtime_inspect_device_binding","riscv_irq_restore","riscv_irq_save"],
+          "directives": [],
+          "guards": [],
+          "loops": [],
+          "signature": "static enum micros_grant_error grant_copy_execute ( const struct micros_grant_registry * grant_registry , const struct micros_endpoint_registry * endpoint_registry , const struct micros_kernel_objects * objects , struct micros_process_handle grantee , micros_endpoint_t grantor_endpoint , micros_grant_t grant , size_t grant_offset , uintptr_t local_address , size_t length , uint32_t required_permission )",
+          "storage": []
+        },
+        "grant_copy_local_range_is_valid": {
+          "accesses": [],
+          "aliases": [],
+          "calls": [],
+          "directives": [],
+          "guards": [],
+          "loops": [],
+          "signature": "static bool grant_copy_local_range_is_valid ( uintptr_t local_address , size_t length )",
+          "storage": []
+        },
+        "grant_copy_prepare_participant_plans": {
+          "accesses": [],
+          "aliases": [],
+          "calls": ["grant_copy_plan_range"],
+          "directives": [],
+          "guards": [],
+          "loops": [],
+          "signature": "static bool grant_copy_prepare_participant_plans ( struct grant_copy_execution * work , uintptr_t local_address , size_t length , uint32_t required_permission )",
+          "storage": []
+        },
+        "grant_copy_prepare_remote_plan": {
+          "accesses": [],
+          "aliases": [],
+          "calls": ["grant_copy_plan_range","micros_tty_handoff_runtime_inspect_device_binding"],
+          "directives": [],
+          "guards": [],
+          "loops": [],
+          "signature": "static void grant_copy_prepare_remote_plan ( struct grant_copy_validation * work , const struct micros_kernel_objects * objects , size_t length , uint32_t required_permission )",
+          "storage": []
+        },
+        "micros_grant_copy_from": {
+          "accesses": [],
+          "aliases": [],
+          "calls": ["grant_copy_execute"],
+          "directives": [],
+          "guards": [],
+          "loops": [],
+          "signature": "enum micros_grant_error micros_grant_copy_from ( const struct micros_grant_registry * grant_registry , const struct micros_endpoint_registry * endpoint_registry , const struct micros_kernel_objects * objects , struct micros_process_handle grantee , micros_endpoint_t grantor_endpoint , micros_grant_t grant , size_t grant_offset , uintptr_t local_address , size_t length )",
+          "storage": []
+        },
+        "micros_grant_copy_to": {
+          "accesses": [],
+          "aliases": [],
+          "calls": ["grant_copy_execute"],
+          "directives": [],
+          "guards": [],
+          "loops": [],
+          "signature": "enum micros_grant_error micros_grant_copy_to ( const struct micros_grant_registry * grant_registry , const struct micros_endpoint_registry * endpoint_registry , const struct micros_kernel_objects * objects , struct micros_process_handle grantee , micros_endpoint_t grantor_endpoint , micros_grant_t grant , size_t grant_offset , uintptr_t local_address , size_t length )",
+          "storage": []
+        },
+        "micros_grant_validate_range": {
+          "accesses": [],
+          "aliases": [],
+          "calls": ["grant_copy_prepare_remote_plan","micros_frame_ownership_runtime_ledger","micros_grant_prepare_copy_authority","riscv_irq_restore","riscv_irq_save"],
+          "directives": [],
+          "guards": [],
+          "loops": [],
+          "signature": "enum micros_grant_error micros_grant_validate_range ( const struct micros_grant_registry * grant_registry , const struct micros_endpoint_registry * endpoint_registry , const struct micros_kernel_objects * objects , struct micros_process_handle grantee , micros_endpoint_t grantor_endpoint , micros_grant_t grant , size_t grant_offset , size_t length , uint32_t required_permission )",
+          "storage": []
+        }
+      },
+      "storage": []
+    },
+    "kernel/grant/grant_copy_core.c": {
+      "complete": 1,
+      "functions": {
+        "chunks_overlap": {
+          "accesses": [],
+          "aliases": [],
+          "calls": [],
+          "directives": [],
+          "guards": [],
+          "loops": [],
+          "signature": "static bool chunks_overlap ( const struct micros_grant_copy_chunk * left , const struct micros_grant_copy_chunk * right )",
+          "storage": []
+        },
+        "micros_grant_copy_commit": {
+          "accesses": [
+            ["chunks [ source_index ]",[["while ( copied < length ) {",0]]],
+            ["chunks [ destination_index ]",[["while ( copied < length ) {",0]]],
+            ["output [ index ]",[["while ( copied < length ) {",0],["for ( index = 0 ; index < count ; ++ index ) {",0]]],
+            ["input [ index ]",[["while ( copied < length ) {",0],["for ( index = 0 ; index < count ; ++ index ) {",0]]]
+          ],
+          "aliases": [],
+          "calls": [],
+          "directives": [],
+          "guards": [],
+          "loops": [
+            ["while ( copied < length ) {",[]],
+            ["for ( index = 0 ; index < count ; ++ index ) {",[["while ( copied < length ) {",0]]]
+          ],
+          "signature": "void micros_grant_copy_commit ( const struct micros_grant_copy_range_plan * source , const struct micros_grant_copy_range_plan * destination , size_t length )",
+          "storage": []
+        },
+        "micros_grant_copy_plan_validate": {
+          "accesses": [
+            ["chunks [ source_index ]",[["for ( source_index = 0 ; source_index < source -> chunk_count ; ++ source_index ) {",0],["for ( destination_index = 0 ; destination_index < destination -> chunk_count ; ++ destination_index ) {",0]]],
+            ["chunks [ destination_index ]",[["for ( source_index = 0 ; source_index < source -> chunk_count ; ++ source_index ) {",0],["for ( destination_index = 0 ; destination_index < destination -> chunk_count ; ++ destination_index ) {",0]]]
+          ],
+          "aliases": [],
+          "calls": ["chunks_overlap","validate_range_plan"],
+          "directives": [],
+          "guards": [],
+          "loops": [
+            ["for ( source_index = 0 ; source_index < source -> chunk_count ; ++ source_index ) {",[]],
+            ["for ( destination_index = 0 ; destination_index < destination -> chunk_count ; ++ destination_index ) {",[["for ( source_index = 0 ; source_index < source -> chunk_count ; ++ source_index ) {",0]]]
+          ],
+          "signature": "enum micros_grant_error micros_grant_copy_plan_validate ( const struct micros_grant_copy_range_plan * source , const struct micros_grant_copy_range_plan * destination , size_t length )",
+          "storage": []
+        },
+        "validate_range_plan": {
+          "accesses": [
+            ["chunks [ index ]",[["for ( index = 0 ; index < plan -> chunk_count ; ++ index ) {",0]]]
+          ],
+          "aliases": [],
+          "calls": [],
+          "directives": [],
+          "guards": [],
+          "loops": [
+            ["for ( index = 0 ; index < plan -> chunk_count ; ++ index ) {",[]]
+          ],
+          "signature": "static enum micros_grant_error validate_range_plan ( const struct micros_grant_copy_range_plan * plan , size_t length )",
+          "storage": []
+        }
+      },
+      "storage": []
+    },
+    "kernel/grant/grant_copy_range.c": {
+      "complete": 1,
+      "functions": {
+        "grant_copy_map_address_error": {
+          "accesses": [],
+          "aliases": [],
+          "calls": [],
+          "directives": [],
+          "guards": [],
+          "loops": [],
+          "signature": "static enum micros_grant_error grant_copy_map_address_error ( enum micros_user_address_space_error error )",
+          "storage": []
+        },
+        "grant_copy_plan_device_span": {
+          "accesses": [],
+          "aliases": [],
+          "calls": ["micros_user_address_space_validate_tty_uart_mapping"],
+          "directives": [],
+          "guards": [],
+          "loops": [],
+          "signature": "static enum micros_grant_error grant_copy_plan_device_span ( struct micros_process_handle process , const struct micros_tty_device_authority * device_authority , uintptr_t * current , size_t * remaining , bool * device_fault , enum micros_user_address_space_error * address_error , size_t * chunk_length )",
+          "storage": []
+        },
+        "grant_copy_plan_range": {
+          "accesses": [
+            ["chunks [ candidate . chunk_count ]",[["while ( remaining != 0 ) {",0]]]
+          ],
+          "aliases": [],
+          "calls": ["grant_copy_map_address_error","grant_copy_plan_device_span","micros_tty_device_range_intersects","micros_user_address_space_translate"],
+          "directives": [],
+          "guards": [],
+          "loops": [
+            ["while ( remaining != 0 ) {",[]]
+          ],
+          "signature": "enum micros_grant_error grant_copy_plan_range ( struct micros_process_handle process , uintptr_t address , size_t length , uint32_t required_permission , const struct micros_tty_device_authority * device_authority , struct micros_grant_copy_range_plan * plan )",
+          "storage": []
+        }
+      },
+      "storage": []
+    },
+    "kernel/grant/grant_runtime.c": {
+      "complete": 1,
+      "functions": {
+        "clear_bytes": {
+          "accesses": [
+            ["bytes [ index ]",[["for ( index = 0 ; index < size ; ++ index ) {",0]]]
+          ],
+          "aliases": [],
+          "calls": [],
+          "directives": [],
+          "guards": [],
+          "loops": [
+            ["for ( index = 0 ; index < size ; ++ index ) {",[]]
+          ],
+          "signature": "static void clear_bytes ( void * storage , size_t size )",
+          "storage": []
+        },
+        "copy_bytes": {
+          "accesses": [
+            ["destination_bytes [ index ]",[["for ( index = 0 ; index < size ; ++ index ) {",0]]],
+            ["source_bytes [ index ]",[["for ( index = 0 ; index < size ; ++ index ) {",0]]]
+          ],
+          "aliases": [],
+          "calls": [],
+          "directives": [],
+          "guards": [],
+          "loops": [
+            ["for ( index = 0 ; index < size ; ++ index ) {",[]]
+          ],
+          "signature": "static void copy_bytes ( void * destination , const void * source , size_t size )",
+          "storage": []
+        },
+        "micros_grant_runtime_authoritative_registry": {
+          "accesses": [],
+          "aliases": [],
+          "calls": [],
+          "directives": [],
+          "guards": [],
+          "loops": [],
+          "signature": "struct micros_grant_registry * micros_grant_runtime_authoritative_registry ( void )",
+          "storage": []
+        },
+        "micros_grant_runtime_initialize": {
+          "accesses": [],
+          "aliases": [],
+          "calls": ["clear_bytes","copy_bytes","micros_grant_registry_initialize","micros_grant_registry_validate","micros_ipc_runtime_registry","micros_ipc_runtime_validate","micros_kernel_object_runtime_registry","micros_kernel_object_runtime_validate","riscv_irq_restore","riscv_irq_save"],
+          "directives": [],
+          "guards": [],
+          "loops": [],
+          "signature": "enum micros_grant_error micros_grant_runtime_initialize ( void )",
+          "storage": []
+        },
+        "micros_grant_runtime_registry": {
+          "accesses": [],
+          "aliases": [],
+          "calls": [],
+          "directives": [],
+          "guards": [],
+          "loops": [],
+          "signature": "const struct micros_grant_registry * micros_grant_runtime_registry ( void )",
+          "storage": []
+        },
+        "micros_grant_runtime_validate": {
+          "accesses": [],
+          "aliases": [],
+          "calls": ["micros_grant_registry_validate","micros_ipc_runtime_registry","micros_kernel_object_runtime_registry","riscv_irq_restore","riscv_irq_save"],
+          "directives": [],
+          "guards": [],
+          "loops": [],
+          "signature": "enum micros_grant_error micros_grant_runtime_validate ( void )",
+          "storage": []
+        }
+      },
+      "storage": ["static struct micros_grant_registry authoritative_registry;","static struct micros_grant_registry initialization_scratch;","static bool runtime_ready;"]
+    },
+    "kernel/grant/grant_syscall.c": {
+      "complete": 1,
+      "functions": {
+        "grant_syscall_create_request": {
+          "accesses": [],
+          "aliases": [],
+          "calls": ["micros_grant_commit_create_prevalidated","micros_grant_prepare_create","micros_tty_device_range_intersects","micros_tty_handoff_runtime_inspect_device_binding","panic_grant_syscall"],
+          "directives": [],
+          "guards": [],
+          "loops": [],
+          "signature": "static void grant_syscall_create_request ( struct micros_hart * hart , struct micros_trap_frame * frame , const struct micros_syscall_context * context , struct grant_syscall_execution * work )",
+          "storage": []
+        },
+        "grant_syscall_execute_request": {
+          "accesses": [],
+          "aliases": [],
+          "calls": ["grant_syscall_create_request","micros_grant_copy_from","micros_grant_copy_to","micros_grant_revoke","micros_grant_validate_range","panic_grant_syscall"],
+          "directives": [],
+          "guards": [],
+          "loops": [],
+          "signature": "static void grant_syscall_execute_request ( struct micros_hart * hart , struct micros_trap_frame * frame , const struct micros_syscall_context * context , struct grant_syscall_execution * work )",
+          "storage": []
+        },
+        "micros_grant_handle_captured_user_ecall": {
+          "accesses": [],
+          "aliases": [],
+          "calls": ["grant_syscall_execute_request","micros_grant_abi_map_error","micros_grant_preflight_context","micros_grant_runtime_authoritative_registry","micros_grant_syscall_decode","micros_ipc_runtime_authoritative_registry","panic_grant_syscall"],
+          "directives": [],
+          "guards": [],
+          "loops": [],
+          "signature": "enum micros_syscall_return micros_grant_handle_captured_user_ecall ( struct micros_hart * hart , struct micros_trap_frame * frame , const struct micros_syscall_context * context , const struct micros_syscall_arguments * arguments )",
+          "storage": []
+        },
+        "panic_grant_syscall": {
+          "accesses": [],
+          "aliases": [],
+          "calls": ["MICROS_TRAP_PANIC"],
+          "directives": [],
+          "guards": [],
+          "loops": [],
+          "signature": "static _Noreturn void panic_grant_syscall ( struct micros_hart * hart , struct micros_trap_frame * frame , const char * reason )",
+          "storage": []
+        }
+      },
+      "storage": []
+    },
+    "kernel/grant/grant_syscall_core.c": {
+      "complete": 1,
+      "functions": {
+        "capture_u32": {
+          "accesses": [],
+          "aliases": [],
+          "calls": [],
+          "directives": [],
+          "guards": [],
+          "loops": [],
+          "signature": "static bool capture_u32 ( uint64_t value , uint32_t * captured )",
+          "storage": []
+        },
+        "micros_grant_syscall_decode": {
+          "accesses": [],
+          "aliases": [],
+          "calls": ["capture_u32"],
+          "directives": [],
+          "guards": [],
+          "loops": [],
+          "signature": "enum micros_syscall_abi_result micros_grant_syscall_decode ( const struct micros_syscall_arguments * arguments , struct micros_grant_syscall_request * request )",
           "storage": []
         }
       },

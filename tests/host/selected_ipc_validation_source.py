@@ -34,7 +34,6 @@ RETAINED_AUDITS = (
     ("kernel/endpoint/endpoint_object_validation.c", "micros_endpoint_registry_validate_objects", "micros_endpoint_registry_validate", 1),
     ("kernel/grant/grant.c", "micros_grant_registry_validate", "micros_endpoint_registry_validate_objects", 1),
     ("kernel/grant/grant_runtime.c", "micros_grant_runtime_initialize", "micros_ipc_runtime_validate", 1),
-    ("kernel/grant/grant_syscall.c", "micros_grant_handle_captured_user_ecall", "micros_ipc_runtime_validate", 1),
     ("kernel/ipc/ipc_runtime.c", "micros_ipc_runtime_initialize", "micros_endpoint_registry_validate_objects", 1),
     ("kernel/ipc/ipc_runtime.c", "micros_ipc_runtime_validate", "micros_endpoint_registry_validate_objects", 1),
     ("kernel/pm/pm_control_execution.c", "prepare_environment_is_valid", "micros_endpoint_registry_validate_objects", 1),

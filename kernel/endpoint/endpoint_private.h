@@ -79,13 +79,6 @@ enum micros_endpoint_error endpoint_require_initialized(
     const struct micros_endpoint_registry *registry
 );
 
-enum micros_endpoint_error endpoint_preflight_process(
-    const struct micros_endpoint_registry *registry,
-    const struct micros_kernel_objects *objects,
-    struct micros_process_handle handle,
-    const struct micros_process **process
-);
-
 enum micros_endpoint_error endpoint_preflight_owned_threads(
     const struct micros_endpoint_registry *registry,
     const struct micros_kernel_objects *objects,

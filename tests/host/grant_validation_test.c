@@ -53,7 +53,7 @@ static bool grant_test_precedence_record_output(
 {
     memset(&work->record_sentinel, 0xa5, sizeof(work->record_sentinel));
     work->record = work->record_sentinel;
-    ++fixture->grant_registry.active_count;
+    fixture->grant_registry.active_count = MICROS_GRANT_CAPACITY + 1;
     EXPECT_GRANT_ERROR(
         MICROS_GRANT_ERROR_INVARIANT,
         micros_grant_inspect(
@@ -66,6 +66,28 @@ static bool grant_test_precedence_record_output(
         )
     );
     EXPECT_TRUE(memcmp(&work->record, &work->record_sentinel, sizeof(work->record)) == 0);
+    fixture->grant_registry = work->valid;
+    return true;
+}
+
+static bool grant_test_selected_count_scope(
+    struct grant_test_fixture *fixture,
+    struct grant_test_precedence_case *work
+)
+{
+    struct micros_grant_registry before;
+
+    ++fixture->grant_registry.active_count;
+    before = fixture->grant_registry;
+    EXPECT_GRANT_ERROR(MICROS_GRANT_OK, micros_grant_inspect(
+        &fixture->grant_registry, &fixture->endpoint_registry, &fixture->objects,
+        fixture->processes[0], work->grant, &work->record
+    ));
+    EXPECT_TRUE(grant_test_records_equal(&work->record, &work->valid.grants[0]));
+    EXPECT_TRUE(memcmp(&before, &fixture->grant_registry, sizeof(before)) == 0);
+    EXPECT_GRANT_ERROR(MICROS_GRANT_ERROR_INVARIANT, micros_grant_registry_validate(
+        &fixture->grant_registry, &fixture->endpoint_registry, &fixture->objects
+    ));
     fixture->grant_registry = work->valid;
     return true;
 }
@@ -193,6 +215,9 @@ bool grant_test_error_precedence_and_output_preservation(void)
         return false;
     }
     if (!grant_test_precedence_record_output(fixture, &work)) {
+        return false;
+    }
+    if (!grant_test_selected_count_scope(fixture, &work)) {
         return false;
     }
     if (!grant_test_precedence_stale_shape(fixture, &work)) {

@@ -65,8 +65,8 @@ All B04 pre-node findings are closed; B04-F005 retains its post-node staged
 replacement point. The next preferred runtime outcome is **GRANT01**, whose
 IPC01 predecessor is merged. Its [selected-grant contract](../architecture/selected-grant-validation.md)
 and [ADR-0128](../adr/0128-selected-grant-validation.md) have clean independent
-design review and are Accepted. Implementation remains pending the separate
-design merge; the design closes no B05 finding.
+design review and are Accepted, separately merged as #258. Implementation is
+in progress; the design closes no B05 finding.
 
 Validation simplification #248 follows separate design #247 / ADR-0123.
 It changes no runtime finding, node or edge. Current contracts replace the
@@ -237,7 +237,7 @@ blocking queue.
 | `IPC02` | Runtime correction | `B04-F003` | `IPC01` | Independently reviewed implementation #253 follows the [linear projection contract](../architecture/linear-ipc-deadlock.md). | Actual linear hop/index/bitmap work, complete portable/PM index lifetime, explicit cold repair, current layout/stack and full acceptance passed. |
 | `IPC03` | Runtime correction | `B04-F004` | `IPC01` | Independently reviewed implementation #255 follows the [direct reply binding contract](../architecture/direct-reply-token-binding.md). | Zero token-table visits, exact phase/receiver lifetime, actual return/close authority, independent models, current layout/stack and full acceptance passed. |
 | `IPC04` | Runtime correction | `B04-F006` | `IPC01` | Independently reviewed implementation #257 follows the [head-only sender contract](../architecture/head-only-ipc-sender-queues.md). | Exact linear append, selected/null-terminated splice, full-capacity close, independent models, current target/stack and full acceptance passed. |
-| `GRANT01` | Runtime correction | `B05-F001`, `B05-F002` | `IPC01` | [Accepted selected-grant contract](../architecture/selected-grant-validation.md): local readiness, selected record/participants and denial-only committed-device inspection. | Actual grant/endpoint/TTY audit and lookup work, preserved syscall/authority/failure semantics and complete current acceptance; implementation pending separate design merge. |
+| `GRANT01` | Runtime correction | `B05-F001`, `B05-F002` | `IPC01` | [Accepted selected-grant contract](../architecture/selected-grant-validation.md): local readiness, selected record/participants and denial-only committed-device inspection; implementation follows merged design #258. | Actual grant/endpoint/TTY audit and lookup work, preserved syscall/authority/failure semantics and complete current acceptance. |
 | `GRANT02` | Runtime correction | `B05-F003`, `B05-F004` | `GRANT01`, `IPC03` | Use the MINIX free-list allocation family and endpoint-owned cancellation links instead of capacity scans. | Allocation/cancellation probe counts, reuse, stale identity, and close traces. |
 | `GRANT03` | Runtime correction | `B05-F005` | `GRANT01`, `COPY01`, `MEM04` | Plan translated spans once and move word/block runs without byte-at-a-time commits. | Cross-page aligned/unaligned transfer counts, faults, overlap policy, and atomic publication. |
 | `BOOT01` | Runtime correction | `B06-F001` | `EV04` | Replace repeated capacity scans and whole-state copies with exact service-slot/binding identity and selected transitions. | Lookup/transition counts over sparse and failed service states. |
