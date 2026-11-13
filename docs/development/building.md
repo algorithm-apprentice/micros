@@ -215,6 +215,21 @@ The same pair includes GRANT02 free-head allocation and sparse cancellation
 prepare/commit cases, including exact poisoned-witness preservation and
 commit after endpoint close. It adds no separate workflow.
 
+GRANT03 adds retained-span geometry and primitive transfer records under
+`MICROS_GRANT03_WORK_SUMMARY`, including real maximum-length copy and
+no-copy failure cases. The existing `test-qemu-grant` workflow also runs
+the grant driver's closed `--target` artifact check after its accepted
+guest. That check proves the actual kernel's linked word-copy provider and
+prints `MICROS_GRANT03_TARGET_PASS`; it launches no additional guest.
+After that build, an artifact-only diagnostic can be repeated directly:
+
+```bash
+"${MICROS_PYTHON}" -E -S -B tools/check_selected_grant_validation.py --target
+```
+
+This checks only the fixed grant kernel and does not replace the guest's
+behavioral acceptance or the complete PR plan.
+
 ## Validation planning
 
 Generate a changed-path plan with:

@@ -1425,6 +1425,7 @@ if(MICROS_BUILD_HOST_TESTS)
         kernel/grant/grant.c
         kernel/grant/grant_abi.c
         kernel/grant/grant_copy_core.c
+        lib/runtime/memory.c
         kernel/grant/grant_syscall_core.c
         kernel/memory/sv39.c
         ${MICROS_USER_ADDRESS_SPACE_CORE_SOURCES}
@@ -1455,6 +1456,7 @@ if(MICROS_BUILD_HOST_TESTS)
         ${MICROS_ENDPOINT_CORE_SOURCES}
         kernel/grant/grant.c
         kernel/grant/grant_copy_core.c
+        lib/runtime/memory.c
         ${MICROS_IPC_CORE_SOURCES}
         ${MICROS_ENDPOINT_MODEL_HOST_TEST_SOURCES}
         ${MICROS_GRANT_HOST_TEST_SOURCES}
@@ -4248,6 +4250,7 @@ if(MICROS_BUILD_HOST_TESTS)
         ${MICROS_ENDPOINT_CORE_SOURCES}
         kernel/grant/grant.c
         kernel/grant/grant_copy_core.c
+        lib/runtime/memory.c
         kernel/grant/grant_copy.c
         kernel/grant/grant_copy_range.c
         kernel/grant/grant_runtime.c
@@ -4268,6 +4271,7 @@ if(MICROS_BUILD_HOST_TESTS)
         include/micros/user_address_space.h
         include/micros/sv39.h
         include/micros/work_observation.h
+        lib/runtime/memory.h
         kernel/grant/grant_internal.h
         kernel/endpoint/endpoint_private.h
         kernel/endpoint/endpoint_internal.h
@@ -4329,6 +4333,7 @@ if(MICROS_BUILD_HOST_TESTS)
             tests/host/selected_grant_irq.h
             tests/host/selected_grant_validation_evidence.py
             tests/host/selected_grant_validation_source.py
+            tests/host/runtime_memory_evidence.py
             tests/host/native_observations.py
             tests/host/native_observations.json
             tests/host/source_snapshot.py
@@ -5517,6 +5522,7 @@ add_executable(
     kernel/grant/grant_abi.c
     ${MICROS_GRANT_COPY_TARGET_SOURCES}
     kernel/grant/grant_copy_core.c
+    lib/runtime/memory.c
     kernel/grant/grant_syscall_core.c
     kernel/grant/grant_syscall.c
     kernel/grant/grant_runtime.c
@@ -6019,6 +6025,11 @@ if(MICROS_BUILD_GRANT_TEST)
             --require-objects-ready
             --timeout
             8
+        COMMAND
+            "${MICROS_PYTHON}"
+            ${MICROS_PYTHON_ARGS}
+            "${CMAKE_CURRENT_SOURCE_DIR}/tools/check_selected_grant_validation.py"
+            --target
         DEPENDS micros
         WORKING_DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}"
         USES_TERMINAL

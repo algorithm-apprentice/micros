@@ -1,8 +1,11 @@
 """Independent selected-grant semantics, work and current-product evidence."""
 
 import json
+import hashlib
+import os
 from pathlib import Path
 import re
+import shlex
 import subprocess
 
 from tests.host.evidence_records import record_fields
@@ -24,6 +27,7 @@ NATIVE_SOURCES = OBJECT_SOURCES + tuple("kernel/endpoint/" + name + ".c" for nam
     "grant", "grant_copy_core", "grant_copy", "grant_copy_range", "grant_runtime",
     "grant_syscall", "grant_syscall_core", "grant_abi",
 )) + (
+    "lib/runtime/memory.c",
     "kernel/ipc/ipc_runtime.c", "kernel/tty/tty_handoff_core.c",
     "kernel/tty/tty_handoff_runtime_state.c", "kernel/tty/tty_handoff_runtime_validate.c",
     "kernel/boot/bootstrap_control_core.c",
@@ -35,6 +39,7 @@ NATIVE_HEADERS = OBJECT_HEADERS + (
     "include/micros/endpoint.h", "include/micros/grant.h", "include/micros/grant_copy.h",
     "include/micros/user_address_space.h", "include/micros/sv39.h",
     "include/micros/work_observation.h", "kernel/grant/grant_internal.h",
+    "lib/runtime/memory.h",
     "kernel/endpoint/endpoint_private.h", "kernel/endpoint/endpoint_internal.h",
     "tests/qemu/selected_ipc_work.h",
     "arch/riscv64/interrupt.h", "kernel/boot/bootstrap_control_internal.h",
@@ -57,7 +62,7 @@ TARGETS = ("selected_grant_validation_ordinary", "selected_grant_validation_test
 PRODUCER = 0x4752414e54303101
 OWNER_MASK = sum(1 << owner for owner in (
     Owner.KERNEL_OBJECTS, Owner.KERNEL_SCHEDULER, Owner.KERNEL_ENDPOINT, Owner.KERNEL_IPC,
-    Owner.KERNEL_GRANT, Owner.KERNEL_BOOT, Owner.KERNEL_TTY,
+    Owner.KERNEL_GRANT, Owner.KERNEL_BOOT, Owner.KERNEL_TTY, Owner.RUNTIME,
 ))
 CASE_FIELDS = ("version", "case", "name", "result", "value", "preserved", "before_state", "after_state")
 WORK_FIELDS = ("version", "reserved0", "producer", "case", "owner_mask", "reserved1", "counts")
@@ -128,6 +133,33 @@ CASES = (
     ("cancel-commit-mixed", 0, 2, 0, 8), ("cancel-commit-closed", 0, 2, 0, 8),
     ("cancel-commit-quarantine", 0, 2, 0, 8),
 )
+SPAN_CASES = (
+    # name, bytes, source/destination offsets, first-chunk cuts, result, copies, core-only
+    ("span-zero", 0, 0, 0, 0, 0, 0, 1, 1),
+    ("span-one", 1, 0, 0, 0, 0, 0, 1, 1),
+    ("span-seven", 7, 0, 0, 0, 0, 0, 1, 1),
+    ("span-eight", 8, 0, 0, 0, 0, 0, 1, 1),
+    ("span-nine", 9, 0, 0, 0, 0, 0, 1, 1),
+    ("span-block", 64, 0, 0, 0, 0, 0, 1, 1),
+    ("span-page", 4096, 0, 0, 0, 0, 0, 1, 1),
+    ("span-prefix-tail", 64, 1, 1, 0, 0, 0, 1, 1),
+    ("span-different-residues", 64, 0, 1, 0, 0, 0, 1, 1),
+    ("span-source-cross", 4096, 4088, 0, 8, 0, 0, 1, 1),
+    ("span-destination-cross", 4096, 0, 4080, 0, 16, 0, 1, 1),
+    ("span-coincident-cross", 4096, 4080, 4080, 16, 16, 0, 1, 1),
+    ("span-unequal-cross", 4096, 4088, 4080, 8, 16, 0, 1, 1),
+    ("span-unaligned-cross", 4096, 4083, 4075, 13, 21, 0, 1, 1),
+    ("span-reversed", 64, 0, 0, 0, 0, 0, 1, 1),
+    ("span-from-page", 4096, 4088, 4080, 8, 16, 0, 1, 0),
+    ("span-to-page", 4096, 4083, 4075, 13, 21, 0, 1, 0),
+    ("span-validate-page", 4096, 4088, 4080, 8, 16, 0, 0, 0),
+    ("span-late-fault", 4096, 4088, 4080, 8, 16, 10, 0, 0),
+    ("span-late-invariant", 4096, 4088, 4080, 8, 16, 12, 0, 0),
+    ("span-physical-overlap", 64, 0, 0, 0, 0, 12, 0, 0),
+)
+SPAN_GEOMETRY = {row[0]: row[1:] for row in SPAN_CASES}
+CASES += tuple((name, result, length if copies else 0, 1, 0)
+               for name, length, _, _, _, _, result, copies, _ in SPAN_CASES)
 COLD_CASES = frozenset(("diagnostic-dense",))
 CANCELLATION_COUNTS = {
     "cancel-empty": 0, "cancel-sparse": 1, "cancel-dense": 64,
@@ -138,6 +170,20 @@ CANCELLATION_COMMITS = {
     "cancel-commit-empty": 0, "cancel-commit-sparse": 1, "cancel-commit-dense": 64,
     "cancel-commit-mixed": 4, "cancel-commit-closed": 4, "cancel-commit-quarantine": 4,
 }
+
+
+def span_work(name):
+    length, source, destination, source_cut, destination_cut, _, copies, core = SPAN_GEOMETRY[name]
+    cuts = sorted({0, length, source_cut, destination_cut})
+    words = 0
+    for start, end in zip(cuts, cuts[1:]):
+        source_residue = (start - source_cut if source_cut and start >= source_cut else source + start) % 8
+        destination_residue = (start - destination_cut if destination_cut and start >= destination_cut
+                               else destination + start) % 8
+        if source_residue == destination_residue:
+            first_aligned = start + (-source_residue) % 8
+            words += max(0, (end - first_aligned) // 8)
+    return len(cuts) - 1, length - 7 * words if copies else 0, length if copies else 0, core
 
 
 def expected_cases():
@@ -212,6 +258,21 @@ def work_failures(records, work):
         totals = work_totals(snapshot)
         audits = totals.per_kind[Kind.COMPLETE_VALIDATOR_CALL]
         grants = totals.per_owner[Owner.KERNEL_GRANT][Kind.RECORD_VISIT]
+        if row["name"] in SPAN_GEOMETRY:
+            spans, units, copied, core = span_work(row["name"])
+            expected = {Kind.COPY_UNIT: units}
+            if core:
+                expected.update({
+                    Kind.COPIED_BYTE: copied, Kind.RANGE_VISIT: spans, Kind.INDEX_PROBE: 2 * spans,
+                })
+            elif copied == 0 and totals.per_owner[Owner.RUNTIME][Kind.COPIED_BYTE] != 0:
+                failures.append((row["name"], "rejected-data-copy", totals.per_owner[Owner.RUNTIME][Kind.COPIED_BYTE], 0))
+            for kind, count in expected.items():
+                if totals.per_kind[kind] != count:
+                    failures.append((row["name"], kind.name.lower(), totals.per_kind[kind], count))
+            if any(totals.per_owner[owner][Kind.COPY_UNIT] for owner in Owner
+                   if owner not in (Owner.KERNEL_GRANT, Owner.RUNTIME)):
+                failures.append((row["name"], "foreign-copy-owner", 1, 0))
         if row["name"] in COLD_CASES:
             if audits == 0:
                 failures.append((row["name"], "lost-complete-diagnostic", audits, 1))
@@ -227,6 +288,9 @@ def work_failures(records, work):
                 Kind.COPIED_BYTE: 256,
                 Kind.CLEARED_BYTE: 256,
             }
+            if row["name"] in SPAN_GEOMETRY:
+                _, _, copied, core = span_work(row["name"])
+                byte_limits[Kind.COPIED_BYTE] = copied + (0 if core else 256)
             if row["name"] in CANCELLATION_COUNTS:
                 count = CANCELLATION_COUNTS[row["name"]]
                 byte_limits[Kind.COPIED_BYTE] = 32 + 8 * count
@@ -285,3 +349,115 @@ def check_native_products(root, executable_paths):
     if failures:
         raise ValueError("GRANT01 independent work bounds failed: " + repr(failures))
     return measured
+
+
+def _target_copy_objects(root, directory, commands, owners, compiler):
+    from tools.stack_bound_manifest import owned_artifact
+
+    expected = frozenset(("kernel/grant/grant_copy_core.c", "lib/runtime/memory.c"))
+    selected = {}
+    for command in commands:
+        source = Path(command["file"])
+        output = Path(command["output"])
+        source = source if source.is_absolute() else directory / source
+        output = output if output.is_absolute() else directory / output
+        if source not in {root / name for name in expected}:
+            continue
+        if not output.is_relative_to(directory) or str(output.relative_to(directory)) not in owners:
+            continue
+        output = owned_artifact(directory, str(output.relative_to(directory)))
+        argv = tuple(shlex.split(command["command"]))
+        if (Path(command["directory"]).resolve() != directory
+            or not argv or argv[0] != compiler
+            or argv.count("-c") != 1 or argv.count("-o") != 1
+            or max(argv.index("-c"), argv.index("-o")) + 1 >= len(argv)
+            or any(argument.startswith("@") for argument in argv)):
+            raise ValueError("GRANT03 kernel copy has a foreign or incomplete compiler command")
+        operands = []
+        for option in ("-c", "-o"):
+            operand = Path(argv[argv.index(option) + 1])
+            operands.append(operand if operand.is_absolute() else directory / operand)
+        if tuple(operands) != (source, output):
+            raise ValueError("GRANT03 kernel copy compiler operands disagree with their linked owner")
+        name = str(source.relative_to(root))
+        if name in selected:
+            raise ValueError("GRANT03 kernel copy has duplicate source ownership")
+        selected[name] = output
+    if selected.keys() != expected:
+        raise ValueError("GRANT03 kernel lacks its exact copy caller and provider objects")
+    return selected
+
+
+def check_target_product(root):
+    from tests.host.runtime_memory_evidence import runtime_compile_commands, validate_green_source, wide_data_transfers
+    from tests.host.source_snapshot import source_bytes
+    from tools.stack_bound_manifest import owned_artifact
+    from tools.stack_bound_collect import image_map_text
+    from tools.stack_bound_flow import function_flow, reachable_instructions
+    from tools.stack_bound_link import text_owners
+    from tools.stack_bound_objects import function_symbols, load_object
+    from tools.stack_bound_relocations import verify_linked_object
+    from tools.user_elf_parse import load_elf
+    from tools.validation_context import compiler_version, target_compiler, validate_environment
+    from tools.validation_inputs import _file_identity, _run
+
+    root = Path(root).resolve()
+    directory = owned_artifact(root, "build/riscv64-grant-test")
+    relative_image = "kernel/micros.elf"
+    image_path = owned_artifact(directory, relative_image)
+    sources = (
+        "kernel/grant/grant_copy_core.c", "lib/runtime/memory.c", "lib/runtime/memory.h",
+        "include/micros/grant_copy.h", "include/micros/work_observation.h",
+    )
+    source_identities = {name: read_regular(owned_artifact(root, name))[1] for name in sources}
+    validate_green_source(source_bytes(root, root / "lib/runtime/memory.c").decode())
+    validate_environment(dict(os.environ), target=True)
+    compiler = target_compiler(dict(os.environ))
+    compiler_identity = _file_identity(compiler.resolve())
+    version = _run((str(compiler), "--version")).decode()
+    compiler_version(version, target=True)
+    image_data, image_identity = read_regular(image_path)
+    image = load_elf(image_path)
+    if image.data != image_data:
+        raise ValueError("GRANT03 kernel image changed before byte proof")
+    map_text = image_map_text(directory, relative_image)
+    owners = {name for name, _ in text_owners(map_text)}
+    commands = runtime_compile_commands(directory)
+    selected = _target_copy_objects(root, directory, commands, owners, str(compiler))
+    identities, objects, symbols = {}, {}, {}
+    names = {
+        "kernel/grant/grant_copy_core.c": "micros_grant_copy_commit",
+        "lib/runtime/memory.c": "micros_runtime_memcpy",
+    }
+    for source, output in selected.items():
+        raw, identities[source] = read_regular(output)
+        obj = load_object(output)
+        if obj.data != raw:
+            raise ValueError("GRANT03 kernel object changed before byte proof")
+        retained = verify_linked_object(obj, str(output.relative_to(directory)), image, map_text)
+        symbol = function_symbols(obj).get(names[source])
+        if symbol is None or symbol.section_index not in retained:
+            raise ValueError("GRANT03 kernel copy function is absent from its linked owner")
+        objects[source], symbols[source] = obj, symbol
+    core, memory = "kernel/grant/grant_copy_core.c", "lib/runtime/memory.c"
+    flow = function_flow(objects[core], symbols[core])
+    if (len(flow.calls) != 1 or flow.calls[0].target_symbol != names[memory]
+        or flow.calls[0].offset not in reachable_instructions(flow)):
+        raise ValueError("GRANT03 kernel commit lacks its unique reachable copy-provider call")
+    transfers = wide_data_transfers(objects[memory], symbols[memory], "copy")
+    if any(symbol.name in ("memcpy", "memset") or symbol.name.startswith("micros_test_work_")
+           for symbol in image.symbols):
+        raise ValueError("GRANT03 ordinary kernel contains a memory forwarder or work observer")
+    if ({name: read_regular(owned_artifact(root, name))[1] for name in sources} != source_identities
+        or {name: read_regular(owned_artifact(directory, str(output.relative_to(directory))))[1]
+            for name, output in selected.items()} != identities
+        or read_regular(owned_artifact(directory, relative_image))[1] != image_identity
+        or image_map_text(directory, relative_image) != map_text
+        or runtime_compile_commands(directory) != commands
+        or _file_identity(compiler.resolve()) != compiler_identity
+        or _run((str(compiler), "--version")).decode() != version):
+        raise ValueError("GRANT03 kernel source, compiler, image, object or recipe changed during proof")
+    return {
+        "image": image_identity, "objects": identities, "compiler": compiler_identity,
+        "map_sha256": hashlib.sha256(map_text.encode()).hexdigest(), "wide_copy_sites": transfers,
+    }

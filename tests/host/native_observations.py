@@ -134,7 +134,9 @@ def native_inputs(root, family):
     root = Path(root)
     members = declarations(root)["families"][family]["native_sources"]
     if len(set(members)) != len(members) or any(
-        not name.startswith("kernel/") or not name.endswith(".c") or ".." in Path(name).parts
+        (not name.startswith("kernel/")
+         and not (family == "GRANT01" and name == "lib/runtime/memory.c"))
+        or not name.endswith(".c") or ".." in Path(name).parts
         for name in members
     ):
         raise ValueError("native source membership is incomplete or leaves the project")
@@ -143,6 +145,8 @@ def native_inputs(root, family):
         for directory in ("arch", "include", "kernel")
         for path in (root / directory).rglob("*.h")
     }
+    if family == "GRANT01" and "lib/runtime/memory.c" in members:
+        headers.add("lib/runtime/memory.h")
     return tuple(sorted({*members, *headers}))
 
 

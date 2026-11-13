@@ -33,6 +33,7 @@ struct grant01_fixture {
     const char *panic_reason;
     bool panic_armed;
     bool ledger_available;
+    bool overlap_memory;
     uintptr_t irq_status;
     uintptr_t memory_base[GRANT01_ACTORS];
     enum micros_user_address_space_error translation_error[GRANT01_ACTORS][2];

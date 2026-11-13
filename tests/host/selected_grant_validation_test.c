@@ -270,6 +270,7 @@ bool grant01_begin(size_t index)
             | (UINT32_C(1) << MICROS_WORK_OWNER_KERNEL_GRANT)
             | (UINT32_C(1) << MICROS_WORK_OWNER_KERNEL_BOOT)
             | (UINT32_C(1) << MICROS_WORK_OWNER_KERNEL_TTY)
+            | (UINT32_C(1) << MICROS_WORK_OWNER_RUNTIME)
     ) == MICROS_TEST_WORK_OK);
 #else
     (void)index;
@@ -425,6 +426,169 @@ bool grant01_report(size_t index, const char *name, enum micros_grant_error resu
     return true;
 }
 
+enum copy_span_operation {
+    COPY_SPAN_CORE, COPY_SPAN_FROM, COPY_SPAN_TO, COPY_SPAN_VALIDATE,
+    COPY_SPAN_LATE_FAULT, COPY_SPAN_LATE_INVARIANT, COPY_SPAN_OVERLAP,
+};
+
+struct copy_span_case {
+    const char *name;
+    size_t length;
+    size_t source_offset;
+    size_t destination_offset;
+    size_t source_first;
+    size_t destination_first;
+    enum copy_span_operation operation;
+    bool reverse;
+    enum micros_grant_error result;
+};
+
+static const struct copy_span_case copy_span_cases[] = {
+    {"span-zero", 0, 0, 0, 0, 0, COPY_SPAN_CORE, false, MICROS_GRANT_OK},
+    {"span-one", 1, 0, 0, 0, 0, COPY_SPAN_CORE, false, MICROS_GRANT_OK},
+    {"span-seven", 7, 0, 0, 0, 0, COPY_SPAN_CORE, false, MICROS_GRANT_OK},
+    {"span-eight", 8, 0, 0, 0, 0, COPY_SPAN_CORE, false, MICROS_GRANT_OK},
+    {"span-nine", 9, 0, 0, 0, 0, COPY_SPAN_CORE, false, MICROS_GRANT_OK},
+    {"span-block", 64, 0, 0, 0, 0, COPY_SPAN_CORE, false, MICROS_GRANT_OK},
+    {"span-page", 4096, 0, 0, 0, 0, COPY_SPAN_CORE, false, MICROS_GRANT_OK},
+    {"span-prefix-tail", 64, 1, 1, 0, 0, COPY_SPAN_CORE, false, MICROS_GRANT_OK},
+    {"span-different-residues", 64, 0, 1, 0, 0, COPY_SPAN_CORE, false, MICROS_GRANT_OK},
+    {"span-source-cross", 4096, 4088, 0, 8, 0, COPY_SPAN_CORE, false, MICROS_GRANT_OK},
+    {"span-destination-cross", 4096, 0, 4080, 0, 16, COPY_SPAN_CORE, false, MICROS_GRANT_OK},
+    {"span-coincident-cross", 4096, 4080, 4080, 16, 16, COPY_SPAN_CORE, false, MICROS_GRANT_OK},
+    {"span-unequal-cross", 4096, 4088, 4080, 8, 16, COPY_SPAN_CORE, false, MICROS_GRANT_OK},
+    {"span-unaligned-cross", 4096, 4083, 4075, 13, 21, COPY_SPAN_CORE, false, MICROS_GRANT_OK},
+    {"span-reversed", 64, 0, 0, 0, 0, COPY_SPAN_CORE, true, MICROS_GRANT_OK},
+    {"span-from-page", 4096, 4088, 4080, 8, 16, COPY_SPAN_FROM, false, MICROS_GRANT_OK},
+    {"span-to-page", 4096, 4083, 4075, 13, 21, COPY_SPAN_TO, false, MICROS_GRANT_OK},
+    {"span-validate-page", 4096, 4088, 4080, 8, 16, COPY_SPAN_VALIDATE, false, MICROS_GRANT_OK},
+    {"span-late-fault", 4096, 4088, 4080, 8, 16, COPY_SPAN_LATE_FAULT, false, MICROS_GRANT_ERROR_FAULT},
+    {"span-late-invariant", 4096, 4088, 4080, 8, 16, COPY_SPAN_LATE_INVARIANT, false, MICROS_GRANT_ERROR_INVARIANT},
+    {"span-physical-overlap", 64, 0, 0, 0, 0, COPY_SPAN_OVERLAP, false, MICROS_GRANT_ERROR_INVARIANT},
+};
+
+static unsigned char *copy_span_byte(
+    const struct copy_span_case *test, unsigned char memory[][GRANT01_MEMORY_SIZE],
+    bool source, size_t logical
+)
+{
+    size_t actor = source ? 0 : 1;
+    size_t offset = source ? test->source_offset : test->destination_offset;
+    size_t first = source ? test->source_first : test->destination_first;
+
+    if (test->reverse || test->operation == COPY_SPAN_TO) {
+        actor ^= 1;
+    }
+    if (test->operation == COPY_SPAN_CORE && first != 0 && logical >= first) {
+        actor += 2;
+        offset = 0;
+        logical -= first;
+    }
+    return &memory[actor][offset + logical];
+}
+
+static struct micros_grant_copy_range_plan copy_span_plan(
+    const struct copy_span_case *test, bool source
+)
+{
+    struct micros_grant_copy_range_plan plan = {0};
+    size_t first = source ? test->source_first : test->destination_first;
+
+    if (test->length != 0) {
+        plan.chunk_count = first == 0 ? 1 : 2;
+        plan.chunks[0] = (struct micros_grant_copy_chunk){
+            .physical_address = (uintptr_t)copy_span_byte(test, fixture.memory, source, 0),
+            .length = first == 0 ? test->length : first,
+        };
+        if (first != 0) {
+            plan.chunks[1] = (struct micros_grant_copy_chunk){
+                .physical_address = (uintptr_t)copy_span_byte(test, fixture.memory, source, first),
+                .length = test->length - first,
+            };
+        }
+    }
+    return plan;
+}
+
+static bool run_copy_span(size_t index, const struct copy_span_case *test)
+{
+    struct micros_grant_copy_range_plan source, destination;
+    micros_grant_t grant = MICROS_GRANT_NONE;
+    enum micros_grant_error result = MICROS_GRANT_OK;
+    bool core = test->operation == COPY_SPAN_CORE;
+    bool to = test->operation == COPY_SPAN_TO;
+    bool writes = test->result == MICROS_GRANT_OK && test->operation != COPY_SPAN_VALIDATE;
+    size_t remote_offset = to ? test->destination_offset : test->source_offset;
+    size_t local_offset = to ? test->source_offset : test->destination_offset;
+    size_t remote_visits = core ? 0 : 1 + (remote_offset + test->length - 1) / 4096;
+    size_t local_visits = core || test->operation == COPY_SPAN_VALIDATE
+        ? 0 : 1 + (local_offset + test->length - 1) / 4096;
+
+    REQUIRE(grant01_setup(0, 4));
+    memset(tty_handoff_context(), 0, sizeof(*tty_handoff_context()));
+    fixture.ledger_available = true;
+    fixture.ledger.phase = to ? MICROS_FRAME_OWNERSHIP_PHASE_HANDED_OFF : MICROS_FRAME_OWNERSHIP_PHASE_BOOTSTRAP;
+    for (size_t actor = 0; actor < GRANT01_ACTORS; ++actor) {
+        fixture.memory_base[actor] = MICROS_USER_VIRTUAL_BASE;
+        fixture.permissions[actor][0] = fixture.permissions[actor][1] =
+            MICROS_SV39_PERMISSION_READ | MICROS_SV39_PERMISSION_WRITE;
+        for (size_t byte = 0; byte < GRANT01_MEMORY_SIZE; ++byte) {
+            fixture.memory[actor][byte] = (unsigned char)(13 * actor + 17 * byte + 7);
+        }
+    }
+    if (!core) {
+        REQUIRE(micros_grant_create(
+            &fixture.grants, &fixture.endpoints, &fixture.objects, fixture.processes[0],
+            fixture.identities[1], MICROS_USER_VIRTUAL_BASE, GRANT01_MEMORY_SIZE,
+            MICROS_GRANT_PERMISSION_DEFINED_MASK, &grant
+        ) == MICROS_GRANT_OK);
+    }
+    if (test->operation == COPY_SPAN_LATE_FAULT) {
+        fixture.permissions[1][1] = MICROS_SV39_PERMISSION_READ;
+    } else if (test->operation == COPY_SPAN_LATE_INVARIANT) {
+        fixture.translation_error[0][1] = MICROS_USER_ADDRESS_SPACE_ERROR_PTE;
+        fixture.permissions[1][0] = MICROS_SV39_PERMISSION_READ;
+        local_visits = 1;
+    }
+    fixture.overlap_memory = test->operation == COPY_SPAN_OVERLAP;
+    source = copy_span_plan(test, true);
+    destination = copy_span_plan(test, false);
+    REQUIRE(micros_grant_copy_plan_validate(&source, &destination, test->length) == MICROS_GRANT_OK);
+    memcpy(fixture.before_memory, fixture.memory, sizeof(fixture.memory));
+    if (writes) {
+        for (size_t byte = 0; byte < test->length; ++byte) {
+            *copy_span_byte(test, fixture.before_memory, false, byte) =
+                *copy_span_byte(test, fixture.before_memory, true, byte);
+        }
+    }
+    grant01_snapshot();
+    REQUIRE(grant01_begin(index));
+    if (core) {
+        micros_grant_copy_commit(&source, &destination, test->length);
+    } else if (test->operation == COPY_SPAN_VALIDATE) {
+        result = micros_grant_validate_range(
+            &fixture.grants, &fixture.endpoints, &fixture.objects, fixture.processes[1],
+            fixture.identities[0], grant, remote_offset, test->length, MICROS_GRANT_PERMISSION_READ
+        );
+    } else if (to) {
+        result = micros_grant_copy_to(
+            &fixture.grants, &fixture.endpoints, &fixture.objects, fixture.processes[1],
+            fixture.identities[0], grant, remote_offset, MICROS_USER_VIRTUAL_BASE + local_offset, test->length
+        );
+    } else {
+        result = micros_grant_copy_from(
+            &fixture.grants, &fixture.endpoints, &fixture.objects, fixture.processes[1],
+            fixture.identities[0], grant, remote_offset, MICROS_USER_VIRTUAL_BASE + local_offset, test->length
+        );
+    }
+    REQUIRE(grant01_finish());
+    REQUIRE(result == test->result);
+    REQUIRE(fixture.translations[0] == remote_visits && fixture.translations[1] == local_visits);
+    REQUIRE(fixture.translations[2] == 0 && fixture.translations[3] == 0 && fixture.irq_status == 0);
+    REQUIRE(memcmp(fixture.memory, fixture.before_memory, sizeof(fixture.memory)) == 0);
+    return grant01_report(index, test->name, result, writes ? test->length : 0, true);
+}
+
 int main(int argc, char **argv)
 {
     size_t count = sizeof(cases) / sizeof(cases[0]);
@@ -464,6 +628,12 @@ int main(int argc, char **argv)
     }
     if (!grant01_runtime_cases(&count) || !grant01_scope_cases(&count)) {
         return 1;
+    }
+    for (size_t index = 0; index < sizeof(copy_span_cases) / sizeof(copy_span_cases[0]); ++index) {
+        if (!run_copy_span(count, &copy_span_cases[index])) {
+            return 1;
+        }
+        ++count;
     }
     printf("MICROS_GRANT01_NATIVE_PASS cases=%zu\n", count);
     return 0;

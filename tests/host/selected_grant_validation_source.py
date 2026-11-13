@@ -5,6 +5,7 @@ import re
 
 from tests.host.c_source_records import c_lexical_text, function_records, tokens
 from tests.host.native_observations import bind_sites, declarations
+from tests.host.runtime_memory_evidence import MEMORY_PATH, validate_green_source
 from tests.host.source_snapshot import source_bytes
 from tests.host.work_count_lexical import (
     compound_layout, enclosing_regions, matching_tokens, positional_tokens, region_header,
@@ -103,6 +104,11 @@ def validate_native_sites(root, path, text):
         records = {name: records[name] for name in family["subsets"][path]}
     if declared.keys() != records.keys():
         raise ValueError("GRANT01 declarations omit a compiled function: " + path)
+    if path == MEMORY_PATH:
+        if any(declared.values()):
+            raise ValueError("GRANT03 cannot duplicate the existing COPY01 observations")
+        validate_green_source(text)
+        return
     for name, record in records.items():
         if any(tuple(channels) != ("work",) for channels, _ in declared[name]):
             raise ValueError("GRANT01 primitive belongs to another channel")
