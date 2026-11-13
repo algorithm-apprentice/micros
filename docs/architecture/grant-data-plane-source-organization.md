@@ -9,6 +9,11 @@ starts from separately merged design #139,
 `a71253e88b367d9cc4fe494395b76c7f16d39540`. Current progress below separates
 actual definition ownership from once-only future source wiring.
 
+The later [selected-grant contract](selected-grant-validation.md) owns
+GRANT01's ordinary validation-boundary correction and its separate phase
+barrier. It retains these coherent registry, copy, adapter and evidence
+owners; GRANT02/GRANT03 still own indexing and copy-algorithm changes.
+
 ```text
 reviewed micros base: 6269d9247de6beafed2448aa0ffd6904de5e8833
 fixed MINIX reference: 4db99f4012570a577414fe2a43697b2f239b699e

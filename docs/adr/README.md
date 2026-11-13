@@ -143,3 +143,4 @@ to make the project appear more consistent than it was.
 | [0125](0125-linear-ipc-deadlock.md) | Linear IPC deadlock projection | Accepted |
 | [0126](0126-direct-reply-token-binding.md) | Direct reply-token binding | Accepted |
 | [0127](0127-head-only-ipc-sender-queues.md) | Head-only IPC sender queues | Accepted |
+| [0128](0128-selected-grant-validation.md) | Selected grant validation | Accepted |
