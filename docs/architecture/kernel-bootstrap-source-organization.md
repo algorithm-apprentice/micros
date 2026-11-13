@@ -21,6 +21,10 @@ these owners while replacing service-ID scans and whole-runtime mutation
 plans. BOOT02 separately owns command audit cadence; BOOT03 owns copy/fill
 algorithms. Current metadata upkeep follows ADR-0123, not the historical
 source-transport ceremony below.
+The declarations-only `kernel/boot/bootstrap_transitions_internal.h`
+belongs to the portable transition owner. Portable control and target
+diagnostics consume its checked lookup and selected plans without adding
+another runtime owner.
 
 ## Reviewed base and scope
 

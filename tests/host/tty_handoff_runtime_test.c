@@ -52,8 +52,10 @@ static void tty_handoff_test_seed_runtime_records(
         .irq_source = MICROS_TTY_UART_IRQ_SOURCE,
     };
     work->bootstrap.entry_count = 1;
+    work->bootstrap.binding_slots[MICROS_TTY_SERVICE_ID] = 1;
     work->bootstrap.plan.console_service_id = MICROS_TTY_SERVICE_ID;
     work->bootstrap.transitions.entry_count = 1;
+    work->bootstrap.transitions.service_slots[MICROS_TTY_SERVICE_ID] = 1;
     *work->transition = (struct micros_bootstrap_runtime_entry){
         .service_id = MICROS_TTY_SERVICE_ID,
         .state = MICROS_BOOTSTRAP_SERVICE_PREPARED,

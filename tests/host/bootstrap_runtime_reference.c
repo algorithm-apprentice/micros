@@ -238,6 +238,8 @@ void bootstrap_runtime_project_reference(
         reference->controller_service_id;
     runtime->starting_service_id = reference->starting_service_id;
     for (index = 0; index < reference->entry_count; ++index) {
+        runtime->service_slots[reference->entries[index].service_id] =
+            (uint8_t)(index + 1);
         runtime->entries[index].service_id =
             reference->entries[index].service_id;
         runtime->entries[index].prerequisites =

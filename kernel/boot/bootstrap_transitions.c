@@ -1,33 +1,91 @@
 #include "kernel/boot/bootstrap_manifest_internal.h"
+#include "kernel/boot/bootstrap_transitions_internal.h"
 
-static struct micros_bootstrap_runtime_entry *runtime_entry(
-    struct micros_bootstrap_runtime *runtime,
-    uint32_t service_id
+static enum micros_bootstrap_error runtime_slot(
+    const struct micros_bootstrap_runtime *runtime,
+    uint32_t service_id,
+    uint16_t *index
 )
 {
-    size_t index;
+    uint8_t slot;
 
-    for (index = 0; index < runtime->entry_count; ++index) {
-        if (runtime->entries[index].service_id == service_id) {
-            return &runtime->entries[index];
-        }
+    if (
+        runtime == NULL
+        || service_id == 0
+        || service_id > MICROS_BOOTSTRAP_SERVICE_ID_LIMIT
+    ) {
+        return MICROS_BOOTSTRAP_ERROR_ARGUMENT;
     }
-    return NULL;
+    if (
+        runtime->entry_count == 0
+        || runtime->entry_count > MICROS_BOOTSTRAP_SERVICE_CAPACITY
+    ) {
+        return MICROS_BOOTSTRAP_ERROR_INVARIANT;
+    }
+    slot = runtime->service_slots[service_id];
+    if (slot == 0) {
+        return MICROS_BOOTSTRAP_ERROR_ARGUMENT;
+    }
+    if (
+        slot > runtime->entry_count
+        || runtime->entries[slot - 1].service_id != service_id
+    ) {
+        return MICROS_BOOTSTRAP_ERROR_INVARIANT;
+    }
+    *index = (uint16_t)(slot - 1);
+    return MICROS_BOOTSTRAP_OK;
 }
 
-static const struct micros_bootstrap_runtime_entry *runtime_entry_const(
+const struct micros_bootstrap_runtime_entry *bootstrap_runtime_find_entry(
     const struct micros_bootstrap_runtime *runtime,
     uint32_t service_id
 )
 {
+    uint16_t index;
+
+    return runtime_slot(runtime, service_id, &index) == MICROS_BOOTSTRAP_OK
+        ? &runtime->entries[index] : NULL;
+}
+
+bool bootstrap_runtime_validate_index(
+    const struct micros_bootstrap_runtime *runtime
+)
+{
     size_t index;
 
+    if (
+        runtime == NULL
+        || runtime->entry_count == 0
+        || runtime->entry_count > MICROS_BOOTSTRAP_SERVICE_CAPACITY
+        || runtime->service_slots[0] != 0
+    ) {
+        return false;
+    }
     for (index = 0; index < runtime->entry_count; ++index) {
-        if (runtime->entries[index].service_id == service_id) {
-            return &runtime->entries[index];
+        uint32_t service_id = runtime->entries[index].service_id;
+
+        if (
+            service_id == 0
+            || service_id > MICROS_BOOTSTRAP_SERVICE_ID_LIMIT
+            || runtime->service_slots[service_id] != index + 1
+        ) {
+            return false;
         }
     }
-    return NULL;
+    for (index = 1; index <= MICROS_BOOTSTRAP_SERVICE_ID_LIMIT; ++index) {
+        uint8_t slot = runtime->service_slots[index];
+
+        if (
+            slot != 0
+            && (
+                slot > runtime->entry_count
+                || runtime->entries[slot - 1].service_id != index
+            )
+        ) {
+            return false;
+        }
+    }
+    return true;
 }
 
 enum micros_bootstrap_error micros_bootstrap_runtime_initialize(
@@ -37,6 +95,7 @@ enum micros_bootstrap_error micros_bootstrap_runtime_initialize(
 )
 {
     struct micros_bootstrap_runtime candidate;
+    uint64_t ordered_ids = 0;
     size_t index;
 
     if (manifest == NULL || plan == NULL || runtime == NULL) {
@@ -64,6 +123,7 @@ enum micros_bootstrap_error micros_bootstrap_runtime_initialize(
     }
     if (
         plan->entry_count == 0
+        || plan->entry_count > MICROS_BOOTSTRAP_SERVICE_CAPACITY
         || plan->entry_count != manifest->header.entry_count
         || plan->controller_service_id == 0
         || plan->ordered_service_ids[0]
@@ -81,6 +141,15 @@ enum micros_bootstrap_error micros_bootstrap_runtime_initialize(
         struct micros_bootstrap_runtime_entry *entry =
             &candidate.entries[index];
 
+        if (
+            manifest_entry->service_id == 0
+            || manifest_entry->service_id > MICROS_BOOTSTRAP_SERVICE_ID_LIMIT
+            || candidate.service_slots[manifest_entry->service_id] != 0
+        ) {
+            return MICROS_BOOTSTRAP_ERROR_INVARIANT;
+        }
+        candidate.service_slots[manifest_entry->service_id] =
+            (uint8_t)(index + 1);
         entry->service_id = manifest_entry->service_id;
         entry->prerequisites = manifest_entry->prerequisites;
         entry->ready_timeout_counter_ticks =
@@ -101,31 +170,98 @@ enum micros_bootstrap_error micros_bootstrap_runtime_initialize(
         candidate.ordered_service_ids[index] =
             plan->ordered_service_ids[index];
     }
+    for (index = 0; index < plan->entry_count; ++index) {
+        uint32_t service_id = plan->ordered_service_ids[index];
+        uint64_t bit;
+
+        if (
+            service_id == 0
+            || service_id > MICROS_BOOTSTRAP_SERVICE_ID_LIMIT
+            || candidate.service_slots[service_id] == 0
+        ) {
+            return MICROS_BOOTSTRAP_ERROR_INVARIANT;
+        }
+        bit = UINT64_C(1) << (service_id - 1);
+        if ((ordered_ids & bit) != 0) {
+            return MICROS_BOOTSTRAP_ERROR_INVARIANT;
+        }
+        ordered_ids |= bit;
+    }
     bootstrap_manifest_copy_bytes(runtime, &candidate, sizeof(*runtime));
     return MICROS_BOOTSTRAP_OK;
 }
 
-static enum micros_bootstrap_error runtime_release(
-    struct micros_bootstrap_runtime *runtime,
+static void initialize_transition_plan(
+    const struct micros_bootstrap_runtime *runtime,
+    uint16_t index,
+    struct bootstrap_transition_plan *plan
+)
+{
+    bootstrap_manifest_clear_bytes(plan, sizeof(*plan));
+    plan->entry_index = index;
+    plan->next_order_index = runtime->next_order_index;
+    plan->phase = runtime->phase;
+    plan->controller_service_id = runtime->controller_service_id;
+    plan->starting_service_id = runtime->starting_service_id;
+    bootstrap_manifest_copy_bytes(
+        &plan->entry, &runtime->entries[index], sizeof(plan->entry)
+    );
+}
+
+static uint32_t lowest_prerequisite_id(uint64_t bits)
+{
+    uint32_t service_id = 1;
+
+    if ((bits & UINT64_C(0xffffffff)) == 0) {
+        bits >>= 32;
+        service_id += 32;
+    }
+    if ((bits & UINT64_C(0xffff)) == 0) {
+        bits >>= 16;
+        service_id += 16;
+    }
+    if ((bits & UINT64_C(0xff)) == 0) {
+        bits >>= 8;
+        service_id += 8;
+    }
+    if ((bits & UINT64_C(0xf)) == 0) {
+        bits >>= 4;
+        service_id += 4;
+    }
+    if ((bits & UINT64_C(3)) == 0) {
+        bits >>= 2;
+        service_id += 2;
+    }
+    if ((bits & UINT64_C(1)) == 0) {
+        ++service_id;
+    }
+    return service_id;
+}
+
+enum micros_bootstrap_error bootstrap_runtime_prepare_release(
+    const struct micros_bootstrap_runtime *runtime,
     uint32_t service_id,
     uint64_t now,
     uint64_t retained_deadline,
-    bool retain_deadline
+    bool retain_deadline,
+    struct bootstrap_transition_plan *plan
 )
 {
-    struct micros_bootstrap_runtime candidate;
-    struct micros_bootstrap_runtime_entry *entry;
-    uint64_t ready_ids = 0;
-    size_t index;
+    struct bootstrap_transition_plan candidate;
+    const struct micros_bootstrap_runtime_entry *entry;
+    enum micros_bootstrap_error error;
+    uint64_t prerequisites;
+    uint16_t index;
 
-    if (runtime == NULL || service_id == 0) {
+    if (runtime == NULL || service_id == 0 || plan == NULL) {
         return MICROS_BOOTSTRAP_ERROR_ARGUMENT;
     }
     if (runtime->phase != MICROS_BOOTSTRAP_PHASE_RUNNING) {
         return MICROS_BOOTSTRAP_ERROR_STATE;
     }
-    if (runtime_entry(runtime, service_id) == NULL) {
-        return MICROS_BOOTSTRAP_ERROR_ARGUMENT;
+    error = runtime_slot(runtime, service_id, &index);
+    if (error != MICROS_BOOTSTRAP_OK) {
+        return error;
     }
     if (
         runtime->starting_service_id != 0
@@ -135,11 +271,9 @@ static enum micros_bootstrap_error runtime_release(
     ) {
         return MICROS_BOOTSTRAP_ERROR_STATE;
     }
-    bootstrap_manifest_copy_bytes(&candidate, runtime, sizeof(candidate));
-    entry = runtime_entry(&candidate, service_id);
+    entry = &runtime->entries[index];
     if (
-        entry == NULL
-        || entry->state != MICROS_BOOTSTRAP_SERVICE_PREPARED
+        entry->state != MICROS_BOOTSTRAP_SERVICE_PREPARED
         || entry->endpoint_state
             != MICROS_BOOTSTRAP_ENDPOINT_RESERVED
         || entry->profile_installed
@@ -147,17 +281,27 @@ static enum micros_bootstrap_error runtime_release(
     ) {
         return MICROS_BOOTSTRAP_ERROR_STATE;
     }
-    for (index = 0; index < candidate.entry_count; ++index) {
-        if (
-            candidate.entries[index].state
-                == MICROS_BOOTSTRAP_SERVICE_READY
-        ) {
-            ready_ids |= UINT64_C(1)
-                << (candidate.entries[index].service_id - 1);
-        }
-    }
-    if ((entry->prerequisites & ~ready_ids) != 0) {
+    prerequisites = entry->prerequisites;
+    if ((prerequisites & (UINT64_C(1) << 63)) != 0) {
         return MICROS_BOOTSTRAP_ERROR_STATE;
+    }
+    while (prerequisites != 0) {
+        uint16_t dependency_index;
+
+        error = runtime_slot(
+            runtime, lowest_prerequisite_id(prerequisites), &dependency_index
+        );
+        if (error == MICROS_BOOTSTRAP_ERROR_INVARIANT) {
+            return error;
+        }
+        if (
+            error != MICROS_BOOTSTRAP_OK
+            || runtime->entries[dependency_index].state
+                != MICROS_BOOTSTRAP_SERVICE_READY
+        ) {
+            return MICROS_BOOTSTRAP_ERROR_STATE;
+        }
+        prerequisites &= prerequisites - 1;
     }
     if (entry->ready_timeout_counter_ticks == 0) {
         return MICROS_BOOTSTRAP_ERROR_RANGE;
@@ -171,16 +315,50 @@ static enum micros_bootstrap_error runtime_release(
     ) {
         return MICROS_BOOTSTRAP_ERROR_RANGE;
     }
-    entry->profile_installed = true;
-    entry->endpoint_state = MICROS_BOOTSTRAP_ENDPOINT_ACTIVE;
-    entry->scheduler_assigned = true;
-    entry->state = MICROS_BOOTSTRAP_SERVICE_STARTING;
-    entry->ready_deadline = retain_deadline
+    initialize_transition_plan(runtime, index, &candidate);
+    candidate.entry.profile_installed = true;
+    candidate.entry.endpoint_state = MICROS_BOOTSTRAP_ENDPOINT_ACTIVE;
+    candidate.entry.scheduler_assigned = true;
+    candidate.entry.state = MICROS_BOOTSTRAP_SERVICE_STARTING;
+    candidate.entry.ready_deadline = retain_deadline
         ? retained_deadline
         : now + entry->ready_timeout_counter_ticks;
     candidate.starting_service_id = service_id;
-    bootstrap_manifest_copy_bytes(runtime, &candidate, sizeof(*runtime));
+    bootstrap_manifest_copy_bytes(plan, &candidate, sizeof(*plan));
     return MICROS_BOOTSTRAP_OK;
+}
+
+void bootstrap_runtime_commit_prevalidated(
+    struct micros_bootstrap_runtime *runtime,
+    const struct bootstrap_transition_plan *plan
+)
+{
+    bootstrap_manifest_copy_bytes(
+        &runtime->entries[plan->entry_index], &plan->entry, sizeof(plan->entry)
+    );
+    runtime->next_order_index = plan->next_order_index;
+    runtime->phase = plan->phase;
+    runtime->controller_service_id = plan->controller_service_id;
+    runtime->starting_service_id = plan->starting_service_id;
+}
+
+static enum micros_bootstrap_error runtime_release(
+    struct micros_bootstrap_runtime *runtime,
+    uint32_t service_id,
+    uint64_t now,
+    uint64_t retained_deadline,
+    bool retain_deadline
+)
+{
+    struct bootstrap_transition_plan plan;
+    enum micros_bootstrap_error error = bootstrap_runtime_prepare_release(
+        runtime, service_id, now, retained_deadline, retain_deadline, &plan
+    );
+
+    if (error == MICROS_BOOTSTRAP_OK) {
+        bootstrap_runtime_commit_prevalidated(runtime, &plan);
+    }
+    return error;
 }
 
 enum micros_bootstrap_error micros_bootstrap_runtime_release(
@@ -209,54 +387,65 @@ micros_bootstrap_runtime_release_retaining_deadline(
     );
 }
 
-enum micros_bootstrap_error micros_bootstrap_runtime_accept_ready(
-    struct micros_bootstrap_runtime *runtime,
+enum micros_bootstrap_error bootstrap_runtime_prepare_ready(
+    const struct micros_bootstrap_runtime *runtime,
     uint32_t service_id,
-    uint64_t now
+    uint64_t now,
+    struct bootstrap_transition_plan *plan
 )
 {
-    struct micros_bootstrap_runtime candidate;
-    struct micros_bootstrap_runtime_entry *entry;
+    struct bootstrap_transition_plan candidate;
+    const struct micros_bootstrap_runtime_entry *entry;
+    enum micros_bootstrap_error error;
+    uint16_t index;
 
-    if (runtime == NULL || service_id == 0) {
+    if (runtime == NULL || service_id == 0 || plan == NULL) {
         return MICROS_BOOTSTRAP_ERROR_ARGUMENT;
     }
     if (runtime->phase != MICROS_BOOTSTRAP_PHASE_RUNNING) {
         return MICROS_BOOTSTRAP_ERROR_STATE;
     }
-    if (runtime_entry(runtime, service_id) == NULL) {
-        return MICROS_BOOTSTRAP_ERROR_ARGUMENT;
+    error = runtime_slot(runtime, service_id, &index);
+    if (error != MICROS_BOOTSTRAP_OK) {
+        return error;
     }
     if (runtime->starting_service_id != service_id) {
         return MICROS_BOOTSTRAP_ERROR_STATE;
     }
-    bootstrap_manifest_copy_bytes(&candidate, runtime, sizeof(candidate));
-    entry = runtime_entry(&candidate, service_id);
+    entry = &runtime->entries[index];
     if (
-        entry == NULL
-        || entry->state != MICROS_BOOTSTRAP_SERVICE_STARTING
+        entry->state != MICROS_BOOTSTRAP_SERVICE_STARTING
         || entry->ready_deadline == 0
         || now >= entry->ready_deadline
     ) {
         return MICROS_BOOTSTRAP_ERROR_STATE;
     }
-    entry->state = MICROS_BOOTSTRAP_SERVICE_READY;
-    entry->ready_deadline = 0;
+    if (
+        runtime->next_order_index == 0
+        || runtime->next_order_index >= runtime->entry_count
+    ) {
+        return MICROS_BOOTSTRAP_ERROR_INVARIANT;
+    }
+    initialize_transition_plan(runtime, index, &candidate);
+    candidate.entry.state = MICROS_BOOTSTRAP_SERVICE_READY;
+    candidate.entry.ready_deadline = 0;
     candidate.starting_service_id = 0;
     ++candidate.next_order_index;
-    bootstrap_manifest_copy_bytes(runtime, &candidate, sizeof(*runtime));
+    bootstrap_manifest_copy_bytes(plan, &candidate, sizeof(*plan));
     return MICROS_BOOTSTRAP_OK;
 }
 
-enum micros_bootstrap_error micros_bootstrap_runtime_complete(
-    struct micros_bootstrap_runtime *runtime
+enum micros_bootstrap_error bootstrap_runtime_prepare_complete(
+    const struct micros_bootstrap_runtime *runtime,
+    struct bootstrap_transition_plan *plan
 )
 {
-    struct micros_bootstrap_runtime candidate;
-    struct micros_bootstrap_runtime_entry *controller;
+    struct bootstrap_transition_plan candidate;
+    const struct micros_bootstrap_runtime_entry *controller;
+    uint16_t controller_index;
     size_t index;
 
-    if (runtime == NULL) {
+    if (runtime == NULL || plan == NULL) {
         return MICROS_BOOTSTRAP_ERROR_ARGUMENT;
     }
     if (
@@ -265,6 +454,12 @@ enum micros_bootstrap_error micros_bootstrap_runtime_complete(
         || runtime->next_order_index != runtime->entry_count
     ) {
         return MICROS_BOOTSTRAP_ERROR_STATE;
+    }
+    if (
+        runtime->entry_count == 0
+        || runtime->entry_count > MICROS_BOOTSTRAP_SERVICE_CAPACITY
+    ) {
+        return MICROS_BOOTSTRAP_ERROR_INVARIANT;
     }
     for (index = 0; index < runtime->entry_count; ++index) {
         if (
@@ -275,27 +470,61 @@ enum micros_bootstrap_error micros_bootstrap_runtime_complete(
             return MICROS_BOOTSTRAP_ERROR_STATE;
         }
     }
-    bootstrap_manifest_copy_bytes(&candidate, runtime, sizeof(candidate));
-    controller = runtime_entry(
-        &candidate,
-        candidate.controller_service_id
-    );
     if (
-        controller == NULL
-        || controller->endpoint_state
+        runtime_slot(runtime, runtime->controller_service_id, &controller_index)
+            != MICROS_BOOTSTRAP_OK
+    ) {
+        return MICROS_BOOTSTRAP_ERROR_INVARIANT;
+    }
+    controller = &runtime->entries[controller_index];
+    if (
+        controller->endpoint_state
             != MICROS_BOOTSTRAP_ENDPOINT_ACTIVE
         || !controller->profile_installed
         || !controller->scheduler_assigned
     ) {
         return MICROS_BOOTSTRAP_ERROR_INVARIANT;
     }
-    controller->endpoint_state =
+    initialize_transition_plan(runtime, controller_index, &candidate);
+    candidate.entry.endpoint_state =
         MICROS_BOOTSTRAP_ENDPOINT_SOURCE_ONLY;
-    controller->scheduler_assigned = false;
+    candidate.entry.scheduler_assigned = false;
     candidate.phase = MICROS_BOOTSTRAP_PHASE_SEALED;
     candidate.controller_service_id = 0;
-    bootstrap_manifest_copy_bytes(runtime, &candidate, sizeof(*runtime));
+    bootstrap_manifest_copy_bytes(plan, &candidate, sizeof(*plan));
     return MICROS_BOOTSTRAP_OK;
+}
+
+enum micros_bootstrap_error micros_bootstrap_runtime_accept_ready(
+    struct micros_bootstrap_runtime *runtime,
+    uint32_t service_id,
+    uint64_t now
+)
+{
+    struct bootstrap_transition_plan plan;
+    enum micros_bootstrap_error error = bootstrap_runtime_prepare_ready(
+        runtime, service_id, now, &plan
+    );
+
+    if (error == MICROS_BOOTSTRAP_OK) {
+        bootstrap_runtime_commit_prevalidated(runtime, &plan);
+    }
+    return error;
+}
+
+enum micros_bootstrap_error micros_bootstrap_runtime_complete(
+    struct micros_bootstrap_runtime *runtime
+)
+{
+    struct bootstrap_transition_plan plan;
+    enum micros_bootstrap_error error = bootstrap_runtime_prepare_complete(
+        runtime, &plan
+    );
+
+    if (error == MICROS_BOOTSTRAP_OK) {
+        bootstrap_runtime_commit_prevalidated(runtime, &plan);
+    }
+    return error;
 }
 
 enum micros_bootstrap_ready_class micros_bootstrap_classify_ready(
@@ -313,7 +542,7 @@ enum micros_bootstrap_ready_class micros_bootstrap_classify_ready(
     if (runtime == NULL || source_service_id == 0) {
         return MICROS_BOOTSTRAP_READY_FOREIGN;
     }
-    entry = runtime_entry_const(runtime, source_service_id);
+    entry = bootstrap_runtime_find_entry(runtime, source_service_id);
     if (entry == NULL) {
         return MICROS_BOOTSTRAP_READY_FOREIGN;
     }

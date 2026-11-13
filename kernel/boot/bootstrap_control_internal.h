@@ -1,6 +1,7 @@
 #ifndef MICROS_KERNEL_BOOTSTRAP_CONTROL_INTERNAL_H
 #define MICROS_KERNEL_BOOTSTRAP_CONTROL_INTERNAL_H
 
+#include "kernel/boot/bootstrap_transitions_internal.h"
 #include "micros/bootstrap_control.h"
 #include "micros/grant.h"
 #include "micros/ipc.h"
@@ -33,13 +34,14 @@ struct micros_bootstrap_control_state {
     struct micros_process_handle controller_process;
     struct micros_thread_handle controller_thread;
     micros_endpoint_t controller_endpoint;
+    uint8_t binding_slots[MICROS_BOOTSTRAP_SERVICE_ID_LIMIT + 1];
 };
 
 struct micros_bootstrap_ready_plan {
     bool active;
     uint16_t binding_index;
     uint16_t reserved;
-    struct micros_bootstrap_runtime transitions;
+    struct bootstrap_transition_plan transition;
     struct micros_ipc_message acknowledgment;
 };
 
@@ -47,9 +49,16 @@ struct micros_bootstrap_complete_plan {
     bool active;
     uint16_t controller_binding_index;
     uint16_t reserved;
-    struct micros_bootstrap_runtime transitions;
+    struct bootstrap_transition_plan transition;
     struct micros_ipc_kernel_notification_plan pm_notification;
 };
+
+_Static_assert(sizeof(struct micros_bootstrap_control_state) <= 2416,
+               "Bootstrap control state exceeds its storage bound");
+_Static_assert(sizeof(struct micros_bootstrap_ready_plan) <= 136,
+               "Bootstrap ready plan exceeds its storage bound");
+_Static_assert(sizeof(struct micros_bootstrap_complete_plan) <= 200,
+               "Bootstrap complete plan exceeds its storage bound");
 
 static inline const struct micros_bootstrap_binding *
 micros_bootstrap_control_find_binding_bounded(
@@ -57,20 +66,24 @@ micros_bootstrap_control_find_binding_bounded(
     uint32_t service_id
 )
 {
-    size_t index;
+    const struct micros_bootstrap_binding *binding;
+    uint8_t slot;
 
     if (
         state == NULL
+        || service_id == 0
+        || service_id > MICROS_BOOTSTRAP_SERVICE_ID_LIMIT
+        || state->entry_count == 0
         || state->entry_count > MICROS_BOOTSTRAP_SERVICE_CAPACITY
     ) {
         return NULL;
     }
-    for (index = 0; index < state->entry_count; ++index) {
-        if (state->bindings[index].service_id == service_id) {
-            return &state->bindings[index];
-        }
+    slot = state->binding_slots[service_id];
+    if (slot == 0 || slot > state->entry_count) {
+        return NULL;
     }
-    return NULL;
+    binding = &state->bindings[slot - 1];
+    return binding->service_id == service_id ? binding : NULL;
 }
 
 enum micros_bootstrap_error micros_bootstrap_control_state_prepare(

@@ -111,6 +111,10 @@ static void reset_bootstrap_state(
                 TEST_LAUNCHER_SERVICE_ID,
                 MICROS_TTY_SERVICE_ID,
             },
+            .service_slots = {
+                [TEST_LAUNCHER_SERVICE_ID] = 1,
+                [MICROS_TTY_SERVICE_ID] = 2,
+            },
         },
         .bindings = {
             {
@@ -119,6 +123,7 @@ static void reset_bootstrap_state(
                 .endpoint = fixture->launcher_endpoint,
             },
         },
+        .binding_slots = {[TEST_LAUNCHER_SERVICE_ID] = 1},
     };
 }
 

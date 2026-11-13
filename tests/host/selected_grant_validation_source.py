@@ -14,7 +14,7 @@ from tests.host.work_count_lexical import (
 
 INDEX_FIELDS = frozenset((
     "processes", "threads", "harts", "endpoints", "profiles", "grants", "expected_generation",
-    "pending_events", "ready_head", "ready_tail", "transitions", "entries", "bindings", "chunks", "participants",
+    "pending_events", "ready_head", "ready_tail", "transitions", "entries", "bindings", "binding_slots", "chunks", "participants",
 ))
 AUDITS = frozenset((
     "micros_kernel_objects_validate", "micros_kernel_objects_validate_base",

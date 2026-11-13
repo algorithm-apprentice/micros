@@ -76,7 +76,7 @@ static const char *diagnostic_state_name(
 )
 {
     const struct micros_bootstrap_binding *binding;
-    size_t index;
+    const struct micros_bootstrap_runtime_entry *entry;
 
     if (service_id == 0) {
         return "none";
@@ -93,25 +93,19 @@ static const char *diagnostic_state_name(
     ) {
         return "controller";
     }
-    for (
-        index = 0;
-        index < runtime->bootstrap_state.transitions.entry_count;
-        ++index
-    ) {
-        const struct micros_bootstrap_runtime_entry *entry =
-            &runtime->bootstrap_state.transitions.entries[index];
-
-        if (entry->service_id != service_id) {
-            continue;
-        }
-        switch (entry->state) {
-        case MICROS_BOOTSTRAP_SERVICE_PREPARED:
-            return "prepared";
-        case MICROS_BOOTSTRAP_SERVICE_STARTING:
-            return "starting";
-        case MICROS_BOOTSTRAP_SERVICE_READY:
-            return "ready";
-        }
+    entry = bootstrap_runtime_find_entry(
+        &runtime->bootstrap_state.transitions, service_id
+    );
+    if (entry == NULL) {
+        return "none";
+    }
+    switch (entry->state) {
+    case MICROS_BOOTSTRAP_SERVICE_PREPARED:
+        return "prepared";
+    case MICROS_BOOTSTRAP_SERVICE_STARTING:
+        return "starting";
+    case MICROS_BOOTSTRAP_SERVICE_READY:
+        return "ready";
     }
     return "none";
 }
@@ -171,8 +165,8 @@ void micros_bootstrap_runtime_check_deadline(uint64_t now)
         bootstrap_runtime_context();
     uint32_t service_id;
     const struct micros_bootstrap_binding *binding;
+    const struct micros_bootstrap_runtime_entry *entry;
     const struct micros_tty_handoff_runtime_state *tty;
-    size_t index;
 
     if (runtime->bootstrap_state.phase != MICROS_BOOTSTRAP_PHASE_RUNNING) {
         return;
@@ -199,32 +193,30 @@ void micros_bootstrap_runtime_check_deadline(uint64_t now)
         return;
     }
     service_id = runtime->bootstrap_state.transitions.starting_service_id;
-    for (
-        index = 0;
-        index < runtime->bootstrap_state.transitions.entry_count;
-        ++index
+    entry = bootstrap_runtime_find_entry(
+        &runtime->bootstrap_state.transitions, service_id
+    );
+    binding = micros_bootstrap_control_find_binding(
+        &runtime->bootstrap_state, service_id
+    );
+    if (
+        entry == NULL
+        || entry->state != MICROS_BOOTSTRAP_SERVICE_STARTING
+        || entry->ready_deadline == 0
     ) {
-        const struct micros_bootstrap_runtime_entry *entry =
-            &runtime->bootstrap_state.transitions.entries[index];
-
-        if (
-            entry->service_id == service_id
-            && entry->state == MICROS_BOOTSTRAP_SERVICE_STARTING
-            && entry->ready_deadline != 0
-            && now >= entry->ready_deadline
-        ) {
-            binding = micros_bootstrap_control_find_binding(
-                &runtime->bootstrap_state,
-                service_id
-            );
-            micros_bootstrap_runtime_fail(
-                MICROS_BOOTSTRAP_DIAGNOSTIC_READY_TIMEOUT,
-                service_id,
-                binding == NULL
-                    ? MICROS_ENDPOINT_NONE
-                    : binding->endpoint,
-                entry->ready_deadline
-            );
-        }
+        micros_bootstrap_runtime_fail(
+            MICROS_BOOTSTRAP_DIAGNOSTIC_AUTHORITY,
+            service_id,
+            binding == NULL ? MICROS_ENDPOINT_NONE : binding->endpoint,
+            0
+        );
+    }
+    if (now >= entry->ready_deadline) {
+        micros_bootstrap_runtime_fail(
+            MICROS_BOOTSTRAP_DIAGNOSTIC_READY_TIMEOUT,
+            service_id,
+            binding == NULL ? MICROS_ENDPOINT_NONE : binding->endpoint,
+            entry->ready_deadline
+        );
     }
 }

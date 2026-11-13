@@ -234,6 +234,7 @@ static bool prepare_tty_bootstrap_fixture(
     fixture->tty_entry.device_base = MICROS_TTY_UART_PHYSICAL_BASE;
     fixture->tty_entry.device_length = MICROS_TTY_UART_MAPPED_LENGTH;
     fixture->tty_bootstrap.entry_count = 1;
+    fixture->tty_bootstrap.binding_slots[MICROS_TTY_SERVICE_ID] = 1;
     fixture->tty_bootstrap.plan.console_service_id = MICROS_TTY_SERVICE_ID;
     handoff_test_copy_bytes(fixture,
         &fixture->tty_bootstrap.bindings[0],
@@ -246,6 +247,7 @@ static bool prepare_tty_bootstrap_fixture(
         sizeof(fixture->tty_entry)
     );
     fixture->tty_bootstrap.transitions.entry_count = 1;
+    fixture->tty_bootstrap.transitions.service_slots[MICROS_TTY_SERVICE_ID] = 1;
     fixture->tty_bootstrap.transitions.entries[0] =
         (struct micros_bootstrap_runtime_entry){
             .service_id = MICROS_TTY_SERVICE_ID,

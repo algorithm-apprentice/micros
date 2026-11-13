@@ -979,8 +979,10 @@ static bool prepare_tty_bootstrap(micros_endpoint_t endpoint)
     state->root_physical_address = context.table_addresses[0];
     REQUIRE(micros_tty_handoff_initialize(&state->handoff) == MICROS_TTY_HANDOFF_OK);
     context.bootstrap.entry_count = 1;
+    context.bootstrap.binding_slots[MICROS_TTY_SERVICE_ID] = 1;
     context.bootstrap.plan.console_service_id = MICROS_TTY_SERVICE_ID;
     context.bootstrap.transitions.entry_count = 1;
+    context.bootstrap.transitions.service_slots[MICROS_TTY_SERVICE_ID] = 1;
     *binding = (struct micros_bootstrap_binding){
         .service_id = MICROS_TTY_SERVICE_ID, .process = context.process, .thread = context.thread,
         .root = state->root_physical_address, .endpoint = endpoint, .scheduler_priority = 8,

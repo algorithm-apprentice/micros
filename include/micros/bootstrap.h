@@ -11,6 +11,7 @@
 enum {
     MICROS_BOOTSTRAP_MANIFEST_VERSION = 1,
     MICROS_BOOTSTRAP_SERVICE_CAPACITY = 7,
+    MICROS_BOOTSTRAP_SERVICE_ID_LIMIT = 63,
     MICROS_BOOTSTRAP_MANIFEST_HEADER_SIZE = 64,
     MICROS_BOOTSTRAP_MANIFEST_ENTRY_SIZE = 192,
     MICROS_BOOTSTRAP_MANIFEST_SIZE =
@@ -221,6 +222,7 @@ struct micros_bootstrap_runtime {
     struct micros_bootstrap_runtime_entry
         entries[MICROS_BOOTSTRAP_SERVICE_CAPACITY];
     uint32_t ordered_service_ids[MICROS_BOOTSTRAP_SERVICE_CAPACITY];
+    uint8_t service_slots[MICROS_BOOTSTRAP_SERVICE_ID_LIMIT + 1];
 };
 
 enum micros_bootstrap_error micros_bootstrap_manifest_validate(

@@ -5,7 +5,14 @@
 This is the independently reviewed BOOT01 design Accepted by
 [ADR-0132](../adr/0132-indexed-bootstrap-transitions.md), owning B06-F001.
 EV04 #189 is its actual prerequisite; preferred predecessor GRANT03 #264
-is complete. Implementation remains pending the separate design merge.
+is complete. Design #265 is separately merged; its paired implementation
+proceeds from that main. The design alone closes no BOOT01 finding.
+
+The implementation names the two indices `service_slots` and
+`binding_slots`. `bootstrap_transitions_internal.h` declares
+`bootstrap_transition_plan`, the checked runtime lookup/index diagnostic
+and selected prepare/commit helpers; their definitions remain in
+`bootstrap_transitions.c`.
 
 The [fixed study](../research/minix-indexed-bootstrap-transitions.md) owns
 reference provenance and adaptations. Only B06-owned service-ID navigation
@@ -254,7 +261,7 @@ the fixed ID-index extent.
 No cross-call amortization is claimed. Whole control/syscall cost still
 includes the retained audits.
 
-Preserve the 48-byte runtime-entry representation. Prospective LP64 bounds
+Preserve the 48-byte runtime-entry representation. Enforced LP64 bounds
 are runtime 448 bytes, control state 2,416 bytes and existing target context
 3,816 bytes, exactly 128 additional persistent bytes for the two indices.
 Selected plans are at most 64 bytes; outer ready/complete plans at most
@@ -296,6 +303,14 @@ existing MEM04, MEM05 and GRANT01 inline-header consumers, in this same
 outcome. Preserve ordinary observer absence, complete input/collector
 identity and independent work limits. One focused native pair may join
 complete `test-unit`; no new QEMU workflow or collector is required.
+
+The indexed inline getter also appears as a header-origin function in
+stack catalogs. Apply ADR-0123's current-source/type/machine checks to
+callback-free header helpers just as to C-owner helpers, rather than
+freezing their old bodies. Callback-typed/using functions retain their
+anchors; actual machine indirect calls still require complete binding,
+even when omitted from a supplied pending list. No callback target, frame,
+direct edge, epoch or budget is removed.
 
 Retain actual launcher, deadline/failure, VM/TTY role and service,
 PM sealed notification and complete ELF-spawn resource scenarios,

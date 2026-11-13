@@ -69,8 +69,8 @@ its post-node staged replacement point. The next preferred runtime outcome
 is **BOOT01**, whose EV04 prerequisite is merged. Its
 [indexed-transition contract](../architecture/indexed-bootstrap-transitions.md)
 and [ADR-0132](../adr/0132-indexed-bootstrap-transitions.md) have clean
-independent review and are Accepted; implementation remains pending the
-separate design merge. GRANT03 retained complete semantic/model coverage and earned
+independent review and are Accepted; implementation follows the separate
+design merge #265. GRANT03 retained complete semantic/model coverage and earned
 actual kernel word-transfer, composed-resource and full stack evidence
 before independent review and merge.
 
@@ -246,7 +246,7 @@ blocking queue.
 | `GRANT01` | Runtime correction | `B05-F001`, `B05-F002` | `IPC01` | [Accepted selected-grant contract](../architecture/selected-grant-validation.md): local readiness, selected record/participants and denial-only committed-device inspection; implementation #259 is merged. | Actual grant/endpoint/TTY audit and lookup work, preserved syscall/authority/failure semantics and complete current acceptance. |
 | `GRANT02` | Runtime correction | `B05-F003`, `B05-F004` | `GRANT01`, `IPC03` | Independently reviewed implementation #262 follows the [free-list/cancellation contract](../architecture/grant-free-lists-and-targeted-cancellation.md) and [quiescent resource-witness correction](../adr/0130-quiescent-grant-resource-equivalence.md). | Exact LIFO/index/model and sparse close work, malformed inventory controls, actual composed resources and complete current acceptance passed. |
 | `GRANT03` | Runtime correction | `B05-F005` | `GRANT01`, `COPY01`, `MEM04` | Independently reviewed implementation #264 follows the [retained-span contract](../architecture/grant-copy-spans.md), reusing the unchanged COPY01 provider after complete physical preflight. | Independent exact span/work and byte evidence, actual same-guest kernel artifact proof, preserved composition and complete current acceptance passed. |
-| `BOOT01` | Runtime correction | `B06-F001` | `EV04` | [Accepted indexed-transition contract](../architecture/indexed-bootstrap-transitions.md): checked service-ID indices and bounded selected plans without changing policy, audit cadence or copy primitives; implementation awaits separate design merge. | Lookup/transition counts over sparse and failed service states. |
+| `BOOT01` | Runtime correction | `B06-F001` | `EV04` | [Accepted indexed-transition contract](../architecture/indexed-bootstrap-transitions.md): checked service-ID indices and bounded selected plans without changing policy, audit cadence or copy primitives; implementation follows merged design #265. | Lookup/transition counts over sparse and failed service states. |
 | `BOOT02` | Runtime correction | `B06-F002`, `B06-F003` | `BOOT01`, `MEM04`, `OBJ01`, `OBJ02`, `IPC01`, `GRANT01` | Validate owner-specific command plans once before commit; keep whole-system audits diagnostic-only. | Release/ready/complete/console call counts, rollback, deadline, and target failure cases. |
 | `BOOT03` | Runtime correction | `B06-F004` | `COPY01` | Use the shared bounded copy/fill family for image, stack, manifest, configuration, and state movement. | Exact bytes/words/blocks moved over every bootstrap object size. |
 | `VM01` | Runtime correction | `B07-F001` | `BOOT02`, `MEM04`, `GRANT01` | Keep complete kernel/service VM validation diagnostic-only and retain selected transaction subplans. | Per-command Vsvc/Vkh counts and malformed selected-state cases. |

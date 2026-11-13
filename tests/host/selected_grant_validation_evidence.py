@@ -43,6 +43,7 @@ NATIVE_HEADERS = OBJECT_HEADERS + (
     "kernel/endpoint/endpoint_private.h", "kernel/endpoint/endpoint_internal.h",
     "tests/qemu/selected_ipc_work.h",
     "arch/riscv64/interrupt.h", "kernel/boot/bootstrap_control_internal.h",
+    "kernel/boot/bootstrap_transitions_internal.h",
     "kernel/grant/grant_copy_internal.h", "kernel/grant/grant_runtime_internal.h",
     "kernel/grant/grant_syscall.h", "kernel/ipc/ipc_runtime_internal.h",
     "kernel/trap/syscall.h", "kernel/tty/tty_handoff_core.h",
