@@ -1,4 +1,5 @@
 #include "micros/bootstrap_memory.h"
+#include "micros/work_observation.h"
 
 #include <stddef.h>
 #include <stdint.h>
@@ -481,6 +482,10 @@ micros_frame_ownership_runtime_validate_metadata(
     const struct micros_kernel_objects *objects
 )
 {
+#ifdef MICROS_TEST_BOOTSTRAP_COMMAND_COUNTS
+    MICROS_TEST_WORK_HIT("boot02-owner-runtime", MICROS_WORK_OWNER_KERNEL_MEMORY,
+                         MICROS_WORK_KIND_INDEX_PROBE, 1);
+#endif
     const struct micros_kernel_objects *authoritative_objects;
     enum micros_frame_ownership_error error;
 

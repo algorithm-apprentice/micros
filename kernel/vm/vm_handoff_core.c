@@ -1,4 +1,5 @@
 #include "kernel/vm/vm_handoff_internal.h"
+#include "micros/work_observation.h"
 #include "micros/user_address_space_core.h"
 
 #include <stddef.h>
@@ -605,7 +606,7 @@ static bool mapping_record_is_valid(
     );
 }
 
-static bool vm_handoff_identity_is_valid(
+bool micros_vm_handoff_identity_is_valid(
     const struct micros_vm_handoff_state *state
 )
 {
@@ -808,6 +809,10 @@ enum micros_vm_handoff_error micros_vm_handoff_state_validate(
     const struct micros_vm_handoff_state *state
 )
 {
+#ifdef MICROS_TEST_BOOTSTRAP_COMMAND_COUNTS
+    MICROS_TEST_WORK_HIT("boot02-vm-state", MICROS_WORK_OWNER_KERNEL_VM,
+                         MICROS_WORK_KIND_COMPLETE_VALIDATOR_CALL, 1);
+#endif
     size_t loading_slot;
     size_t frozen_slot;
 
@@ -820,7 +825,7 @@ enum micros_vm_handoff_error micros_vm_handoff_state_validate(
     ) {
         return MICROS_VM_HANDOFF_ERROR_ARGUMENT;
     }
-    if (!vm_handoff_identity_is_valid(state)) {
+    if (!micros_vm_handoff_identity_is_valid(state)) {
         return MICROS_VM_HANDOFF_ERROR_INVARIANT;
     }
     if (state->phase == MICROS_VM_HANDOFF_PHASE_PREPARED) {
@@ -926,7 +931,7 @@ enum micros_vm_handoff_error micros_vm_handoff_inspect_scratch_binding(
         *binding = candidate;
         return MICROS_VM_HANDOFF_OK;
     }
-    if (!vm_handoff_identity_is_valid(state) || !scratch_binding_load_is_valid(state)) {
+    if (!micros_vm_handoff_identity_is_valid(state) || !scratch_binding_load_is_valid(state)) {
         return MICROS_VM_HANDOFF_ERROR_INVARIANT;
     }
     candidate.process = state->process;

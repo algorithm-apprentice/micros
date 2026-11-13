@@ -1,4 +1,6 @@
 #include "kernel/vm/vm_handoff_runtime.h"
+#include "kernel/vm/vm_handoff_internal.h"
+#include "micros/work_observation.h"
 
 #include <stddef.h>
 #include <stdint.h>
@@ -111,6 +113,10 @@ enum micros_vm_handoff_error micros_vm_handoff_runtime_validate(
     const struct micros_kernel_objects *objects
 )
 {
+#ifdef MICROS_TEST_BOOTSTRAP_COMMAND_COUNTS
+    MICROS_TEST_WORK_HIT("boot02-vm-runtime", MICROS_WORK_OWNER_KERNEL_VM,
+                         MICROS_WORK_KIND_COMPLETE_VALIDATOR_CALL, 1);
+#endif
     const struct micros_bootstrap_binding *binding;
     const struct micros_bootstrap_manifest_entry *entry;
     const struct micros_process *process;
@@ -212,10 +218,11 @@ bool micros_vm_handoff_runtime_role_ready(
 {
     const struct micros_frame_ownership *ownership =
         micros_frame_ownership_runtime_ledger();
+    struct micros_bootstrap_service_selection selected;
+    struct micros_frame_owner root_owner;
 
     return (
-        micros_vm_handoff_state_validate(&handoff_state)
-            == MICROS_VM_HANDOFF_OK
+        micros_vm_handoff_identity_is_valid(&handoff_state)
         && handoff_state.phase
             == MICROS_VM_HANDOFF_PHASE_HANDED_OFF
         && ownership != NULL
@@ -224,11 +231,26 @@ bool micros_vm_handoff_runtime_role_ready(
         && handoff_state.service_id == service_id
         && handoff_state.endpoint == endpoint
         && process_handles_equal(handoff_state.process, process)
-        && micros_vm_handoff_runtime_validate(
-            bootstrap,
-            registry,
-            objects
-        ) == MICROS_VM_HANDOFF_OK
+        && micros_bootstrap_control_select_service(
+            bootstrap, registry, objects, service_id, &selected
+        ) == MICROS_BOOTSTRAP_OK
+        && bootstrap->plan.vm_service_id == service_id
+        && selected.manifest->role_flags == MICROS_BOOTSTRAP_ROLE_VM
+        && selected.manifest->image_id == handoff_state.image_id
+        && selected.manifest->profile_id == handoff_state.profile_id
+        && selected.binding->root == handoff_state.root_physical_address
+        && selected.binding->endpoint == handoff_state.endpoint
+        && process_handles_equal(selected.binding->process, handoff_state.process)
+        && thread_handles_equal(selected.binding->thread, handoff_state.thread)
+        && micros_privilege_profile_allows_kernel_operation(
+            registry, (uint8_t)handoff_state.profile_id, 1
+        ) == MICROS_ENDPOINT_OK
+        && micros_frame_ownership_lookup(
+            ownership, handoff_state.root_physical_address, &root_owner
+        ) == MICROS_FRAME_OWNERSHIP_OK
+        && root_owner.kind == MICROS_FRAME_OWNER_PROCESS_PAGE_TABLE
+        && root_owner.slot == handoff_state.process.slot
+        && root_owner.generation == handoff_state.process.generation
     );
 }
 

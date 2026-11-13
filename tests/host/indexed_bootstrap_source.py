@@ -17,18 +17,9 @@ INDEX_FIELDS = frozenset((
     "processes", "threads", "harts", "endpoints", "profiles", "service_slots", "binding_slots", "grants",
 ))
 RETAINED_AUDITS = (
-    ("kernel/boot/bootstrap_control_core.c", "control_release", "micros_bootstrap_control_validate", 2),
-    ("kernel/boot/bootstrap_control_core.c", "micros_bootstrap_control_prepare_complete", "micros_bootstrap_control_validate", 1),
-    ("kernel/boot/bootstrap_control_core.c", "micros_bootstrap_control_prepare_ready", "micros_bootstrap_control_validate", 1),
     ("kernel/boot/bootstrap_control_core.c", "micros_bootstrap_control_publish_controller", "micros_bootstrap_control_validate", 1),
     ("kernel/boot/bootstrap_runtime.c", "micros_bootstrap_runtime_publish_controller", "micros_bootstrap_control_validate", 1),
     ("kernel/boot/bootstrap_runtime_validation.c", "micros_bootstrap_runtime_validate", "micros_bootstrap_control_validate", 1),
-    ("kernel/boot/bootstrap_syscall.c", "preflight_runtime", "micros_bootstrap_runtime_validate", 1),
-    ("kernel/boot/bootstrap_syscall_complete.c", "bootstrap_syscall_handle_complete", "micros_bootstrap_control_validate", 1),
-    ("kernel/boot/bootstrap_syscall_complete.c", "bootstrap_syscall_handle_complete", "micros_bootstrap_runtime_validate", 1),
-    ("kernel/boot/bootstrap_syscall_ready.c", "bootstrap_syscall_handle_accept_ready", "micros_bootstrap_runtime_validate", 1),
-    ("kernel/boot/bootstrap_syscall_release.c", "bootstrap_syscall_handle_console_begin", "micros_bootstrap_runtime_validate", 1),
-    ("kernel/boot/bootstrap_syscall_release.c", "finish_release", "micros_bootstrap_runtime_validate", 1),
     ("kernel/diagnostic/diagnostic_control.c", "micros_diagnostic_control_dispatch", "micros_bootstrap_runtime_validate", 1),
     ("kernel/pm/pm_control_syscall.c", "runtime_state_is_valid", "micros_bootstrap_runtime_validate", 1),
     ("kernel/tty/tty_control_syscall.c", "common_invariants_hold", "micros_bootstrap_runtime_validate", 1),

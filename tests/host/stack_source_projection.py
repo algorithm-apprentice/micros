@@ -55,13 +55,11 @@ HOOKS = {
     ),
     "kernel/tests/boot/bootstrap_test.c": (
         ("micros_bootstrap_test_handle_trap",
-         '    uart_write(\n'
-         '        "MICROS_BOOTSTRAP_TEST_PASS "\n'
-         '        "manifest=immutable order=topological profiles=exact "\n'
-         '        "endpoints=staged readiness=acknowledged authority=revoked\\n"\n'
-         '    );\n'
-         '    uart_flush();',
-         "MICROS_TEST_STACK_REPORT();", "after"),
+         '    (void)sbi_system_reset(\n'
+         '        SBI_RESET_TYPE_SHUTDOWN,\n'
+         '        SBI_RESET_REASON_NONE\n'
+         '    );',
+         "MICROS_TEST_STACK_REPORT();", "before"),
     ),
     "kernel/tests/vm/vm_scratch_preemption_test_report.c": (
         ("vm_scratch_test_report_success",
@@ -156,6 +154,16 @@ def replace_in_function(source, function, selected, replacement):
     return source[:point] + replacement + source[point + len(selected):]
 
 
+def source_hooks(unit, source):
+    for function, primitive, hook, placement in HOOKS[unit]:
+        if unit in ("kernel/tests/boot/bootstrap_test.c", "kernel/tests/tty/tty_service_test.c"):
+            begin, end = function_range(source, function)
+            if "MICROS_BOOT02_REPORT" in lexical(source[begin:end]):
+                # Authenticate users before the terminal command report seizes UART.
+                primitive = "    if (!MICROS_BOOT02_REPORT()) {"
+        yield function, primitive, hook, placement
+
+
 def instrument_source(unit, source):
     if unit not in HOOKS or "MICROS_TEST_STACK_" in lexical(source) or HEADER in source:
         raise AssertionError("unknown or already instrumented observer source")
@@ -164,7 +172,7 @@ def instrument_source(unit, source):
         raise AssertionError("observer header has no exact existing blank-line slot")
     lines[1] = HEADER
     source = "".join(lines)
-    for function, primitive, hook, placement in HOOKS[unit]:
+    for function, primitive, hook, placement in source_hooks(unit, source):
         source = replace_in_function(
             source, function, primitive, added_statement(primitive, hook, placement),
         )
@@ -181,7 +189,7 @@ def project_stack_source(unit, source):
         raise AssertionError("observer header moved or has a borrowed source owner")
     lines[1] = "\n"
     source = "".join(lines)
-    for function, primitive, hook, placement in HOOKS[unit]:
+    for function, primitive, hook, placement in source_hooks(unit, source):
         source = replace_in_function(
             source, function, added_statement(primitive, hook, placement), primitive,
         )

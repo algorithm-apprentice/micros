@@ -56,6 +56,7 @@ RECIPE_ADMISSION = {
     "kernel/memory/user_address_space_validation.c",
     "kernel/memory/user_address_space_mutation.c",
     "kernel/memory/user_address_space_activation.c",
+    "kernel/memory/user_address_space_tty.c",
     "kernel/vm/vm_handoff_core.c",
     "kernel/vm/vm_handoff_boot.c",
     "kernel/vm/vm_handoff_runtime.c",
@@ -63,6 +64,7 @@ RECIPE_ADMISSION = {
     "kernel/tty/tty_handoff_runtime_state.c",
     "kernel/tty/tty_handoff_runtime_validate.c",
     "kernel/boot/bootstrap_control_core.c",
+    "kernel/boot/bootstrap_transitions.c",
     ),
     "base_cmake_sha256": "9dfda2f310dfeb7cc9fd97f16b50935b56b2a802a83a89cfa3644a47ae811feb",
     "legacy_cmake_sha256": "528fd82f7df2fd8d49188db24362def4793e94d84f096e38bb30fe0d0dcc2746",
@@ -140,6 +142,17 @@ BOOTSTRAP_FUNCTIONS = (
     "micros_frame_ownership_runtime_validate", "micros_frame_ownership_runtime_release_process",
     "micros_frame_ownership_runtime_complete_handoff",
     "micros_frame_ownership_runtime_validate_metadata", "validate_active_process_owners",
+)
+
+CONTROL_FUNCTIONS = (
+    "process_handles_equal", "micros_bootstrap_control_find_binding",
+    "binding_matches_manifest", "binding_matches_objects", "require_running_header",
+    "selected_runtime_shape", "micros_bootstrap_control_select_service",
+)
+VM_RUNTIME_FUNCTIONS = (
+    "process_handles_equal", "thread_handles_equal", "micros_vm_handoff_runtime_state",
+    "micros_vm_handoff_runtime_authoritative_state", "micros_vm_handoff_runtime_scratch_authority",
+    "micros_vm_handoff_runtime_inspect_scratch_binding", "micros_vm_handoff_runtime_role_ready",
 )
 
 NATIVE_PREFIX = '#include "tests/host/selected_address_space_test.h"\n'
@@ -228,12 +241,10 @@ def bind_native(path, text, stage=Stage.GREEN):
     if path == "kernel/vm/vm_handoff_runtime.c":
         return (
             prefix + '#include "kernel/vm/vm_handoff_runtime.h"\n#include <string.h>\n'
+            '#include "kernel/vm/vm_handoff_internal.h"\n'
+            '#include "micros/frame_ownership_runtime.h"\n'
             "static struct micros_vm_handoff_state handoff_state;\n"
-            + definitions(text, (
-                "micros_vm_handoff_runtime_state", "micros_vm_handoff_runtime_authoritative_state",
-                "micros_vm_handoff_runtime_scratch_authority",
-                "micros_vm_handoff_runtime_inspect_scratch_binding",
-            ))
+            + definitions(text, VM_RUNTIME_FUNCTIONS)
             + "\nvoid micros_as_native_vm_reset(void)\n"
             "{ memset(&handoff_state, 0, sizeof(handoff_state)); }\n"
             "struct micros_vm_handoff_state *micros_as_native_vm_input(void)\n"
@@ -248,7 +259,23 @@ def bind_native(path, text, stage=Stage.GREEN):
     if path == "kernel/boot/bootstrap_control_core.c":
         return (
             prefix + '#include "kernel/boot/bootstrap_control_internal.h"\n'
-            + definitions(text, ("micros_bootstrap_control_find_binding",))
+            '#include "kernel/endpoint/endpoint_internal.h"\n'
+            '#include "micros/scheduler_core.h"\n'
+            + definitions(text, CONTROL_FUNCTIONS)
+        )
+    if path == "kernel/boot/bootstrap_transitions.c":
+        return (
+            prefix + '#include "kernel/boot/bootstrap_transitions_internal.h"\n'
+            + definitions(text, ("bootstrap_runtime_select_slot", "bootstrap_runtime_find_entry"))
+        )
+    if path == "kernel/memory/user_address_space_tty.c":
+        return (
+            prefix + '#include "kernel/memory/user_address_space_internal.h"\n'
+            '#include "kernel/tty/tty_handoff_core.h"\n'
+            + definitions(text, (
+                "active_root", "require_read_authority", "resolve_process_with_root",
+                "micros_user_address_space_inspect_bootstrap_tty_uart",
+            ))
         )
     if path == "kernel/memory/user_address_space_runtime.c":
         return prefix + replace_body(text, "read_satp", "    return micros_as_native_read_satp();") + (

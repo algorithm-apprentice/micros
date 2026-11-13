@@ -27,7 +27,8 @@
             [["work"],["boot01/kernel/boot/bootstrap_control_core.c/clear_bytes/loop-23","insert","KERNEL_BOOT","CLEARED_BYTE",1,"entry","",[["for ( index = 0 ; index < size ; ++ index ) {",0]],0,0]]
           ],
           "control_release": [
-            [["work"],["boot01/kernel/boot/bootstrap_control_core.c/control_release/index-106","wrap","KERNEL_BOOT","INDEX_PROBE",1,"value","binding -> manifest_index",[],0,1]]
+            [["work"],["boot01/kernel/boot/bootstrap_control_core.c/control_release/index-136","wrap","KERNEL_BOOT","INDEX_PROBE",1,"value","state -> transitions . next_order_index",[],1,3]],
+            [["work"],["boot01/kernel/boot/bootstrap_control_core.c/control_release/index-149","wrap","KERNEL_BOOT","INDEX_PROBE",1,"value","state -> transitions . next_order_index",[],2,3]]
           ],
           "copy_bytes": [
             [["work"],["boot01/kernel/boot/bootstrap_control_core.c/copy_bytes/loop-31","insert","KERNEL_BOOT","COPIED_BYTE",1,"entry","",[["for ( index = 0 ; index < size ; ++ index ) {",0]],0,0]]
@@ -46,18 +47,29 @@
           "micros_bootstrap_control_commit_complete_prevalidated": [],
           "micros_bootstrap_control_commit_ready_prevalidated": [],
           "micros_bootstrap_control_find_binding": [],
+          "micros_bootstrap_control_preflight_command": [],
           "micros_bootstrap_control_prepare_complete": [
-            [["work"],["boot01/kernel/boot/bootstrap_control_core.c/micros_bootstrap_control_prepare_complete/index-292","wrap","KERNEL_BOOT","INDEX_PROBE",1,"value","0",[],1,2]]
+            [["work"],["boot01/kernel/boot/bootstrap_control_core.c/micros_bootstrap_control_prepare_complete/loop-108","insert","KERNEL_BOOT","RECORD_VISIT",1,"entry","",[["for ( size_t index = 0 ; index < state -> entry_count ; ++ index ) {",0]],0,0]],
+            [["work"],["boot01/kernel/boot/bootstrap_control_core.c/micros_bootstrap_control_prepare_complete/index-124","wrap","KERNEL_BOOT","INDEX_PROBE",1,"value","index",[["for ( size_t index = 0 ; index < state -> entry_count ; ++ index ) {",0]],0,2]],
+            [["work"],["boot01/kernel/boot/bootstrap_control_core.c/micros_bootstrap_control_prepare_complete/index-343","wrap","KERNEL_BOOT","INDEX_PROBE",1,"value","0",[],2,3]]
           ],
           "micros_bootstrap_control_prepare_ready": [
-            [["work"],["boot01/kernel/boot/bootstrap_control_core.c/micros_bootstrap_control_prepare_ready/index-113","wrap","KERNEL_BOOT","INDEX_PROBE",1,"value","binding -> manifest_index",[],0,1]],
-            [["work"],["boot01/kernel/boot/bootstrap_control_core.c/micros_bootstrap_control_prepare_ready/index-206","wrap","KERNEL_BOOT","INDEX_PROBE",1,"value","0",[],1,4]]
+            [["work"],["boot01/kernel/boot/bootstrap_control_core.c/micros_bootstrap_control_prepare_ready/index-213","wrap","KERNEL_BOOT","INDEX_PROBE",1,"value","0",[],1,4]]
           ],
           "micros_bootstrap_control_publish_controller": [
             [["work"],["boot01/kernel/boot/bootstrap_control_core.c/micros_bootstrap_control_publish_controller/index-147","wrap","KERNEL_BOOT","INDEX_PROBE",1,"value","controller -> manifest_index",[],0,1]]
           ],
           "micros_bootstrap_control_release": [],
           "micros_bootstrap_control_release_console": [],
+          "micros_bootstrap_control_select_service": [
+            [["work"],["boot01/kernel/boot/bootstrap_control_core.c/micros_bootstrap_control_select_service/index-89","wrap","KERNEL_BOOT","INDEX_PROBE",1,"value","service_id",[],2,6]],
+            [["work"],["boot01/kernel/boot/bootstrap_control_core.c/micros_bootstrap_control_select_service/index-152","wrap","KERNEL_BOOT","INDEX_PROBE",1,"value","binding_slot - 1",[],0,2]],
+            [["work"],["boot01/kernel/boot/bootstrap_control_core.c/micros_bootstrap_control_select_service/index-187","wrap","KERNEL_BOOT","INDEX_PROBE",1,"value","binding -> manifest_index",[],0,2]],
+            [["work"],["boot01/kernel/boot/bootstrap_control_core.c/micros_bootstrap_control_select_service/index-201","wrap","KERNEL_BOOT","INDEX_PROBE",1,"value","runtime_index",[],2,6]],
+            [["work"],["boot01/kernel/boot/bootstrap_control_core.c/micros_bootstrap_control_select_service/index-318","wrap","KERNEL_BOOT","INDEX_PROBE",1,"value","binding -> process . slot",[],0,2]],
+            [["work"],["boot01/kernel/boot/bootstrap_control_core.c/micros_bootstrap_control_select_service/index-334","wrap","KERNEL_BOOT","INDEX_PROBE",1,"value","binding -> thread . slot",[],0,1]],
+            [["work"],["boot01/kernel/boot/bootstrap_control_core.c/micros_bootstrap_control_select_service/index-350","wrap","KERNEL_BOOT","INDEX_PROBE",1,"value","binding -> process . slot",[],1,2]]
+          ],
           "micros_bootstrap_control_state_prepare": [
             [["work"],["boot01/kernel/boot/bootstrap_control_core.c/micros_bootstrap_control_state_prepare/loop-175","insert","KERNEL_BOOT","RECORD_VISIT",1,"entry","",[["for ( index = 0 ; index < binding_count ; ++ index ) {",0]],0,0]],
             [["work"],["boot01/kernel/boot/bootstrap_control_core.c/micros_bootstrap_control_state_prepare/index-186","wrap","KERNEL_BOOT","INDEX_PROBE",1,"value","index",[["for ( index = 0 ; index < binding_count ; ++ index ) {",0]],0,2]],
@@ -65,12 +77,17 @@
           ],
           "micros_bootstrap_control_validate": [
             [["work"],["boot01/kernel/boot/bootstrap_control_core.c/micros_bootstrap_control_validate/audit","insert","KERNEL_BOOT","COMPLETE_VALIDATOR_CALL",1,"entry","",[],0,0]],
-            [["work"],["boot01/kernel/boot/bootstrap_control_core.c/micros_bootstrap_control_validate/loop-205","insert","KERNEL_BOOT","RECORD_VISIT",1,"entry","",[["for ( index = 0 ; index < state -> entry_count ; ++ index ) {",0]],0,0]],
-            [["work"],["boot01/kernel/boot/bootstrap_control_core.c/micros_bootstrap_control_validate/index-217","wrap","KERNEL_BOOT","INDEX_PROBE",1,"value","index",[["for ( index = 0 ; index < state -> entry_count ; ++ index ) {",0]],0,2]],
-            [["work"],["boot01/kernel/boot/bootstrap_control_core.c/micros_bootstrap_control_validate/index-231","wrap","KERNEL_BOOT","INDEX_PROBE",1,"value","index",[["for ( index = 0 ; index < state -> entry_count ; ++ index ) {",0]],1,2]]
+            [["work"],["boot01/kernel/boot/bootstrap_control_core.c/micros_bootstrap_control_validate/loop-221","insert","KERNEL_BOOT","RECORD_VISIT",1,"entry","",[["for ( index = 0 ; index < state -> entry_count ; ++ index ) {",0]],0,0]],
+            [["work"],["boot01/kernel/boot/bootstrap_control_core.c/micros_bootstrap_control_validate/index-233","wrap","KERNEL_BOOT","INDEX_PROBE",1,"value","index",[["for ( index = 0 ; index < state -> entry_count ; ++ index ) {",0]],0,2]],
+            [["work"],["boot01/kernel/boot/bootstrap_control_core.c/micros_bootstrap_control_validate/index-247","wrap","KERNEL_BOOT","INDEX_PROBE",1,"value","index",[["for ( index = 0 ; index < state -> entry_count ; ++ index ) {",0]],1,2]]
           ],
           "process_handles_equal": [],
           "read_u32_le": [],
+          "require_running_header": [
+            [["work"],["boot01/kernel/boot/bootstrap_control_core.c/require_running_header/index-86","wrap","KERNEL_BOOT","INDEX_PROBE",1,"value","0",[],1,6]],
+            [["work"],["boot01/kernel/boot/bootstrap_control_core.c/require_running_header/index-97","wrap","KERNEL_BOOT","INDEX_PROBE",1,"value","0",[],3,6]]
+          ],
+          "selected_runtime_shape": [],
           "staged_launcher_acknowledgments_are_valid": [
             [["work"],["boot01/kernel/boot/bootstrap_control_core.c/staged_launcher_acknowledgments_are_valid/loop-16","insert","KERNEL_BOOT","RECORD_VISIT",1,"entry","",[["for ( thread_index = 0 ; thread_index < MICROS_THREAD_CAPACITY ; ++ thread_index ) {",0]],0,0]],
             [["work"],["boot01/kernel/boot/bootstrap_control_core.c/staged_launcher_acknowledgments_are_valid/index-27","wrap","KERNEL_BOOT","INDEX_PROBE",1,"value","thread_index",[["for ( thread_index = 0 ; thread_index < MICROS_THREAD_CAPACITY ; ++ thread_index ) {",0]],0,1]],
@@ -140,15 +157,19 @@
             [["work"],["boot01/kernel/boot/bootstrap_transitions.c/bootstrap_runtime_prepare_release/loop-178","insert","KERNEL_BOOT","RECORD_VISIT",1,"entry","",[["while ( prerequisites != 0 ) {",0]],0,0]],
             [["work"],["boot01/kernel/boot/bootstrap_transitions.c/bootstrap_runtime_prepare_release/index-217","wrap","KERNEL_BOOT","INDEX_PROBE",1,"value","dependency_index",[["while ( prerequisites != 0 ) {",0]],2,3]]
           ],
+          "bootstrap_runtime_select_slot": [
+            [["work"],["boot01/kernel/boot/bootstrap_transitions.c/bootstrap_runtime_select_slot/index-50","wrap","KERNEL_BOOT","INDEX_PROBE",1,"value","service_id",[],2,5]],
+            [["work"],["boot01/kernel/boot/bootstrap_transitions.c/bootstrap_runtime_select_slot/index-76","wrap","KERNEL_BOOT","INDEX_PROBE",1,"value","slot - 1",[],0,2]]
+          ],
           "bootstrap_runtime_validate_index": [
             [["work"],["boot01/kernel/boot/bootstrap_transitions.c/bootstrap_runtime_validate_index/audit","insert","KERNEL_BOOT","COMPLETE_VALIDATOR_CALL",1,"entry","",[],0,0]],
-            [["work"],["boot01/kernel/boot/bootstrap_transitions.c/bootstrap_runtime_validate_index/index-24","wrap","KERNEL_BOOT","INDEX_PROBE",1,"value","0",[],1,4]],
-            [["work"],["boot01/kernel/boot/bootstrap_transitions.c/bootstrap_runtime_validate_index/loop-50","insert","KERNEL_BOOT","RECORD_VISIT",1,"entry","",[["for ( index = 0 ; index < runtime -> entry_count ; ++ index ) {",0]],0,0]],
-            [["work"],["boot01/kernel/boot/bootstrap_transitions.c/bootstrap_runtime_validate_index/index-57","wrap","KERNEL_BOOT","INDEX_PROBE",1,"value","index",[["for ( index = 0 ; index < runtime -> entry_count ; ++ index ) {",0]],0,2]],
-            [["work"],["boot01/kernel/boot/bootstrap_transitions.c/bootstrap_runtime_validate_index/index-76","wrap","KERNEL_BOOT","INDEX_PROBE",1,"value","service_id",[["for ( index = 0 ; index < runtime -> entry_count ; ++ index ) {",0]],4,5]],
-            [["work"],["boot01/kernel/boot/bootstrap_transitions.c/bootstrap_runtime_validate_index/loop-103","insert","KERNEL_BOOT","RECORD_VISIT",1,"entry","",[["for ( index = 1 ; index <= MICROS_BOOTSTRAP_SERVICE_ID_LIMIT ; ++ index ) {",0]],0,0]],
-            [["work"],["boot01/kernel/boot/bootstrap_transitions.c/bootstrap_runtime_validate_index/index-110","wrap","KERNEL_BOOT","INDEX_PROBE",1,"value","index",[["for ( index = 1 ; index <= MICROS_BOOTSTRAP_SERVICE_ID_LIMIT ; ++ index ) {",0]],0,2]],
-            [["work"],["boot01/kernel/boot/bootstrap_transitions.c/bootstrap_runtime_validate_index/index-130","wrap","KERNEL_BOOT","INDEX_PROBE",1,"value","slot - 1",[["for ( index = 1 ; index <= MICROS_BOOTSTRAP_SERVICE_ID_LIMIT ; ++ index ) {",0]],0,1]]
+            [["work"],["boot01/kernel/boot/bootstrap_transitions.c/bootstrap_runtime_validate_index/index-40","wrap","KERNEL_BOOT","INDEX_PROBE",1,"value","0",[],1,4]],
+            [["work"],["boot01/kernel/boot/bootstrap_transitions.c/bootstrap_runtime_validate_index/loop-66","insert","KERNEL_BOOT","RECORD_VISIT",1,"entry","",[["for ( index = 0 ; index < runtime -> entry_count ; ++ index ) {",0]],0,0]],
+            [["work"],["boot01/kernel/boot/bootstrap_transitions.c/bootstrap_runtime_validate_index/index-73","wrap","KERNEL_BOOT","INDEX_PROBE",1,"value","index",[["for ( index = 0 ; index < runtime -> entry_count ; ++ index ) {",0]],0,2]],
+            [["work"],["boot01/kernel/boot/bootstrap_transitions.c/bootstrap_runtime_validate_index/index-92","wrap","KERNEL_BOOT","INDEX_PROBE",1,"value","service_id",[["for ( index = 0 ; index < runtime -> entry_count ; ++ index ) {",0]],4,5]],
+            [["work"],["boot01/kernel/boot/bootstrap_transitions.c/bootstrap_runtime_validate_index/loop-119","insert","KERNEL_BOOT","RECORD_VISIT",1,"entry","",[["for ( index = 1 ; index <= MICROS_BOOTSTRAP_SERVICE_ID_LIMIT ; ++ index ) {",0]],0,0]],
+            [["work"],["boot01/kernel/boot/bootstrap_transitions.c/bootstrap_runtime_validate_index/index-126","wrap","KERNEL_BOOT","INDEX_PROBE",1,"value","index",[["for ( index = 1 ; index <= MICROS_BOOTSTRAP_SERVICE_ID_LIMIT ; ++ index ) {",0]],0,2]],
+            [["work"],["boot01/kernel/boot/bootstrap_transitions.c/bootstrap_runtime_validate_index/index-146","wrap","KERNEL_BOOT","INDEX_PROBE",1,"value","slot - 1",[["for ( index = 1 ; index <= MICROS_BOOTSTRAP_SERVICE_ID_LIMIT ; ++ index ) {",0]],0,1]]
           ],
           "initialize_transition_plan": [
             [["work"],["boot01/kernel/boot/bootstrap_transitions.c/initialize_transition_plan/index-60","wrap","KERNEL_BOOT","INDEX_PROBE",1,"value","index",[],1,2]]
@@ -172,11 +193,7 @@
           ],
           "micros_bootstrap_runtime_release": [],
           "micros_bootstrap_runtime_release_retaining_deadline": [],
-          "runtime_release": [],
-          "runtime_slot": [
-            [["work"],["boot01/kernel/boot/bootstrap_transitions.c/runtime_slot/index-46","wrap","KERNEL_BOOT","INDEX_PROBE",1,"value","service_id",[],2,5]],
-            [["work"],["boot01/kernel/boot/bootstrap_transitions.c/runtime_slot/index-72","wrap","KERNEL_BOOT","INDEX_PROBE",1,"value","slot - 1",[],0,2]]
-          ]
+          "runtime_release": []
         },
         "kernel/endpoint/endpoint.c": {
           "micros_endpoint_authorize_kernel_operation": [
@@ -953,6 +970,10 @@
           "micros_thread_runtime_flags_unset": [],
           "micros_thread_scheduler_admit": [],
           "micros_thread_scheduler_admit_preflight": [],
+          "micros_thread_scheduler_commit_admit_prevalidated": [
+            [["work"],["boot01-shared/ipc01-boot02-admit-thread","wrap","KERNEL_SCHEDULER","INDEX_PROBE",1,"value","thread_handle . slot",[],0,1]],
+            [["work"],["boot01-shared/ipc01-boot02-admit-hart","wrap","KERNEL_SCHEDULER","INDEX_PROBE",1,"value","hart_handle . slot",[],0,1]]
+          ],
           "micros_thread_scheduler_hold": [],
           "micros_thread_scheduler_remove": []
         },
@@ -1146,7 +1167,7 @@
     },
     "GRANT01": {
       "channels": ["work"],
-      "native_sources": ["kernel/boot/bootstrap_control_core.c","kernel/endpoint/endpoint.c","kernel/endpoint/endpoint_close.c","kernel/endpoint/endpoint_codec.c","kernel/endpoint/endpoint_completion_validation.c","kernel/endpoint/endpoint_identity.c","kernel/endpoint/endpoint_object_validation.c","kernel/endpoint/endpoint_privilege.c","kernel/endpoint/endpoint_publication.c","kernel/endpoint/endpoint_queue_validation.c","kernel/endpoint/endpoint_registry.c","kernel/grant/grant.c","kernel/grant/grant_abi.c","kernel/grant/grant_copy.c","kernel/grant/grant_copy_core.c","kernel/grant/grant_copy_range.c","kernel/grant/grant_runtime.c","kernel/grant/grant_syscall.c","kernel/grant/grant_syscall_core.c","kernel/ipc/ipc_runtime.c","kernel/objects/kernel_object_context.c","kernel/objects/kernel_object_hart.c","kernel/objects/kernel_object_identity.c","kernel/objects/kernel_object_process.c","kernel/objects/kernel_object_stack.c","kernel/objects/kernel_object_state.c","kernel/objects/kernel_object_thread.c","kernel/objects/kernel_object_validation.c","kernel/objects/kernel_objects.c","kernel/scheduler/scheduler_core.c","kernel/scheduler/scheduler_core_accounting.c","kernel/scheduler/scheduler_core_ipc.c","kernel/scheduler/scheduler_core_ipc_transition.c","kernel/scheduler/scheduler_core_policy.c","kernel/scheduler/scheduler_core_queue.c","kernel/scheduler/scheduler_core_return.c","kernel/scheduler/scheduler_core_return_plan.c","kernel/scheduler/scheduler_core_validate.c","kernel/tty/tty_handoff_core.c","kernel/tty/tty_handoff_runtime_state.c","kernel/tty/tty_handoff_runtime_validate.c","lib/runtime/memory.c"],
+      "native_sources": ["kernel/boot/bootstrap_control_core.c","kernel/boot/bootstrap_transitions.c","kernel/endpoint/endpoint.c","kernel/endpoint/endpoint_close.c","kernel/endpoint/endpoint_codec.c","kernel/endpoint/endpoint_completion_validation.c","kernel/endpoint/endpoint_identity.c","kernel/endpoint/endpoint_object_validation.c","kernel/endpoint/endpoint_privilege.c","kernel/endpoint/endpoint_publication.c","kernel/endpoint/endpoint_queue_validation.c","kernel/endpoint/endpoint_registry.c","kernel/grant/grant.c","kernel/grant/grant_abi.c","kernel/grant/grant_copy.c","kernel/grant/grant_copy_core.c","kernel/grant/grant_copy_range.c","kernel/grant/grant_runtime.c","kernel/grant/grant_syscall.c","kernel/grant/grant_syscall_core.c","kernel/ipc/ipc_runtime.c","kernel/objects/kernel_object_context.c","kernel/objects/kernel_object_hart.c","kernel/objects/kernel_object_identity.c","kernel/objects/kernel_object_process.c","kernel/objects/kernel_object_stack.c","kernel/objects/kernel_object_state.c","kernel/objects/kernel_object_thread.c","kernel/objects/kernel_object_validation.c","kernel/objects/kernel_objects.c","kernel/scheduler/scheduler_core.c","kernel/scheduler/scheduler_core_accounting.c","kernel/scheduler/scheduler_core_ipc.c","kernel/scheduler/scheduler_core_ipc_transition.c","kernel/scheduler/scheduler_core_policy.c","kernel/scheduler/scheduler_core_queue.c","kernel/scheduler/scheduler_core_return.c","kernel/scheduler/scheduler_core_return_plan.c","kernel/scheduler/scheduler_core_validate.c","kernel/tty/tty_handoff_core.c","kernel/tty/tty_handoff_runtime_state.c","kernel/tty/tty_handoff_runtime_validate.c","lib/runtime/memory.c"],
       "sites": {
         "kernel/boot/bootstrap_control_core.c": {
           "micros_bootstrap_control_find_binding": []
@@ -1155,6 +1176,15 @@
           "micros_bootstrap_control_find_binding_bounded": [
             [["work"],["grant01-boot01/kernel/boot/bootstrap_control_internal.h/micros_bootstrap_control_find_binding_bounded/index-45","wrap","KERNEL_BOOT","INDEX_PROBE",1,"value","service_id",[],2,5]],
             [["work"],["grant01-boot01/kernel/boot/bootstrap_control_internal.h/micros_bootstrap_control_find_binding_bounded/index-72","wrap","KERNEL_BOOT","INDEX_PROBE",1,"value","slot - 1",[],0,1]]
+          ]
+        },
+        "kernel/boot/bootstrap_transitions.c": {
+          "bootstrap_runtime_find_entry": [
+            [["work"],["grant01-boot01/kernel/boot/bootstrap_transitions.c/bootstrap_runtime_find_entry/index-20","wrap","KERNEL_BOOT","INDEX_PROBE",1,"value","index",[],2,3]]
+          ],
+          "bootstrap_runtime_select_slot": [
+            [["work"],["grant01-boot01/kernel/boot/bootstrap_transitions.c/bootstrap_runtime_select_slot/index-50","wrap","KERNEL_BOOT","INDEX_PROBE",1,"value","service_id",[],2,5]],
+            [["work"],["grant01-boot01/kernel/boot/bootstrap_transitions.c/bootstrap_runtime_select_slot/index-76","wrap","KERNEL_BOOT","INDEX_PROBE",1,"value","slot - 1",[],0,2]]
           ]
         },
         "kernel/endpoint/endpoint.c": {
@@ -1896,6 +1926,10 @@
           "micros_thread_runtime_flags_unset": [],
           "micros_thread_scheduler_admit": [],
           "micros_thread_scheduler_admit_preflight": [],
+          "micros_thread_scheduler_commit_admit_prevalidated": [
+            [["work"],["grant01-boot02-admit-thread","wrap","KERNEL_SCHEDULER","INDEX_PROBE",1,"value","thread_handle . slot",[],0,1]],
+            [["work"],["grant01-boot02-admit-hart","wrap","KERNEL_SCHEDULER","INDEX_PROBE",1,"value","hart_handle . slot",[],0,1]]
+          ],
           "micros_thread_scheduler_hold": [],
           "micros_thread_scheduler_remove": []
         },
@@ -2084,6 +2118,7 @@
           "micros_tty_handoff_runtime_validate": [
             [["work"],["grant01/kernel/tty/tty_handoff_runtime_validate.c/micros_tty_handoff_runtime_validate/audit","insert","KERNEL_TTY","COMPLETE_VALIDATOR_CALL",1,"entry","",[],0,0]]
           ],
+          "micros_tty_handoff_runtime_validate_bootstrap_binding": [],
           "tty_handoff_binding_identity_matches": [
             [["work"],["grant01/kernel/tty/tty_handoff_runtime_validate.c/tty_handoff_binding_identity_matches/index-72","wrap","KERNEL_TTY","INDEX_PROBE",1,"value","binding -> manifest_index",[],1,2]]
           ],
@@ -2092,11 +2127,6 @@
           "tty_handoff_identity_is_valid": [],
           "tty_handoff_live_binding_matches": [],
           "tty_handoff_process_handles_equal": [],
-          "tty_handoff_runtime_entry": [
-            [["work"],["grant01/kernel/tty/tty_handoff_runtime_validate.c/tty_handoff_runtime_entry/loop-35","insert","KERNEL_TTY","RECORD_VISIT",1,"entry","",[["for ( index = 0 ; index < runtime -> entry_count ; ++ index ) {",0]],0,0]],
-            [["work"],["grant01/kernel/tty/tty_handoff_runtime_validate.c/tty_handoff_runtime_entry/index-41","wrap","KERNEL_TTY","INDEX_PROBE",1,"value","index",[["for ( index = 0 ; index < runtime -> entry_count ; ++ index ) {",0]],0,1]],
-            [["work"],["grant01/kernel/tty/tty_handoff_runtime_validate.c/tty_handoff_runtime_entry/index-55","wrap","KERNEL_TTY","INDEX_PROBE",1,"value","index",[["for ( index = 0 ; index < runtime -> entry_count ; ++ index ) {",0],["if ( runtime -> entries [ index ] . service_id == service_id ) {",0]],0,1]]
-          ],
           "tty_handoff_selected_binding_is_valid": [],
           "tty_handoff_thread_handles_equal": []
         },
@@ -2106,7 +2136,8 @@
         }
       },
       "subsets": {
-        "kernel/boot/bootstrap_control_core.c": ["micros_bootstrap_control_find_binding"]
+        "kernel/boot/bootstrap_control_core.c": ["micros_bootstrap_control_find_binding"],
+        "kernel/boot/bootstrap_transitions.c": ["bootstrap_runtime_select_slot","bootstrap_runtime_find_entry"]
       }
     },
     "IPC01": {
@@ -2921,6 +2952,10 @@
           "micros_thread_runtime_flags_unset": [],
           "micros_thread_scheduler_admit": [],
           "micros_thread_scheduler_admit_preflight": [],
+          "micros_thread_scheduler_commit_admit_prevalidated": [
+            [["work"],["ipc01-boot02-admit-thread","wrap","KERNEL_SCHEDULER","INDEX_PROBE",1,"value","thread_handle . slot",[],0,1]],
+            [["work"],["ipc01-boot02-admit-hart","wrap","KERNEL_SCHEDULER","INDEX_PROBE",1,"value","hart_handle . slot",[],0,1]]
+          ],
           "micros_thread_scheduler_hold": [],
           "micros_thread_scheduler_remove": []
         },
@@ -3520,6 +3555,7 @@
           "micros_thread_runtime_flags_unset": [],
           "micros_thread_scheduler_admit": [],
           "micros_thread_scheduler_admit_preflight": [],
+          "micros_thread_scheduler_commit_admit_prevalidated": [],
           "micros_thread_scheduler_hold": [],
           "micros_thread_scheduler_remove": []
         },
@@ -4206,6 +4242,7 @@
           "micros_thread_runtime_flags_unset": [],
           "micros_thread_scheduler_admit": [],
           "micros_thread_scheduler_admit_preflight": [],
+          "micros_thread_scheduler_commit_admit_prevalidated": [],
           "micros_thread_scheduler_hold": [],
           "micros_thread_scheduler_remove": []
         },
@@ -5261,6 +5298,7 @@
           "micros_thread_runtime_flags_unset": [],
           "micros_thread_scheduler_admit": [],
           "micros_thread_scheduler_admit_preflight": [],
+          "micros_thread_scheduler_commit_admit_prevalidated": [],
           "micros_thread_scheduler_hold": [],
           "micros_thread_scheduler_remove": []
         },
@@ -5409,6 +5447,7 @@
           "micros_vm_handoff_copy_bytes": [],
           "micros_vm_handoff_endpoint_matches_process": [],
           "micros_vm_handoff_frozen_record_is_valid": [],
+          "micros_vm_handoff_identity_is_valid": [],
           "micros_vm_handoff_inspect_scratch_binding": [],
           "micros_vm_handoff_loading_record_can_append": [],
           "micros_vm_handoff_mapping_entry_is_valid": [],
@@ -5435,8 +5474,7 @@
           "record_overlaps_prior_records": [],
           "record_tokens_are_unique": [],
           "scratch_binding_load_is_valid": [],
-          "scratch_binding_record_is_valid": [],
-          "vm_handoff_identity_is_valid": []
+          "scratch_binding_record_is_valid": []
         }
       },
       "subsets": {
@@ -5445,15 +5483,45 @@
     },
     "MEM04": {
       "channels": ["aggregate","path","context"],
-      "native_sources": ["kernel/boot/bootstrap_control_core.c","kernel/endpoint/endpoint.c","kernel/endpoint/endpoint_codec.c","kernel/endpoint/endpoint_completion_validation.c","kernel/endpoint/endpoint_identity.c","kernel/endpoint/endpoint_object_validation.c","kernel/endpoint/endpoint_privilege.c","kernel/endpoint/endpoint_publication.c","kernel/endpoint/endpoint_queue_validation.c","kernel/endpoint/endpoint_registry.c","kernel/ipc/ipc_runtime.c","kernel/memory/address_space.c","kernel/memory/bootstrap_memory.c","kernel/memory/frame_allocator.c","kernel/memory/frame_ownership.c","kernel/memory/frame_ownership_bootstrap.c","kernel/memory/frame_ownership_handoff.c","kernel/memory/frame_ownership_validation.c","kernel/memory/frame_ownership_vm_claim.c","kernel/memory/frame_ownership_vm_freeze.c","kernel/memory/frame_ownership_vm_release.c","kernel/memory/sv39.c","kernel/memory/user_address_space.c","kernel/memory/user_address_space_activation.c","kernel/memory/user_address_space_core.c","kernel/memory/user_address_space_mapping.c","kernel/memory/user_address_space_mutation.c","kernel/memory/user_address_space_runtime.c","kernel/memory/user_address_space_table.c","kernel/memory/user_address_space_validation.c","kernel/objects/kernel_object_context.c","kernel/objects/kernel_object_hart.c","kernel/objects/kernel_object_identity.c","kernel/objects/kernel_object_process.c","kernel/objects/kernel_object_runtime.c","kernel/objects/kernel_object_stack.c","kernel/objects/kernel_object_state.c","kernel/objects/kernel_object_thread.c","kernel/objects/kernel_object_validation.c","kernel/objects/kernel_objects.c","kernel/scheduler/scheduler_context.c","kernel/scheduler/scheduler_core.c","kernel/scheduler/scheduler_core_accounting.c","kernel/scheduler/scheduler_core_ipc.c","kernel/scheduler/scheduler_core_ipc_transition.c","kernel/scheduler/scheduler_core_policy.c","kernel/scheduler/scheduler_core_queue.c","kernel/scheduler/scheduler_core_return.c","kernel/scheduler/scheduler_core_return_plan.c","kernel/scheduler/scheduler_core_validate.c","kernel/tty/tty_handoff_core.c","kernel/tty/tty_handoff_runtime_state.c","kernel/tty/tty_handoff_runtime_validate.c","kernel/vm/vm_handoff_boot.c","kernel/vm/vm_handoff_core.c","kernel/vm/vm_handoff_runtime.c"],
+      "native_sources": ["kernel/boot/bootstrap_control_core.c","kernel/boot/bootstrap_transitions.c","kernel/endpoint/endpoint.c","kernel/endpoint/endpoint_codec.c","kernel/endpoint/endpoint_completion_validation.c","kernel/endpoint/endpoint_identity.c","kernel/endpoint/endpoint_object_validation.c","kernel/endpoint/endpoint_privilege.c","kernel/endpoint/endpoint_publication.c","kernel/endpoint/endpoint_queue_validation.c","kernel/endpoint/endpoint_registry.c","kernel/ipc/ipc_runtime.c","kernel/memory/address_space.c","kernel/memory/bootstrap_memory.c","kernel/memory/frame_allocator.c","kernel/memory/frame_ownership.c","kernel/memory/frame_ownership_bootstrap.c","kernel/memory/frame_ownership_handoff.c","kernel/memory/frame_ownership_validation.c","kernel/memory/frame_ownership_vm_claim.c","kernel/memory/frame_ownership_vm_freeze.c","kernel/memory/frame_ownership_vm_release.c","kernel/memory/sv39.c","kernel/memory/user_address_space.c","kernel/memory/user_address_space_activation.c","kernel/memory/user_address_space_core.c","kernel/memory/user_address_space_mapping.c","kernel/memory/user_address_space_mutation.c","kernel/memory/user_address_space_runtime.c","kernel/memory/user_address_space_table.c","kernel/memory/user_address_space_tty.c","kernel/memory/user_address_space_validation.c","kernel/objects/kernel_object_context.c","kernel/objects/kernel_object_hart.c","kernel/objects/kernel_object_identity.c","kernel/objects/kernel_object_process.c","kernel/objects/kernel_object_runtime.c","kernel/objects/kernel_object_stack.c","kernel/objects/kernel_object_state.c","kernel/objects/kernel_object_thread.c","kernel/objects/kernel_object_validation.c","kernel/objects/kernel_objects.c","kernel/scheduler/scheduler_context.c","kernel/scheduler/scheduler_core.c","kernel/scheduler/scheduler_core_accounting.c","kernel/scheduler/scheduler_core_ipc.c","kernel/scheduler/scheduler_core_ipc_transition.c","kernel/scheduler/scheduler_core_policy.c","kernel/scheduler/scheduler_core_queue.c","kernel/scheduler/scheduler_core_return.c","kernel/scheduler/scheduler_core_return_plan.c","kernel/scheduler/scheduler_core_validate.c","kernel/tty/tty_handoff_core.c","kernel/tty/tty_handoff_runtime_state.c","kernel/tty/tty_handoff_runtime_validate.c","kernel/vm/vm_handoff_boot.c","kernel/vm/vm_handoff_core.c","kernel/vm/vm_handoff_runtime.c"],
       "sites": {
         "kernel/boot/bootstrap_control_core.c": {
-          "micros_bootstrap_control_find_binding": []
+          "binding_matches_manifest": [
+            [["aggregate","context"],["mem04-boot01/kernel/boot/bootstrap_control_core.c/binding_matches_manifest/index-81","wrap","KERNEL_BOOT","INDEX_PROBE",1,"value","binding -> manifest_index",[],1,2]]
+          ],
+          "binding_matches_objects": [
+            [["aggregate","context"],["mem04-boot01/kernel/boot/bootstrap_control_core.c/binding_matches_objects/index-12","wrap","KERNEL_BOOT","INDEX_PROBE",1,"value","binding -> manifest_index",[],0,1]]
+          ],
+          "micros_bootstrap_control_find_binding": [],
+          "micros_bootstrap_control_select_service": [
+            [["aggregate","context"],["mem04-boot01/kernel/boot/bootstrap_control_core.c/micros_bootstrap_control_select_service/index-89","wrap","KERNEL_BOOT","INDEX_PROBE",1,"value","service_id",[],2,6]],
+            [["aggregate","context"],["mem04-boot01/kernel/boot/bootstrap_control_core.c/micros_bootstrap_control_select_service/index-152","wrap","KERNEL_BOOT","INDEX_PROBE",1,"value","binding_slot - 1",[],0,2]],
+            [["aggregate","context"],["mem04-boot01/kernel/boot/bootstrap_control_core.c/micros_bootstrap_control_select_service/index-187","wrap","KERNEL_BOOT","INDEX_PROBE",1,"value","binding -> manifest_index",[],0,2]],
+            [["aggregate","context"],["mem04-boot01/kernel/boot/bootstrap_control_core.c/micros_bootstrap_control_select_service/index-201","wrap","KERNEL_BOOT","INDEX_PROBE",1,"value","runtime_index",[],2,6]],
+            [["aggregate","context"],["mem04-boot01/kernel/boot/bootstrap_control_core.c/micros_bootstrap_control_select_service/index-318","wrap","KERNEL_BOOT","INDEX_PROBE",1,"value","binding -> process . slot",[],0,2]],
+            [["aggregate","context"],["mem04-boot01/kernel/boot/bootstrap_control_core.c/micros_bootstrap_control_select_service/index-334","wrap","KERNEL_BOOT","INDEX_PROBE",1,"value","binding -> thread . slot",[],0,1]],
+            [["aggregate","context"],["mem04-boot01/kernel/boot/bootstrap_control_core.c/micros_bootstrap_control_select_service/index-350","wrap","KERNEL_BOOT","INDEX_PROBE",1,"value","binding -> process . slot",[],1,2]]
+          ],
+          "process_handles_equal": [],
+          "require_running_header": [
+            [["aggregate","context"],["mem04-boot01/kernel/boot/bootstrap_control_core.c/require_running_header/index-86","wrap","KERNEL_BOOT","INDEX_PROBE",1,"value","0",[],1,6]],
+            [["aggregate","context"],["mem04-boot01/kernel/boot/bootstrap_control_core.c/require_running_header/index-97","wrap","KERNEL_BOOT","INDEX_PROBE",1,"value","0",[],3,6]]
+          ],
+          "selected_runtime_shape": []
         },
         "kernel/boot/bootstrap_control_internal.h": {
           "micros_bootstrap_control_find_binding_bounded": [
             [["aggregate","context"],["mem04-boot01/kernel/boot/bootstrap_control_internal.h/micros_bootstrap_control_find_binding_bounded/index-45","wrap","KERNEL_BOOT","INDEX_PROBE",1,"value","service_id",[],2,5]],
             [["aggregate","context"],["mem04-boot01/kernel/boot/bootstrap_control_internal.h/micros_bootstrap_control_find_binding_bounded/index-72","wrap","KERNEL_BOOT","INDEX_PROBE",1,"value","slot - 1",[],0,1]]
+          ]
+        },
+        "kernel/boot/bootstrap_transitions.c": {
+          "bootstrap_runtime_find_entry": [
+            [["aggregate","context"],["mem04-boot01/kernel/boot/bootstrap_transitions.c/bootstrap_runtime_find_entry/index-20","wrap","KERNEL_BOOT","INDEX_PROBE",1,"value","index",[],2,3]]
+          ],
+          "bootstrap_runtime_select_slot": [
+            [["aggregate","context"],["mem04-boot01/kernel/boot/bootstrap_transitions.c/bootstrap_runtime_select_slot/index-50","wrap","KERNEL_BOOT","INDEX_PROBE",1,"value","service_id",[],2,5]],
+            [["aggregate","context"],["mem04-boot01/kernel/boot/bootstrap_transitions.c/bootstrap_runtime_select_slot/index-76","wrap","KERNEL_BOOT","INDEX_PROBE",1,"value","slot - 1",[],0,2]]
           ]
         },
         "kernel/endpoint/endpoint.c": {
@@ -6250,6 +6318,12 @@
           "micros_user_address_space_user_byte_address_is_valid": [],
           "micros_user_address_space_user_page_is_valid": []
         },
+        "kernel/memory/user_address_space_tty.c": {
+          "active_root": [],
+          "micros_user_address_space_inspect_bootstrap_tty_uart": [],
+          "require_read_authority": [],
+          "resolve_process_with_root": []
+        },
         "kernel/memory/user_address_space_validation.c": {
           "acquire_scratch": [],
           "bootstrap_collect_frame": [
@@ -6663,6 +6737,7 @@
           "micros_thread_runtime_flags_unset": [],
           "micros_thread_scheduler_admit": [],
           "micros_thread_scheduler_admit_preflight": [],
+          "micros_thread_scheduler_commit_admit_prevalidated": [],
           "micros_thread_scheduler_hold": [],
           "micros_thread_scheduler_remove": []
         },
@@ -6841,6 +6916,7 @@
           "micros_tty_handoff_runtime_validate": [
             [["aggregate","context"],["mem04-audit-cf2158eddf110ae6ecec","insert","KERNEL_TTY","COMPLETE_VALIDATOR_CALL",1,"entry","",[],0,0]]
           ],
+          "micros_tty_handoff_runtime_validate_bootstrap_binding": [],
           "tty_handoff_binding_identity_matches": [],
           "tty_handoff_classify_live_binding": [],
           "tty_handoff_endpoint_matches_process": [],
@@ -6849,9 +6925,6 @@
           ],
           "tty_handoff_live_binding_matches": [],
           "tty_handoff_process_handles_equal": [],
-          "tty_handoff_runtime_entry": [
-            [["aggregate","context"],["mem04-0fe7d1df89bca72adb9a","insert","KERNEL_TTY","INDEX_PROBE",1,"entry","",[["for ( index = 0 ; index < runtime -> entry_count ; ++ index ) {",0]],0,0]]
-          ],
           "tty_handoff_selected_binding_is_valid": [],
           "tty_handoff_thread_handles_equal": []
         },
@@ -6892,6 +6965,9 @@
             [["aggregate","context"],["mem04-c1d5301505384a0adc7e","insert","KERNEL_VM","INDEX_PROBE",1,"entry","",[["for ( table_index = 0 ; table_index < MICROS_VM_LOAD_PAGE_TABLE_FRAME_COUNT ; ++ table_index ) {",0]],0,0]],
             [["aggregate","context"],["mem04-7577e936239ea30b6a7c","insert","KERNEL_VM","INDEX_PROBE",1,"entry","",[["for ( table_index = 0 ; table_index < MICROS_VM_LOAD_PAGE_TABLE_FRAME_COUNT ; ++ table_index ) {",0],["for ( entry_index = 0 ; entry_index < table_index ; ++ entry_index ) {",0]],0,0]],
             [["aggregate","context"],["mem04-04239f7afa58708571d7","insert","KERNEL_VM","INDEX_PROBE",1,"entry","",[["for ( table_index = 0 ; table_index < MICROS_VM_LOAD_PAGE_TABLE_FRAME_COUNT ; ++ table_index ) {",0],["for ( entry_index = 0 ; entry_index < record -> entry_count ; ++ entry_index ) {",0]],0,0]]
+          ],
+          "micros_vm_handoff_identity_is_valid": [
+            [["aggregate","context"],["mem04-1d822d13af68af050d90","wrap","KERNEL_VM","RECORD_VISIT",1,"value","state -> initialization_magic",[],0,1]]
           ],
           "micros_vm_handoff_inspect_scratch_binding": [],
           "micros_vm_handoff_loading_record_can_append": [
@@ -6953,38 +7029,70 @@
           "scratch_binding_load_is_valid": [],
           "scratch_binding_record_is_valid": [
             [["aggregate","context"],["mem04-current-957656ad304f1857d373","wrap","KERNEL_VM","INDEX_PROBE",1,"value","& state -> mappings [ state -> load . process . slot ]",[],0,1]]
-          ],
-          "vm_handoff_identity_is_valid": [
-            [["aggregate","context"],["mem04-1d822d13af68af050d90","wrap","KERNEL_VM","RECORD_VISIT",1,"value","state -> initialization_magic",[],0,1]]
           ]
         },
         "kernel/vm/vm_handoff_runtime.c": {
           "micros_vm_handoff_runtime_authoritative_state": [],
           "micros_vm_handoff_runtime_inspect_scratch_binding": [],
+          "micros_vm_handoff_runtime_role_ready": [],
           "micros_vm_handoff_runtime_scratch_authority": [],
-          "micros_vm_handoff_runtime_state": []
+          "micros_vm_handoff_runtime_state": [],
+          "process_handles_equal": [],
+          "thread_handles_equal": []
         }
       },
       "subsets": {
-        "kernel/boot/bootstrap_control_core.c": ["micros_bootstrap_control_find_binding"],
+        "kernel/boot/bootstrap_control_core.c": ["binding_matches_manifest","binding_matches_objects","micros_bootstrap_control_find_binding","micros_bootstrap_control_select_service","process_handles_equal","require_running_header","selected_runtime_shape"],
+        "kernel/boot/bootstrap_transitions.c": ["bootstrap_runtime_find_entry","bootstrap_runtime_select_slot"],
         "kernel/ipc/ipc_runtime.c": ["micros_ipc_runtime_authoritative_registry","micros_ipc_runtime_registry"],
         "kernel/memory/address_space.c": ["micros_kernel_address_space_report"],
         "kernel/memory/bootstrap_memory.c": ["micros_bootstrap_frame_allocator","micros_frame_ownership_runtime_allocate","micros_frame_ownership_runtime_complete_handoff","micros_frame_ownership_runtime_initialize","micros_frame_ownership_runtime_ledger","micros_frame_ownership_runtime_release","micros_frame_ownership_runtime_release_process","micros_frame_ownership_runtime_release_process_set","micros_frame_ownership_runtime_validate","micros_frame_ownership_runtime_validate_metadata","owner_is_process_bound","ownership_mutation_is_allowed","validate_active_process_owners","validate_process_owners"],
+        "kernel/memory/user_address_space_tty.c": ["active_root","micros_user_address_space_inspect_bootstrap_tty_uart","require_read_authority","resolve_process_with_root"],
         "kernel/scheduler/scheduler_context.c": ["scheduler_runtime_validate_selected_thread"],
-        "kernel/vm/vm_handoff_runtime.c": ["micros_vm_handoff_runtime_authoritative_state","micros_vm_handoff_runtime_inspect_scratch_binding","micros_vm_handoff_runtime_scratch_authority","micros_vm_handoff_runtime_state"]
+        "kernel/vm/vm_handoff_runtime.c": ["micros_vm_handoff_runtime_authoritative_state","micros_vm_handoff_runtime_inspect_scratch_binding","micros_vm_handoff_runtime_role_ready","micros_vm_handoff_runtime_scratch_authority","micros_vm_handoff_runtime_state","process_handles_equal","thread_handles_equal"]
       }
     },
     "MEM05": {
       "channels": ["aggregate","frames","plans","context"],
-      "native_sources": ["kernel/boot/bootstrap_control_core.c","kernel/endpoint/endpoint.c","kernel/endpoint/endpoint_codec.c","kernel/endpoint/endpoint_completion_validation.c","kernel/endpoint/endpoint_identity.c","kernel/endpoint/endpoint_object_validation.c","kernel/endpoint/endpoint_privilege.c","kernel/endpoint/endpoint_publication.c","kernel/endpoint/endpoint_queue_validation.c","kernel/endpoint/endpoint_registry.c","kernel/execution/user_execution_validation.c","kernel/ipc/ipc_runtime.c","kernel/memory/address_space.c","kernel/memory/bootstrap_memory.c","kernel/memory/frame_allocator.c","kernel/memory/frame_ownership.c","kernel/memory/frame_ownership_bootstrap.c","kernel/memory/frame_ownership_handoff.c","kernel/memory/frame_ownership_validation.c","kernel/memory/frame_ownership_vm_claim.c","kernel/memory/frame_ownership_vm_freeze.c","kernel/memory/frame_ownership_vm_release.c","kernel/memory/sv39.c","kernel/memory/user_address_space.c","kernel/memory/user_address_space_activation.c","kernel/memory/user_address_space_core.c","kernel/memory/user_address_space_handoff.c","kernel/memory/user_address_space_mapping.c","kernel/memory/user_address_space_mutation.c","kernel/memory/user_address_space_runtime.c","kernel/memory/user_address_space_table.c","kernel/memory/user_address_space_validation.c","kernel/objects/kernel_object_context.c","kernel/objects/kernel_object_hart.c","kernel/objects/kernel_object_identity.c","kernel/objects/kernel_object_process.c","kernel/objects/kernel_object_runtime.c","kernel/objects/kernel_object_stack.c","kernel/objects/kernel_object_state.c","kernel/objects/kernel_object_thread.c","kernel/objects/kernel_object_validation.c","kernel/objects/kernel_objects.c","kernel/scheduler/scheduler_context.c","kernel/scheduler/scheduler_core.c","kernel/scheduler/scheduler_core_accounting.c","kernel/scheduler/scheduler_core_ipc.c","kernel/scheduler/scheduler_core_ipc_transition.c","kernel/scheduler/scheduler_core_policy.c","kernel/scheduler/scheduler_core_queue.c","kernel/scheduler/scheduler_core_return.c","kernel/scheduler/scheduler_core_return_plan.c","kernel/scheduler/scheduler_core_validate.c","kernel/tty/tty_handoff_core.c","kernel/tty/tty_handoff_runtime_state.c","kernel/tty/tty_handoff_runtime_validate.c","kernel/vm/vm_handoff_boot.c","kernel/vm/vm_handoff_core.c","kernel/vm/vm_handoff_runtime.c"],
+      "native_sources": ["kernel/boot/bootstrap_control_core.c","kernel/boot/bootstrap_transitions.c","kernel/endpoint/endpoint.c","kernel/endpoint/endpoint_codec.c","kernel/endpoint/endpoint_completion_validation.c","kernel/endpoint/endpoint_identity.c","kernel/endpoint/endpoint_object_validation.c","kernel/endpoint/endpoint_privilege.c","kernel/endpoint/endpoint_publication.c","kernel/endpoint/endpoint_queue_validation.c","kernel/endpoint/endpoint_registry.c","kernel/execution/user_execution_validation.c","kernel/ipc/ipc_runtime.c","kernel/memory/address_space.c","kernel/memory/bootstrap_memory.c","kernel/memory/frame_allocator.c","kernel/memory/frame_ownership.c","kernel/memory/frame_ownership_bootstrap.c","kernel/memory/frame_ownership_handoff.c","kernel/memory/frame_ownership_validation.c","kernel/memory/frame_ownership_vm_claim.c","kernel/memory/frame_ownership_vm_freeze.c","kernel/memory/frame_ownership_vm_release.c","kernel/memory/sv39.c","kernel/memory/user_address_space.c","kernel/memory/user_address_space_activation.c","kernel/memory/user_address_space_core.c","kernel/memory/user_address_space_handoff.c","kernel/memory/user_address_space_mapping.c","kernel/memory/user_address_space_mutation.c","kernel/memory/user_address_space_runtime.c","kernel/memory/user_address_space_table.c","kernel/memory/user_address_space_validation.c","kernel/objects/kernel_object_context.c","kernel/objects/kernel_object_hart.c","kernel/objects/kernel_object_identity.c","kernel/objects/kernel_object_process.c","kernel/objects/kernel_object_runtime.c","kernel/objects/kernel_object_stack.c","kernel/objects/kernel_object_state.c","kernel/objects/kernel_object_thread.c","kernel/objects/kernel_object_validation.c","kernel/objects/kernel_objects.c","kernel/scheduler/scheduler_context.c","kernel/scheduler/scheduler_core.c","kernel/scheduler/scheduler_core_accounting.c","kernel/scheduler/scheduler_core_ipc.c","kernel/scheduler/scheduler_core_ipc_transition.c","kernel/scheduler/scheduler_core_policy.c","kernel/scheduler/scheduler_core_queue.c","kernel/scheduler/scheduler_core_return.c","kernel/scheduler/scheduler_core_return_plan.c","kernel/scheduler/scheduler_core_validate.c","kernel/tty/tty_handoff_core.c","kernel/tty/tty_handoff_runtime_state.c","kernel/tty/tty_handoff_runtime_validate.c","kernel/vm/vm_handoff_boot.c","kernel/vm/vm_handoff_core.c","kernel/vm/vm_handoff_runtime.c"],
       "sites": {
         "kernel/boot/bootstrap_control_core.c": {
-          "micros_bootstrap_control_find_binding": []
+          "binding_matches_manifest": [
+            [["aggregate","context"],["mem05-boot01/kernel/boot/bootstrap_control_core.c/binding_matches_manifest/index-81","wrap","KERNEL_BOOT","INDEX_PROBE",1,"value","binding -> manifest_index",[],1,2]]
+          ],
+          "binding_matches_objects": [
+            [["aggregate","context"],["mem05-boot01/kernel/boot/bootstrap_control_core.c/binding_matches_objects/index-12","wrap","KERNEL_BOOT","INDEX_PROBE",1,"value","binding -> manifest_index",[],0,1]]
+          ],
+          "micros_bootstrap_control_find_binding": [],
+          "micros_bootstrap_control_select_service": [
+            [["aggregate","context"],["mem05-boot01/kernel/boot/bootstrap_control_core.c/micros_bootstrap_control_select_service/index-89","wrap","KERNEL_BOOT","INDEX_PROBE",1,"value","service_id",[],2,6]],
+            [["aggregate","context"],["mem05-boot01/kernel/boot/bootstrap_control_core.c/micros_bootstrap_control_select_service/index-152","wrap","KERNEL_BOOT","INDEX_PROBE",1,"value","binding_slot - 1",[],0,2]],
+            [["aggregate","context"],["mem05-boot01/kernel/boot/bootstrap_control_core.c/micros_bootstrap_control_select_service/index-187","wrap","KERNEL_BOOT","INDEX_PROBE",1,"value","binding -> manifest_index",[],0,2]],
+            [["aggregate","context"],["mem05-boot01/kernel/boot/bootstrap_control_core.c/micros_bootstrap_control_select_service/index-201","wrap","KERNEL_BOOT","INDEX_PROBE",1,"value","runtime_index",[],2,6]],
+            [["aggregate","context"],["mem05-boot01/kernel/boot/bootstrap_control_core.c/micros_bootstrap_control_select_service/index-318","wrap","KERNEL_BOOT","INDEX_PROBE",1,"value","binding -> process . slot",[],0,2]],
+            [["aggregate","context"],["mem05-boot01/kernel/boot/bootstrap_control_core.c/micros_bootstrap_control_select_service/index-334","wrap","KERNEL_BOOT","INDEX_PROBE",1,"value","binding -> thread . slot",[],0,1]],
+            [["aggregate","context"],["mem05-boot01/kernel/boot/bootstrap_control_core.c/micros_bootstrap_control_select_service/index-350","wrap","KERNEL_BOOT","INDEX_PROBE",1,"value","binding -> process . slot",[],1,2]]
+          ],
+          "process_handles_equal": [],
+          "require_running_header": [
+            [["aggregate","context"],["mem05-boot01/kernel/boot/bootstrap_control_core.c/require_running_header/index-86","wrap","KERNEL_BOOT","INDEX_PROBE",1,"value","0",[],1,6]],
+            [["aggregate","context"],["mem05-boot01/kernel/boot/bootstrap_control_core.c/require_running_header/index-97","wrap","KERNEL_BOOT","INDEX_PROBE",1,"value","0",[],3,6]]
+          ],
+          "selected_runtime_shape": []
         },
         "kernel/boot/bootstrap_control_internal.h": {
           "micros_bootstrap_control_find_binding_bounded": [
             [["aggregate","context"],["mem05-boot01/kernel/boot/bootstrap_control_internal.h/micros_bootstrap_control_find_binding_bounded/index-45","wrap","KERNEL_BOOT","INDEX_PROBE",1,"value","service_id",[],2,5]],
             [["aggregate","context"],["mem05-boot01/kernel/boot/bootstrap_control_internal.h/micros_bootstrap_control_find_binding_bounded/index-72","wrap","KERNEL_BOOT","INDEX_PROBE",1,"value","slot - 1",[],0,1]]
+          ]
+        },
+        "kernel/boot/bootstrap_transitions.c": {
+          "bootstrap_runtime_find_entry": [
+            [["aggregate","context"],["mem05-boot01/kernel/boot/bootstrap_transitions.c/bootstrap_runtime_find_entry/index-20","wrap","KERNEL_BOOT","INDEX_PROBE",1,"value","index",[],2,3]]
+          ],
+          "bootstrap_runtime_select_slot": [
+            [["aggregate","context"],["mem05-boot01/kernel/boot/bootstrap_transitions.c/bootstrap_runtime_select_slot/index-50","wrap","KERNEL_BOOT","INDEX_PROBE",1,"value","service_id",[],2,5]],
+            [["aggregate","context"],["mem05-boot01/kernel/boot/bootstrap_transitions.c/bootstrap_runtime_select_slot/index-76","wrap","KERNEL_BOOT","INDEX_PROBE",1,"value","slot - 1",[],0,2]]
           ]
         },
         "kernel/endpoint/endpoint.c": {
@@ -8393,6 +8501,10 @@
           "micros_thread_runtime_flags_unset": [],
           "micros_thread_scheduler_admit": [],
           "micros_thread_scheduler_admit_preflight": [],
+          "micros_thread_scheduler_commit_admit_prevalidated": [
+            [["aggregate","context"],["mem05-boot02-admit-thread","wrap","KERNEL_SCHEDULER","RECORD_VISIT",1,"value","thread_handle . slot",[],0,1]],
+            [["aggregate","context"],["mem05-boot02-admit-hart","wrap","KERNEL_SCHEDULER","RECORD_VISIT",1,"value","hart_handle . slot",[],0,1]]
+          ],
           "micros_thread_scheduler_hold": [],
           "micros_thread_scheduler_remove": []
         },
@@ -8583,15 +8695,13 @@
           "micros_tty_handoff_runtime_validate": [
             [["aggregate","context"],["mem05-current-f7c65e83201701118688","insert","KERNEL_TTY","COMPLETE_VALIDATOR_CALL",1,"entry","",[],0,0]]
           ],
+          "micros_tty_handoff_runtime_validate_bootstrap_binding": [],
           "tty_handoff_binding_identity_matches": [],
           "tty_handoff_classify_live_binding": [],
           "tty_handoff_endpoint_matches_process": [],
           "tty_handoff_identity_is_valid": [],
           "tty_handoff_live_binding_matches": [],
           "tty_handoff_process_handles_equal": [],
-          "tty_handoff_runtime_entry": [
-            [["aggregate","context"],["mem05-current-b0ae6108da4477871a92","insert","KERNEL_TTY","INDEX_PROBE",1,"entry","",[["for ( index = 0 ; index < runtime -> entry_count ; ++ index ) {",0]],0,0]]
-          ],
           "tty_handoff_selected_binding_is_valid": [],
           "tty_handoff_thread_handles_equal": []
         },
@@ -8636,6 +8746,7 @@
             [["aggregate","context"],["mem05-current-3593f123cfdfb50dbbae","insert","KERNEL_VM","INDEX_PROBE",1,"entry","",[["for ( table_index = 0 ; table_index < MICROS_VM_LOAD_PAGE_TABLE_FRAME_COUNT ; ++ table_index ) {",0],["for ( entry_index = 0 ; entry_index < table_index ; ++ entry_index ) {",0]],0,0]],
             [["aggregate","context"],["mem05-current-6966563bed86f0904bc8","insert","KERNEL_VM","INDEX_PROBE",1,"entry","",[["for ( table_index = 0 ; table_index < MICROS_VM_LOAD_PAGE_TABLE_FRAME_COUNT ; ++ table_index ) {",0],["for ( entry_index = 0 ; entry_index < record -> entry_count ; ++ entry_index ) {",0]],0,0]]
           ],
+          "micros_vm_handoff_identity_is_valid": [],
           "micros_vm_handoff_inspect_scratch_binding": [],
           "micros_vm_handoff_loading_record_can_append": [
             [["aggregate","context"],["mem05-current-4b819d50e5c556dd3887","insert","KERNEL_VM","INDEX_PROBE",1,"entry","",[["for ( index = 0 ; index < record -> entry_count ; ++ index ) {",0]],0,0]]
@@ -8696,24 +8807,27 @@
           "scratch_binding_load_is_valid": [],
           "scratch_binding_record_is_valid": [
             [["aggregate","context"],["mem05-current-27666162abd220c216cc","wrap","KERNEL_VM","INDEX_PROBE",1,"value","state -> load . process . slot",[],0,1]]
-          ],
-          "vm_handoff_identity_is_valid": []
+          ]
         },
         "kernel/vm/vm_handoff_runtime.c": {
           "micros_vm_handoff_runtime_authoritative_state": [],
           "micros_vm_handoff_runtime_inspect_scratch_binding": [],
+          "micros_vm_handoff_runtime_role_ready": [],
           "micros_vm_handoff_runtime_scratch_authority": [],
-          "micros_vm_handoff_runtime_state": []
+          "micros_vm_handoff_runtime_state": [],
+          "process_handles_equal": [],
+          "thread_handles_equal": []
         }
       },
       "subsets": {
-        "kernel/boot/bootstrap_control_core.c": ["micros_bootstrap_control_find_binding"],
+        "kernel/boot/bootstrap_control_core.c": ["binding_matches_manifest","binding_matches_objects","micros_bootstrap_control_find_binding","micros_bootstrap_control_select_service","process_handles_equal","require_running_header","selected_runtime_shape"],
+        "kernel/boot/bootstrap_transitions.c": ["bootstrap_runtime_find_entry","bootstrap_runtime_select_slot"],
         "kernel/execution/user_execution_validation.c": ["derive_user_status","micros_user_execution_map_object_error","micros_user_execution_resolve_thread_and_process","micros_user_execution_validate_context","status_is_valid_user_return","validate_user_mappings"],
         "kernel/ipc/ipc_runtime.c": ["micros_ipc_runtime_authoritative_registry","micros_ipc_runtime_registry"],
         "kernel/memory/address_space.c": ["micros_kernel_address_space_report"],
         "kernel/memory/bootstrap_memory.c": ["micros_bootstrap_frame_allocator","micros_frame_ownership_runtime_allocate","micros_frame_ownership_runtime_complete_handoff","micros_frame_ownership_runtime_initialize","micros_frame_ownership_runtime_ledger","micros_frame_ownership_runtime_prepare_wired_process_user_set","micros_frame_ownership_runtime_release","micros_frame_ownership_runtime_release_process","micros_frame_ownership_runtime_release_process_set","micros_frame_ownership_runtime_validate","micros_frame_ownership_runtime_validate_metadata","owner_is_process_bound","ownership_mutation_is_allowed","validate_active_process_owners","validate_process_owners"],
         "kernel/scheduler/scheduler_context.c": ["scheduler_runtime_validate_selected_thread"],
-        "kernel/vm/vm_handoff_runtime.c": ["micros_vm_handoff_runtime_authoritative_state","micros_vm_handoff_runtime_inspect_scratch_binding","micros_vm_handoff_runtime_scratch_authority","micros_vm_handoff_runtime_state"]
+        "kernel/vm/vm_handoff_runtime.c": ["micros_vm_handoff_runtime_authoritative_state","micros_vm_handoff_runtime_inspect_scratch_binding","micros_vm_handoff_runtime_role_ready","micros_vm_handoff_runtime_scratch_authority","micros_vm_handoff_runtime_state","process_handles_equal","thread_handles_equal"]
       }
     },
     "OBJ01": {
@@ -9085,6 +9199,10 @@
           "micros_thread_runtime_flags_unset": [],
           "micros_thread_scheduler_admit": [],
           "micros_thread_scheduler_admit_preflight": [],
+          "micros_thread_scheduler_commit_admit_prevalidated": [
+            [["aggregate"],["obj01-boot02-admit-thread","wrap","KERNEL_SCHEDULER","RECORD_VISIT",1,"value","thread_handle . slot",[],0,1]],
+            [["aggregate"],["obj01-boot02-admit-hart","wrap","KERNEL_SCHEDULER","RECORD_VISIT",1,"value","hart_handle . slot",[],0,1]]
+          ],
           "micros_thread_scheduler_hold": [],
           "micros_thread_scheduler_remove": []
         },
@@ -9615,6 +9733,10 @@
           "micros_thread_runtime_flags_unset": [],
           "micros_thread_scheduler_admit": [],
           "micros_thread_scheduler_admit_preflight": [],
+          "micros_thread_scheduler_commit_admit_prevalidated": [
+            [["work"],["obj02-boot02-admit-thread","wrap","KERNEL_SCHEDULER","RECORD_VISIT",1,"value","thread_handle . slot",[],0,1]],
+            [["work"],["obj02-boot02-admit-hart","wrap","KERNEL_SCHEDULER","RECORD_VISIT",1,"value","hart_handle . slot",[],0,1]]
+          ],
           "micros_thread_scheduler_hold": [],
           "micros_thread_scheduler_remove": []
         },
@@ -9908,14 +10030,18 @@
         },
         "control_release": {
           "accesses": [
-            ["entries [ binding -> manifest_index ]",[]]
+            ["ordered_service_ids [ state -> transitions . next_order_index ]",[]],
+            ["ordered_service_ids [ state -> transitions . next_order_index ]",[]]
           ],
           "aliases": [
-            ["entries",["["]],
+            ["transitions",["."]],
+            ["transitions",["."]],
+            ["transitions",["."]],
+            ["transitions",["."]],
             ["transitions",[","]],
             ["transitions",[","]]
           ],
-          "calls": ["bootstrap_runtime_commit_prevalidated","bootstrap_runtime_prepare_release","map_endpoint_error","micros_bootstrap_control_find_binding","micros_bootstrap_control_validate","micros_endpoint_commit_publish_prevalidated","micros_endpoint_preflight_publish","micros_thread_scheduler_admit","micros_thread_scheduler_admit_preflight"],
+          "calls": ["bootstrap_runtime_commit_prevalidated","bootstrap_runtime_prepare_release","map_endpoint_error","micros_bootstrap_control_preflight_command","micros_bootstrap_control_select_service","micros_endpoint_commit_publish_prevalidated","micros_endpoint_preflight_publish","micros_thread_scheduler_admit_preflight","micros_thread_scheduler_commit_admit_prevalidated"],
           "directives": [],
           "guards": [],
           "loops": [],
@@ -10024,24 +10150,36 @@
           "signature": "const struct micros_bootstrap_binding * micros_bootstrap_control_find_binding ( const struct micros_bootstrap_control_state * state , uint32_t service_id )",
           "storage": []
         },
-        "micros_bootstrap_control_prepare_complete": {
-          "accesses": [
-            ["bindings [ 0 ]",[]]
-          ],
-          "aliases": [
-            ["transitions",["."]],
-            ["transitions",[","]]
-          ],
-          "calls": ["bootstrap_runtime_prepare_complete","clear_bytes","copy_bytes","find_ready_pm_endpoint","launcher_has_grant_dependency","map_notification_error","micros_bootstrap_control_find_binding","micros_bootstrap_control_validate","micros_endpoint_preflight_source_only","micros_ipc_prepare_kernel_notification","micros_thread_ipc_state_is_clear","micros_thread_resolve","staged_launcher_acknowledgments_are_valid"],
+        "micros_bootstrap_control_preflight_command": {
+          "accesses": [],
+          "aliases": [],
+          "calls": ["micros_bootstrap_control_select_service","micros_privilege_profile_allows_kernel_operation","process_handles_equal","thread_handles_equal"],
           "directives": [],
           "guards": [],
           "loops": [],
+          "signature": "enum micros_bootstrap_error micros_bootstrap_control_preflight_command ( const struct micros_bootstrap_control_state * state , const struct micros_endpoint_registry * registry , const struct micros_kernel_objects * objects , struct micros_bootstrap_service_selection * controller )",
+          "storage": []
+        },
+        "micros_bootstrap_control_prepare_complete": {
+          "accesses": [
+            ["entries [ index ]",[["for ( size_t index = 0 ; index < state -> entry_count ; ++ index ) {",0]]],
+            ["bindings [ 0 ]",[]]
+          ],
+          "aliases": [
+            ["entries",["["]],
+            ["transitions",[","]]
+          ],
+          "calls": ["bootstrap_runtime_prepare_complete","clear_bytes","copy_bytes","find_ready_pm_endpoint","launcher_has_grant_dependency","map_notification_error","micros_bootstrap_control_preflight_command","micros_bootstrap_control_select_service","micros_endpoint_preflight_source_only","micros_ipc_prepare_kernel_notification","micros_thread_ipc_state_is_clear","micros_thread_resolve","staged_launcher_acknowledgments_are_valid"],
+          "directives": [],
+          "guards": [],
+          "loops": [
+            ["for ( size_t index = 0 ; index < state -> entry_count ; ++ index ) {",[]]
+          ],
           "signature": "enum micros_bootstrap_error micros_bootstrap_control_prepare_complete ( const struct micros_bootstrap_control_state * state , const struct micros_endpoint_registry * registry , const struct micros_kernel_objects * objects , const struct micros_grant_registry * grants , struct micros_bootstrap_complete_plan * plan )",
           "storage": []
         },
         "micros_bootstrap_control_prepare_ready": {
           "accesses": [
-            ["entries [ binding -> manifest_index ]",[]],
             ["bindings [ 0 ]",[]],
             ["payload [ 0 ]",[]],
             ["payload [ 4 ]",[]],
@@ -10050,10 +10188,9 @@
             ["payload [ 16 ]",[]]
           ],
           "aliases": [
-            ["entries",["["]],
             ["transitions",[","]]
           ],
-          "calls": ["bootstrap_runtime_prepare_ready","clear_bytes","copy_bytes","micros_bootstrap_control_find_binding","micros_bootstrap_control_validate","write_u32_le"],
+          "calls": ["bootstrap_runtime_prepare_ready","clear_bytes","copy_bytes","micros_bootstrap_control_preflight_command","micros_bootstrap_control_select_service","write_u32_le"],
           "directives": [],
           "guards": [],
           "loops": [],
@@ -10096,6 +10233,33 @@
           "signature": "enum micros_bootstrap_error micros_bootstrap_control_release_console ( struct micros_bootstrap_control_state * state , struct micros_endpoint_registry * registry , struct micros_kernel_objects * objects , struct micros_hart_handle hart , uint32_t service_id , uint64_t now , uint64_t retained_deadline , bool role_gate_ready )",
           "storage": []
         },
+        "micros_bootstrap_control_select_service": {
+          "accesses": [
+            ["binding_slots [ service_id ]",[]],
+            ["bindings [ binding_slot - 1 ]",[]],
+            ["entries [ binding -> manifest_index ]",[]],
+            ["entries [ runtime_index ]",[]],
+            ["processes [ binding -> process . slot ]",[]],
+            ["threads [ binding -> thread . slot ]",[]],
+            ["endpoints [ binding -> process . slot ]",[]]
+          ],
+          "aliases": [
+            ["transitions",[","]],
+            ["entries",["["]],
+            ["transitions",["."]],
+            ["entries",["["]],
+            ["transitions",[","]],
+            ["processes",["["]],
+            ["threads",["["]],
+            ["endpoints",["["]]
+          ],
+          "calls": ["binding_matches_manifest","binding_matches_objects","bootstrap_runtime_select_slot","require_running_header","selected_runtime_shape"],
+          "directives": [],
+          "guards": [],
+          "loops": [],
+          "signature": "enum micros_bootstrap_error micros_bootstrap_control_select_service ( const struct micros_bootstrap_control_state * state , const struct micros_endpoint_registry * registry , const struct micros_kernel_objects * objects , uint32_t service_id , struct micros_bootstrap_service_selection * selection )",
+          "storage": []
+        },
         "micros_bootstrap_control_state_prepare": {
           "accesses": [
             ["bindings [ 0 ]",[]],
@@ -10125,8 +10289,8 @@
             ["transitions",[")"]],
             ["transitions",["."]]
           ],
-          "calls": ["binding_index_is_valid","binding_matches_manifest","binding_matches_objects","bootstrap_runtime_validate_index","bytes_are_zero","micros_bootstrap_control_find_binding","micros_endpoint_registry_validate_objects","micros_kernel_objects_validate","process_handles_equal","staged_launcher_acknowledgments_are_valid","thread_handles_equal"],
-          "directives": [],
+          "calls": ["MICROS_TEST_WORK_HIT","binding_index_is_valid","binding_matches_manifest","binding_matches_objects","bootstrap_runtime_validate_index","bytes_are_zero","micros_bootstrap_control_find_binding","micros_endpoint_registry_validate_objects","micros_kernel_objects_validate","process_handles_equal","staged_launcher_acknowledgments_are_valid","thread_handles_equal"],
+          "directives": ["# ifdef MICROS_TEST_BOOTSTRAP_COMMAND_COUNTS","# endif"],
           "guards": [],
           "loops": [
             ["for ( index = 0 ; index < state -> entry_count ; ++ index ) {",[]]
@@ -10157,6 +10321,35 @@
           "guards": [],
           "loops": [],
           "signature": "static uint32_t read_u32_le ( const unsigned char * bytes )",
+          "storage": []
+        },
+        "require_running_header": {
+          "accesses": [
+            ["binding_slots [ 0 ]",[]],
+            ["service_slots [ 0 ]",[]]
+          ],
+          "aliases": [
+            ["transitions",["."]],
+            ["transitions",["."]],
+            ["transitions",["."]],
+            ["transitions",["."]],
+            ["transitions",["."]]
+          ],
+          "calls": [],
+          "directives": [],
+          "guards": [],
+          "loops": [],
+          "signature": "static enum micros_bootstrap_error require_running_header ( const struct micros_bootstrap_control_state * state )",
+          "storage": []
+        },
+        "selected_runtime_shape": {
+          "accesses": [],
+          "aliases": [],
+          "calls": [],
+          "directives": [],
+          "guards": [],
+          "loops": [],
+          "signature": "static bool selected_runtime_shape ( const struct micros_bootstrap_runtime * runtime , const struct micros_bootstrap_runtime_entry * entry )",
           "storage": []
         },
         "staged_launcher_acknowledgments_are_valid": {
@@ -10545,7 +10738,7 @@
           "aliases": [
             ["entries",["["]]
           ],
-          "calls": ["runtime_slot"],
+          "calls": ["bootstrap_runtime_select_slot"],
           "directives": [],
           "guards": [],
           "loops": [],
@@ -10563,7 +10756,7 @@
             ["entries",["["]],
             ["entries",["["]]
           ],
-          "calls": ["bootstrap_manifest_copy_bytes","initialize_transition_plan","runtime_slot"],
+          "calls": ["bootstrap_manifest_copy_bytes","bootstrap_runtime_select_slot","initialize_transition_plan"],
           "directives": [],
           "guards": [],
           "loops": [
@@ -10579,7 +10772,7 @@
           "aliases": [
             ["entries",["["]]
           ],
-          "calls": ["bootstrap_manifest_copy_bytes","initialize_transition_plan","runtime_slot"],
+          "calls": ["bootstrap_manifest_copy_bytes","bootstrap_runtime_select_slot","initialize_transition_plan"],
           "directives": [],
           "guards": [],
           "loops": [],
@@ -10596,13 +10789,28 @@
             ["entries",["["]],
             ["entries",["["]]
           ],
-          "calls": ["bootstrap_manifest_copy_bytes","initialize_transition_plan","lowest_prerequisite_id","runtime_slot"],
+          "calls": ["bootstrap_manifest_copy_bytes","bootstrap_runtime_select_slot","initialize_transition_plan","lowest_prerequisite_id"],
           "directives": [],
           "guards": [],
           "loops": [
             ["while ( prerequisites != 0 ) {",[]]
           ],
           "signature": "enum micros_bootstrap_error bootstrap_runtime_prepare_release ( const struct micros_bootstrap_runtime * runtime , uint32_t service_id , uint64_t now , uint64_t retained_deadline , bool retain_deadline , struct bootstrap_transition_plan * plan )",
+          "storage": []
+        },
+        "bootstrap_runtime_select_slot": {
+          "accesses": [
+            ["service_slots [ service_id ]",[]],
+            ["entries [ slot - 1 ]",[]]
+          ],
+          "aliases": [
+            ["entries",["["]]
+          ],
+          "calls": [],
+          "directives": [],
+          "guards": [],
+          "loops": [],
+          "signature": "enum micros_bootstrap_error bootstrap_runtime_select_slot ( const struct micros_bootstrap_runtime * runtime , uint32_t service_id , uint16_t * index )",
           "storage": []
         },
         "bootstrap_runtime_validate_index": {
@@ -10617,8 +10825,8 @@
             ["entries",["["]],
             ["entries",["["]]
           ],
-          "calls": [],
-          "directives": [],
+          "calls": ["MICROS_TEST_WORK_HIT"],
+          "directives": ["# ifdef MICROS_TEST_BOOTSTRAP_COMMAND_COUNTS","# endif"],
           "guards": [],
           "loops": [
             ["for ( index = 0 ; index < runtime -> entry_count ; ++ index ) {",[]],
@@ -10735,21 +10943,6 @@
           "guards": [],
           "loops": [],
           "signature": "static enum micros_bootstrap_error runtime_release ( struct micros_bootstrap_runtime * runtime , uint32_t service_id , uint64_t now , uint64_t retained_deadline , bool retain_deadline )",
-          "storage": []
-        },
-        "runtime_slot": {
-          "accesses": [
-            ["service_slots [ service_id ]",[]],
-            ["entries [ slot - 1 ]",[]]
-          ],
-          "aliases": [
-            ["entries",["["]]
-          ],
-          "calls": [],
-          "directives": [],
-          "guards": [],
-          "loops": [],
-          "signature": "static enum micros_bootstrap_error runtime_slot ( const struct micros_bootstrap_runtime * runtime , uint32_t service_id , uint16_t * index )",
           "storage": []
         }
       },
@@ -11584,8 +11777,8 @@
             ["queued_threads [ index ]",[["for ( index = 0 ; index < MICROS_THREAD_CAPACITY ; ++ index ) {",0]]]
           ],
           "aliases": [],
-          "calls": ["MICROS_TEST_WORK_HIT","micros_endpoint_registry_validate","micros_kernel_objects_validate","process_relationships_are_canonical","thread_relationships_are_canonical"],
-          "directives": ["# ifdef MICROS_BUILD_IPC_SYSCALL_TEST","# endif"],
+          "calls": ["MICROS_TEST_WORK_HIT","defined","micros_endpoint_registry_validate","micros_kernel_objects_validate","process_relationships_are_canonical","thread_relationships_are_canonical"],
+          "directives": ["# if defined ( MICROS_BUILD_IPC_SYSCALL_TEST ) || defined ( MICROS_TEST_BOOTSTRAP_COMMAND_COUNTS )","# endif"],
           "guards": [],
           "loops": [
             ["for ( index = 0 ; index < MICROS_THREAD_CAPACITY ; ++ index ) {",[]]
@@ -11962,8 +12155,8 @@
             ["profiles [ 0 ]",[]]
           ],
           "aliases": [],
-          "calls": ["MICROS_TEST_WORK_HIT","endpoint_profile_is_zero","endpoint_records_are_canonical","endpoint_require_initialized","profile_table_is_canonical"],
-          "directives": ["# ifdef MICROS_BUILD_IPC_SYSCALL_TEST","# endif"],
+          "calls": ["MICROS_TEST_WORK_HIT","defined","endpoint_profile_is_zero","endpoint_records_are_canonical","endpoint_require_initialized","profile_table_is_canonical"],
+          "directives": ["# if defined ( MICROS_BUILD_IPC_SYSCALL_TEST ) || defined ( MICROS_TEST_BOOTSTRAP_COMMAND_COUNTS )","# endif"],
           "guards": [],
           "loops": [],
           "signature": "enum micros_endpoint_error micros_endpoint_registry_validate ( const struct micros_endpoint_registry * registry )",
@@ -12054,8 +12247,8 @@
         "micros_user_execution_validate_context": {
           "accesses": [],
           "aliases": [],
-          "calls": ["micros_user_execution_resolve_thread_and_process","riscv_irq_restore","riscv_irq_save","status_is_valid_user_return","validate_user_mappings"],
-          "directives": [],
+          "calls": ["MICROS_TEST_WORK_HIT","micros_user_execution_resolve_thread_and_process","riscv_irq_restore","riscv_irq_save","status_is_valid_user_return","validate_user_mappings"],
+          "directives": ["# ifdef MICROS_TEST_BOOTSTRAP_COMMAND_COUNTS","# endif"],
           "guards": [],
           "loops": [],
           "signature": "enum micros_user_execution_error micros_user_execution_validate_context ( struct micros_thread_handle thread_handle , const struct micros_user_context * context )",
@@ -12378,8 +12571,8 @@
             ["grants [ index ]",[["for ( index = 0 ; index < MICROS_GRANT_CAPACITY ; ++ index ) {",0]]]
           ],
           "aliases": [],
-          "calls": ["micros_endpoint_registry_validate_objects","micros_endpoint_resolve_internal","resolve_live_process_endpoint","validate_registry_indexes","validate_registry_storage"],
-          "directives": [],
+          "calls": ["MICROS_TEST_WORK_HIT","micros_endpoint_registry_validate_objects","micros_endpoint_resolve_internal","resolve_live_process_endpoint","validate_registry_indexes","validate_registry_storage"],
+          "directives": ["# ifdef MICROS_TEST_BOOTSTRAP_COMMAND_COUNTS","# endif"],
           "guards": [],
           "loops": [
             ["for ( index = 0 ; index < MICROS_GRANT_CAPACITY ; ++ index ) {",[]]
@@ -12937,8 +13130,8 @@
         "micros_grant_runtime_validate": {
           "accesses": [],
           "aliases": [],
-          "calls": ["micros_grant_registry_validate","micros_ipc_runtime_registry","micros_kernel_object_runtime_registry","riscv_irq_restore","riscv_irq_save"],
-          "directives": [],
+          "calls": ["MICROS_TEST_WORK_HIT","micros_grant_registry_validate","micros_ipc_runtime_registry","micros_kernel_object_runtime_registry","riscv_irq_restore","riscv_irq_save"],
+          "directives": ["# ifdef MICROS_TEST_BOOTSTRAP_COMMAND_COUNTS","# endif"],
           "guards": [],
           "loops": [],
           "signature": "enum micros_grant_error micros_grant_runtime_validate ( void )",
@@ -14247,8 +14440,8 @@
         "micros_ipc_runtime_validate": {
           "accesses": [],
           "aliases": [],
-          "calls": ["MICROS_TEST_WORK_HIT","micros_endpoint_registry_validate_objects","micros_kernel_object_runtime_registry","riscv_irq_restore","riscv_irq_save"],
-          "directives": ["# ifdef MICROS_BUILD_IPC_SYSCALL_TEST","# endif"],
+          "calls": ["MICROS_TEST_WORK_HIT","defined","micros_endpoint_registry_validate_objects","micros_kernel_object_runtime_registry","riscv_irq_restore","riscv_irq_save"],
+          "directives": ["# if defined ( MICROS_BUILD_IPC_SYSCALL_TEST ) || defined ( MICROS_TEST_BOOTSTRAP_COMMAND_COUNTS )","# endif"],
           "guards": [],
           "loops": [],
           "signature": "enum micros_endpoint_error micros_ipc_runtime_validate ( void )",
@@ -15131,8 +15324,8 @@
         "micros_frame_ownership_runtime_validate_metadata": {
           "accesses": [],
           "aliases": [],
-          "calls": ["micros_frame_ownership_validate_metadata","micros_kernel_object_runtime_registry","riscv_irq_is_enabled"],
-          "directives": [],
+          "calls": ["MICROS_TEST_WORK_HIT","micros_frame_ownership_validate_metadata","micros_kernel_object_runtime_registry","riscv_irq_is_enabled"],
+          "directives": ["# ifdef MICROS_TEST_BOOTSTRAP_COMMAND_COUNTS","# endif"],
           "guards": [],
           "loops": [],
           "signature": "enum micros_frame_ownership_error micros_frame_ownership_runtime_validate_metadata ( const struct micros_kernel_objects * objects )",
@@ -16321,8 +16514,8 @@
             ["owner_counts",["["]],
             ["owner_counts",["["]]
           ],
-          "calls": ["allocated_prefix_is_valid","inactive_state_is_zero","index_storage_is_valid","micros_frame_ownership_clear_bytes","micros_frame_ownership_geometry_matches","micros_frame_ownership_require_initialized","validate_active_frames"],
-          "directives": [],
+          "calls": ["MICROS_TEST_WORK_HIT","allocated_prefix_is_valid","inactive_state_is_zero","index_storage_is_valid","micros_frame_ownership_clear_bytes","micros_frame_ownership_geometry_matches","micros_frame_ownership_require_initialized","validate_active_frames"],
+          "directives": ["# ifdef MICROS_TEST_BOOTSTRAP_COMMAND_COUNTS","# endif"],
           "guards": [],
           "loops": [
             ["for ( kind_index = 0 ; kind_index < MICROS_FRAME_OWNER_KIND_COUNT ; ++ kind_index ) {",[]]
@@ -18233,6 +18426,52 @@
       },
       "storage": []
     },
+    "kernel/memory/user_address_space_tty.c": {
+      "complete": 0,
+      "functions": {
+        "active_root": {
+          "accesses": [],
+          "aliases": [],
+          "calls": ["micros_user_address_space_active_root"],
+          "directives": [],
+          "guards": [],
+          "loops": [],
+          "signature": "static uint64_t active_root ( void )",
+          "storage": []
+        },
+        "micros_user_address_space_inspect_bootstrap_tty_uart": {
+          "accesses": [],
+          "aliases": [],
+          "calls": ["MICROS_TEST_WORK_HIT","active_root","micros_frame_ownership_lookup","micros_tty_device_leaf_required","micros_user_address_space_classify_tty_device_leaf","micros_user_address_space_load_selected_bindings","micros_user_address_space_require_idle","micros_user_address_space_runtime_lock","micros_user_address_space_runtime_unlock","micros_user_address_space_select_path","require_read_authority","resolve_process_with_root"],
+          "directives": ["# ifdef MICROS_TEST_BOOTSTRAP_COMMAND_COUNTS","# endif"],
+          "guards": [],
+          "loops": [],
+          "signature": "enum micros_user_address_space_error micros_user_address_space_inspect_bootstrap_tty_uart ( struct micros_process_handle process , uint64_t expected_root_physical_address , bool mapped )",
+          "storage": []
+        },
+        "require_read_authority": {
+          "accesses": [],
+          "aliases": [],
+          "calls": ["micros_user_address_space_leaf_owner_kind","micros_user_address_space_runtime_require_read"],
+          "directives": [],
+          "guards": [],
+          "loops": [],
+          "signature": "static enum micros_user_address_space_error require_read_authority ( struct micros_user_address_space_runtime_view * view , const struct micros_frame_ownership * * ledger , const struct micros_kernel_objects * * objects , const struct micros_kernel_address_space_report * * kernel_report )",
+          "storage": []
+        },
+        "resolve_process_with_root": {
+          "accesses": [],
+          "aliases": [],
+          "calls": ["micros_user_address_space_runtime_resolve_process"],
+          "directives": [],
+          "guards": [],
+          "loops": [],
+          "signature": "static enum micros_user_address_space_error resolve_process_with_root ( struct micros_user_address_space_runtime_view * view , struct micros_process_handle process , const struct micros_process * * resolved )",
+          "storage": []
+        }
+      },
+      "storage": []
+    },
     "kernel/memory/user_address_space_validation.c": {
       "complete": 1,
       "functions": {
@@ -18485,8 +18724,8 @@
         "micros_user_address_space_validate": {
           "accesses": [],
           "aliases": [],
-          "calls": ["acquire_scratch","micros_user_address_space_runtime_lock","micros_user_address_space_runtime_unlock","micros_user_address_space_validate_locked","release_scratch","require_read_authority","resolve_process_with_root"],
-          "directives": [],
+          "calls": ["MICROS_TEST_WORK_HIT","acquire_scratch","micros_user_address_space_runtime_lock","micros_user_address_space_runtime_unlock","micros_user_address_space_validate_locked","release_scratch","require_read_authority","resolve_process_with_root"],
+          "directives": ["# ifdef MICROS_TEST_BOOTSTRAP_COMMAND_COUNTS","# endif"],
           "guards": [],
           "loops": [],
           "signature": "enum micros_user_address_space_error micros_user_address_space_validate ( struct micros_process_handle process )",
@@ -18511,8 +18750,8 @@
         "micros_user_address_space_validate_locked": {
           "accesses": [],
           "aliases": [],
-          "calls": ["load_validation_context","validate_owned_frame_set","validate_required_exceptional_leaves","validate_shared_kernel_entries","validate_user_tree"],
-          "directives": [],
+          "calls": ["MICROS_TEST_WORK_HIT","load_validation_context","validate_owned_frame_set","validate_required_exceptional_leaves","validate_shared_kernel_entries","validate_user_tree"],
+          "directives": ["# ifdef MICROS_TEST_BOOTSTRAP_COMMAND_COUNTS","# endif"],
           "guards": [],
           "loops": [],
           "signature": "enum micros_user_address_space_error micros_user_address_space_validate_locked ( struct micros_user_address_space_runtime_view * runtime , const struct micros_user_address_space_scratch_lease * lease , struct micros_process_handle process , const struct micros_process * * resolved_process )",
@@ -19852,8 +20091,8 @@
           "aliases": [
             ["owners",[">="]]
           ],
-          "calls": ["MICROS_TEST_WORK_HIT","kernel_object_require_initialized","kernel_object_validation_hart_slots_match","kernel_object_validation_process_counts_match","kernel_object_validation_process_slots_match","kernel_object_validation_stack_exceptions_avoid","kernel_object_validation_stack_regulars_avoid","kernel_object_validation_thread_slots_match"],
-          "directives": ["# ifdef MICROS_BUILD_IPC_SYSCALL_TEST","# endif"],
+          "calls": ["MICROS_TEST_WORK_HIT","defined","kernel_object_require_initialized","kernel_object_validation_hart_slots_match","kernel_object_validation_process_counts_match","kernel_object_validation_process_slots_match","kernel_object_validation_stack_exceptions_avoid","kernel_object_validation_stack_regulars_avoid","kernel_object_validation_thread_slots_match"],
+          "directives": ["# if defined ( MICROS_BUILD_IPC_SYSCALL_TEST ) || defined ( MICROS_TEST_BOOTSTRAP_COMMAND_COUNTS )","# endif"],
           "guards": [],
           "loops": [
             ["for ( index = 0 ; index < MICROS_PROCESS_CAPACITY ; ++ index ) {",[]],
@@ -19887,8 +20126,8 @@
         "micros_kernel_objects_validate": {
           "accesses": [],
           "aliases": [],
-          "calls": ["MICROS_TEST_WORK_HIT","micros_scheduler_core_validate"],
-          "directives": ["# ifdef MICROS_BUILD_IPC_SYSCALL_TEST","# endif"],
+          "calls": ["MICROS_TEST_WORK_HIT","defined","micros_scheduler_core_validate"],
+          "directives": ["# if defined ( MICROS_BUILD_IPC_SYSCALL_TEST ) || defined ( MICROS_TEST_BOOTSTRAP_COMMAND_COUNTS )","# endif"],
           "guards": [],
           "loops": [],
           "signature": "enum micros_kernel_object_error micros_kernel_objects_validate ( const struct micros_kernel_objects * objects )",
@@ -21158,7 +21397,7 @@
         "micros_thread_scheduler_admit": {
           "accesses": [],
           "aliases": [],
-          "calls": ["micros_thread_scheduler_admit_preflight","scheduler_core_queue_enqueue_tail_prevalidated","scheduler_core_resolve_hart_mutable","scheduler_core_resolve_thread_mutable"],
+          "calls": ["micros_thread_scheduler_admit_preflight","micros_thread_scheduler_commit_admit_prevalidated"],
           "directives": [],
           "guards": [],
           "loops": [],
@@ -21173,6 +21412,22 @@
           "guards": [],
           "loops": [],
           "signature": "enum micros_kernel_object_error micros_thread_scheduler_admit_preflight ( const struct micros_kernel_objects * objects , struct micros_hart_handle hart_handle , struct micros_thread_handle thread_handle , uint8_t priority , uint64_t quantum_counter_ticks )",
+          "storage": []
+        },
+        "micros_thread_scheduler_commit_admit_prevalidated": {
+          "accesses": [
+            ["threads [ thread_handle . slot ]",[]],
+            ["harts [ hart_handle . slot ]",[]]
+          ],
+          "aliases": [
+            ["threads",["["]],
+            ["harts",["["]]
+          ],
+          "calls": ["scheduler_core_queue_enqueue_tail_prevalidated"],
+          "directives": [],
+          "guards": [],
+          "loops": [],
+          "signature": "void micros_thread_scheduler_commit_admit_prevalidated ( struct micros_kernel_objects * objects , struct micros_hart_handle hart_handle , struct micros_thread_handle thread_handle , uint8_t priority , uint64_t quantum_counter_ticks , bool preemptible )",
           "storage": []
         },
         "micros_thread_scheduler_hold": {
@@ -21672,8 +21927,8 @@
             ["current_seen [ MICROS_THREAD_CAPACITY ]",[]]
           ],
           "aliases": [],
-          "calls": ["MICROS_TEST_WORK_HIT","initialize_validation_witnesses","micros_kernel_objects_validate_base","validate_harts","validate_threads"],
-          "directives": ["# ifdef MICROS_BUILD_IPC_SYSCALL_TEST","# endif"],
+          "calls": ["MICROS_TEST_WORK_HIT","defined","initialize_validation_witnesses","micros_kernel_objects_validate_base","validate_harts","validate_threads"],
+          "directives": ["# if defined ( MICROS_BUILD_IPC_SYSCALL_TEST ) || defined ( MICROS_TEST_BOOTSTRAP_COMMAND_COUNTS )","# endif"],
           "guards": [],
           "loops": [],
           "signature": "enum micros_kernel_object_error micros_scheduler_core_validate ( const struct micros_kernel_objects * objects )",
@@ -22218,7 +22473,7 @@
         "micros_tty_handoff_runtime_role_ready": {
           "accesses": [],
           "aliases": [],
-          "calls": ["micros_tty_handoff_runtime_validate","tty_handoff_context"],
+          "calls": ["micros_tty_handoff_runtime_validate_bootstrap_binding","tty_handoff_context"],
           "directives": [],
           "guards": [],
           "loops": [],
@@ -22227,14 +22482,25 @@
         },
         "micros_tty_handoff_runtime_validate": {
           "accesses": [],
-          "aliases": [
-            ["transitions",[","]]
-          ],
-          "calls": ["micros_bootstrap_control_find_binding","micros_privilege_profile_allows_kernel_operation","tty_handoff_binding_identity_matches","tty_handoff_context","tty_handoff_identity_is_valid","tty_handoff_live_binding_matches","tty_handoff_runtime_entry"],
-          "directives": [],
+          "aliases": [],
+          "calls": ["MICROS_TEST_WORK_HIT","micros_endpoint_registry_validate_objects","micros_tty_handoff_runtime_validate_bootstrap_binding"],
+          "directives": ["# ifdef MICROS_TEST_BOOTSTRAP_COMMAND_COUNTS","# endif"],
           "guards": [],
           "loops": [],
           "signature": "enum micros_tty_handoff_error micros_tty_handoff_runtime_validate ( const struct micros_bootstrap_control_state * bootstrap , const struct micros_endpoint_registry * registry , const struct micros_kernel_objects * objects )",
+          "storage": []
+        },
+        "micros_tty_handoff_runtime_validate_bootstrap_binding": {
+          "accesses": [],
+          "aliases": [
+            ["transitions",["."]],
+            ["transitions",[","]]
+          ],
+          "calls": ["bootstrap_runtime_find_entry","micros_bootstrap_control_find_binding","micros_privilege_profile_allows_kernel_operation","tty_handoff_binding_identity_matches","tty_handoff_context","tty_handoff_identity_is_valid","tty_handoff_live_binding_matches"],
+          "directives": [],
+          "guards": [],
+          "loops": [],
+          "signature": "enum micros_tty_handoff_error micros_tty_handoff_runtime_validate_bootstrap_binding ( const struct micros_bootstrap_control_state * bootstrap , const struct micros_endpoint_registry * registry , const struct micros_kernel_objects * objects )",
           "storage": []
         },
         "tty_handoff_binding_identity_matches": {
@@ -22284,7 +22550,7 @@
         "tty_handoff_live_binding_matches": {
           "accesses": [],
           "aliases": [],
-          "calls": ["micros_endpoint_registry_validate_objects","micros_endpoint_resolve_internal","micros_process_resolve","micros_thread_resolve","tty_handoff_classify_live_binding","tty_handoff_process_handles_equal"],
+          "calls": ["micros_endpoint_resolve_internal","micros_process_resolve","micros_thread_resolve","tty_handoff_classify_live_binding","tty_handoff_process_handles_equal"],
           "directives": [],
           "guards": [],
           "loops": [],
@@ -22299,24 +22565,6 @@
           "guards": [],
           "loops": [],
           "signature": "static bool tty_handoff_process_handles_equal ( struct micros_process_handle left , struct micros_process_handle right )",
-          "storage": []
-        },
-        "tty_handoff_runtime_entry": {
-          "accesses": [
-            ["entries [ index ]",[["for ( index = 0 ; index < runtime -> entry_count ; ++ index ) {",0]]],
-            ["entries [ index ]",[["for ( index = 0 ; index < runtime -> entry_count ; ++ index ) {",0],["if ( runtime -> entries [ index ] . service_id == service_id ) {",0]]]
-          ],
-          "aliases": [
-            ["entries",["["]],
-            ["entries",["["]]
-          ],
-          "calls": [],
-          "directives": [],
-          "guards": [],
-          "loops": [
-            ["for ( index = 0 ; index < runtime -> entry_count ; ++ index ) {",[]]
-          ],
-          "signature": "static const struct micros_bootstrap_runtime_entry * tty_handoff_runtime_entry ( const struct micros_bootstrap_runtime * runtime , uint32_t service_id )",
           "storage": []
         },
         "tty_handoff_selected_binding_is_valid": {
@@ -22561,10 +22809,20 @@
           "signature": "bool micros_vm_handoff_frozen_record_is_valid ( const struct micros_vm_kernel_mapping_record * record )",
           "storage": []
         },
+        "micros_vm_handoff_identity_is_valid": {
+          "accesses": [],
+          "aliases": [],
+          "calls": ["micros_vm_handoff_endpoint_matches_process","micros_vm_handoff_summary_is_valid","micros_vm_handoff_thread_is_valid"],
+          "directives": [],
+          "guards": [],
+          "loops": [],
+          "signature": "bool micros_vm_handoff_identity_is_valid ( const struct micros_vm_handoff_state * state )",
+          "storage": []
+        },
         "micros_vm_handoff_inspect_scratch_binding": {
           "accesses": [],
           "aliases": [],
-          "calls": ["micros_vm_handoff_pointer_is_aligned","scratch_binding_load_is_valid","vm_handoff_identity_is_valid"],
+          "calls": ["micros_vm_handoff_identity_is_valid","micros_vm_handoff_pointer_is_aligned","scratch_binding_load_is_valid"],
           "directives": [],
           "guards": [],
           "loops": [],
@@ -22704,8 +22962,8 @@
         "micros_vm_handoff_state_validate": {
           "accesses": [],
           "aliases": [],
-          "calls": ["active_load_identity_is_valid","frozen_transaction_is_valid","loading_transaction_is_valid","mapping_slots_are_valid","micros_vm_handoff_bytes_are_zero","micros_vm_handoff_pointer_is_aligned","prepared_vm_handoff_state_is_valid","vm_handoff_identity_is_valid"],
-          "directives": [],
+          "calls": ["MICROS_TEST_WORK_HIT","active_load_identity_is_valid","frozen_transaction_is_valid","loading_transaction_is_valid","mapping_slots_are_valid","micros_vm_handoff_bytes_are_zero","micros_vm_handoff_identity_is_valid","micros_vm_handoff_pointer_is_aligned","prepared_vm_handoff_state_is_valid"],
+          "directives": ["# ifdef MICROS_TEST_BOOTSTRAP_COMMAND_COUNTS","# endif"],
           "guards": [],
           "loops": [],
           "signature": "enum micros_vm_handoff_error micros_vm_handoff_state_validate ( const struct micros_vm_handoff_state * state )",
@@ -22915,16 +23173,6 @@
           "loops": [],
           "signature": "static bool scratch_binding_record_is_valid ( const struct micros_vm_handoff_state * state )",
           "storage": []
-        },
-        "vm_handoff_identity_is_valid": {
-          "accesses": [],
-          "aliases": [],
-          "calls": ["micros_vm_handoff_endpoint_matches_process","micros_vm_handoff_summary_is_valid","micros_vm_handoff_thread_is_valid"],
-          "directives": [],
-          "guards": [],
-          "loops": [],
-          "signature": "static bool vm_handoff_identity_is_valid ( const struct micros_vm_handoff_state * state )",
-          "storage": []
         }
       },
       "storage": []
@@ -22952,6 +23200,16 @@
           "signature": "enum micros_vm_scratch_authority_status micros_vm_handoff_runtime_inspect_scratch_binding ( struct micros_user_address_space_vm_scratch_authority * binding )",
           "storage": []
         },
+        "micros_vm_handoff_runtime_role_ready": {
+          "accesses": [],
+          "aliases": [],
+          "calls": ["micros_bootstrap_control_select_service","micros_frame_ownership_lookup","micros_frame_ownership_runtime_ledger","micros_privilege_profile_allows_kernel_operation","micros_vm_handoff_identity_is_valid","process_handles_equal","thread_handles_equal"],
+          "directives": [],
+          "guards": [],
+          "loops": [],
+          "signature": "bool micros_vm_handoff_runtime_role_ready ( const struct micros_bootstrap_control_state * bootstrap , const struct micros_endpoint_registry * registry , const struct micros_kernel_objects * objects , uint32_t service_id , struct micros_process_handle process , micros_endpoint_t endpoint )",
+          "storage": []
+        },
         "micros_vm_handoff_runtime_scratch_authority": {
           "accesses": [],
           "aliases": [],
@@ -22970,6 +23228,26 @@
           "guards": [],
           "loops": [],
           "signature": "const struct micros_vm_handoff_state * micros_vm_handoff_runtime_state ( void )",
+          "storage": []
+        },
+        "process_handles_equal": {
+          "accesses": [],
+          "aliases": [],
+          "calls": [],
+          "directives": [],
+          "guards": [],
+          "loops": [],
+          "signature": "static bool process_handles_equal ( struct micros_process_handle left , struct micros_process_handle right )",
+          "storage": []
+        },
+        "thread_handles_equal": {
+          "accesses": [],
+          "aliases": [],
+          "calls": [],
+          "directives": [],
+          "guards": [],
+          "loops": [],
+          "signature": "static bool thread_handles_equal ( struct micros_thread_handle left , struct micros_thread_handle right )",
           "storage": []
         }
       },

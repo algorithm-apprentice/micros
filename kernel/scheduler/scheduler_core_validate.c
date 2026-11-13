@@ -335,7 +335,7 @@ enum micros_kernel_object_error micros_scheduler_core_validate(
     bool current_seen[MICROS_THREAD_CAPACITY];
     enum micros_kernel_object_error error;
 
-#ifdef MICROS_BUILD_IPC_SYSCALL_TEST
+#if defined(MICROS_BUILD_IPC_SYSCALL_TEST) || defined(MICROS_TEST_BOOTSTRAP_COMMAND_COUNTS)
     MICROS_TEST_WORK_HIT("ipc01-target-scheduler", MICROS_WORK_OWNER_KERNEL_SCHEDULER,
                          MICROS_WORK_KIND_COMPLETE_VALIDATOR_CALL, 1);
 #endif

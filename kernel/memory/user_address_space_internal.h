@@ -333,6 +333,13 @@ micros_user_address_space_prepare_tty_uart_mapping(
     struct micros_user_address_space_tty_uart_plan *plan
 );
 
+enum micros_user_address_space_error
+micros_user_address_space_inspect_bootstrap_tty_uart(
+    struct micros_process_handle process,
+    uint64_t expected_root_physical_address,
+    bool mapped
+);
+
 void micros_user_address_space_commit_tty_uart_mapping(
     struct micros_user_address_space_tty_uart_plan *plan
 );

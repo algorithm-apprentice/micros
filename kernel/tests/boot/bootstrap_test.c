@@ -1,5 +1,6 @@
 #include "kernel/tests/boot/bootstrap_test.h"
 #include "micros/stack_observation.h"
+#include "tests/qemu/bootstrap_command_work.h"
 #include <stdbool.h>
 #include <stddef.h>
 #include <stdint.h>
@@ -414,7 +415,10 @@ _Noreturn void micros_bootstrap_test_handle_trap(
         "manifest=immutable order=topological profiles=exact "
         "endpoints=staged readiness=acknowledged authority=revoked\n"
     );
-    uart_flush(); MICROS_TEST_STACK_REPORT();
+    uart_flush();
+    MICROS_TEST_STACK_REPORT(); if (!MICROS_BOOT02_REPORT()) {
+        test_failure(hart, frame, "bootstrap-command-work");
+    }
     (void)sbi_system_reset(
         SBI_RESET_TYPE_SHUTDOWN,
         SBI_RESET_REASON_NONE

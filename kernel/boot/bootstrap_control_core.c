@@ -1,4 +1,5 @@
 #include "kernel/boot/bootstrap_control_internal.h"
+#include "micros/work_observation.h"
 
 #include <stddef.h>
 #include <stdint.h>
@@ -235,6 +236,161 @@ static bool binding_matches_objects(
     return endpoint->state == MICROS_ENDPOINT_STATE_ACTIVE;
 }
 
+static enum micros_bootstrap_error require_running_header(
+    const struct micros_bootstrap_control_state *state
+)
+{
+    if (state->phase != MICROS_BOOTSTRAP_PHASE_RUNNING) {
+        return state->phase == MICROS_BOOTSTRAP_PHASE_PREPARING
+                || state->phase == MICROS_BOOTSTRAP_PHASE_SEALED
+            ? MICROS_BOOTSTRAP_ERROR_STATE : MICROS_BOOTSTRAP_ERROR_INVARIANT;
+    }
+    if (
+        state->entry_count == 0
+        || state->entry_count > MICROS_BOOTSTRAP_SERVICE_CAPACITY
+        || state->entry_count != state->manifest.header.entry_count
+        || state->entry_count != state->plan.entry_count
+        || state->entry_count != state->transitions.entry_count
+        || state->transitions.phase != state->phase
+        || state->binding_slots[0] != 0
+        || state->transitions.service_slots[0] != 0
+        || state->plan.controller_service_id == 0
+        || state->plan.controller_service_id > MICROS_BOOTSTRAP_SERVICE_ID_LIMIT
+        || state->transitions.controller_service_id != state->plan.controller_service_id
+        || state->transitions.starting_service_id > MICROS_BOOTSTRAP_SERVICE_ID_LIMIT
+    ) {
+        return MICROS_BOOTSTRAP_ERROR_INVARIANT;
+    }
+    return MICROS_BOOTSTRAP_OK;
+}
+
+static bool selected_runtime_shape(
+    const struct micros_bootstrap_runtime *runtime,
+    const struct micros_bootstrap_runtime_entry *entry
+)
+{
+    switch (entry->state) {
+    case MICROS_BOOTSTRAP_SERVICE_PREPARED:
+        return entry->endpoint_state == MICROS_BOOTSTRAP_ENDPOINT_RESERVED
+            && !entry->profile_installed && !entry->scheduler_assigned
+            && entry->ready_deadline == 0 && runtime->starting_service_id != entry->service_id;
+    case MICROS_BOOTSTRAP_SERVICE_STARTING:
+        return entry->endpoint_state == MICROS_BOOTSTRAP_ENDPOINT_ACTIVE
+            && entry->profile_installed && entry->scheduler_assigned
+            && entry->ready_deadline != 0 && runtime->starting_service_id == entry->service_id;
+    case MICROS_BOOTSTRAP_SERVICE_READY:
+        return entry->endpoint_state == MICROS_BOOTSTRAP_ENDPOINT_ACTIVE
+            && entry->profile_installed && entry->scheduler_assigned
+            && entry->ready_deadline == 0 && runtime->starting_service_id != entry->service_id;
+    }
+    return false;
+}
+
+enum micros_bootstrap_error micros_bootstrap_control_select_service(
+    const struct micros_bootstrap_control_state *state,
+    const struct micros_endpoint_registry *registry,
+    const struct micros_kernel_objects *objects,
+    uint32_t service_id,
+    struct micros_bootstrap_service_selection *selection
+)
+{
+    const struct micros_bootstrap_binding *binding;
+    const struct micros_bootstrap_manifest_entry *manifest;
+    const struct micros_bootstrap_runtime_entry *runtime;
+    enum micros_bootstrap_error error;
+    uint16_t runtime_index;
+    uint8_t binding_slot;
+
+    if (state == NULL || registry == NULL || objects == NULL || selection == NULL) {
+        return MICROS_BOOTSTRAP_ERROR_ARGUMENT;
+    }
+    error = require_running_header(state);
+    if (error != MICROS_BOOTSTRAP_OK) {
+        return error;
+    }
+    if (service_id == 0 || service_id > MICROS_BOOTSTRAP_SERVICE_ID_LIMIT) {
+        return MICROS_BOOTSTRAP_ERROR_ARGUMENT;
+    }
+    binding_slot = state->binding_slots[service_id];
+    error = bootstrap_runtime_select_slot(&state->transitions, service_id, &runtime_index);
+    if (binding_slot == 0 || error != MICROS_BOOTSTRAP_OK) {
+        return binding_slot == 0 && error == MICROS_BOOTSTRAP_ERROR_ARGUMENT
+            ? MICROS_BOOTSTRAP_ERROR_ARGUMENT : MICROS_BOOTSTRAP_ERROR_INVARIANT;
+    }
+    if (binding_slot > state->entry_count) {
+        return MICROS_BOOTSTRAP_ERROR_INVARIANT;
+    }
+    binding = &state->bindings[binding_slot - 1];
+    if (binding->service_id != service_id || !binding_matches_manifest(state, binding)) {
+        return MICROS_BOOTSTRAP_ERROR_INVARIANT;
+    }
+    manifest = &state->manifest.entries[binding->manifest_index];
+    runtime = &state->transitions.entries[runtime_index];
+    if (
+        runtime_index != binding->manifest_index
+        || (manifest->role_flags & ~MICROS_BOOTSTRAP_ROLE_DEFINED_MASK) != 0
+        || (manifest->role_flags != 0
+            && (manifest->role_flags & (manifest->role_flags - 1)) != 0)
+        || runtime->prerequisites != manifest->prerequisites
+        || runtime->ready_timeout_counter_ticks != manifest->ready_timeout_counter_ticks
+        || !selected_runtime_shape(&state->transitions, runtime)
+        || !binding_matches_objects(state, binding, registry, objects)
+    ) {
+        return MICROS_BOOTSTRAP_ERROR_INVARIANT;
+    }
+    selection->binding = binding;
+    selection->manifest = manifest;
+    selection->runtime = runtime;
+    selection->process = &objects->processes[binding->process.slot];
+    selection->thread = &objects->threads[binding->thread.slot];
+    selection->endpoint = &registry->endpoints[binding->process.slot];
+    selection->binding_index = (uint16_t)(binding_slot - 1);
+    selection->runtime_index = runtime_index;
+    return MICROS_BOOTSTRAP_OK;
+}
+
+enum micros_bootstrap_error micros_bootstrap_control_preflight_command(
+    const struct micros_bootstrap_control_state *state,
+    const struct micros_endpoint_registry *registry,
+    const struct micros_kernel_objects *objects,
+    struct micros_bootstrap_service_selection *controller
+)
+{
+    struct micros_bootstrap_service_selection selected;
+    enum micros_bootstrap_error error;
+
+    if (state == NULL || registry == NULL || objects == NULL || controller == NULL) {
+        return MICROS_BOOTSTRAP_ERROR_ARGUMENT;
+    }
+    error = micros_bootstrap_control_select_service(
+        state, registry, objects, state->plan.controller_service_id, &selected
+    );
+    if (error != MICROS_BOOTSTRAP_OK) {
+        return error == MICROS_BOOTSTRAP_ERROR_STATE ? error : MICROS_BOOTSTRAP_ERROR_INVARIANT;
+    }
+    if (
+        selected.manifest->role_flags != MICROS_BOOTSTRAP_ROLE_CONTROLLER
+        || selected.runtime->state != MICROS_BOOTSTRAP_SERVICE_READY
+        || !process_handles_equal(state->controller_process, selected.binding->process)
+        || !thread_handles_equal(state->controller_thread, selected.binding->thread)
+        || state->controller_endpoint != selected.binding->endpoint
+        || micros_privilege_profile_allows_kernel_operation(
+            registry, selected.manifest->profile_id, 0
+        ) != MICROS_ENDPOINT_OK
+    ) {
+        return MICROS_BOOTSTRAP_ERROR_INVARIANT;
+    }
+    controller->binding = selected.binding;
+    controller->manifest = selected.manifest;
+    controller->runtime = selected.runtime;
+    controller->process = selected.process;
+    controller->thread = selected.thread;
+    controller->endpoint = selected.endpoint;
+    controller->binding_index = selected.binding_index;
+    controller->runtime_index = selected.runtime_index;
+    return MICROS_BOOTSTRAP_OK;
+}
+
 enum micros_bootstrap_error micros_bootstrap_control_state_prepare(
     struct micros_bootstrap_control_state *state,
     const struct micros_bootstrap_manifest *manifest,
@@ -301,6 +457,10 @@ enum micros_bootstrap_error micros_bootstrap_control_validate(
     const struct micros_kernel_objects *objects
 )
 {
+#ifdef MICROS_TEST_BOOTSTRAP_COMMAND_COUNTS
+    MICROS_TEST_WORK_HIT("boot02-control", MICROS_WORK_OWNER_KERNEL_BOOT,
+                         MICROS_WORK_KIND_COMPLETE_VALIDATOR_CALL, 1);
+#endif
     size_t index;
 
     if (state == NULL || registry == NULL || objects == NULL) {
@@ -528,6 +688,8 @@ static enum micros_bootstrap_error control_release(
 )
 {
     struct bootstrap_transition_plan transition;
+    struct micros_bootstrap_service_selection controller;
+    struct micros_bootstrap_service_selection selected;
     const struct micros_bootstrap_binding *binding;
     const struct micros_bootstrap_manifest_entry *entry;
     enum micros_bootstrap_error error;
@@ -537,20 +699,23 @@ static enum micros_bootstrap_error control_release(
     if (state == NULL || registry == NULL || objects == NULL) {
         return MICROS_BOOTSTRAP_ERROR_ARGUMENT;
     }
+    error = micros_bootstrap_control_preflight_command(state, registry, objects, &controller);
+    if (error != MICROS_BOOTSTRAP_OK) {
+        return error;
+    }
+    error = micros_bootstrap_control_select_service(state, registry, objects, service_id, &selected);
+    if (error != MICROS_BOOTSTRAP_OK) {
+        return error;
+    }
+    binding = selected.binding;
+    entry = selected.manifest;
     if (
-        micros_bootstrap_control_validate(state, registry, objects)
-            != MICROS_BOOTSTRAP_OK
+        state->transitions.next_order_index < state->entry_count
+        && state->transitions.ordered_service_ids[state->transitions.next_order_index]
+            != state->plan.ordered_service_ids[state->transitions.next_order_index]
     ) {
         return MICROS_BOOTSTRAP_ERROR_INVARIANT;
     }
-    binding = micros_bootstrap_control_find_binding(state, service_id);
-    if (state->phase != MICROS_BOOTSTRAP_PHASE_RUNNING) {
-        return MICROS_BOOTSTRAP_ERROR_STATE;
-    }
-    if (binding == NULL) {
-        return MICROS_BOOTSTRAP_ERROR_ARGUMENT;
-    }
-    entry = &state->manifest.entries[binding->manifest_index];
     if (
         (entry->role_flags & MICROS_BOOTSTRAP_ROLE_CONSOLE_OWNER)
             != 0
@@ -604,7 +769,7 @@ static enum micros_bootstrap_error control_release(
         entry->profile_id
     );
     bootstrap_runtime_commit_prevalidated(&state->transitions, &transition);
-    scheduler_error = micros_thread_scheduler_admit(
+    micros_thread_scheduler_commit_admit_prevalidated(
         objects,
         hart,
         binding->thread,
@@ -612,13 +777,6 @@ static enum micros_bootstrap_error control_release(
         binding->scheduler_quantum_counter_ticks,
         binding->scheduler_preemptible
     );
-    if (
-        scheduler_error != MICROS_KERNEL_OBJECT_OK
-        || micros_bootstrap_control_validate(state, registry, objects)
-            != MICROS_BOOTSTRAP_OK
-    ) {
-        return MICROS_BOOTSTRAP_ERROR_INVARIANT;
-    }
     return MICROS_BOOTSTRAP_OK;
 }
 
@@ -700,6 +858,8 @@ enum micros_bootstrap_error micros_bootstrap_control_prepare_ready(
 )
 {
     struct micros_bootstrap_ready_plan candidate;
+    struct micros_bootstrap_service_selection controller;
+    struct micros_bootstrap_service_selection selected;
     const struct micros_bootstrap_binding *binding;
     const struct micros_bootstrap_manifest_entry *entry;
     enum micros_bootstrap_error error;
@@ -713,20 +873,16 @@ enum micros_bootstrap_error micros_bootstrap_control_prepare_ready(
         return MICROS_BOOTSTRAP_ERROR_ARGUMENT;
     }
     clear_bytes(&candidate, sizeof(candidate));
-    if (
-        micros_bootstrap_control_validate(state, registry, objects)
-            != MICROS_BOOTSTRAP_OK
-    ) {
-        return MICROS_BOOTSTRAP_ERROR_INVARIANT;
+    error = micros_bootstrap_control_preflight_command(state, registry, objects, &controller);
+    if (error != MICROS_BOOTSTRAP_OK) {
+        return error;
     }
-    if (state->phase != MICROS_BOOTSTRAP_PHASE_RUNNING) {
-        return MICROS_BOOTSTRAP_ERROR_STATE;
+    error = micros_bootstrap_control_select_service(state, registry, objects, service_id, &selected);
+    if (error != MICROS_BOOTSTRAP_OK) {
+        return error;
     }
-    binding = micros_bootstrap_control_find_binding(state, service_id);
-    if (binding == NULL) {
-        return MICROS_BOOTSTRAP_ERROR_ARGUMENT;
-    }
-    entry = &state->manifest.entries[binding->manifest_index];
+    binding = selected.binding;
+    entry = selected.manifest;
     error = bootstrap_runtime_prepare_ready(
         &state->transitions,
         service_id,
@@ -973,6 +1129,7 @@ micros_bootstrap_control_prepare_complete(
 )
 {
     struct micros_bootstrap_complete_plan candidate;
+    struct micros_bootstrap_service_selection selected;
     const struct micros_bootstrap_binding *controller;
     const struct micros_thread *controller_thread;
     micros_endpoint_t pm_endpoint;
@@ -987,19 +1144,19 @@ micros_bootstrap_control_prepare_complete(
         return MICROS_BOOTSTRAP_ERROR_ARGUMENT;
     }
     clear_bytes(&candidate, sizeof(candidate));
-    if (
-        micros_bootstrap_control_validate(state, registry, objects)
-            != MICROS_BOOTSTRAP_OK
-    ) {
-        return MICROS_BOOTSTRAP_ERROR_INVARIANT;
+    error = micros_bootstrap_control_preflight_command(state, registry, objects, &selected);
+    if (error != MICROS_BOOTSTRAP_OK) {
+        return error;
     }
-    if (state->phase != MICROS_BOOTSTRAP_PHASE_RUNNING) {
-        return MICROS_BOOTSTRAP_ERROR_STATE;
+    controller = selected.binding;
+    for (size_t index = 0; index < state->entry_count; ++index) {
+        error = micros_bootstrap_control_select_service(
+            state, registry, objects, state->manifest.entries[index].service_id, &selected
+        );
+        if (error != MICROS_BOOTSTRAP_OK || selected.runtime_index != index) {
+            return MICROS_BOOTSTRAP_ERROR_INVARIANT;
+        }
     }
-    controller = micros_bootstrap_control_find_binding(
-        state,
-        state->transitions.controller_service_id
-    );
     if (
         controller == NULL
         || micros_thread_resolve(

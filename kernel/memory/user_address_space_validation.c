@@ -1,4 +1,5 @@
 #include "kernel/memory/user_address_space_internal.h"
+#include "micros/work_observation.h"
 
 #include "kernel/tty/tty_handoff_runtime.h"
 #include "kernel/vm/vm_handoff_runtime.h"
@@ -821,6 +822,10 @@ micros_user_address_space_validate_locked(
     const struct micros_process **resolved_process
 )
 {
+#ifdef MICROS_TEST_BOOTSTRAP_COMMAND_COUNTS
+    MICROS_TEST_WORK_HIT("boot02-root-locked", MICROS_WORK_OWNER_KERNEL_MEMORY,
+                         MICROS_WORK_KIND_COMPLETE_VALIDATOR_CALL, 1);
+#endif
     struct user_address_space_validation_context context;
     enum micros_user_address_space_error error;
 
@@ -1097,6 +1102,10 @@ micros_user_address_space_validate(
     struct micros_process_handle process
 )
 {
+#ifdef MICROS_TEST_BOOTSTRAP_COMMAND_COUNTS
+    MICROS_TEST_WORK_HIT("boot02-root", MICROS_WORK_OWNER_KERNEL_MEMORY,
+                         MICROS_WORK_KIND_COMPLETE_VALIDATOR_CALL, 1);
+#endif
     const struct micros_frame_ownership *ledger;
     const struct micros_kernel_objects *objects;
     const struct micros_kernel_address_space_report *kernel_report;

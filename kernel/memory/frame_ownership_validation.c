@@ -1,4 +1,5 @@
 #include "kernel/memory/frame_ownership_internal.h"
+#include "micros/work_observation.h"
 
 #include <stdbool.h>
 #include <stddef.h>
@@ -333,6 +334,10 @@ enum micros_frame_ownership_error micros_frame_ownership_validate(
     const struct micros_frame_ownership *ownership
 )
 {
+#ifdef MICROS_TEST_BOOTSTRAP_COMMAND_COUNTS
+    MICROS_TEST_WORK_HIT("boot02-owner-complete", MICROS_WORK_OWNER_KERNEL_MEMORY,
+                         MICROS_WORK_KIND_COMPLETE_VALIDATOR_CALL, 1);
+#endif
     uint64_t observed_counts[MICROS_FRAME_OWNER_KIND_COUNT];
     uint64_t observed_owned_count = 0;
     uint64_t observed_allocated_count = 0;

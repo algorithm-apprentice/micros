@@ -9,6 +9,10 @@
 
 #define MICROS_VM_HANDOFF_MAGIC UINT64_C(0x4d4943524f535648)
 
+bool micros_vm_handoff_identity_is_valid(
+    const struct micros_vm_handoff_state *state
+);
+
 bool micros_vm_handoff_bytes_are_zero(
     const void *storage,
     size_t size

@@ -245,9 +245,9 @@ variants and timeout arguments are executable contracts in
 [CMake](../CMakeLists.txt) and the [runner owners](architecture/qemu-runner-source-organization.md).
 Missing, duplicate, malformed or partial evidence is not success.
 
-The seven [current-evidence scopes](architecture/current-contract-validation.md#required-target-evidence-has-an-ordinary-owner)
+The [current-evidence scopes](architecture/current-contract-validation.md#required-target-evidence-has-an-ordinary-owner)
 belong to their existing MMU, address-space, handoff, scheduler, user-runtime,
-IPC-syscall and seeded-panic workflows. They inspect the same owned guest result and
+IPC-syscall, bootstrap-launcher, TTY and seeded-panic workflows. They inspect the same owned guest result and
 actual artifacts rather than launching a duplicate guest. Terminal and trace
 controllers retain every twelve/eighteen-case execution, private debugger
 authority, complete captures, current input identity and atomic publication.

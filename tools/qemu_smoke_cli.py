@@ -67,6 +67,18 @@ def _validate_current_evidence(scope, result, kernel):
         from tests.host.selected_ipc_validation_evidence import parse_target_output, target_failures
 
         failures = target_failures(parse_target_output(reported, result.return_code))
+    elif scope in ("bootstrap-command", "tty-bootstrap-command"):
+        from tests.host.bootstrap_command_evidence import parse_target_output, target_failures
+        from tests.host.bootstrap_command_source import validate_target_observations
+        from tools.stack_bound_manifest import owned_artifact
+
+        root = Path(__file__).resolve().parents[1]
+        configuration = "riscv64-bootstrap-launcher-test" if scope == "bootstrap-command" else "riscv64-tty-service-test"
+        expected = owned_artifact(root, "build/" + configuration + "/kernel/micros.elf")
+        if Path(kernel).absolute() != expected:
+            raise ValueError("BOOT02 evidence borrowed another configured kernel")
+        validate_target_observations(root)
+        failures = target_failures(parse_target_output(reported, result.return_code, scope), scope)
     elif scope in ("user-address-space", "address-space-handoff"):
         from tests.host.selected_release_handoff_evidence import parse_target_output, target_failures
         from tests.host.work_count_types import Stage

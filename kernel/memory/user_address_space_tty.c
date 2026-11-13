@@ -1,4 +1,5 @@
 #include "kernel/memory/user_address_space_internal.h"
+#include "micros/work_observation.h"
 
 #include "arch/riscv64/mmu.h"
 #include "kernel/tty/tty_handoff_core.h"
@@ -165,12 +166,117 @@ prepare_tty_uart_leaf(
 }
 
 enum micros_user_address_space_error
+micros_user_address_space_inspect_bootstrap_tty_uart(
+    struct micros_process_handle process,
+    uint64_t expected_root_physical_address,
+    bool mapped
+)
+{
+#ifdef MICROS_TEST_BOOTSTRAP_COMMAND_COUNTS
+    MICROS_TEST_WORK_HIT("boot02-uart-point", MICROS_WORK_OWNER_KERNEL_MEMORY,
+                         MICROS_WORK_KIND_RANGE_VISIT, 1);
+#endif
+    const struct micros_frame_ownership *ledger;
+    const struct micros_kernel_objects *objects;
+    const struct micros_kernel_address_space_report *kernel_report;
+    const struct micros_process *resolved;
+    struct micros_user_address_space_runtime_view runtime;
+    struct micros_user_address_space_bindings bindings;
+    struct micros_user_address_space_path path;
+    struct micros_frame_owner owner;
+    enum micros_user_address_space_error error;
+    enum micros_frame_ownership_error owner_error;
+    bool is_device = false;
+    uintptr_t saved_status;
+
+    if (expected_root_physical_address == 0
+        || expected_root_physical_address % MICROS_SV39_PAGE_SIZE != 0) {
+        return MICROS_USER_ADDRESS_SPACE_ERROR_ARGUMENT;
+    }
+    saved_status = micros_user_address_space_runtime_lock();
+    error = require_read_authority(&runtime, &ledger, &objects, &kernel_report);
+    if (error != MICROS_USER_ADDRESS_SPACE_OK) {
+        goto done;
+    }
+    if (runtime.ownership_phase != MICROS_FRAME_OWNERSHIP_PHASE_HANDED_OFF) {
+        error = MICROS_USER_ADDRESS_SPACE_ERROR_PHASE;
+        goto done;
+    }
+    error = resolve_process_with_root(&runtime, process, &resolved);
+    if (error != MICROS_USER_ADDRESS_SPACE_OK) {
+        goto done;
+    }
+    if (resolved->address_space_root != expected_root_physical_address) {
+        error = MICROS_USER_ADDRESS_SPACE_ERROR_STATE;
+        goto done;
+    }
+    error = micros_user_address_space_require_idle(&runtime);
+    if (error != MICROS_USER_ADDRESS_SPACE_OK) {
+        goto done;
+    }
+    error = micros_user_address_space_load_selected_bindings(&runtime, &bindings);
+    if (error != MICROS_USER_ADDRESS_SPACE_OK) {
+        goto done;
+    }
+    error = micros_user_address_space_select_path(
+        &runtime, process, MICROS_TTY_UART_VIRTUAL_BASE, &bindings, &path
+    );
+    if (error != MICROS_USER_ADDRESS_SPACE_OK) {
+        goto done;
+    }
+    if (path.table_count != MICROS_SV39_LEVEL_COUNT) {
+        error = MICROS_USER_ADDRESS_SPACE_ERROR_NOT_MAPPED;
+        goto done;
+    }
+    if (!mapped && active_root() == resolved->address_space_root) {
+        error = MICROS_USER_ADDRESS_SPACE_ERROR_STATE;
+        goto done;
+    }
+    owner_error = micros_frame_ownership_lookup(ledger, MICROS_TTY_UART_PHYSICAL_BASE, &owner);
+    if (owner_error != MICROS_FRAME_OWNERSHIP_ERROR_UNMANAGED) {
+        error = owner_error == MICROS_FRAME_OWNERSHIP_OK
+            ? MICROS_USER_ADDRESS_SPACE_ERROR_OWNERSHIP : MICROS_USER_ADDRESS_SPACE_ERROR_INVARIANT;
+        goto done;
+    }
+    if (!mapped) {
+        error = path.leaf.kind == MICROS_SV39_PTE_ABSENT
+            ? MICROS_USER_ADDRESS_SPACE_OK : MICROS_USER_ADDRESS_SPACE_ERROR_CONFLICT;
+        goto done;
+    }
+    if (path.leaf.kind == MICROS_SV39_PTE_ABSENT) {
+        error = MICROS_USER_ADDRESS_SPACE_ERROR_NOT_MAPPED;
+        goto done;
+    }
+    if (!bindings.tty_active || !micros_tty_device_leaf_required(
+        &bindings.tty, process, resolved->address_space_root
+    )) {
+        error = MICROS_USER_ADDRESS_SPACE_ERROR_STATE;
+        goto done;
+    }
+    error = micros_user_address_space_classify_tty_device_leaf(
+        true, &bindings.tty, process, resolved->address_space_root,
+        MICROS_TTY_UART_VIRTUAL_BASE, &path.leaf, &is_device
+    );
+    if (error == MICROS_USER_ADDRESS_SPACE_OK && !is_device) {
+        error = MICROS_USER_ADDRESS_SPACE_ERROR_OWNERSHIP;
+    }
+
+done:
+    micros_user_address_space_runtime_unlock(saved_status);
+    return error;
+}
+
+enum micros_user_address_space_error
 micros_user_address_space_prepare_tty_uart_mapping(
     struct micros_process_handle process,
     uint64_t expected_root_physical_address,
     struct micros_user_address_space_tty_uart_plan *plan
 )
 {
+#ifdef MICROS_TEST_BOOTSTRAP_COMMAND_COUNTS
+    MICROS_TEST_WORK_HIT("boot02-uart-prepare", MICROS_WORK_OWNER_KERNEL_MEMORY,
+                         MICROS_WORK_KIND_COMPLETE_VALIDATOR_CALL, 1);
+#endif
     const struct micros_frame_ownership *ledger;
     const struct micros_kernel_objects *objects;
     const struct micros_kernel_address_space_report *kernel_report;
@@ -292,6 +398,10 @@ micros_user_address_space_validate_tty_uart_mapping(
     uint64_t expected_root_physical_address
 )
 {
+#ifdef MICROS_TEST_BOOTSTRAP_COMMAND_COUNTS
+    MICROS_TEST_WORK_HIT("boot02-uart-full", MICROS_WORK_OWNER_KERNEL_MEMORY,
+                         MICROS_WORK_KIND_COMPLETE_VALIDATOR_CALL, 1);
+#endif
     const struct micros_frame_ownership *ledger;
     const struct micros_kernel_objects *objects;
     const struct micros_kernel_address_space_report *kernel_report;

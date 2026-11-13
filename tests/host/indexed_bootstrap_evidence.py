@@ -65,11 +65,11 @@ CASES = (
     ("runtime-complete-many", 0, 3, 0, 7, 192, 96, 0),
     ("runtime-release-unknown", 1, 0, 1, 0, 192, 96, 0),
     ("runtime-ready-expired", 10, 0, 1, 0, 192, 96, 0),
-    ("control-release", 0, 110, 0, -1, 192, 96, 2),
-    ("control-ready-plan", 0, 2, 1, -1, 320, 224, 1),
+    ("control-release", 0, 110, 0, -1, 192, 96, 0),
+    ("control-ready-plan", 0, 2, 1, -1, 320, 224, 0),
     ("control-ready-commit", 0, 2, 0, 0, 64, 160, 0),
-    ("control-ready-role", 8, 0, 1, -1, 192, 224, 1),
-    ("control-complete-plan", 0, 1, 1, -1, 384, 288, 1),
+    ("control-ready-role", 8, 0, 1, -1, 192, 224, 0),
+    ("control-complete-plan", 0, 1, 1, -1, 384, 288, 0),
     ("control-complete-commit", 0, 3, 0, -1, 64, 224, 0),
     ("deadline-before", 0, 0, 1, 0, 0, 0, 0),
     ("deadline-expired", 0, 1, 0, 0, 0, 0, 0),
@@ -96,7 +96,19 @@ CASES = (
     ("preparing-permutation", 0, 1, 0, -1, 4096, 2416, 0),
     ("permuted-control-seal", 0, 3, 0, -1, 64, 224, 0),
     ("runtime-unvisited-scope", 0, 110, 0, 1, 192, 96, 0),
+    ("control-unvisited-binding", 0, 110, 0, 1, 192, 96, 0),
+    ("control-unvisited-runtime", 0, 110, 0, 1, 192, 96, 0),
+    ("control-selected-tuple", 11, 0, 1, 0, 192, 96, 0),
+    ("control-selection-guards", 0, 1, 1, 0, 0, 0, 0),
+    ("control-complete-membership", 0, 1, 1, 15, 0, 1000, 0),
 )
+COMMAND_CASES = frozenset((
+    "control-release", "control-ready-plan", "control-ready-commit", "control-ready-role",
+    "control-complete-plan", "control-complete-commit", "permuted-control-seal",
+    "control-unvisited-binding", "control-unvisited-runtime", "control-selected-tuple",
+    "control-selection-guards",
+    "control-complete-membership",
+))
 
 
 def expected_cases():
@@ -162,6 +174,8 @@ def work_failures(records, work):
             raise ValueError("BOOT01 borrowed a work snapshot")
         totals = work_totals(snapshot)
         owned = totals.per_owner[Owner.KERNEL_BOOT]
+        if row["name"] in COMMAND_CASES and totals.per_kind[Kind.COMPLETE_VALIDATOR_CALL] != 0:
+            failures.append((row["name"], "complete-command-audit", totals.per_kind[Kind.COMPLETE_VALIDATOR_CALL], 0))
         for kind, bound in (
             (Kind.RECORD_VISIT, spec[4]), (Kind.COPIED_BYTE, spec[5]), (Kind.CLEARED_BYTE, spec[6]),
         ):

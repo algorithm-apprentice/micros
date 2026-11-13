@@ -12,6 +12,7 @@
 #include "kernel/memory/user_address_space_internal.h"
 #include "kernel/vm/vm_handoff_runtime.h"
 #include "micros/panic.h"
+#include "micros/frame_ownership_runtime.h"
 
 _Noreturn void bootstrap_syscall_panic_bootstrap_syscall(
     struct micros_hart *hart,
@@ -196,9 +197,10 @@ bool bootstrap_syscall_role_gate_ready(
                 registry,
                 objects
             )
-            && micros_user_address_space_validate_tty_uart_mapping(
+            && micros_user_address_space_inspect_bootstrap_tty_uart(
                 tty->process,
-                tty->root_physical_address
+                tty->root_physical_address,
+                true
             ) == MICROS_USER_ADDRESS_SPACE_OK
             && uart_console_handoff_is_active()
             && micros_plic_validate(MICROS_PLIC_ENABLED)
@@ -219,4 +221,18 @@ bool bootstrap_syscall_role_gate_ready(
         );
     }
     return true;
+}
+
+bool bootstrap_syscall_root_is_owned(
+    const struct micros_bootstrap_binding *binding
+)
+{
+    const struct micros_frame_ownership *ownership = micros_frame_ownership_runtime_ledger();
+    struct micros_frame_owner owner;
+
+    return binding != NULL && ownership != NULL
+        && micros_frame_ownership_lookup(ownership, binding->root, &owner) == MICROS_FRAME_OWNERSHIP_OK
+        && owner.kind == MICROS_FRAME_OWNER_PROCESS_PAGE_TABLE
+        && owner.slot == binding->process.slot
+        && owner.generation == binding->process.generation;
 }

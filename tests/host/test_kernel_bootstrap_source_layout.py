@@ -344,7 +344,8 @@ PERMITTED_OWNER_DEPENDENCIES = {
         DIAGNOSTICS, 'kernel/boot/bootstrap_manifest.c', 'kernel/boot/bootstrap_image.c', TRANSITIONS,
     ),
     SYSCALL_COMMON: (RUNTIME_STATE, RUNTIME_VALIDATION, DIAGNOSTICS),
-    **{path: (SYSCALL_COMMON, RUNTIME_STATE, RUNTIME_VALIDATION, DIAGNOSTICS)
+    **{path: (SYSCALL_COMMON, RUNTIME_STATE, RUNTIME_VALIDATION, DIAGNOSTICS,
+              *((TRANSITIONS,) if path == 'kernel/boot/bootstrap_syscall_release.c' else ()))
        for path in SYSCALL_COMMANDS},
     'kernel/boot/bootstrap_syscall.c': (
         SYSCALL_COMMON, *SYSCALL_COMMANDS, RUNTIME_STATE, RUNTIME_VALIDATION, DIAGNOSTICS,

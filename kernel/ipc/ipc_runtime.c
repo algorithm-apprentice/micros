@@ -108,7 +108,7 @@ micros_ipc_runtime_authoritative_registry(void)
 
 enum micros_endpoint_error micros_ipc_runtime_validate(void)
 {
-#ifdef MICROS_BUILD_IPC_SYSCALL_TEST
+#if defined(MICROS_BUILD_IPC_SYSCALL_TEST) || defined(MICROS_TEST_BOOTSTRAP_COMMAND_COUNTS)
     MICROS_TEST_WORK_HIT("ipc01-target-runtime", MICROS_WORK_OWNER_KERNEL_IPC,
                          MICROS_WORK_KIND_COMPLETE_VALIDATOR_CALL, 1);
 #endif

@@ -22,6 +22,20 @@ struct micros_bootstrap_binding {
     uint64_t scheduler_quantum_counter_ticks;
 };
 
+struct micros_bootstrap_service_selection {
+    const struct micros_bootstrap_binding *binding;
+    const struct micros_bootstrap_manifest_entry *manifest;
+    const struct micros_bootstrap_runtime_entry *runtime;
+    const struct micros_process *process;
+    const struct micros_thread *thread;
+    const struct micros_endpoint_record *endpoint;
+    uint16_t binding_index;
+    uint16_t runtime_index;
+};
+
+_Static_assert(sizeof(struct micros_bootstrap_service_selection) <= 64,
+               "Bootstrap selected service view exceeds its storage bound");
+
 struct micros_bootstrap_control_state {
     enum micros_bootstrap_phase phase;
     uint16_t entry_count;
@@ -92,6 +106,21 @@ enum micros_bootstrap_error micros_bootstrap_control_state_prepare(
     const struct micros_bootstrap_manifest_plan *plan,
     const struct micros_bootstrap_binding *bindings,
     size_t binding_count
+);
+
+enum micros_bootstrap_error micros_bootstrap_control_select_service(
+    const struct micros_bootstrap_control_state *state,
+    const struct micros_endpoint_registry *registry,
+    const struct micros_kernel_objects *objects,
+    uint32_t service_id,
+    struct micros_bootstrap_service_selection *selection
+);
+
+enum micros_bootstrap_error micros_bootstrap_control_preflight_command(
+    const struct micros_bootstrap_control_state *state,
+    const struct micros_endpoint_registry *registry,
+    const struct micros_kernel_objects *objects,
+    struct micros_bootstrap_service_selection *controller
 );
 
 enum micros_bootstrap_error

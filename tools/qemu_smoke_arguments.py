@@ -85,6 +85,7 @@ def _add_execution_arguments(
             "kernel-mapping", "user-address-space", "address-space-handoff", "scheduler-return",
             "runtime-memory", "diagnostic-history",
             "selected-ipc",
+            "bootstrap-command", "tty-bootstrap-command",
         ),
         help="Require the current semantic/work witnesses from this same guest execution",
     )
