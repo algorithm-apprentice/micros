@@ -47,7 +47,7 @@ enum micros_kernel_object_error micros_kernel_objects_validate(
     const struct micros_kernel_objects *objects
 )
 {
-#ifdef MICROS_BUILD_IPC_SYSCALL_TEST
+#if defined(MICROS_BUILD_IPC_SYSCALL_TEST) || defined(MICROS_TEST_BOOTSTRAP_COMMAND_COUNTS)
     MICROS_TEST_WORK_HIT("ipc01-target-objects", MICROS_WORK_OWNER_KERNEL_OBJECTS,
                          MICROS_WORK_KIND_COMPLETE_VALIDATOR_CALL, 1);
 #endif

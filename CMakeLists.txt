@@ -1741,6 +1741,8 @@ if(MICROS_BUILD_HOST_TESTS)
     )
     add_executable(
         tty_test
+        kernel/boot/bootstrap_manifest_common.c
+        kernel/boot/bootstrap_transitions.c
         kernel/platform/plic_core.c
         kernel/tty/tty_control_core.c
         kernel/tty/tty_control_syscall_core.c
@@ -3500,6 +3502,7 @@ if(MICROS_BUILD_HOST_TESTS)
         kernel/memory/user_address_space_validation.c
         kernel/memory/user_address_space_mutation.c
         kernel/memory/user_address_space_activation.c
+        kernel/memory/user_address_space_tty.c
         kernel/vm/vm_handoff_core.c
         kernel/vm/vm_handoff_boot.c
         kernel/vm/vm_handoff_runtime.c
@@ -3507,6 +3510,7 @@ if(MICROS_BUILD_HOST_TESTS)
         kernel/tty/tty_handoff_runtime_state.c
         kernel/tty/tty_handoff_runtime_validate.c
         kernel/boot/bootstrap_control_core.c
+        kernel/boot/bootstrap_transitions.c
     )
     file(GLOB_RECURSE MEM04_NATIVE_HEADERS
         "${CMAKE_CURRENT_SOURCE_DIR}/include/*.h"
@@ -3707,6 +3711,7 @@ if(MICROS_BUILD_HOST_TESTS)
         kernel/tty/tty_handoff_runtime_state.c
         kernel/tty/tty_handoff_runtime_validate.c
         kernel/boot/bootstrap_control_core.c
+        kernel/boot/bootstrap_transitions.c
         kernel/memory/user_address_space_handoff.c
         kernel/execution/user_execution_validation.c
     )
@@ -4262,6 +4267,7 @@ if(MICROS_BUILD_HOST_TESTS)
         kernel/tty/tty_handoff_runtime_state.c
         kernel/tty/tty_handoff_runtime_validate.c
         kernel/boot/bootstrap_control_core.c
+        kernel/boot/bootstrap_transitions.c
     )
     set(GRANT01_NATIVE_HEADERS
         ${OBJ01_NATIVE_HEADERS}
@@ -6257,6 +6263,39 @@ if(MICROS_BUILD_IPC_SYSCALL_TEST)
     )
 endif()
 
+if(MICROS_BUILD_BOOTSTRAP_LAUNCHER_TEST OR MICROS_BUILD_TTY_SERVICE_TEST)
+    target_sources(micros PRIVATE
+        tests/qemu/bootstrap_command_work.c tests/work/work_counts.c)
+    set_source_files_properties(
+        kernel/objects/kernel_objects.c
+        kernel/objects/kernel_object_validation.c
+        kernel/scheduler/scheduler_core_validate.c
+        kernel/endpoint/endpoint_registry.c
+        kernel/endpoint/endpoint_object_validation.c
+        kernel/ipc/ipc_runtime.c
+        kernel/boot/bootstrap_control_core.c
+        kernel/boot/bootstrap_transitions.c
+        kernel/boot/bootstrap_runtime_validation.c
+        kernel/memory/bootstrap_memory.c
+        kernel/memory/frame_ownership_validation.c
+        kernel/memory/user_address_space_validation.c
+        kernel/memory/user_address_space_tty.c
+        kernel/grant/grant.c
+        kernel/grant/grant_runtime.c
+        kernel/vm/vm_handoff_core.c
+        kernel/vm/vm_handoff_runtime.c
+        kernel/tty/tty_handoff_runtime_validate.c
+        kernel/execution/user_execution_validation.c
+        kernel/trap/syscall.c
+        kernel/tests/boot/bootstrap_test.c
+        kernel/tests/tty/tty_service_test.c
+        tests/qemu/bootstrap_command_work.c
+        tests/work/work_counts.c
+        PROPERTIES COMPILE_DEFINITIONS
+            "MICROS_TEST_WORK_COUNTS=1;MICROS_TEST_BOOTSTRAP_COMMAND_COUNTS=1"
+    )
+endif()
+
 if(MICROS_BUILD_IPC_SYSCALL_PANIC_TEST)
     add_custom_target(
         test-qemu-ipc-syscall-panic
@@ -6323,6 +6362,9 @@ if(MICROS_BUILD_BOOTSTRAP_LAUNCHER_TEST)
             --require-mmu-ready
             --require-frame-ownership-ready
             --require-objects-ready
+            --require-current-evidence
+            bootstrap-command
+            --report-transcript
             --timeout
             20
         DEPENDS micros
@@ -6466,6 +6508,9 @@ if(MICROS_BUILD_TTY_SERVICE_TEST)
             --require-frame-ownership-ready
             --require-objects-ready
             --require-diagnostic-forwarding
+            --require-current-evidence
+            tty-bootstrap-command
+            --report-transcript
             --timeout
             90
         DEPENDS micros

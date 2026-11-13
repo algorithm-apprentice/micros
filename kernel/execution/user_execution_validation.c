@@ -1,4 +1,5 @@
 #include "kernel/execution/user_execution_internal.h"
+#include "micros/work_observation.h"
 
 #include <stddef.h>
 #include <stdint.h>
@@ -482,6 +483,10 @@ micros_user_execution_validate_context(
     const struct micros_user_context *context
 )
 {
+#ifdef MICROS_TEST_BOOTSTRAP_COMMAND_COUNTS
+    MICROS_TEST_WORK_HIT("boot02-context", MICROS_WORK_OWNER_KERNEL_EXECUTION,
+                         MICROS_WORK_KIND_INDEX_PROBE, 1);
+#endif
     struct micros_kernel_objects *objects;
     const struct micros_thread *thread;
     const struct micros_process *process;

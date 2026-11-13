@@ -39,6 +39,10 @@ bool bootstrap_syscall_controller_is_authorized(
     const struct micros_syscall_context *context
 );
 
+bool bootstrap_syscall_root_is_owned(
+    const struct micros_bootstrap_binding *binding
+);
+
 bool bootstrap_syscall_role_gate_ready(
     const struct micros_bootstrap_control_state *state,
     const struct micros_endpoint_registry *registry,

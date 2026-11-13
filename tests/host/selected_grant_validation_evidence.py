@@ -31,8 +31,12 @@ NATIVE_SOURCES = OBJECT_SOURCES + tuple("kernel/endpoint/" + name + ".c" for nam
     "kernel/ipc/ipc_runtime.c", "kernel/tty/tty_handoff_core.c",
     "kernel/tty/tty_handoff_runtime_state.c", "kernel/tty/tty_handoff_runtime_validate.c",
     "kernel/boot/bootstrap_control_core.c",
+    "kernel/boot/bootstrap_transitions.c",
 )
-NATIVE_SUBSETS = {"kernel/boot/bootstrap_control_core.c": ("micros_bootstrap_control_find_binding",)}
+NATIVE_SUBSETS = {
+    "kernel/boot/bootstrap_control_core.c": ("micros_bootstrap_control_find_binding",),
+    "kernel/boot/bootstrap_transitions.c": ("bootstrap_runtime_select_slot", "bootstrap_runtime_find_entry"),
+}
 OBSERVED_HEADERS = ("kernel/boot/bootstrap_control_internal.h",)
 NATIVE_BACKENDS = {"arch/riscv64/interrupt.h": "tests/host/selected_grant_irq.h"}
 NATIVE_HEADERS = OBJECT_HEADERS + (

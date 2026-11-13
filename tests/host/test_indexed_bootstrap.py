@@ -41,7 +41,7 @@ class IndexedBootstrapTest(unittest.TestCase):
         self.assertEqual((), absent)
         self.assertEqual((), work_failures(observed, work))
 
-    def test_scans_full_snapshots_and_dropped_audits_fail(self):
+    def test_scans_full_snapshots_and_wrong_audit_boundaries_fail(self):
         records, work = parse_native_output(transcript(), "work")
         for name, kind, value in (
             ("binding-last", Kind.RECORD_VISIT, 1),
@@ -51,6 +51,7 @@ class IndexedBootstrapTest(unittest.TestCase):
             ("runtime-ready-many", Kind.CLEARED_BYTE, 384),
             ("control-release", Kind.COPIED_BYTE, 384),
             ("control-release", Kind.COMPLETE_VALIDATOR_CALL, 1),
+            ("control-index-diagnosis", Kind.COMPLETE_VALIDATOR_CALL, 7),
             ("control-ready-plan", Kind.COPIED_BYTE, 384),
             ("control-complete-plan", Kind.CLEARED_BYTE, 520),
         ):
@@ -85,8 +86,8 @@ class IndexedBootstrapTest(unittest.TestCase):
         subjects = audit_subjects(root)
         validate_audit_boundaries(root, subjects)
         for path, before in (
-            ("kernel/boot/bootstrap_control_core.c", "micros_bootstrap_control_validate(state, registry, objects)"),
-            ("kernel/boot/bootstrap_syscall.c", "micros_bootstrap_runtime_validate()"),
+            ("kernel/boot/bootstrap_runtime.c", "micros_bootstrap_control_validate("),
+            ("kernel/diagnostic/diagnostic_control.c", "micros_bootstrap_runtime_validate()"),
         ):
             changed = dict(subjects)
             self.assertIn(before, changed[path])

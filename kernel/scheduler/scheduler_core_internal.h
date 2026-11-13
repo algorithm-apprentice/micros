@@ -37,6 +37,15 @@ micros_thread_scheduler_admit_preflight(
     uint64_t quantum_counter_ticks
 );
 
+void micros_thread_scheduler_commit_admit_prevalidated(
+    struct micros_kernel_objects *objects,
+    struct micros_hart_handle hart,
+    struct micros_thread_handle thread,
+    uint8_t priority,
+    uint64_t quantum_counter_ticks,
+    bool preemptible
+);
+
 enum micros_kernel_object_error
 micros_scheduler_preflight_current_ipc(
     const struct micros_kernel_objects *objects,

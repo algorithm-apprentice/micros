@@ -11,67 +11,23 @@
 #include "kernel/vm/vm_handoff_runtime.h"
 #include "micros/frame_ownership_runtime.h"
 
-static const struct micros_bootstrap_runtime_entry *
-find_runtime_entry(
-    const struct micros_bootstrap_runtime *runtime,
-    uint32_t service_id
-)
-{
-    size_t index;
-
-    if (
-        runtime == NULL
-        || runtime->entry_count > MICROS_BOOTSTRAP_SERVICE_CAPACITY
-    ) {
-        return NULL;
-    }
-    for (index = 0; index < runtime->entry_count; ++index) {
-        if (runtime->entries[index].service_id == service_id) {
-            return &runtime->entries[index];
-        }
-    }
-    return NULL;
-}
-
-static bool service_is_ready(
+static enum micros_bootstrap_error service_ready_state(
     const struct micros_bootstrap_control_state *state,
+    const struct micros_endpoint_registry *registry,
+    const struct micros_kernel_objects *objects,
     uint32_t service_id
 )
 {
-    const struct micros_bootstrap_runtime_entry *entry =
-        find_runtime_entry(&state->transitions, service_id);
-
-    return (
-        service_id != 0
-        && entry != NULL
-        && entry->state == MICROS_BOOTSTRAP_SERVICE_READY
-        && entry->endpoint_state
-            == MICROS_BOOTSTRAP_ENDPOINT_ACTIVE
-        && entry->profile_installed
-        && entry->scheduler_assigned
-        && entry->ready_deadline == 0
+    struct micros_bootstrap_service_selection selected;
+    enum micros_bootstrap_error error = micros_bootstrap_control_select_service(
+        state, registry, objects, service_id, &selected
     );
-}
 
-static bool no_bootstrap_deadline_is_armed(
-    const struct micros_bootstrap_runtime *runtime
-)
-{
-    size_t index;
-
-    if (
-        runtime == NULL
-        || runtime->entry_count > MICROS_BOOTSTRAP_SERVICE_CAPACITY
-        || runtime->starting_service_id != 0
-    ) {
-        return false;
+    if (error != MICROS_BOOTSTRAP_OK || !bootstrap_syscall_root_is_owned(selected.binding)) {
+        return MICROS_BOOTSTRAP_ERROR_INVARIANT;
     }
-    for (index = 0; index < runtime->entry_count; ++index) {
-        if (runtime->entries[index].ready_deadline != 0) {
-            return false;
-        }
-    }
-    return true;
+    return selected.runtime->state == MICROS_BOOTSTRAP_SERVICE_READY
+        ? MICROS_BOOTSTRAP_OK : MICROS_BOOTSTRAP_ERROR_STATE;
 }
 
 static bool console_event_state_is_clear(
@@ -134,6 +90,8 @@ static enum micros_syscall_abi_result prepare_console_begin_identity(
     struct micros_trap_frame *frame,
     const struct micros_bootstrap_control_request *request,
     const struct micros_bootstrap_control_state *state,
+    const struct micros_endpoint_registry *registry,
+    const struct micros_kernel_objects *objects,
     const struct micros_tty_handoff_runtime_state **tty_result,
     const struct micros_bootstrap_manifest_entry **entry_result,
     const struct micros_bootstrap_binding **vm_binding_result,
@@ -150,6 +108,8 @@ static enum micros_syscall_abi_result prepare_console_begin_identity(
     const struct micros_bootstrap_binding *vm_binding;
     const struct micros_bootstrap_manifest_entry *tty_entry;
     const struct micros_bootstrap_runtime_entry *tty_transition;
+    enum micros_bootstrap_error vm_ready;
+    enum micros_bootstrap_error pm_ready;
 
     *now = riscv_read_time();
     if (
@@ -166,7 +126,7 @@ static enum micros_syscall_abi_result prepare_console_begin_identity(
         state,
         state->plan.vm_service_id
     );
-    tty_transition = find_runtime_entry(
+    tty_transition = bootstrap_runtime_find_entry(
         &state->transitions,
         request->service_id
     );
@@ -192,8 +152,20 @@ static enum micros_syscall_abi_result prepare_console_begin_identity(
         ownership->phase
             != MICROS_FRAME_OWNERSHIP_PHASE_HANDED_OFF
         || vm->phase != MICROS_VM_HANDOFF_PHASE_HANDED_OFF
-        || !service_is_ready(state, state->plan.vm_service_id)
-        || !service_is_ready(state, state->plan.pm_service_id)
+    ) {
+        return MICROS_SYSCALL_ABI_STATE;
+    }
+    vm_ready = service_ready_state(state, registry, objects, state->plan.vm_service_id);
+    pm_ready = service_ready_state(state, registry, objects, state->plan.pm_service_id);
+    if (vm_ready == MICROS_BOOTSTRAP_ERROR_INVARIANT || pm_ready == MICROS_BOOTSTRAP_ERROR_INVARIANT) {
+        bootstrap_syscall_fail_active_bootstrap(
+            hart, frame, MICROS_BOOTSTRAP_DIAGNOSTIC_RELEASE_TRANSITION,
+            request->service_id, MICROS_ENDPOINT_NONE
+        );
+    }
+    if (
+        vm_ready != MICROS_BOOTSTRAP_OK
+        || pm_ready != MICROS_BOOTSTRAP_OK
         || state->transitions.next_order_index
             >= state->transitions.entry_count
         || state->transitions.ordered_service_ids[
@@ -214,9 +186,7 @@ static enum micros_syscall_abi_result prepare_console_begin_identity(
         || tty->handoff.route_phase
             != MICROS_TTY_ROUTE_DISABLED
         || tty->handoff.deadline_armed
-        || !no_bootstrap_deadline_is_armed(
-            &state->transitions
-        )
+        || state->transitions.starting_service_id != 0
     ) {
         return MICROS_SYSCALL_ABI_STATE;
     }
@@ -235,20 +205,20 @@ static void validate_console_begin_runtime(
     const struct micros_endpoint_registry *registry
 )
 {
+    const struct micros_bootstrap_binding *vm = micros_bootstrap_control_find_binding(
+        state, state->plan.vm_service_id
+    );
+
     if (
-        micros_vm_handoff_runtime_validate(
-            state,
-            registry,
-            context->objects
-        ) != MICROS_VM_HANDOFF_OK
-        || micros_tty_handoff_runtime_validate(
+        vm == NULL
+        || !micros_vm_handoff_runtime_role_ready(
+            state, registry, context->objects, state->plan.vm_service_id, vm->process, vm->endpoint
+        )
+        || micros_tty_handoff_runtime_validate_bootstrap_binding(
             state,
             registry,
             context->objects
         ) != MICROS_TTY_HANDOFF_OK
-        || micros_frame_ownership_runtime_validate_metadata(
-            context->objects
-        ) != MICROS_FRAME_OWNERSHIP_OK
     ) {
         bootstrap_syscall_fail_active_bootstrap(
             hart,
@@ -271,15 +241,14 @@ prepare_console_begin_mapping_deadline(
     struct micros_tty_handoff *begin
 )
 {
-    struct micros_user_address_space_tty_uart_plan mapping_plan;
     enum micros_user_address_space_error address_error;
     enum micros_tty_handoff_error tty_error;
 
     address_error =
-        micros_user_address_space_prepare_tty_uart_mapping(
+        micros_user_address_space_inspect_bootstrap_tty_uart(
             tty->process,
             tty->root_physical_address,
-            &mapping_plan
+            false
         );
     if (
         address_error == MICROS_USER_ADDRESS_SPACE_ERROR_NOT_MAPPED
@@ -390,6 +359,8 @@ enum micros_syscall_return bootstrap_syscall_handle_console_begin(
         frame,
         request,
         state,
+        registry,
+        context->objects,
         &tty,
         &tty_entry,
         &vm_binding,
@@ -443,8 +414,6 @@ enum micros_syscall_return bootstrap_syscall_handle_console_begin(
     );
     if (
         !uart_console_handoff_is_quiesced()
-        || micros_bootstrap_runtime_validate()
-            != MICROS_BOOTSTRAP_OK
     ) {
         bootstrap_syscall_fail_active_bootstrap(
             hart,
@@ -472,19 +441,6 @@ static enum micros_syscall_return finish_release(
         && error != MICROS_BOOTSTRAP_ERROR_ARGUMENT
         && error != MICROS_BOOTSTRAP_ERROR_RANGE
         && error != MICROS_BOOTSTRAP_ERROR_STATE
-    ) {
-        bootstrap_syscall_fail_active_bootstrap(
-            hart,
-            frame,
-            MICROS_BOOTSTRAP_DIAGNOSTIC_RELEASE_TRANSITION,
-            service_id,
-            MICROS_ENDPOINT_NONE
-        );
-    }
-    if (
-        error == MICROS_BOOTSTRAP_OK
-        && micros_bootstrap_runtime_validate()
-            != MICROS_BOOTSTRAP_OK
     ) {
         bootstrap_syscall_fail_active_bootstrap(
             hart,
@@ -564,9 +520,10 @@ enum micros_syscall_return bootstrap_syscall_handle_release(
             || tty->service_id != request->service_id
             || !uart_console_handoff_is_quiesced()
             || !micros_plic_validate(MICROS_PLIC_DISABLED)
-            || micros_user_address_space_validate_tty_uart_mapping(
+            || micros_user_address_space_inspect_bootstrap_tty_uart(
                 tty->process,
-                tty->root_physical_address
+                tty->root_physical_address,
+                true
             ) != MICROS_USER_ADDRESS_SPACE_OK
             || !console_event_state_is_clear(
                 state,

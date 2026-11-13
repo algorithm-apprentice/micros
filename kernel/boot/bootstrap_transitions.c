@@ -1,7 +1,8 @@
 #include "kernel/boot/bootstrap_manifest_internal.h"
 #include "kernel/boot/bootstrap_transitions_internal.h"
+#include "micros/work_observation.h"
 
-static enum micros_bootstrap_error runtime_slot(
+enum micros_bootstrap_error bootstrap_runtime_select_slot(
     const struct micros_bootstrap_runtime *runtime,
     uint32_t service_id,
     uint16_t *index
@@ -11,6 +12,7 @@ static enum micros_bootstrap_error runtime_slot(
 
     if (
         runtime == NULL
+        || index == NULL
         || service_id == 0
         || service_id > MICROS_BOOTSTRAP_SERVICE_ID_LIMIT
     ) {
@@ -43,7 +45,7 @@ const struct micros_bootstrap_runtime_entry *bootstrap_runtime_find_entry(
 {
     uint16_t index;
 
-    return runtime_slot(runtime, service_id, &index) == MICROS_BOOTSTRAP_OK
+    return bootstrap_runtime_select_slot(runtime, service_id, &index) == MICROS_BOOTSTRAP_OK
         ? &runtime->entries[index] : NULL;
 }
 
@@ -51,6 +53,10 @@ bool bootstrap_runtime_validate_index(
     const struct micros_bootstrap_runtime *runtime
 )
 {
+#ifdef MICROS_TEST_BOOTSTRAP_COMMAND_COUNTS
+    MICROS_TEST_WORK_HIT("boot02-runtime-index", MICROS_WORK_OWNER_KERNEL_BOOT,
+                         MICROS_WORK_KIND_COMPLETE_VALIDATOR_CALL, 1);
+#endif
     size_t index;
 
     if (
@@ -259,7 +265,7 @@ enum micros_bootstrap_error bootstrap_runtime_prepare_release(
     if (runtime->phase != MICROS_BOOTSTRAP_PHASE_RUNNING) {
         return MICROS_BOOTSTRAP_ERROR_STATE;
     }
-    error = runtime_slot(runtime, service_id, &index);
+    error = bootstrap_runtime_select_slot(runtime, service_id, &index);
     if (error != MICROS_BOOTSTRAP_OK) {
         return error;
     }
@@ -288,7 +294,7 @@ enum micros_bootstrap_error bootstrap_runtime_prepare_release(
     while (prerequisites != 0) {
         uint16_t dependency_index;
 
-        error = runtime_slot(
+        error = bootstrap_runtime_select_slot(
             runtime, lowest_prerequisite_id(prerequisites), &dependency_index
         );
         if (error == MICROS_BOOTSTRAP_ERROR_INVARIANT) {
@@ -405,7 +411,7 @@ enum micros_bootstrap_error bootstrap_runtime_prepare_ready(
     if (runtime->phase != MICROS_BOOTSTRAP_PHASE_RUNNING) {
         return MICROS_BOOTSTRAP_ERROR_STATE;
     }
-    error = runtime_slot(runtime, service_id, &index);
+    error = bootstrap_runtime_select_slot(runtime, service_id, &index);
     if (error != MICROS_BOOTSTRAP_OK) {
         return error;
     }
@@ -471,7 +477,7 @@ enum micros_bootstrap_error bootstrap_runtime_prepare_complete(
         }
     }
     if (
-        runtime_slot(runtime, runtime->controller_service_id, &controller_index)
+        bootstrap_runtime_select_slot(runtime, runtime->controller_service_id, &controller_index)
             != MICROS_BOOTSTRAP_OK
     ) {
         return MICROS_BOOTSTRAP_ERROR_INVARIANT;

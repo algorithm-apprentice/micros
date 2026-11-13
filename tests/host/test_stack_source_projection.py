@@ -11,6 +11,23 @@ ROOT = Path(__file__).resolve().parents[2]
 
 
 class StackSourceProjectionTest(unittest.TestCase):
+    def test_current_bootstrap_terminal_hooks_keep_command_evidence(self):
+        from tests.host.stack_source_projection import instrument_source, project_stack_source
+
+        for unit in ("kernel/tests/boot/bootstrap_test.c", "kernel/tests/tty/tty_service_test.c"):
+            source = (ROOT / unit).read_text()
+            projected = project_stack_source(unit, source)
+            self.assertEqual(source.count("\n"), projected.count("\n"))
+            self.assertEqual(1, projected.count("MICROS_BOOT02_REPORT()"))
+            self.assertNotIn("MICROS_TEST_STACK_REPORT", projected)
+            self.assertLess(source.index("MICROS_TEST_STACK_REPORT()"), source.index("MICROS_BOOT02_REPORT()"))
+            self.assertEqual(source, instrument_source(unit, projected))
+            moved = source.replace("MICROS_TEST_STACK_REPORT(); ", "", 1).replace(
+                "    (void)sbi_system_reset(", "    MICROS_TEST_STACK_REPORT(); (void)sbi_system_reset(", 1,
+            )
+            with self.assertRaises(AssertionError):
+                project_stack_source(unit, moved)
+
     def test_only_declared_inline_hooks_project_to_the_exact_fixed_source(self):
         from tests.host.stack_source_projection import HOOKS, instrument_source, project_stack_source
 

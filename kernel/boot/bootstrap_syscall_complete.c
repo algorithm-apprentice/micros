@@ -39,6 +39,28 @@ enum micros_syscall_return bootstrap_syscall_handle_complete(
             bootstrap_syscall_map_bootstrap_error(error, false)
         );
     }
+    for (size_t index = 0; index < state->entry_count; ++index) {
+        struct micros_bootstrap_service_selection service;
+
+        if (micros_bootstrap_control_select_service(
+            state, registry, context->objects, state->manifest.entries[index].service_id, &service
+        ) != MICROS_BOOTSTRAP_OK || !bootstrap_syscall_root_is_owned(service.binding)) {
+            bootstrap_syscall_fail_active_bootstrap(
+                hart, frame, MICROS_BOOTSTRAP_DIAGNOSTIC_AUTHORITY, 0, MICROS_ENDPOINT_NONE
+            );
+        }
+        if (
+            (service.manifest->role_flags & (MICROS_BOOTSTRAP_ROLE_VM | MICROS_BOOTSTRAP_ROLE_CONSOLE_OWNER)) != 0
+            && !bootstrap_syscall_role_gate_ready(
+                state, registry, context->objects, service.binding->service_id, false
+            )
+        ) {
+            bootstrap_syscall_fail_active_bootstrap(
+                hart, frame, MICROS_BOOTSTRAP_DIAGNOSTIC_COMPLETION,
+                service.binding->service_id, service.binding->endpoint
+            );
+        }
+    }
     if (
         micros_scheduler_preflight_current_ipc(
             context->objects,
@@ -92,22 +114,5 @@ enum micros_syscall_return bootstrap_syscall_handle_complete(
         context->objects,
         &plan
     );
-    if (
-        micros_bootstrap_control_validate(
-            state,
-            registry,
-            context->objects
-        ) != MICROS_BOOTSTRAP_OK
-        || micros_bootstrap_runtime_validate()
-            != MICROS_BOOTSTRAP_OK
-    ) {
-        bootstrap_syscall_fail_active_bootstrap(
-            hart,
-            frame,
-            MICROS_BOOTSTRAP_DIAGNOSTIC_COMPLETION,
-            0,
-            MICROS_ENDPOINT_NONE
-        );
-    }
     return MICROS_SYSCALL_RETURN_CAPTURED;
 }

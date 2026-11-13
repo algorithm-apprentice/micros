@@ -429,7 +429,7 @@ checks. Generator implementations were not changed for this transport removal.
 
 ### Required target evidence has an ordinary owner
 
-The existing runner accepts seven finite current-evidence scopes:
+The existing runner accepts nine finite current-evidence scopes:
 
 | Scope | Existing workflow and retained evidence |
 | --- | --- |
@@ -439,14 +439,23 @@ The existing runner accepts seven finite current-evidence scopes:
 | `scheduler-return` | `test-qemu-scheduler`: exact selected context counts, including 1/2/1 validation |
 | `runtime-memory` | `test-qemu-user-runtime`: actual linked memory object, ELF/map/Ninja recipe and non-stack wide transfers |
 | `selected-ipc` | `test-qemu-ipc-syscall`: all six syscall and four completion classes, complete actual work snapshots and zero ordinary complete audits |
+| `bootstrap-command` | `test-qemu-bootstrap-launcher`: captured release/readiness/seal, selected context admission and zero ordinary complete audits |
+| `tty-bootstrap-command` | `test-qemu-tty`: captured VM/PM/TTY/service roles, console begin, fixed UART points and sealed completion without complete command audits |
 | `diagnostic-history` | `test-qemu-panic`: the unique aligned 12,012-byte local BSS history and complete seeded panic witness |
 
-The first six require a pass result. Diagnostic history requires panic,
+Every scope except diagnostic history requires a pass result. Diagnostic history requires panic,
 the complete panic report and the seeded-history expectation. Each scope
 uses the same owned `QemuResult` as its workflow, with kernel identity checks
 before execution, after execution and after witness validation. Missing
 witnesses or artifact drift use the normal failed TAP/raw reporting path.
 They never cause a second guest to run.
+
+The bootstrap scopes report only after the original terminal semantic
+boundary. Stack-user authentication and reporting precede terminal UART
+seizure for the command report, while the original handoff authority is
+still intact. Their fixed context/UART invocation counts retain MEM03
+scalar/geometry admission separately from complete diagnostics; the
+native selected-path evidence still bounds actual PTE/owner work.
 
 Both exact diagnostic command decoders remain exercised by
 `diagnostic_control_test.c` in the ordinary `diagnostic-history` CTest.

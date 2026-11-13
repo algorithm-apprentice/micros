@@ -1142,6 +1142,251 @@ static bool capture_tty_bindings(void)
     return true;
 }
 
+static bool check_bootstrap_uart_query(
+    struct micros_process_handle process,
+    uint64_t root,
+    bool mapped,
+    enum micros_user_address_space_error expected
+)
+{
+    const uintptr_t status = context.status;
+    const uint64_t satp = context.satp;
+    const uint64_t writes = context.satp_writes;
+    enum micros_user_address_space_error observed;
+
+    save_state();
+    REQUIRE(begin_capture());
+    observed = micros_user_address_space_inspect_bootstrap_tty_uart(process, root, mapped);
+#if defined(MICROS_TEST_WORK_COUNTS)
+    REQUIRE(finish_capture());
+    for (size_t owner = 0; owner < MICROS_WORK_OWNER_COUNT; ++owner) {
+        REQUIRE(context.observation.counts[owner][MICROS_WORK_KIND_COMPLETE_VALIDATOR_CALL] == 0);
+    }
+#if MICROS_AS_NATIVE_CHANNEL == 0 || MICROS_AS_NATIVE_CHANNEL == 1
+    if (context.observation.counts[MICROS_WORK_OWNER_KERNEL_MEMORY][MICROS_WORK_KIND_PTE_VISIT] > 3) {
+        fprintf(stderr, "BOOT02 UART point case=%u pte_reads=%" PRIu64 " limit=3\n",
+                context.scenario,
+                context.observation.counts[MICROS_WORK_OWNER_KERNEL_MEMORY][MICROS_WORK_KIND_PTE_VISIT]);
+        return false;
+    }
+    if (expected == MICROS_USER_ADDRESS_SPACE_OK) {
+        REQUIRE(context.observation.counts[MICROS_WORK_OWNER_KERNEL_MEMORY][MICROS_WORK_KIND_PTE_VISIT] == 3);
+    }
+#endif
+#if MICROS_AS_NATIVE_CHANNEL == 1
+    REQUIRE(context.observation.counts[MICROS_WORK_OWNER_KERNEL_MEMORY][MICROS_WORK_KIND_RECORD_VISIT] <= 4);
+    REQUIRE(context.observation.counts[MICROS_WORK_OWNER_KERNEL_MEMORY][MICROS_WORK_KIND_COPY_UNIT] == 0);
+#endif
+#if MICROS_AS_NATIVE_CHANNEL == 2
+    REQUIRE(context.observation.counts[MICROS_WORK_OWNER_KERNEL_MEMORY][MICROS_WORK_KIND_CLEAR_UNIT] == 0);
+#endif
+#endif
+    if (observed != expected) {
+        fprintf(stderr, "BOOT02 UART point case=%u result=%u expected=%u\n",
+                context.scenario, (unsigned)observed, (unsigned)expected);
+        return false;
+    }
+    REQUIRE(state_matches(true));
+    REQUIRE(context.status == status && context.satp == satp && context.satp_writes == writes);
+    return true;
+}
+
+static bool check_bootstrap_uart_points(void)
+{
+    for (unsigned int scenario = 0; scenario < 17; ++scenario) {
+        struct micros_user_address_space_runtime_view runtime;
+        struct micros_user_address_space_scratch_lease lease;
+        struct micros_process_handle process;
+        struct micros_kernel_objects *objects;
+        enum micros_user_address_space_error expected = MICROS_USER_ADDRESS_SPACE_OK;
+        unsigned int phase = scenario < 5 ? scenario
+            : scenario == 10 || scenario == 13 || scenario == 16 ? 1 : 2;
+        uint64_t physical;
+        uint64_t root;
+        uint64_t *slot;
+        bool mapped = phase >= 2 && scenario != 15;
+
+        REQUIRE(prepare_tty_fixture(phase, &physical, &slot));
+        context.scenario = scenario;
+        objects = micros_kernel_object_runtime_authoritative_registry();
+        process = context.process;
+        root = context.table_addresses[0];
+        switch (scenario) {
+        case 0:
+            expected = MICROS_USER_ADDRESS_SPACE_ERROR_PHASE;
+            break;
+        case 5: {
+            uint64_t frame = (root - (uint64_t)(uintptr_t)context.arena) / MICROS_FRAME_SIZE;
+
+            ++micros_as_native_ownership()->owners[frame].generation;
+            expected = MICROS_USER_ADDRESS_SPACE_ERROR_OWNERSHIP;
+            break;
+        }
+        case 6:
+            REQUIRE(micros_sv39_make_leaf_pte(
+                MICROS_TTY_UART_PHYSICAL_BASE,
+                MICROS_SV39_PERMISSION_READ | MICROS_SV39_PERMISSION_EXECUTE | MICROS_SV39_PERMISSION_USER,
+                slot
+            ) == MICROS_SV39_OK);
+            expected = MICROS_USER_ADDRESS_SPACE_ERROR_OWNERSHIP;
+            break;
+        case 7:
+            *slot = 0;
+            expected = MICROS_USER_ADDRESS_SPACE_ERROR_OWNERSHIP;
+            break;
+        case 8:
+            objects->processes[MICROS_PROCESS_CAPACITY - 1].live_thread_count = 1;
+            REQUIRE(micros_tty_handoff_runtime_validate(
+                &context.bootstrap, micros_as_native_ipc_input(), objects
+            ) == MICROS_TTY_HANDOFF_ERROR_INVARIANT);
+            REQUIRE(micros_tty_handoff_runtime_validate_bootstrap_binding(
+                &context.bootstrap, micros_as_native_ipc_input(), objects
+            ) == MICROS_TTY_HANDOFF_OK);
+            break;
+        case 9:
+            REQUIRE(micros_user_address_space_runtime_require_read(&runtime) == MICROS_USER_ADDRESS_SPACE_OK);
+            REQUIRE(micros_user_address_space_acquire_scratch(&runtime, &lease) == MICROS_USER_ADDRESS_SPACE_OK);
+            expected = MICROS_USER_ADDRESS_SPACE_ERROR_BUSY;
+            break;
+        case 10:
+            context.satp = MICROS_RISCV_SATP_MODE_SV39 | (root >> 12);
+            expected = MICROS_USER_ADDRESS_SPACE_ERROR_STATE;
+            break;
+        case 11:
+            root += MICROS_FRAME_SIZE;
+            expected = MICROS_USER_ADDRESS_SPACE_ERROR_STATE;
+            break;
+        case 12:
+            ++process.generation;
+            expected = MICROS_USER_ADDRESS_SPACE_ERROR_STALE;
+            break;
+        case 13:
+            *slot = 2;
+            expected = MICROS_USER_ADDRESS_SPACE_ERROR_PTE;
+            break;
+        case 14: {
+            uint64_t other = objects->processes[context.foreign_process.slot].address_space_root;
+            uint64_t frame = (other - (uint64_t)(uintptr_t)context.arena) / MICROS_FRAME_SIZE;
+
+            ++micros_as_native_ownership()->owners[frame].generation;
+            REQUIRE(micros_frame_ownership_runtime_validate(objects) != MICROS_FRAME_OWNERSHIP_OK);
+            break;
+        }
+        case 15:
+            expected = MICROS_USER_ADDRESS_SPACE_ERROR_CONFLICT;
+            break;
+        case 16:
+            context.satp = MICROS_RISCV_SATP_MODE_SV39 | (root >> 12);
+            *slot = 2;
+            expected = MICROS_USER_ADDRESS_SPACE_ERROR_PTE;
+            break;
+        default:
+            break;
+        }
+        context.status = scenario % 2 == 0 ? 0 : MICROS_RISCV_SSTATUS_SIE;
+        REQUIRE(check_bootstrap_uart_query(process, root, mapped, expected));
+        context.status = 0;
+        if (scenario == 9) {
+            micros_user_address_space_release_scratch(&lease);
+        }
+    }
+    return true;
+}
+
+static bool check_bootstrap_vm_role(void)
+{
+    for (unsigned int scenario = 0; scenario < 6; ++scenario) {
+        struct micros_privilege_profile profile = {
+            .id = MICROS_PRIVILEGE_PROFILE_VM, .name = "vm",
+            .operations = MICROS_PRIVILEGE_OPERATION_RECEIVE,
+            .kernel_operations = MICROS_KERNEL_OPERATION_VM_HANDOFF,
+        };
+        struct micros_vm_handoff_state *state = micros_as_native_vm_input();
+        struct micros_bootstrap_binding *binding = &context.bootstrap.bindings[0];
+        struct micros_endpoint_registry *registry = micros_as_native_ipc_input();
+        struct micros_kernel_objects *objects;
+        micros_endpoint_t endpoint;
+        uint64_t physical;
+        uint64_t *slot;
+        bool ready;
+
+        REQUIRE(prepare_vm_fixture(1, &physical, &slot));
+        objects = micros_kernel_object_runtime_authoritative_registry();
+        REQUIRE(micros_thread_runtime_flags_set(
+            objects, context.thread, MICROS_THREAD_RTS_INACTIVE
+        ) == MICROS_KERNEL_OBJECT_OK);
+        REQUIRE(micros_thread_scheduler_remove(objects, context.thread) == MICROS_KERNEL_OBJECT_OK);
+        if (scenario == 4) {
+            profile.kernel_operations = 0;
+        }
+        REQUIRE(micros_endpoint_registry_initialize(registry, &profile, 1) == MICROS_ENDPOINT_OK);
+        REQUIRE(micros_endpoint_reserve(registry, objects, context.process, &endpoint) == MICROS_ENDPOINT_OK);
+        REQUIRE(micros_endpoint_install_profile(
+            registry, objects, context.process, MICROS_PRIVILEGE_PROFILE_VM
+        ) == MICROS_ENDPOINT_OK);
+        REQUIRE(micros_endpoint_activate(registry, objects, endpoint) == MICROS_ENDPOINT_OK);
+        REQUIRE(micros_thread_scheduler_admit(
+            objects, micros_kernel_object_runtime_boot_hart_handle(), context.thread,
+            8, UINT64_C(1000000), true
+        ) == MICROS_KERNEL_OBJECT_OK);
+        micros_as_native_ipc_publish();
+        context.bootstrap.phase = MICROS_BOOTSTRAP_PHASE_RUNNING;
+        context.bootstrap.entry_count = 1;
+        context.bootstrap.manifest.header.entry_count = 1;
+        context.bootstrap.plan.entry_count = 1;
+        context.bootstrap.plan.controller_service_id = 1;
+        context.bootstrap.plan.vm_service_id = state->service_id;
+        context.bootstrap.binding_slots[state->service_id] = 1;
+        *binding = (struct micros_bootstrap_binding){
+            .service_id = state->service_id, .process = context.process, .thread = context.thread,
+            .root = state->root_physical_address, .endpoint = endpoint, .prepared_page_count = 1,
+            .scheduler_priority = 8, .scheduler_preemptible = true,
+            .scheduler_quantum_counter_ticks = UINT64_C(1000000),
+        };
+        context.bootstrap.manifest.entries[0] = (struct micros_bootstrap_manifest_entry){
+            .service_id = state->service_id, .image_id = state->image_id,
+            .process_slot = context.process.slot, .profile_id = MICROS_PRIVILEGE_PROFILE_VM,
+            .role_flags = MICROS_BOOTSTRAP_ROLE_VM,
+        };
+        context.bootstrap.transitions.phase = MICROS_BOOTSTRAP_PHASE_RUNNING;
+        context.bootstrap.transitions.entry_count = 1;
+        context.bootstrap.transitions.controller_service_id = 1;
+        context.bootstrap.transitions.service_slots[state->service_id] = 1;
+        context.bootstrap.transitions.entries[0] = (struct micros_bootstrap_runtime_entry){
+            .service_id = state->service_id, .state = MICROS_BOOTSTRAP_SERVICE_READY,
+            .endpoint_state = MICROS_BOOTSTRAP_ENDPOINT_ACTIVE,
+            .profile_installed = true, .scheduler_assigned = true,
+        };
+        if (scenario == 1) {
+            state->mappings[MICROS_PROCESS_CAPACITY - 1].entry_count = 1;
+            REQUIRE(micros_vm_handoff_state_validate(state) == MICROS_VM_HANDOFF_ERROR_INVARIANT);
+        } else if (scenario == 2) {
+            uint64_t frame =
+                (state->root_physical_address - (uint64_t)(uintptr_t)context.arena) / MICROS_FRAME_SIZE;
+
+            ++micros_as_native_ownership()->owners[frame].generation;
+        } else if (scenario == 3) {
+            ++binding->thread.generation;
+        } else if (scenario == 5) {
+            ++context.bootstrap.manifest.entries[0].image_id;
+        }
+        save_state();
+        REQUIRE(begin_capture());
+        ready = micros_vm_handoff_runtime_role_ready(
+            &context.bootstrap, registry, objects, state->service_id, state->process, state->endpoint
+        );
+#if defined(MICROS_TEST_WORK_COUNTS)
+        REQUIRE(finish_capture());
+        for (size_t owner = 0; owner < MICROS_WORK_OWNER_COUNT; ++owner) {
+            REQUIRE(context.observation.counts[owner][MICROS_WORK_KIND_COMPLETE_VALIDATOR_CALL] == 0);
+        }
+#endif
+        REQUIRE(ready == (scenario < 2));
+        REQUIRE(state_matches(true));
+    }
+    return true;
+}
+
 static bool capture_allocation_prefixes(void)
 {
     struct micros_frame_owner retained = {.kind = MICROS_FRAME_OWNER_KERNEL_RETAINED};
@@ -1879,7 +2124,9 @@ int main(int argc, char **argv)
         && capture_inactive_owned_slots()
         && capture_foreign_vm_slot()
         && capture_prepare_interface()
-        && capture_binding_interfaces();
+        && capture_binding_interfaces()
+        && check_bootstrap_uart_points()
+        && check_bootstrap_vm_role();
     if (munmap(context.arena, ARENA_BYTES) != 0) {
         return 2;
     }

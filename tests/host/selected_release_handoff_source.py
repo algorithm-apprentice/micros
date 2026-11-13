@@ -67,6 +67,7 @@ RECIPE_ADMISSION = {
         "kernel/tty/tty_handoff_runtime_state.c",
         "kernel/tty/tty_handoff_runtime_validate.c",
         "kernel/boot/bootstrap_control_core.c",
+        "kernel/boot/bootstrap_transitions.c",
         "kernel/memory/user_address_space_handoff.c",
         "kernel/execution/user_execution_validation.c",
     ),

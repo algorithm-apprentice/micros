@@ -252,8 +252,6 @@ enum micros_syscall_return bootstrap_syscall_handle_accept_ready(
             context->objects,
             &guard
         ) != MICROS_KERNEL_OBJECT_OK
-        || micros_bootstrap_runtime_validate()
-            != MICROS_BOOTSTRAP_OK
     ) {
         bootstrap_syscall_fail_active_bootstrap(
             hart,

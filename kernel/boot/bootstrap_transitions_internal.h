@@ -24,6 +24,12 @@ const struct micros_bootstrap_runtime_entry *bootstrap_runtime_find_entry(
     uint32_t service_id
 );
 
+enum micros_bootstrap_error bootstrap_runtime_select_slot(
+    const struct micros_bootstrap_runtime *runtime,
+    uint32_t service_id,
+    uint16_t *index
+);
+
 bool bootstrap_runtime_validate_index(
     const struct micros_bootstrap_runtime *runtime
 );

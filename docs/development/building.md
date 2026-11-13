@@ -239,12 +239,20 @@ cmake --build build/host-debug --target indexed_bootstrap_ordinary indexed_boots
 ctest --test-dir build/host-debug --output-on-failure --no-tests=error -R '^indexed-bootstrap$'
 ```
 
-The pair belongs to complete `test-unit`, not the fast loop. It separates
-selected bootstrap lookup/copy work from retained full-control audits.
+The pair belongs to complete `test-unit`, not the fast loop. It measures
+selected bootstrap lookup/copy and audit-free ordinary control work;
+explicit complete diagnostics retain positive audit controls.
 It also runs the actual deadline/diagnostic code with injected counter
 values, real TTY deadline predicates and bounded output/panic backends.
 It does not replace the original bootstrap model or actual launcher,
 deadline, service-composition and stack gates.
+
+The existing `test-qemu-bootstrap-launcher` and `test-qemu-tty` workflows
+also report their actual captured bootstrap command work from the same
+guest, after their original semantic completion. They require zero complete
+command audits and exact selected context/UART query counts; scalar memory
+geometry admission is measured separately. Native address-space cases
+exercise the actual read-only UART path and selected VM/TTY role boundaries.
 
 ## Validation planning
 
@@ -652,6 +660,32 @@ passivity checks and real linked proof; it does not publish the complete
 certificate, run the ten observed scopes, or satisfy the full author gate.
 Select `riscv64-panic-trace-test` instead of `riscv64-debug` in this same
 development command to check the closed trace fixture.
+
+For a focused observed bootstrap/TTY reporting check, use the existing
+sealed observed-profile builder and runner:
+
+```bash
+"${MICROS_PYTHON}" -E -S -B - <<'PY'
+import os
+from pathlib import Path
+from tools.stack_bound_build import build_observed_profile, static_profiles
+from tools.stack_bound_run import run_observed_scope
+from tools.validation_context import capture_candidate
+root = Path.cwd()
+assert capture_candidate(root).clean
+profiles = {profile.configure: profile for profile in static_profiles(root)}
+for configure in ("riscv64-bootstrap-launcher-test", "riscv64-tty-service-test"):
+    directory = build_observed_profile(root, profiles[configure], os.environ["MICROS_PYTHON"])
+    result = run_observed_scope(root, directory)
+    print("DEVELOPMENT_ONLY:", configure, "producers=", len(result.observations))
+PY
+```
+
+This preserves real user-image authentication and each scope's original
+guest deadline. It publishes no complete stack certificate and does not
+replace the complete static/target gate. In these terminal reports, stack
+capture precedes the command observer's UART seizure so the full sealed
+bootstrap diagnostic still sees the original console authority.
 
 The fixture proof binds the actual outer, nested and word-load fault
 instructions, complete trap captures, physical stack pivots and read-only

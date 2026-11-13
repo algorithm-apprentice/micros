@@ -1,5 +1,6 @@
 #include "micros/grant.h"
 #include "micros/grant_copy.h"
+#include "micros/work_observation.h"
 
 #include <stddef.h>
 #include <stdint.h>
@@ -727,6 +728,10 @@ enum micros_grant_error micros_grant_registry_validate(
     const struct micros_kernel_objects *objects
 )
 {
+#ifdef MICROS_TEST_BOOTSTRAP_COMMAND_COUNTS
+    MICROS_TEST_WORK_HIT("boot02-grant-registry", MICROS_WORK_OWNER_KERNEL_GRANT,
+                         MICROS_WORK_KIND_COMPLETE_VALIDATOR_CALL, 1);
+#endif
     enum micros_grant_error error;
     size_t index;
 

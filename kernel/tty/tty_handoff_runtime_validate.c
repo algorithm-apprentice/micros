@@ -1,4 +1,5 @@
 #include "kernel/tty/tty_handoff_runtime_internal.h"
+#include "micros/work_observation.h"
 
 #include <stddef.h>
 #include <stdint.h>
@@ -66,28 +67,6 @@ bool tty_handoff_identity_is_valid(
         && micros_tty_handoff_validate(&state->handoff)
             == MICROS_TTY_HANDOFF_OK
     );
-}
-
-static const struct micros_bootstrap_runtime_entry *
-tty_handoff_runtime_entry(
-    const struct micros_bootstrap_runtime *runtime,
-    uint32_t service_id
-)
-{
-    size_t index;
-
-    if (
-        runtime == NULL
-        || runtime->entry_count > MICROS_BOOTSTRAP_SERVICE_CAPACITY
-    ) {
-        return NULL;
-    }
-    for (index = 0; index < runtime->entry_count; ++index) {
-        if (runtime->entries[index].service_id == service_id) {
-            return &runtime->entries[index];
-        }
-    }
-    return NULL;
 }
 
 bool tty_handoff_binding_identity_matches(
@@ -201,7 +180,6 @@ static bool tty_handoff_live_binding_matches(
 {
     struct tty_handoff_live_binding work;
 
-
     if (
         registry == NULL
         || objects == NULL
@@ -217,8 +195,6 @@ static bool tty_handoff_live_binding_matches(
             context->tty_handoff_state.thread,
             &work.thread
         ) != MICROS_KERNEL_OBJECT_OK
-        || micros_endpoint_registry_validate_objects(registry, objects)
-            != MICROS_ENDPOINT_OK
         || micros_endpoint_resolve_internal(
             registry,
             objects,
@@ -292,7 +268,7 @@ bool micros_tty_handoff_runtime_role_ready(
 
     return (
         context->tty_bootstrap_state != NULL
-        && micros_tty_handoff_runtime_validate(
+        && micros_tty_handoff_runtime_validate_bootstrap_binding(
             context->tty_bootstrap_state,
             registry,
             objects
@@ -415,7 +391,8 @@ micros_tty_handoff_runtime_inspect_device_binding(
     return active ? MICROS_TTY_DEVICE_AUTHORITY_ACTIVE : MICROS_TTY_DEVICE_AUTHORITY_NONE;
 }
 
-enum micros_tty_handoff_error micros_tty_handoff_runtime_validate(
+enum micros_tty_handoff_error
+micros_tty_handoff_runtime_validate_bootstrap_binding(
     const struct micros_bootstrap_control_state *bootstrap,
     const struct micros_endpoint_registry *registry,
     const struct micros_kernel_objects *objects
@@ -430,6 +407,9 @@ enum micros_tty_handoff_error micros_tty_handoff_runtime_validate(
         bootstrap == NULL
         || registry == NULL
         || objects == NULL
+        || bootstrap->entry_count == 0
+        || bootstrap->entry_count > MICROS_BOOTSTRAP_SERVICE_CAPACITY
+        || bootstrap->transitions.entry_count != bootstrap->entry_count
         || bootstrap != context->tty_bootstrap_state
         || !tty_handoff_identity_is_valid(&context->tty_handoff_state)
         || !tty_handoff_binding_identity_matches(context, bootstrap)
@@ -446,7 +426,7 @@ enum micros_tty_handoff_error micros_tty_handoff_runtime_validate(
     ) {
         return MICROS_TTY_HANDOFF_ERROR_INVARIANT;
     }
-    transition = tty_handoff_runtime_entry(
+    transition = bootstrap_runtime_find_entry(
         &bootstrap->transitions,
         context->tty_handoff_state.service_id
     );
@@ -468,4 +448,24 @@ enum micros_tty_handoff_error micros_tty_handoff_runtime_validate(
         return MICROS_TTY_HANDOFF_ERROR_INVARIANT;
     }
     return MICROS_TTY_HANDOFF_OK;
+}
+
+enum micros_tty_handoff_error micros_tty_handoff_runtime_validate(
+    const struct micros_bootstrap_control_state *bootstrap,
+    const struct micros_endpoint_registry *registry,
+    const struct micros_kernel_objects *objects
+)
+{
+#ifdef MICROS_TEST_BOOTSTRAP_COMMAND_COUNTS
+    MICROS_TEST_WORK_HIT("boot02-tty-runtime", MICROS_WORK_OWNER_KERNEL_TTY,
+                         MICROS_WORK_KIND_COMPLETE_VALIDATOR_CALL, 1);
+#endif
+    enum micros_tty_handoff_error error =
+        micros_tty_handoff_runtime_validate_bootstrap_binding(bootstrap, registry, objects);
+
+    if (error != MICROS_TTY_HANDOFF_OK) {
+        return error;
+    }
+    return micros_endpoint_registry_validate_objects(registry, objects) == MICROS_ENDPOINT_OK
+        ? MICROS_TTY_HANDOFF_OK : MICROS_TTY_HANDOFF_ERROR_INVARIANT;
 }

@@ -49,7 +49,7 @@ PROFILES = {
     "build-tty-service-image": ("riscv64-tty-service-image", "micros_tty_service", True),
 }
 RECIPE_DIGESTS = {
-    "CMakeLists.txt": "e23201f4e0a8487c477037829f02e8aa16466719cc3a2041b1253415d9f0642a",
+    "CMakeLists.txt": "60d34d533ea8b5ffb3d245643e43df99ecfe8fd480ff34ecb2142fd59ff43544",
     "cmake/toolchains/riscv64-clang.cmake": "1a1bbab2b91b54222bfbae93cdf2ae9d7847f521760dcba9119d306d3a36d459",
     "tests/work/WorkCounts.cmake": "61bee706c6b45f70712021cf4df49829a39bac82e6fb28c446bf84ed83013fc5",
 }
@@ -63,8 +63,8 @@ QEMU_RUNNER_SOURCE_DIGESTS = {
     "tools/qemu_smoke_command.py": "cfd4ce156aa945eff9233755c36fa885e61696bad5d8bd4f4537772aba504484",
     "tools/qemu_smoke_execution.py": "62a3146a854f6faea843ac40d6675efc381f8c30b153d95ac7395f4109127493",
     "tools/qemu_smoke_outcome.py": "11a653265f556f1d08b003c8165bd7f5c0748de4562fd72b16c2bb0a80dfc451",
-    "tools/qemu_smoke_arguments.py": "1a2c8ab536f2fe2b0d3a4da58707beafd03893f5ad70d856ff61fb5ccbdfefd5",
-    "tools/qemu_smoke_cli.py": "3f9e7fa9e1eda795c02f0163009971e848f5d082aa69d8fe95744ecf263bdac9",
+    "tools/qemu_smoke_arguments.py": "1aec382205584645534927bad71d88326b0940b940fc1cb2df5e415d2a76da13",
+    "tools/qemu_smoke_cli.py": "959321a41b360fe25c56314573ab41822d0517ee1ce5dec3bc3f589c87b153ec",
 }
 QEMU_LOADER_PROBE = """
 import importlib.machinery as m, json, sys

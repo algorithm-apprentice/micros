@@ -1,5 +1,6 @@
 #include "kernel/tests/tty/tty_service_test.h"
 #include "micros/stack_observation.h"
+#include "tests/qemu/bootstrap_command_work.h"
 #include <stddef.h>
 #include <stdint.h>
 
@@ -479,7 +480,10 @@ _Noreturn void micros_tty_service_test_handle_trap(
         test_failure(hart, frame, "tty-service-test-uart-drain");
     }
     micros_diagnostic_test_finish();
-    MICROS_TEST_STACK_REPORT(); (void)sbi_system_reset(
+    MICROS_TEST_STACK_REPORT(); if (!MICROS_BOOT02_REPORT()) {
+        test_failure(hart, frame, "bootstrap-command-work");
+    }
+    (void)sbi_system_reset(
         SBI_RESET_TYPE_SHUTDOWN,
         SBI_RESET_REASON_NONE
     );

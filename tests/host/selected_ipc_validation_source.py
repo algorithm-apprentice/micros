@@ -40,7 +40,7 @@ RETAINED_AUDITS = (
     ("kernel/pm/pm_control_exit.c", "micros_pm_control_exit_begin_preflight", "micros_endpoint_registry_validate_objects", 1),
     ("kernel/pm/pm_control_exit.c", "validate_stopped_exit", "micros_endpoint_registry_validate_objects", 1),
     ("kernel/pm/pm_control_validation.c", "micros_pm_control_validate_prepared_shape", "micros_endpoint_registry_validate_objects", 1),
-    ("kernel/tty/tty_handoff_runtime_validate.c", "tty_handoff_live_binding_matches", "micros_endpoint_registry_validate_objects", 1),
+    ("kernel/tty/tty_handoff_runtime_validate.c", "micros_tty_handoff_runtime_validate", "micros_endpoint_registry_validate_objects", 1),
 )
 
 
@@ -157,7 +157,7 @@ def validate_target_source(path, text):
         name, label, owner = AUDIT_SITES[path]
         body = records[name].body
         pattern = (
-            r'#ifdef\s+MICROS_BUILD_IPC_SYSCALL_TEST\s+'
+            r'#if\s+defined\(MICROS_BUILD_IPC_SYSCALL_TEST\)\s*\|\|\s*defined\(MICROS_TEST_BOOTSTRAP_COMMAND_COUNTS\)\s+'
             r'MICROS_TEST_WORK_HIT\("ipc01-target-' + re.escape(label) + r'",\s*'
             r'MICROS_WORK_OWNER_' + owner + r',\s*MICROS_WORK_KIND_COMPLETE_VALIDATOR_CALL,\s*1\);\s*#endif'
         )

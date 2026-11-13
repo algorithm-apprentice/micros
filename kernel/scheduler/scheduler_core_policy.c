@@ -54,7 +54,7 @@ micros_thread_scheduler_admit_preflight(
     return MICROS_KERNEL_OBJECT_OK;
 }
 
-enum micros_kernel_object_error micros_thread_scheduler_admit(
+void micros_thread_scheduler_commit_admit_prevalidated(
     struct micros_kernel_objects *objects,
     struct micros_hart_handle hart_handle,
     struct micros_thread_handle thread_handle,
@@ -63,28 +63,8 @@ enum micros_kernel_object_error micros_thread_scheduler_admit(
     bool preemptible
 )
 {
-    struct micros_thread *thread;
-    struct micros_hart *hart;
-    enum micros_kernel_object_error error;
-
-    error = micros_thread_scheduler_admit_preflight(
-        objects,
-        hart_handle,
-        thread_handle,
-        priority,
-        quantum_counter_ticks
-    );
-    if (error != MICROS_KERNEL_OBJECT_OK) {
-        return error;
-    }
-    error = scheduler_core_resolve_thread_mutable(objects, thread_handle, &thread);
-    if (error != MICROS_KERNEL_OBJECT_OK) {
-        return MICROS_KERNEL_OBJECT_ERROR_INVARIANT;
-    }
-    error = scheduler_core_resolve_hart_mutable(objects, hart_handle, &hart);
-    if (error != MICROS_KERNEL_OBJECT_OK) {
-        return MICROS_KERNEL_OBJECT_ERROR_INVARIANT;
-    }
+    struct micros_thread *thread = &objects->threads[thread_handle.slot];
+    struct micros_hart *hart = &objects->harts[hart_handle.slot];
 
     thread->scheduler_assigned = true;
     thread->scheduler_preemptible = preemptible;
@@ -94,6 +74,27 @@ enum micros_kernel_object_error micros_thread_scheduler_admit(
     thread->remaining_counter_ticks = quantum_counter_ticks;
     thread->runtime_flags = 0;
     scheduler_core_queue_enqueue_tail_prevalidated(objects, hart, thread_handle);
+}
+
+enum micros_kernel_object_error micros_thread_scheduler_admit(
+    struct micros_kernel_objects *objects,
+    struct micros_hart_handle hart_handle,
+    struct micros_thread_handle thread_handle,
+    uint8_t priority,
+    uint64_t quantum_counter_ticks,
+    bool preemptible
+)
+{
+    enum micros_kernel_object_error error = micros_thread_scheduler_admit_preflight(
+        objects, hart_handle, thread_handle, priority, quantum_counter_ticks
+    );
+
+    if (error != MICROS_KERNEL_OBJECT_OK) {
+        return error;
+    }
+    micros_thread_scheduler_commit_admit_prevalidated(
+        objects, hart_handle, thread_handle, priority, quantum_counter_ticks, preemptible
+    );
     return MICROS_KERNEL_OBJECT_OK;
 }
 

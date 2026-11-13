@@ -254,10 +254,12 @@ class SelectedIpcObservationTest(unittest.TestCase):
         root = Path(__file__).resolve().parents[2]
         path = "kernel/objects/kernel_objects.c"
         text = (root / path).read_text()
+        guard = "#if defined(MICROS_BUILD_IPC_SYSCALL_TEST) || defined(MICROS_TEST_BOOTSTRAP_COMMAND_COUNTS)"
+        self.assertIn(guard, text)
         for changed in (
             text.replace('MICROS_TEST_WORK_HIT("ipc01-target-objects"', 'MICROS_TEST_WORK_HIT("foreign"'),
-            text.replace("#ifdef MICROS_BUILD_IPC_SYSCALL_TEST", "#ifdef UNKNOWN_CAPTURE"),
-            text.replace("#ifdef MICROS_BUILD_IPC_SYSCALL_TEST", "if (objects == NULL) { return 0; }\n#ifdef MICROS_BUILD_IPC_SYSCALL_TEST"),
+            text.replace(guard, "#ifdef UNKNOWN_CAPTURE"),
+            text.replace(guard, "if (objects == NULL) { return 0; }\n" + guard),
         ):
             with self.assertRaises(ValueError):
                 validate_target_source(path, changed)

@@ -74,8 +74,8 @@ and [Accepted contract](../architecture/selected-bootstrap-command-validation.md
 trace the remaining complete-audit boundaries. BOOT01 retained the original
 model and actual composed/stack evidence, with clean independent review
 before its implementation commit and merge. BOOT02 design has clean
-independent review and is Accepted; implementation awaits its separate
-design merge.
+independent review and is Accepted; implementation follows the separate
+design merge #267. Neither BOOT02 finding is closed by that design.
 
 Validation simplification #248 follows separate design #247 / ADR-0123.
 It changes no runtime finding, node or edge. Current contracts replace the
@@ -250,7 +250,7 @@ blocking queue.
 | `GRANT02` | Runtime correction | `B05-F003`, `B05-F004` | `GRANT01`, `IPC03` | Independently reviewed implementation #262 follows the [free-list/cancellation contract](../architecture/grant-free-lists-and-targeted-cancellation.md) and [quiescent resource-witness correction](../adr/0130-quiescent-grant-resource-equivalence.md). | Exact LIFO/index/model and sparse close work, malformed inventory controls, actual composed resources and complete current acceptance passed. |
 | `GRANT03` | Runtime correction | `B05-F005` | `GRANT01`, `COPY01`, `MEM04` | Independently reviewed implementation #264 follows the [retained-span contract](../architecture/grant-copy-spans.md), reusing the unchanged COPY01 provider after complete physical preflight. | Independent exact span/work and byte evidence, actual same-guest kernel artifact proof, preserved composition and complete current acceptance passed. |
 | `BOOT01` | Runtime correction | `B06-F001` | `EV04` | Independently reviewed implementation #266 follows the [indexed-transition contract](../architecture/indexed-bootstrap-transitions.md), with distinct indices and selected plans; command audit cadence and copy primitives remain separately owned. | Independent lookup/transition and actual deadline evidence, original model, composed workflows and complete current acceptance passed. |
-| `BOOT02` | Runtime correction | `B06-F002`, `B06-F003` | `BOOT01`, `MEM04`, `OBJ01`, `OBJ02`, `IPC01`, `GRANT01` | [Accepted selected-command contract](../architecture/selected-bootstrap-command-validation.md): prepare consumed authority once, keep complete diagnostics and required lifecycle barriers; implementation remains pending separate design merge. | Actual release/ready/complete/console audit and consumed-work counts, rollback, deadline, role and target failure evidence. |
+| `BOOT02` | Runtime correction | `B06-F002`, `B06-F003` | `BOOT01`, `MEM04`, `OBJ01`, `OBJ02`, `IPC01`, `GRANT01` | [Accepted selected-command contract](../architecture/selected-bootstrap-command-validation.md): prepare consumed authority once, keep complete diagnostics and required lifecycle barriers; implementation follows separately merged design #267. | Actual release/ready/complete/console audit and consumed-work counts, rollback, deadline, role and target failure evidence. |
 | `BOOT03` | Runtime correction | `B06-F004` | `COPY01` | Use the shared bounded copy/fill family for image, stack, manifest, configuration, and state movement. | Exact bytes/words/blocks moved over every bootstrap object size. |
 | `VM01` | Runtime correction | `B07-F001` | `BOOT02`, `MEM04`, `GRANT01` | Keep complete kernel/service VM validation diagnostic-only and retain selected transaction subplans. | Per-command Vsvc/Vkh counts and malformed selected-state cases. |
 | `VM02` | Runtime correction | `B02-F008`, `B02-F009`, `B07-F004` | `VM01`, `MEM04` | Build selected-root/frame indexes and ordered uniqueness proofs without all-process or pairwise searches. | Root/frame comparison and owner-lookup counts over sparse/adversarial plans. |

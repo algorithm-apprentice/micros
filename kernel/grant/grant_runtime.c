@@ -1,4 +1,5 @@
 #include "micros/grant_runtime.h"
+#include "micros/work_observation.h"
 
 #include <stdbool.h>
 #include <stddef.h>
@@ -106,6 +107,10 @@ micros_grant_runtime_authoritative_registry(void)
 
 enum micros_grant_error micros_grant_runtime_validate(void)
 {
+#ifdef MICROS_TEST_BOOTSTRAP_COMMAND_COUNTS
+    MICROS_TEST_WORK_HIT("boot02-grant-runtime", MICROS_WORK_OWNER_KERNEL_GRANT,
+                         MICROS_WORK_KIND_COMPLETE_VALIDATOR_CALL, 1);
+#endif
     const struct micros_endpoint_registry *endpoint_registry;
     const struct micros_kernel_objects *objects;
     enum micros_grant_error error;

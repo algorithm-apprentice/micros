@@ -36,6 +36,9 @@ static const char *const names[] = {
     "single-service-complete", "binding-sparse", "binding-corruption", "control-index-diagnosis",
     "release-named-dependencies", "runtime-selected-corruption", "ready-counter-precedence", "selected-plan-canaries",
     "constructor-rejections", "preparing-permutation", "permuted-control-seal", "runtime-unvisited-scope",
+    "control-unvisited-binding", "control-unvisited-runtime", "control-selected-tuple",
+    "control-selection-guards",
+    "control-complete-membership",
 };
 
 static struct {
@@ -580,8 +583,8 @@ static bool complete_index_diagnosis(size_t index)
         case 7: fixture.state.transitions.entry_count = 1; break;
         }
         fixture.expected_state = fixture.state;
-        REQUIRE(micros_bootstrap_control_release(
-            &fixture.state, &fixture.registry, &fixture.objects, fixture.hart, 2, 10, true
+        REQUIRE(micros_bootstrap_control_validate(
+            &fixture.state, &fixture.registry, &fixture.objects
         ) == MICROS_BOOTSTRAP_ERROR_INVARIANT);
         REQUIRE(memcmp(&fixture.state, &fixture.expected_state, sizeof(fixture.state)) == 0);
     }
@@ -830,6 +833,154 @@ static bool permuted_control_seal(size_t index)
                   &fixture.before_state, &fixture.state, sizeof(fixture.state));
 }
 
+static bool selected_control_scope_case(size_t index)
+{
+    enum micros_bootstrap_error result;
+    bool preserved = index == 45;
+
+    REQUIRE(setup_control(false));
+    if (index == 43) {
+        fixture.state.binding_slots[63] = 1;
+    } else if (index == 44) {
+        fixture.state.transitions.service_slots[63] = 1;
+    } else {
+        fixture.state.transitions.entries[0].ready_timeout_counter_ticks = 0;
+    }
+    if (!preserved) {
+        REQUIRE(micros_bootstrap_control_validate(&fixture.state, &fixture.registry, &fixture.objects)
+                == MICROS_BOOTSTRAP_ERROR_INVARIANT);
+    }
+    snapshot_control();
+    if (!preserved) {
+        fixture.expected_state.transitions.entries[0].state = MICROS_BOOTSTRAP_SERVICE_STARTING;
+        fixture.expected_state.transitions.entries[0].endpoint_state = MICROS_BOOTSTRAP_ENDPOINT_ACTIVE;
+        fixture.expected_state.transitions.entries[0].profile_installed = true;
+        fixture.expected_state.transitions.entries[0].scheduler_assigned = true;
+        fixture.expected_state.transitions.entries[0].ready_deadline = 110;
+        fixture.expected_state.transitions.starting_service_id = 2;
+    }
+    REQUIRE(begin(index));
+    result = micros_bootstrap_control_release(
+        &fixture.state, &fixture.registry, &fixture.objects, fixture.hart, 2, 10, true
+    );
+    REQUIRE(finish());
+    REQUIRE(result == (preserved ? MICROS_BOOTSTRAP_ERROR_INVARIANT : MICROS_BOOTSTRAP_OK));
+    REQUIRE(memcmp(&fixture.state, &fixture.expected_state, sizeof(fixture.state)) == 0);
+    if (preserved) {
+        REQUIRE(memcmp(&fixture.registry, &fixture.before_registry, sizeof(fixture.registry)) == 0);
+        REQUIRE(memcmp(&fixture.objects, &fixture.before_objects, sizeof(fixture.objects)) == 0);
+    } else {
+        REQUIRE(micros_bootstrap_control_validate(&fixture.state, &fixture.registry, &fixture.objects)
+                == MICROS_BOOTSTRAP_ERROR_INVARIANT);
+    }
+    return report(index, result, preserved ? 0 : 110, preserved,
+                  &fixture.before_state, &fixture.state, sizeof(fixture.state));
+}
+
+static bool selected_control_view_guards(size_t index)
+{
+    struct {
+        uint64_t prefix;
+        struct micros_bootstrap_service_selection view;
+        uint64_t suffix;
+    } guarded, sentinel;
+
+    REQUIRE(setup_control(false));
+    snapshot_control();
+    memset(&sentinel, 0xa5, sizeof(sentinel));
+    REQUIRE(begin(index));
+    for (unsigned int variant = 0; variant < 15; ++variant) {
+        uint32_t service_id = 2;
+        enum micros_bootstrap_error expected = MICROS_BOOTSTRAP_ERROR_INVARIANT;
+
+        fixture.state = fixture.before_state;
+        guarded = sentinel;
+        switch (variant) {
+        case 0: expected = MICROS_BOOTSTRAP_OK; break;
+        case 1: service_id = 63; expected = MICROS_BOOTSTRAP_ERROR_ARGUMENT; break;
+        case 2: fixture.state.binding_slots[2] = 0; break;
+        case 3: fixture.state.transitions.service_slots[2] = 0; break;
+        case 4: fixture.state.bindings[0].manifest_index = MICROS_BOOTSTRAP_SERVICE_CAPACITY; break;
+        case 5: ++fixture.state.bindings[0].process.generation; break;
+        case 6: ++fixture.state.bindings[0].thread.generation; break;
+        case 7: ++fixture.state.transitions.entries[0].ready_timeout_counter_ticks; break;
+        case 8: fixture.state.manifest.header.entry_count = 0; break;
+        case 9: service_id = 0; expected = MICROS_BOOTSTRAP_ERROR_ARGUMENT; break;
+        case 10: fixture.state.binding_slots[2] = UINT8_MAX; break;
+        case 11: fixture.state.transitions.service_slots[2] = UINT8_MAX; break;
+        case 12: fixture.state.transitions.entries[0].service_id = 3; break;
+        case 13:
+            fixture.state.manifest.entries[0].role_flags =
+                MICROS_BOOTSTRAP_ROLE_VM | MICROS_BOOTSTRAP_ROLE_CONSOLE_OWNER;
+            break;
+        case 14: fixture.state.transitions.starting_service_id = 2; break;
+        }
+        fixture.expected_state = fixture.state;
+        REQUIRE(micros_bootstrap_control_select_service(
+            &fixture.state, &fixture.registry, &fixture.objects, service_id, &guarded.view
+        ) == expected);
+        REQUIRE(memcmp(&fixture.state, &fixture.expected_state, sizeof(fixture.state)) == 0);
+        if (expected == MICROS_BOOTSTRAP_OK) {
+            const struct micros_bootstrap_binding *binding = &fixture.state.bindings[0];
+
+            REQUIRE(guarded.prefix == sentinel.prefix && guarded.suffix == sentinel.suffix);
+            REQUIRE(guarded.view.binding == binding);
+            REQUIRE(guarded.view.manifest == &fixture.state.manifest.entries[0]);
+            REQUIRE(guarded.view.runtime == &fixture.state.transitions.entries[0]);
+            REQUIRE(guarded.view.process == &fixture.objects.processes[binding->process.slot]);
+            REQUIRE(guarded.view.thread == &fixture.objects.threads[binding->thread.slot]);
+            REQUIRE(guarded.view.endpoint == &fixture.registry.endpoints[binding->process.slot]);
+            REQUIRE(guarded.view.binding_index == 0 && guarded.view.runtime_index == 0);
+        } else {
+            REQUIRE(memcmp(&guarded, &sentinel, sizeof(guarded)) == 0);
+        }
+    }
+    fixture.state = fixture.before_state;
+    REQUIRE(finish());
+    REQUIRE(memcmp(&fixture.registry, &fixture.before_registry, sizeof(fixture.registry)) == 0);
+    REQUIRE(memcmp(&fixture.objects, &fixture.before_objects, sizeof(fixture.objects)) == 0);
+    return report(index, MICROS_BOOTSTRAP_OK, 1, true,
+                  &fixture.before_state, &fixture.state, sizeof(fixture.state));
+}
+
+static bool complete_membership_guards(size_t index)
+{
+    struct {
+        uint64_t prefix;
+        struct micros_bootstrap_complete_plan plan;
+        uint64_t suffix;
+    } guarded, sentinel;
+
+    REQUIRE(setup_control(true));
+    snapshot_control();
+    memset(&sentinel, 0xa5, sizeof(sentinel));
+    sentinel.plan.active = false;
+    REQUIRE(begin(index));
+    for (unsigned int variant = 0; variant < 5; ++variant) {
+        fixture.state = fixture.before_state;
+        guarded = sentinel;
+        switch (variant) {
+        case 0: fixture.state.manifest.entries[2].service_id = 2; break;
+        case 1: fixture.state.manifest.entries[0].service_id = 3; break;
+        case 2: fixture.state.transitions.entries[2].service_id = 2; break;
+        case 3: fixture.state.bindings[2].service_id = 2; break;
+        case 4: ++fixture.state.bindings[2].thread.generation; break;
+        }
+        fixture.expected_state = fixture.state;
+        REQUIRE(micros_bootstrap_control_prepare_complete(
+            &fixture.state, &fixture.registry, &fixture.objects, NULL, &guarded.plan
+        ) == MICROS_BOOTSTRAP_ERROR_INVARIANT);
+        REQUIRE(memcmp(&guarded, &sentinel, sizeof(guarded)) == 0);
+        REQUIRE(memcmp(&fixture.state, &fixture.expected_state, sizeof(fixture.state)) == 0);
+    }
+    fixture.state = fixture.before_state;
+    REQUIRE(finish());
+    REQUIRE(memcmp(&fixture.registry, &fixture.before_registry, sizeof(fixture.registry)) == 0);
+    REQUIRE(memcmp(&fixture.objects, &fixture.before_objects, sizeof(fixture.objects)) == 0);
+    return report(index, MICROS_BOOTSTRAP_OK, 1, true,
+                  &fixture.before_state, &fixture.state, sizeof(fixture.state));
+}
+
 static bool boundary_case(size_t index)
 {
     switch (index) {
@@ -845,6 +996,11 @@ static bool boundary_case(size_t index)
     case 39: return constructor_rejections(index);
     case 40: return preparing_permutation(index);
     case 41: return permuted_control_seal(index);
+    case 43:
+    case 44:
+    case 45: return selected_control_scope_case(index);
+    case 46: return selected_control_view_guards(index);
+    case 47: return complete_membership_guards(index);
     default: return false;
     }
 }

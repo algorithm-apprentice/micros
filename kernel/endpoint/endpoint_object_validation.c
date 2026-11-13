@@ -337,7 +337,7 @@ enum micros_endpoint_error micros_endpoint_registry_validate_objects(
     const struct micros_kernel_objects *objects
 )
 {
-#ifdef MICROS_BUILD_IPC_SYSCALL_TEST
+#if defined(MICROS_BUILD_IPC_SYSCALL_TEST) || defined(MICROS_TEST_BOOTSTRAP_COMMAND_COUNTS)
     MICROS_TEST_WORK_HIT("ipc01-target-endpoints", MICROS_WORK_OWNER_KERNEL_ENDPOINT,
                          MICROS_WORK_KIND_COMPLETE_VALIDATOR_CALL, 1);
 #endif

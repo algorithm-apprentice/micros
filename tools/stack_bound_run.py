@@ -72,7 +72,21 @@ def run_observed_scope(root, directory):
     )
     if outcome is not SmokeOutcome.PASS:
         raise StackEvidenceError(f"observed scenario failed its legacy outcome: {outcome.value}\n{result.output}")
-    legacy = replace(result, output=legacy_transcript(result.output))
+    terminal_prefix = result.output
+    bootstrap_scope = {
+        "riscv64-bootstrap-launcher-test": "bootstrap-command",
+        "riscv64-tty-service-test": "tty-bootstrap-command",
+    }.get(configure)
+    if bootstrap_scope is not None:
+        from tests.host.bootstrap_command_evidence import checked_terminal_prefix
+
+        if arguments.require_current_evidence != bootstrap_scope:
+            raise StackEvidenceError("bootstrap observation omitted its owned command-evidence scope")
+        try:
+            terminal_prefix = checked_terminal_prefix(result.output, result.return_code, bootstrap_scope)
+        except ValueError as error:
+            raise StackEvidenceError(str(error)) from error
+    legacy = replace(result, output=legacy_transcript(terminal_prefix))
     if not _matches_observed_run(
         arguments, legacy, outcome, SmokeOutcome.PASS, None, None,
     ) or arguments.serial_input_trigger is not None and not result.serial_input_sent:

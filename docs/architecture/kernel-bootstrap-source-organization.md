@@ -22,9 +22,9 @@ plans. BOOT02 separately owns command audit cadence; BOOT03 owns copy/fill
 algorithms. Current metadata upkeep follows ADR-0123, not the historical
 source-transport ceremony below.
 The declarations-only `kernel/boot/bootstrap_transitions_internal.h`
-belongs to the portable transition owner. Portable control and target
-diagnostics consume its checked lookup and selected plans without adding
-another runtime owner.
+belongs to the portable transition owner. Portable control, target
+diagnostics and console-begin identity preparation consume its checked
+lookup and selected plans without adding another runtime owner.
 The [Accepted BOOT02 contract](selected-bootstrap-command-validation.md)
 keeps those owners while replacing B06's complete command-audit boundary.
 Its narrowly consumed scheduler, VM, TTY and UART point helpers remain

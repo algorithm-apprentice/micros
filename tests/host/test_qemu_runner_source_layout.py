@@ -50,6 +50,8 @@ OWNER_IMPORTS = {
         "tests.host.selected_release_handoff_evidence", "tests.host.work_count_types",
         "tests.host.runtime_memory_evidence", "tests.host.diagnostic_history_evidence",
         "tests.host.selected_ipc_validation_evidence",
+        "tests.host.bootstrap_command_evidence", "tests.host.bootstrap_command_source",
+        "tools.stack_bound_manifest",
         "tools.qemu_smoke_faults",
     },
 }

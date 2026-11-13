@@ -208,7 +208,6 @@ CURRENT_COMPLETE_BOUNDARIES = (
 )
 CURRENT_SELECTED_BOUNDARIES = (
     ("kernel/boot/bootstrap_runtime_validation.c", "micros_bootstrap_runtime_validate", "micros_frame_ownership_runtime_validate_metadata", (), 1),
-    ("kernel/boot/bootstrap_syscall_release.c", "validate_console_begin_runtime", "micros_frame_ownership_runtime_validate_metadata", (), 1),
     ("kernel/memory/bootstrap_memory.c", "micros_frame_ownership_runtime_complete_handoff", "micros_frame_ownership_runtime_validate_metadata", (), 1),
     ("kernel/memory/bootstrap_memory.c", "micros_frame_ownership_runtime_release_process", "micros_frame_ownership_runtime_validate_metadata", (), 1),
     ("kernel/memory/frame_ownership_bootstrap.c", "micros_frame_ownership_release_process_set", "micros_frame_ownership_validate_metadata", (), 1),
@@ -219,6 +218,7 @@ CURRENT_SELECTED_BOUNDARIES = (
     ("kernel/memory/user_address_space_handoff.c", "micros_user_address_space_complete_wired_handoff", "micros_frame_ownership_runtime_validate_metadata", (), 1),
     ("kernel/memory/user_address_space_handoff.c", "micros_user_address_space_prepare_wired_handoff", "micros_frame_ownership_runtime_validate_metadata", (), 1),
     ("kernel/memory/user_address_space_validation.c", "load_validation_context", "micros_frame_ownership_runtime_validate_metadata", (), 1),
+    ("kernel/memory/user_address_space_validation.c", "micros_user_address_space_load_selected_bindings", "micros_frame_ownership_runtime_validate_metadata", (), 1),
     ("kernel/memory/user_address_space_vm_freeze.c", "validate_vm_freeze_address_spaces", "micros_frame_ownership_runtime_validate_metadata", (), 1),
     ("kernel/memory/user_address_space_vm_scratch.c", "micros_user_address_space_prepare_vm_scratch_mapping", "micros_frame_ownership_runtime_validate_metadata", (), 1),
     ("kernel/pm/pm_control_runtime_core.c", "micros_pm_control_runtime_validate_reservation", "micros_frame_ownership_validate_metadata", (), 1),
