@@ -35,9 +35,13 @@ def main(argv=None):
     for row, snapshot in zip(*measured["work"], strict=True):
         totals = work_totals(snapshot)
         owned = totals.per_owner[Owner.KERNEL_BOOT]
+        runtime = totals.per_owner[Owner.RUNTIME]
         print(f"MICROS_BOOT01_WORK_SUMMARY case={row['name']} rows={owned[Kind.RECORD_VISIT]}"
-              f" index={owned[Kind.INDEX_PROBE]} copied={owned[Kind.COPIED_BYTE]}"
-              f" cleared={owned[Kind.CLEARED_BYTE]} boot_audits={owned[Kind.COMPLETE_VALIDATOR_CALL]}"
+              f" index={owned[Kind.INDEX_PROBE]} copied={owned[Kind.COPIED_BYTE] + runtime[Kind.COPIED_BYTE]}"
+              f" copy_units={owned[Kind.COPY_UNIT] + runtime[Kind.COPY_UNIT]}"
+              f" cleared={owned[Kind.CLEARED_BYTE] + runtime[Kind.CLEARED_BYTE]}"
+              f" clear_units={owned[Kind.CLEAR_UNIT] + runtime[Kind.CLEAR_UNIT]}"
+              f" boot_audits={owned[Kind.COMPLETE_VALIDATOR_CALL]}"
               f" all_audits={totals.per_kind[Kind.COMPLETE_VALIDATOR_CALL]}")
     print("MICROS_BOOT01_CURRENT_PASS products=2")
     return 0

@@ -1,5 +1,6 @@
 #include "tests/host/bootstrap_control_test_internal.h"
 #include "arch/riscv64/platform.h"
+#include "kernel/boot/bootstrap_manifest_internal.h"
 #include "kernel/boot/bootstrap_runtime_internal.h"
 #include "kernel/tty/tty_handoff_runtime_internal.h"
 #include "micros/panic.h"
@@ -39,6 +40,7 @@ static const char *const names[] = {
     "control-unvisited-binding", "control-unvisited-runtime", "control-selected-tuple",
     "control-selection-guards",
     "control-complete-membership",
+    "runtime-transfer-sizes", "runtime-unaligned-copy", "runtime-unaligned-clear", "image-catalog-clear",
 };
 
 static struct {
@@ -53,6 +55,13 @@ static struct {
     struct micros_bootstrap_ready_plan ready, before_ready;
     struct micros_bootstrap_complete_plan complete, before_complete;
 } fixture;
+
+static struct {
+    _Alignas(8) unsigned char input[4096 + 32];
+    _Alignas(8) unsigned char output[4096 + 32];
+    unsigned char before[4096 + 32];
+    unsigned char expected[4096 + 32];
+} movement;
 
 static struct {
     jmp_buf jump;
@@ -124,6 +133,7 @@ static bool begin(size_t index)
             | (UINT32_C(1) << MICROS_WORK_OWNER_KERNEL_IPC)
             | (UINT32_C(1) << MICROS_WORK_OWNER_KERNEL_BOOT)
             | (UINT32_C(1) << MICROS_WORK_OWNER_KERNEL_TTY)
+            | (UINT32_C(1) << MICROS_WORK_OWNER_RUNTIME)
     ) == MICROS_TEST_WORK_OK);
 #else
     (void)index;
@@ -981,6 +991,74 @@ static bool complete_membership_guards(size_t index)
                   &fixture.before_state, &fixture.state, sizeof(fixture.state));
 }
 
+static bool runtime_transfer_case(size_t index)
+{
+    const size_t sizes[] = {
+        0, 1, 7, 8, 11, 12, 13, 14, 24, 48, 56, 64, 68, 128, 136, 152,
+        200, 264, 392, 448, 1408, 2416, 4096,
+    };
+    uint64_t value = 0;
+
+    for (size_t byte = 0; byte < sizeof(movement.input); ++byte) {
+        movement.input[byte] = (unsigned char)(byte * 29 + 7);
+    }
+    memset(movement.before, 0xa5, sizeof(movement.before));
+    REQUIRE(begin(index));
+    if (index == 48) {
+        bootstrap_runtime_copy_bytes(NULL, NULL, 0);
+        bootstrap_runtime_clear_bytes(NULL, 0);
+        bootstrap_manifest_copy_bytes(NULL, NULL, 0);
+        bootstrap_manifest_clear_bytes(NULL, 0);
+        for (size_t row = 0; row < sizeof(sizes) / sizeof(sizes[0]); ++row) {
+            size_t size = sizes[row];
+
+            memset(movement.output, 0xa5, sizeof(movement.output));
+            memset(movement.expected, 0xa5, sizeof(movement.expected));
+            memcpy(movement.expected + 16, movement.input + 16, size);
+            bootstrap_runtime_copy_bytes(movement.output + 16, movement.input + 16, size);
+            REQUIRE(memcmp(movement.output, movement.expected, sizeof(movement.output)) == 0);
+            memset(movement.expected + 16, 0, size);
+            bootstrap_runtime_clear_bytes(movement.output + 16, size);
+            REQUIRE(memcmp(movement.output, movement.expected, sizeof(movement.output)) == 0);
+            value += size;
+        }
+    } else {
+        for (size_t row = 0; row < 2; ++row) {
+            size_t target = index == 49 ? (row == 0 ? 19 : 17) : (row == 0 ? 17 : 19);
+            size_t source = row == 0 ? 19 : 16;
+            size_t size = index == 49 ? 65 : (row == 0 ? 13 : 11);
+
+            memset(movement.output, 0xa5, sizeof(movement.output));
+            memset(movement.expected, 0xa5, sizeof(movement.expected));
+            if (index == 49) {
+                memcpy(movement.expected + target, movement.input + source, size);
+                bootstrap_runtime_copy_bytes(movement.output + target, movement.input + source, size);
+            } else {
+                memset(movement.expected + target, 0, size);
+                bootstrap_runtime_clear_bytes(movement.output + target, size);
+            }
+            REQUIRE(memcmp(movement.output, movement.expected, sizeof(movement.output)) == 0);
+            value += size;
+        }
+    }
+    REQUIRE(finish());
+    for (size_t byte = 0; byte < sizeof(movement.input); ++byte) {
+        REQUIRE(movement.input[byte] == (unsigned char)(byte * 29 + 7));
+    }
+    return report(index, MICROS_BOOTSTRAP_OK, value, false,
+                  movement.before, movement.output, sizeof(movement.output));
+}
+
+static bool image_transfer_case(size_t index)
+{
+    fixture.before_state = fixture.state;
+    REQUIRE(begin(index));
+    REQUIRE(test_image_catalog());
+    REQUIRE(finish());
+    return report(index, MICROS_BOOTSTRAP_OK, 1, true,
+                  &fixture.before_state, &fixture.state, sizeof(fixture.state));
+}
+
 static bool boundary_case(size_t index)
 {
     switch (index) {
@@ -1001,6 +1079,10 @@ static bool boundary_case(size_t index)
     case 45: return selected_control_scope_case(index);
     case 46: return selected_control_view_guards(index);
     case 47: return complete_membership_guards(index);
+    case 48:
+    case 49:
+    case 50: return runtime_transfer_case(index);
+    case 51: return image_transfer_case(index);
     default: return false;
     }
 }

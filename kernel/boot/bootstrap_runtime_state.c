@@ -1,4 +1,5 @@
 #include "kernel/boot/bootstrap_runtime_internal.h"
+#include "lib/runtime/memory.h"
 
 #include "micros/kernel_object_runtime.h"
 #include "micros/panic.h"
@@ -26,12 +27,7 @@ void bootstrap_runtime_set_preparation_diagnostic(
 
 void bootstrap_runtime_clear_bytes(void *storage, size_t size)
 {
-    unsigned char *bytes = storage;
-    size_t index;
-
-    for (index = 0; index < size; ++index) {
-        bytes[index] = 0;
-    }
+    (void)micros_runtime_memset(storage, 0, size);
 }
 
 void bootstrap_runtime_copy_bytes(
@@ -40,13 +36,7 @@ void bootstrap_runtime_copy_bytes(
     size_t size
 )
 {
-    unsigned char *output = destination;
-    const unsigned char *input = source;
-    size_t index;
-
-    for (index = 0; index < size; ++index) {
-        output[index] = input[index];
-    }
+    (void)micros_runtime_memcpy(destination, source, size);
 }
 
 bool bootstrap_runtime_bytes_equal(

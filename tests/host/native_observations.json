@@ -2,7 +2,7 @@
   "families": {
     "BOOT01": {
       "channels": ["work"],
-      "native_sources": ["kernel/boot/bootstrap_control_core.c","kernel/boot/bootstrap_diagnostics.c","kernel/boot/bootstrap_manifest_common.c","kernel/boot/bootstrap_runtime_state.c","kernel/boot/bootstrap_transitions.c","kernel/endpoint/endpoint.c","kernel/endpoint/endpoint_close.c","kernel/endpoint/endpoint_codec.c","kernel/endpoint/endpoint_completion_validation.c","kernel/endpoint/endpoint_identity.c","kernel/endpoint/endpoint_object_validation.c","kernel/endpoint/endpoint_privilege.c","kernel/endpoint/endpoint_publication.c","kernel/endpoint/endpoint_queue_validation.c","kernel/endpoint/endpoint_registry.c","kernel/ipc/ipc.c","kernel/ipc/ipc_close.c","kernel/ipc/ipc_common.c","kernel/ipc/ipc_completion.c","kernel/ipc/ipc_deadlock.c","kernel/ipc/ipc_notifications.c","kernel/ipc/ipc_queue.c","kernel/ipc/ipc_rendezvous.c","kernel/ipc/ipc_reply.c","kernel/ipc/ipc_tokens.c","kernel/objects/kernel_object_context.c","kernel/objects/kernel_object_hart.c","kernel/objects/kernel_object_identity.c","kernel/objects/kernel_object_process.c","kernel/objects/kernel_object_stack.c","kernel/objects/kernel_object_state.c","kernel/objects/kernel_object_thread.c","kernel/objects/kernel_object_validation.c","kernel/objects/kernel_objects.c","kernel/scheduler/scheduler_core.c","kernel/scheduler/scheduler_core_accounting.c","kernel/scheduler/scheduler_core_ipc.c","kernel/scheduler/scheduler_core_ipc_transition.c","kernel/scheduler/scheduler_core_policy.c","kernel/scheduler/scheduler_core_queue.c","kernel/scheduler/scheduler_core_return.c","kernel/scheduler/scheduler_core_return_plan.c","kernel/scheduler/scheduler_core_validate.c","kernel/tty/tty_handoff_core.c","kernel/tty/tty_handoff_runtime.c","kernel/tty/tty_handoff_runtime_state.c"],
+      "native_sources": ["kernel/boot/bootstrap_control_core.c","kernel/boot/bootstrap_diagnostics.c","kernel/boot/bootstrap_image.c","kernel/boot/bootstrap_manifest_common.c","kernel/boot/bootstrap_runtime_state.c","kernel/boot/bootstrap_transitions.c","kernel/endpoint/endpoint.c","kernel/endpoint/endpoint_close.c","kernel/endpoint/endpoint_codec.c","kernel/endpoint/endpoint_completion_validation.c","kernel/endpoint/endpoint_identity.c","kernel/endpoint/endpoint_object_validation.c","kernel/endpoint/endpoint_privilege.c","kernel/endpoint/endpoint_publication.c","kernel/endpoint/endpoint_queue_validation.c","kernel/endpoint/endpoint_registry.c","kernel/ipc/ipc.c","kernel/ipc/ipc_close.c","kernel/ipc/ipc_common.c","kernel/ipc/ipc_completion.c","kernel/ipc/ipc_deadlock.c","kernel/ipc/ipc_notifications.c","kernel/ipc/ipc_queue.c","kernel/ipc/ipc_rendezvous.c","kernel/ipc/ipc_reply.c","kernel/ipc/ipc_tokens.c","kernel/objects/kernel_object_context.c","kernel/objects/kernel_object_hart.c","kernel/objects/kernel_object_identity.c","kernel/objects/kernel_object_process.c","kernel/objects/kernel_object_stack.c","kernel/objects/kernel_object_state.c","kernel/objects/kernel_object_thread.c","kernel/objects/kernel_object_validation.c","kernel/objects/kernel_objects.c","kernel/scheduler/scheduler_core.c","kernel/scheduler/scheduler_core_accounting.c","kernel/scheduler/scheduler_core_ipc.c","kernel/scheduler/scheduler_core_ipc_transition.c","kernel/scheduler/scheduler_core_policy.c","kernel/scheduler/scheduler_core_queue.c","kernel/scheduler/scheduler_core_return.c","kernel/scheduler/scheduler_core_return_plan.c","kernel/scheduler/scheduler_core_validate.c","kernel/tty/tty_handoff_core.c","kernel/tty/tty_handoff_runtime.c","kernel/tty/tty_handoff_runtime_state.c","lib/runtime/memory.c"],
       "sites": {
         "kernel/boot/bootstrap_control_core.c": {
           "binding_index_is_valid": [
@@ -23,16 +23,12 @@
           "bytes_are_zero": [
             [["work"],["boot01/kernel/boot/bootstrap_control_core.c/bytes_are_zero/loop-24","insert","KERNEL_BOOT","COMPARISON",1,"entry","",[["for ( index = 0 ; index < size ; ++ index ) {",0]],0,0]]
           ],
-          "clear_bytes": [
-            [["work"],["boot01/kernel/boot/bootstrap_control_core.c/clear_bytes/loop-23","insert","KERNEL_BOOT","CLEARED_BYTE",1,"entry","",[["for ( index = 0 ; index < size ; ++ index ) {",0]],0,0]]
-          ],
+          "clear_bytes": [],
           "control_release": [
             [["work"],["boot01/kernel/boot/bootstrap_control_core.c/control_release/index-136","wrap","KERNEL_BOOT","INDEX_PROBE",1,"value","state -> transitions . next_order_index",[],1,3]],
             [["work"],["boot01/kernel/boot/bootstrap_control_core.c/control_release/index-149","wrap","KERNEL_BOOT","INDEX_PROBE",1,"value","state -> transitions . next_order_index",[],2,3]]
           ],
-          "copy_bytes": [
-            [["work"],["boot01/kernel/boot/bootstrap_control_core.c/copy_bytes/loop-31","insert","KERNEL_BOOT","COPIED_BYTE",1,"entry","",[["for ( index = 0 ; index < size ; ++ index ) {",0]],0,0]]
-          ],
+          "copy_bytes": [],
           "find_ready_pm_endpoint": [
             [["work"],["boot01/kernel/boot/bootstrap_control_core.c/find_ready_pm_endpoint/loop-43","insert","KERNEL_BOOT","RECORD_VISIT",1,"entry","",[["for ( index = 0 ; index < state -> entry_count ; ++ index ) {",0]],0,0]],
             [["work"],["boot01/kernel/boot/bootstrap_control_core.c/find_ready_pm_endpoint/index-56","wrap","KERNEL_BOOT","INDEX_PROBE",1,"value","index",[["for ( index = 0 ; index < state -> entry_count ; ++ index ) {",0]],0,1]],
@@ -110,16 +106,32 @@
           "micros_bootstrap_runtime_fail": [],
           "micros_bootstrap_runtime_record_failure": []
         },
+        "kernel/boot/bootstrap_image.c": {
+          "clear_bytes": [],
+          "micros_bootstrap_image_catalog_validate": [
+            [["work"],["boot01/kernel/boot/bootstrap_image.c/micros_bootstrap_image_catalog_validate/loop-84","insert","KERNEL_BOOT","RECORD_VISIT",1,"entry","",[["for ( index = 0 ; index < image_count ; ++ index ) {",0]],0,0]],
+            [["work"],["boot01/kernel/boot/bootstrap_image.c/micros_bootstrap_image_catalog_validate/loop-105","insert","KERNEL_BOOT","RECORD_VISIT",1,"entry","",[["for ( index = 0 ; index < image_count ; ++ index ) {",0],["for ( other = 0 ; other < index ; ++ other ) {",0]],0,0]],
+            [["work"],["boot01/kernel/boot/bootstrap_image.c/micros_bootstrap_image_catalog_validate/loop-170","insert","KERNEL_BOOT","RECORD_VISIT",1,"entry","",[["for ( index = 0 ; index < image_count ; ++ index ) {",1]],0,0]]
+          ],
+          "pointer_is_aligned": [],
+          "range_bytes_are_zero": [
+            [["work"],["boot01/kernel/boot/bootstrap_image.c/range_bytes_are_zero/loop-25","insert","KERNEL_BOOT","COMPARISON",1,"entry","",[["for ( index = 0 ; index < size ; ++ index ) {",0]],0,0]]
+          ],
+          "ranges_overlap": [],
+          "validate_image": [],
+          "validate_image_segments": [
+            [["work"],["boot01/kernel/boot/bootstrap_image.c/validate_image_segments/loop-16","insert","KERNEL_BOOT","RECORD_VISIT",1,"entry","",[["for ( index = 0 ; index < MICROS_BOOTSTRAP_IMAGE_SEGMENT_COUNT ; ++ index ) {",0]],0,0]]
+          ],
+          "validate_image_shape": [],
+          "validate_segment_objects": [],
+          "validate_segment_shape": []
+        },
         "kernel/boot/bootstrap_manifest_common.c": {
           "bootstrap_manifest_bytes_are_zero": [
             [["work"],["boot01/kernel/boot/bootstrap_manifest_common.c/bootstrap_manifest_bytes_are_zero/loop-24","insert","KERNEL_BOOT","COMPARISON",1,"entry","",[["for ( index = 0 ; index < size ; ++ index ) {",0]],0,0]]
           ],
-          "bootstrap_manifest_clear_bytes": [
-            [["work"],["boot01/kernel/boot/bootstrap_manifest_common.c/bootstrap_manifest_clear_bytes/loop-23","insert","KERNEL_BOOT","CLEARED_BYTE",1,"entry","",[["for ( index = 0 ; index < size ; ++ index ) {",0]],0,0]]
-          ],
-          "bootstrap_manifest_copy_bytes": [
-            [["work"],["boot01/kernel/boot/bootstrap_manifest_common.c/bootstrap_manifest_copy_bytes/loop-31","insert","KERNEL_BOOT","COPIED_BYTE",1,"entry","",[["for ( index = 0 ; index < size ; ++ index ) {",0]],0,0]]
-          ],
+          "bootstrap_manifest_clear_bytes": [],
+          "bootstrap_manifest_copy_bytes": [],
           "bootstrap_manifest_fixed_name_is_canonical": [
             [["work"],["boot01/kernel/boot/bootstrap_manifest_common.c/bootstrap_manifest_fixed_name_is_canonical/loop-35","insert","KERNEL_BOOT","COMPARISON",1,"entry","",[["for ( index = 0 ; index < MICROS_BOOTSTRAP_NAME_SIZE ; ++ index ) {",0]],0,0]]
           ],
@@ -133,7 +145,9 @@
           "bootstrap_manifest_pointer_is_aligned": []
         },
         "kernel/boot/bootstrap_runtime_state.c": {
-          "bootstrap_runtime_context": []
+          "bootstrap_runtime_clear_bytes": [],
+          "bootstrap_runtime_context": [],
+          "bootstrap_runtime_copy_bytes": []
         },
         "kernel/boot/bootstrap_transitions.c": {
           "bootstrap_runtime_commit_prevalidated": [
@@ -1158,10 +1172,14 @@
           "tty_handoff_copy_bytes": [
             [["work"],["boot01-shared/grant01/kernel/tty/tty_handoff_runtime_state.c/tty_handoff_copy_bytes/loop-29","insert","KERNEL_TTY","COPIED_BYTE",1,"entry","",[["for ( index = 0 ; index < size ; ++ index ) {",0]],0,0]]
           ]
+        },
+        "lib/runtime/memory.c": {
+          "micros_runtime_memcpy": [],
+          "micros_runtime_memset": []
         }
       },
       "subsets": {
-        "kernel/boot/bootstrap_runtime_state.c": ["bootstrap_runtime_context"],
+        "kernel/boot/bootstrap_runtime_state.c": ["bootstrap_runtime_context","bootstrap_runtime_copy_bytes","bootstrap_runtime_clear_bytes"],
         "kernel/tty/tty_handoff_runtime.c": ["micros_tty_handoff_runtime_state","micros_tty_handoff_runtime_deadline_expired"]
       }
     },
@@ -10015,16 +10033,12 @@
           "storage": []
         },
         "clear_bytes": {
-          "accesses": [
-            ["bytes [ index ]",[["for ( index = 0 ; index < size ; ++ index ) {",0]]]
-          ],
+          "accesses": [],
           "aliases": [],
-          "calls": [],
+          "calls": ["micros_runtime_memset"],
           "directives": [],
           "guards": [],
-          "loops": [
-            ["for ( index = 0 ; index < size ; ++ index ) {",[]]
-          ],
+          "loops": [],
           "signature": "static void clear_bytes ( void * storage , size_t size )",
           "storage": []
         },
@@ -10049,17 +10063,12 @@
           "storage": []
         },
         "copy_bytes": {
-          "accesses": [
-            ["output [ index ]",[["for ( index = 0 ; index < size ; ++ index ) {",0]]],
-            ["input [ index ]",[["for ( index = 0 ; index < size ; ++ index ) {",0]]]
-          ],
+          "accesses": [],
           "aliases": [],
-          "calls": [],
+          "calls": ["micros_runtime_memcpy"],
           "directives": [],
           "guards": [],
-          "loops": [
-            ["for ( index = 0 ; index < size ; ++ index ) {",[]]
-          ],
+          "loops": [],
           "signature": "static void copy_bytes ( void * destination , const void * source , size_t size )",
           "storage": []
         },
@@ -10497,6 +10506,135 @@
       },
       "storage": []
     },
+    "kernel/boot/bootstrap_image.c": {
+      "complete": 1,
+      "functions": {
+        "clear_bytes": {
+          "accesses": [],
+          "aliases": [],
+          "calls": ["micros_runtime_memset"],
+          "directives": [],
+          "guards": [],
+          "loops": [],
+          "signature": "static void clear_bytes ( void * storage , size_t size )",
+          "storage": []
+        },
+        "micros_bootstrap_image_catalog_validate": {
+          "accesses": [
+            ["candidate [ MICROS_BOOTSTRAP_SERVICE_CAPACITY ]",[]],
+            ["images [ other ]",[["for ( index = 0 ; index < image_count ; ++ index ) {",0],["for ( other = 0 ; other < index ; ++ other ) {",0]]],
+            ["images [ index ]",[["for ( index = 0 ; index < image_count ; ++ index ) {",0],["for ( other = 0 ; other < index ; ++ other ) {",0]]],
+            ["images [ index ]",[["for ( index = 0 ; index < image_count ; ++ index ) {",0]]],
+            ["candidate [ index ]",[["for ( index = 0 ; index < image_count ; ++ index ) {",0]]],
+            ["infos [ index ]",[["for ( index = 0 ; index < image_count ; ++ index ) {",1]]],
+            ["candidate [ index ]",[["for ( index = 0 ; index < image_count ; ++ index ) {",1]]]
+          ],
+          "aliases": [],
+          "calls": ["clear_bytes","pointer_is_aligned","validate_image"],
+          "directives": [],
+          "guards": [],
+          "loops": [
+            ["for ( index = 0 ; index < image_count ; ++ index ) {",[]],
+            ["for ( other = 0 ; other < index ; ++ other ) {",[["for ( index = 0 ; index < image_count ; ++ index ) {",0]]],
+            ["for ( index = 0 ; index < image_count ; ++ index ) {",[]]
+          ],
+          "signature": "enum micros_bootstrap_error micros_bootstrap_image_catalog_validate ( const struct micros_bootstrap_image * images , size_t image_count , struct micros_bootstrap_image_info * infos , size_t info_capacity )",
+          "storage": []
+        },
+        "pointer_is_aligned": {
+          "accesses": [],
+          "aliases": [],
+          "calls": [],
+          "directives": [],
+          "guards": [],
+          "loops": [],
+          "signature": "static bool pointer_is_aligned ( const void * pointer , size_t alignment )",
+          "storage": []
+        },
+        "range_bytes_are_zero": {
+          "accesses": [
+            ["file_bytes [ offset ]",[["for ( index = 0 ; index < size ; ++ index ) {",0]]]
+          ],
+          "aliases": [],
+          "calls": [],
+          "directives": [],
+          "guards": [],
+          "loops": [
+            ["for ( index = 0 ; index < size ; ++ index ) {",[]]
+          ],
+          "signature": "static bool range_bytes_are_zero ( const struct micros_bootstrap_image_segment * segment , uint64_t address , uint32_t size )",
+          "storage": []
+        },
+        "ranges_overlap": {
+          "accesses": [],
+          "aliases": [],
+          "calls": [],
+          "directives": [],
+          "guards": [],
+          "loops": [],
+          "signature": "static bool ranges_overlap ( uint64_t left_base , uint64_t left_size , uint64_t right_base , uint64_t right_size )",
+          "storage": []
+        },
+        "validate_image": {
+          "accesses": [],
+          "aliases": [],
+          "calls": ["validate_image_segments","validate_image_shape"],
+          "directives": [],
+          "guards": [],
+          "loops": [],
+          "signature": "static enum micros_bootstrap_error validate_image ( const struct micros_bootstrap_image * image , struct micros_bootstrap_image_info * info )",
+          "storage": []
+        },
+        "validate_image_segments": {
+          "accesses": [
+            ["segments [ index ]",[["for ( index = 0 ; index < MICROS_BOOTSTRAP_IMAGE_SEGMENT_COUNT ; ++ index ) {",0]]]
+          ],
+          "aliases": [],
+          "calls": ["validate_segment_objects","validate_segment_shape"],
+          "directives": [],
+          "guards": [],
+          "loops": [
+            ["for ( index = 0 ; index < MICROS_BOOTSTRAP_IMAGE_SEGMENT_COUNT ; ++ index ) {",[]]
+          ],
+          "signature": "static enum micros_bootstrap_error validate_image_segments ( const struct micros_bootstrap_image * image , bool has_vm_boot_info , struct image_validation * validation )",
+          "storage": []
+        },
+        "validate_image_shape": {
+          "accesses": [],
+          "aliases": [],
+          "calls": ["ranges_overlap"],
+          "directives": [],
+          "guards": [],
+          "loops": [],
+          "signature": "static enum micros_bootstrap_error validate_image_shape ( const struct micros_bootstrap_image * image , bool has_vm_boot_info )",
+          "storage": []
+        },
+        "validate_segment_objects": {
+          "accesses": [],
+          "aliases": [],
+          "calls": ["range_bytes_are_zero"],
+          "directives": [],
+          "guards": [],
+          "loops": [],
+          "signature": "static bool validate_segment_objects ( const struct micros_bootstrap_image * image , const struct micros_bootstrap_image_segment * segment , uint64_t segment_end , bool has_vm_boot_info , struct image_validation * validation )",
+          "storage": []
+        },
+        "validate_segment_shape": {
+          "accesses": [
+            ["expected_flags [ MICROS_BOOTSTRAP_IMAGE_SEGMENT_COUNT ]",[]],
+            ["expected_flags [ index ]",[]]
+          ],
+          "aliases": [],
+          "calls": [],
+          "directives": [],
+          "guards": [],
+          "loops": [],
+          "signature": "static enum micros_bootstrap_error validate_segment_shape ( const struct micros_bootstrap_image_segment * segment , size_t index , uint64_t next_address )",
+          "storage": ["static const uint32_t expected_flags [ MICROS_BOOTSTRAP_IMAGE_SEGMENT_COUNT ] = { MICROS_BOOTSTRAP_IMAGE_READ | MICROS_BOOTSTRAP_IMAGE_EXECUTE , MICROS_BOOTSTRAP_IMAGE_READ , MICROS_BOOTSTRAP_IMAGE_READ | MICROS_BOOTSTRAP_IMAGE_WRITE , } ;"]
+        }
+      },
+      "storage": []
+    },
     "kernel/boot/bootstrap_manifest_common.c": {
       "complete": 1,
       "functions": {
@@ -10515,31 +10653,22 @@
           "storage": []
         },
         "bootstrap_manifest_clear_bytes": {
-          "accesses": [
-            ["bytes [ index ]",[["for ( index = 0 ; index < size ; ++ index ) {",0]]]
-          ],
+          "accesses": [],
           "aliases": [],
-          "calls": [],
+          "calls": ["micros_runtime_memset"],
           "directives": [],
           "guards": [],
-          "loops": [
-            ["for ( index = 0 ; index < size ; ++ index ) {",[]]
-          ],
+          "loops": [],
           "signature": "void bootstrap_manifest_clear_bytes ( void * storage , size_t size )",
           "storage": []
         },
         "bootstrap_manifest_copy_bytes": {
-          "accesses": [
-            ["destination_bytes [ index ]",[["for ( index = 0 ; index < size ; ++ index ) {",0]]],
-            ["source_bytes [ index ]",[["for ( index = 0 ; index < size ; ++ index ) {",0]]]
-          ],
+          "accesses": [],
           "aliases": [],
-          "calls": [],
+          "calls": ["micros_runtime_memcpy"],
           "directives": [],
           "guards": [],
-          "loops": [
-            ["for ( index = 0 ; index < size ; ++ index ) {",[]]
-          ],
+          "loops": [],
           "signature": "void bootstrap_manifest_copy_bytes ( void * destination , const void * source , size_t size )",
           "storage": []
         },
@@ -10623,16 +10752,12 @@
           "storage": []
         },
         "bootstrap_runtime_clear_bytes": {
-          "accesses": [
-            ["bytes [ index ]",[["for ( index = 0 ; index < size ; ++ index ) {",0]]]
-          ],
+          "accesses": [],
           "aliases": [],
-          "calls": [],
+          "calls": ["micros_runtime_memset"],
           "directives": [],
           "guards": [],
-          "loops": [
-            ["for ( index = 0 ; index < size ; ++ index ) {",[]]
-          ],
+          "loops": [],
           "signature": "void bootstrap_runtime_clear_bytes ( void * storage , size_t size )",
           "storage": []
         },
@@ -10647,17 +10772,12 @@
           "storage": []
         },
         "bootstrap_runtime_copy_bytes": {
-          "accesses": [
-            ["output [ index ]",[["for ( index = 0 ; index < size ; ++ index ) {",0]]],
-            ["input [ index ]",[["for ( index = 0 ; index < size ; ++ index ) {",0]]]
-          ],
+          "accesses": [],
           "aliases": [],
-          "calls": [],
+          "calls": ["micros_runtime_memcpy"],
           "directives": [],
           "guards": [],
-          "loops": [
-            ["for ( index = 0 ; index < size ; ++ index ) {",[]]
-          ],
+          "loops": [],
           "signature": "void bootstrap_runtime_copy_bytes ( void * destination , const void * source , size_t size )",
           "storage": []
         },

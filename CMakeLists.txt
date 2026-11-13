@@ -1475,11 +1475,13 @@ if(MICROS_BUILD_HOST_TESTS)
     )
     add_executable(
         bootstrap_test
+        lib/runtime/memory.c
         ${MICROS_BOOTSTRAP_MANIFEST_SOURCES}
         ${MICROS_BOOTSTRAP_MANIFEST_HOST_TEST_SOURCES}
     )
     add_executable(
         bootstrap_control_test
+        lib/runtime/memory.c
         kernel/boot/bootstrap_control.c
         kernel/boot/bootstrap_control_core.c
         ${MICROS_BOOTSTRAP_IMAGE_SOURCES}
@@ -1741,6 +1743,7 @@ if(MICROS_BUILD_HOST_TESTS)
     )
     add_executable(
         tty_test
+        lib/runtime/memory.c
         kernel/boot/bootstrap_manifest_common.c
         kernel/boot/bootstrap_transitions.c
         kernel/platform/plic_core.c
@@ -4391,6 +4394,8 @@ if(MICROS_BUILD_HOST_TESTS)
         kernel/boot/bootstrap_control_core.c
         kernel/boot/bootstrap_transitions.c
         kernel/boot/bootstrap_manifest_common.c
+        kernel/boot/bootstrap_image.c
+        lib/runtime/memory.c
         kernel/boot/bootstrap_runtime_state.c
         kernel/boot/bootstrap_diagnostics.c
         kernel/tty/tty_handoff_core.c
@@ -4417,7 +4422,8 @@ if(MICROS_BUILD_HOST_TESTS)
         kernel/tty/tty_handoff_core.h
         kernel/tty/tty_handoff_runtime.h
         kernel/tty/tty_handoff_runtime_internal.h
-        kernel/vm/vm_snapshot.h)
+        kernel/vm/vm_snapshot.h
+        lib/runtime/memory.h)
     set(BOOT01_NATIVE_DEPENDENCIES ${BOOT01_NATIVE_INPUTS} ${BOOT01_NATIVE_HEADERS})
     list(TRANSFORM BOOT01_NATIVE_DEPENDENCIES PREPEND "${CMAKE_CURRENT_SOURCE_DIR}/")
     set(BOOT01_NATIVE_OUTPUTS)
@@ -4439,6 +4445,7 @@ if(MICROS_BUILD_HOST_TESTS)
         DEPENDS ${BOOT01_NATIVE_DEPENDENCIES}
             tests/host/indexed_bootstrap_test.c
             tests/host/bootstrap_control_fixture.c
+            tests/host/bootstrap_control_image_catalog_test.c
             tests/host/bootstrap_control_test_internal.h
             tests/host/indexed_bootstrap_evidence.py
             tests/host/indexed_bootstrap_source.py
@@ -4456,9 +4463,11 @@ if(MICROS_BUILD_HOST_TESTS)
         VERBATIM
     )
     add_executable(indexed_bootstrap_ordinary ${BOOT01_SOURCES_ordinary}
-        tests/host/indexed_bootstrap_test.c tests/host/bootstrap_control_fixture.c)
+        tests/host/indexed_bootstrap_test.c tests/host/bootstrap_control_fixture.c
+        tests/host/bootstrap_control_image_catalog_test.c)
     add_executable(indexed_bootstrap_test ${BOOT01_SOURCES_work}
-        tests/host/indexed_bootstrap_test.c tests/host/bootstrap_control_fixture.c tests/work/work_counts.c)
+        tests/host/indexed_bootstrap_test.c tests/host/bootstrap_control_fixture.c
+        tests/host/bootstrap_control_image_catalog_test.c tests/work/work_counts.c)
     foreach(boot01_channel IN ITEMS ordinary work)
         if(boot01_channel STREQUAL ordinary)
             set(boot01_target indexed_bootstrap_ordinary)

@@ -1,8 +1,11 @@
 """Independent bootstrap lookup/transition semantics and bounded native work."""
 
 import json
+import hashlib
+import os
 from pathlib import Path
 import re
+import shlex
 import subprocess
 
 from tests.host.evidence_records import record_fields
@@ -20,12 +23,15 @@ NATIVE_SOURCES = tuple(path for path in IPC_SOURCES if path not in (
 )) + (
     "kernel/boot/bootstrap_control_core.c", "kernel/boot/bootstrap_transitions.c",
     "kernel/boot/bootstrap_manifest_common.c",
+    "kernel/boot/bootstrap_image.c", "lib/runtime/memory.c",
     "kernel/boot/bootstrap_runtime_state.c", "kernel/boot/bootstrap_diagnostics.c",
     "kernel/tty/tty_handoff_core.c", "kernel/tty/tty_handoff_runtime_state.c",
     "kernel/tty/tty_handoff_runtime.c",
 )
 NATIVE_SUBSETS = {
-    "kernel/boot/bootstrap_runtime_state.c": ("bootstrap_runtime_context",),
+    "kernel/boot/bootstrap_runtime_state.c": (
+        "bootstrap_runtime_context", "bootstrap_runtime_copy_bytes", "bootstrap_runtime_clear_bytes",
+    ),
     "kernel/tty/tty_handoff_runtime.c": (
         "micros_tty_handoff_runtime_state", "micros_tty_handoff_runtime_deadline_expired",
     ),
@@ -41,16 +47,18 @@ NATIVE_HEADERS = IPC_HEADERS + (
     "kernel/boot/bootstrap_runtime_internal.h", "kernel/tty/tty_handoff_core.h",
     "kernel/tty/tty_handoff_runtime.h", "kernel/tty/tty_handoff_runtime_internal.h",
     "kernel/vm/vm_snapshot.h",
+    "lib/runtime/memory.h",
 )
 OBSERVED_HEADERS = ("kernel/boot/bootstrap_control_internal.h",)
 TARGETS = ("indexed_bootstrap_ordinary", "indexed_bootstrap_test")
 PRODUCER = 0x424f4f5430310001
 OWNER_MASK = sum(1 << owner for owner in (
     Owner.KERNEL_OBJECTS, Owner.KERNEL_SCHEDULER, Owner.KERNEL_ENDPOINT, Owner.KERNEL_IPC, Owner.KERNEL_BOOT,
-    Owner.KERNEL_TTY,
+    Owner.KERNEL_TTY, Owner.RUNTIME,
 ))
 CASE_FIELDS = ("version", "case", "name", "result", "value", "preserved", "before_state", "after_state")
 WORK_FIELDS = ("version", "reserved0", "producer", "case", "owner_mask", "reserved1", "counts")
+TRANSFER_SIZES = (0, 1, 7, 8, 11, 12, 13, 14, 24, 48, 56, 64, 68, 128, 136, 152, 200, 264, 392, 448, 1408, 2416, 4096)
 # name, result, value, preserved, owned row visits (-1: retained full audit), copied/cleared bytes, minimum boot audits
 CASES = (
     ("binding-first", 0, 2, 1, 0, 0, 0, 0),
@@ -101,7 +109,32 @@ CASES = (
     ("control-selected-tuple", 11, 0, 1, 0, 192, 96, 0),
     ("control-selection-guards", 0, 1, 1, 0, 0, 0, 0),
     ("control-complete-membership", 0, 1, 1, 15, 0, 1000, 0),
+    ("runtime-transfer-sizes", 0, sum(TRANSFER_SIZES), 0, 0, sum(TRANSFER_SIZES), sum(TRANSFER_SIZES), 0),
+    ("runtime-unaligned-copy", 0, 130, 0, 0, 130, 0, 0),
+    ("runtime-unaligned-clear", 0, 24, 0, 0, 0, 24, 0),
+    ("image-catalog-clear", 0, 1, 1, -1, 0, 3136, 0),
 )
+MOVEMENT_KINDS = (Kind.COPIED_BYTE, Kind.CLEARED_BYTE, Kind.COPY_UNIT, Kind.CLEAR_UNIT)
+MOVEMENT_COUNTS = {
+    **{name: (160, 64, 20, 16) for name in (
+        "runtime-release-two", "runtime-release-many", "runtime-ready-many", "runtime-complete-many",
+        "control-release", "single-service-complete", "runtime-unvisited-scope",
+        "control-unvisited-binding", "control-unvisited-runtime",
+    )},
+    "control-ready-plan": (248, 200, 31, 50),
+    "control-ready-commit": (48, 136, 6, 34),
+    "control-complete-plan": (312, 264, 39, 66),
+    "control-complete-commit": (48, 200, 6, 50),
+    "permuted-control-seal": (48, 200, 6, 50),
+    "runtime-transfer-sizes": (
+        sum(TRANSFER_SIZES), sum(TRANSFER_SIZES),
+        sum(size // 8 + size % 8 for size in TRANSFER_SIZES),
+        sum(size if size < 12 else size // 4 + size % 4 for size in TRANSFER_SIZES),
+    ),
+    "runtime-unaligned-copy": (130, 0, 81, 0),
+    "runtime-unaligned-clear": (0, 24, 0, 18),
+    "image-catalog-clear": (0, 3136, 0, 784),
+}
 COMMAND_CASES = frozenset((
     "control-release", "control-ready-plan", "control-ready-commit", "control-ready-role",
     "control-complete-plan", "control-complete-commit", "permuted-control-seal",
@@ -174,13 +207,20 @@ def work_failures(records, work):
             raise ValueError("BOOT01 borrowed a work snapshot")
         totals = work_totals(snapshot)
         owned = totals.per_owner[Owner.KERNEL_BOOT]
+        runtime = totals.per_owner[Owner.RUNTIME]
         if row["name"] in COMMAND_CASES and totals.per_kind[Kind.COMPLETE_VALIDATOR_CALL] != 0:
             failures.append((row["name"], "complete-command-audit", totals.per_kind[Kind.COMPLETE_VALIDATOR_CALL], 0))
         for kind, bound in (
             (Kind.RECORD_VISIT, spec[4]), (Kind.COPIED_BYTE, spec[5]), (Kind.CLEARED_BYTE, spec[6]),
         ):
-            if bound >= 0 and owned[kind] > bound:
-                failures.append((row["name"], kind.name.lower(), owned[kind], bound))
+            count = owned[kind] + (runtime[kind] if kind in MOVEMENT_KINDS else 0)
+            if bound >= 0 and count > bound:
+                failures.append((row["name"], kind.name.lower(), count, bound))
+        if row["name"] in MOVEMENT_COUNTS:
+            for kind, expected in zip(MOVEMENT_KINDS, MOVEMENT_COUNTS[row["name"]], strict=True):
+                count = owned[kind] + runtime[kind]
+                if count != expected:
+                    failures.append((row["name"], "transfer-" + kind.name.lower(), count, expected))
         if owned[Kind.COMPLETE_VALIDATOR_CALL] < spec[7]:
             failures.append((row["name"], "lost-boot-audit", owned[Kind.COMPLETE_VALIDATOR_CALL], spec[7]))
     return tuple(failures)
@@ -226,3 +266,127 @@ def check_native_products(root, executable_paths):
     if failures:
         raise ValueError("BOOT01 independent work bounds failed: " + repr(failures))
     return measured
+
+
+def _target_transfer_objects(root, directory, commands, owners, compiler):
+    from tests.host.indexed_bootstrap_source import MOVEMENT_HELPERS
+    from tools.stack_bound_manifest import owned_artifact
+
+    expected = frozenset((*MOVEMENT_HELPERS, "lib/runtime/memory.c"))
+    selected = {}
+    for command in commands:
+        source = Path(command["file"])
+        output = Path(command["output"])
+        source = source if source.is_absolute() else directory / source
+        output = output if output.is_absolute() else directory / output
+        if source not in {root / name for name in expected}:
+            continue
+        if not output.is_relative_to(directory) or str(output.relative_to(directory)) not in owners:
+            continue
+        output = owned_artifact(directory, str(output.relative_to(directory)))
+        argv = tuple(shlex.split(command["command"]))
+        if (Path(command["directory"]).resolve() != directory
+            or not argv or argv[0] != compiler
+            or argv.count("-c") != 1 or argv.count("-o") != 1
+            or max(argv.index("-c"), argv.index("-o")) + 1 >= len(argv)
+            or any(argument.startswith("@") for argument in argv)):
+            raise ValueError("BOOT03 kernel transfer has a foreign or incomplete compiler command")
+        operands = []
+        for option in ("-c", "-o"):
+            operand = Path(argv[argv.index(option) + 1])
+            operands.append(operand if operand.is_absolute() else directory / operand)
+        if tuple(operands) != (source, output):
+            raise ValueError("BOOT03 compiler operands disagree with their linked owner")
+        name = str(source.relative_to(root))
+        if name in selected:
+            raise ValueError("BOOT03 kernel transfer has duplicate source ownership")
+        selected[name] = output
+    if selected.keys() != expected:
+        raise ValueError("BOOT03 kernel lacks its exact four caller objects and memory provider")
+    return selected
+
+
+def check_target_product(root):
+    from tests.host.indexed_bootstrap_source import MOVEMENT_HELPERS
+    from tests.host.runtime_memory_evidence import runtime_compile_commands, validate_green_source, wide_data_transfers
+    from tests.host.source_snapshot import source_bytes
+    from tools.stack_bound_manifest import owned_artifact
+    from tools.stack_bound_collect import image_map_text
+    from tools.stack_bound_flow import function_flow, reachable_instructions
+    from tools.stack_bound_link import text_owners
+    from tools.stack_bound_objects import function_symbols, load_object
+    from tools.stack_bound_relocations import verify_linked_object
+    from tools.user_elf_parse import load_elf
+    from tools.validation_context import compiler_version, target_compiler, validate_environment
+    from tools.validation_inputs import _file_identity, _run
+
+    root = Path(root).resolve()
+    directory = owned_artifact(root, "build/riscv64-bootstrap-launcher-test")
+    relative_image = "kernel/micros.elf"
+    memory = "lib/runtime/memory.c"
+    sources = (
+        *MOVEMENT_HELPERS, memory, "lib/runtime/memory.h", "include/micros/work_observation.h",
+        "include/micros/bootstrap.h", "kernel/boot/bootstrap_manifest_internal.h",
+        "kernel/boot/bootstrap_control_internal.h", "kernel/boot/bootstrap_runtime_internal.h",
+        "kernel/boot/bootstrap_image.h",
+    )
+    source_identities = {name: read_regular(owned_artifact(root, name))[1] for name in sources}
+    validate_green_source(source_bytes(root, root / memory).decode())
+    validate_environment(dict(os.environ), target=True)
+    compiler = target_compiler(dict(os.environ))
+    compiler_identity = _file_identity(compiler.resolve())
+    version = _run((str(compiler), "--version")).decode()
+    compiler_version(version, target=True)
+    image_path = owned_artifact(directory, relative_image)
+    image_data, image_identity = read_regular(image_path)
+    image = load_elf(image_path)
+    if image.data != image_data:
+        raise ValueError("BOOT03 kernel image changed before byte proof")
+    map_text = image_map_text(directory, relative_image)
+    owners = {name for name, _ in text_owners(map_text)}
+    commands = runtime_compile_commands(directory)
+    selected = _target_transfer_objects(root, directory, commands, owners, str(compiler))
+    identities, objects, symbols = {}, {}, {}
+    for source, output in selected.items():
+        raw, identities[source] = read_regular(output)
+        obj = load_object(output)
+        if obj.data != raw:
+            raise ValueError("BOOT03 kernel object changed before byte proof")
+        retained = verify_linked_object(obj, str(output.relative_to(directory)), image, map_text)
+        functions = function_symbols(obj)
+        names = MOVEMENT_HELPERS[source] if source in MOVEMENT_HELPERS else (
+            "micros_runtime_memcpy", "micros_runtime_memset",
+        )
+        if any(name not in functions or functions[name].section_index not in retained for name in names):
+            raise ValueError("BOOT03 transfer function is absent from its actual linked owner")
+        objects[source], symbols[source] = obj, functions
+    helpers = 0
+    for source, functions in MOVEMENT_HELPERS.items():
+        for name, (unit, _) in functions.items():
+            provider = "micros_runtime_memcpy" if unit == "COPY_UNIT" else "micros_runtime_memset"
+            flow = function_flow(objects[source], symbols[source][name])
+            if (len(flow.calls) != 1 or flow.calls[0].target_symbol != provider
+                or flow.calls[0].offset not in reachable_instructions(flow)):
+                raise ValueError("BOOT03 helper lacks its unique reachable provider call: " + name)
+            helpers += 1
+    transfers = {
+        operation: wide_data_transfers(objects[memory], symbols[memory][name], operation)
+        for operation, name in (("copy", "micros_runtime_memcpy"), ("fill", "micros_runtime_memset"))
+    }
+    if (any(symbol.name in ("memcpy", "memset") for symbol in image.symbols)
+        or any(symbol.name.startswith("micros_test_work_") for symbol in objects[memory].symbols)):
+        raise ValueError("BOOT03 kernel added a memory forwarder or instrumented the ordinary provider")
+    if ({name: read_regular(owned_artifact(root, name))[1] for name in sources} != source_identities
+        or {name: read_regular(owned_artifact(directory, str(output.relative_to(directory))))[1]
+            for name, output in selected.items()} != identities
+        or read_regular(image_path)[1] != image_identity
+        or image_map_text(directory, relative_image) != map_text
+        or runtime_compile_commands(directory) != commands
+        or _file_identity(compiler.resolve()) != compiler_identity
+        or _run((str(compiler), "--version")).decode() != version):
+        raise ValueError("BOOT03 source, compiler, image, object or recipe changed during proof")
+    return {
+        "image": image_identity, "objects": identities, "compiler": compiler_identity,
+        "map_sha256": hashlib.sha256(map_text.encode()).hexdigest(),
+        "helpers": helpers, "wide_transfers": transfers,
+    }

@@ -1,4 +1,5 @@
 #include "kernel/boot/bootstrap_image.h"
+#include "lib/runtime/memory.h"
 
 #include <stddef.h>
 #include <stdint.h>
@@ -14,12 +15,7 @@ static bool pointer_is_aligned(const void *pointer, size_t alignment)
 
 static void clear_bytes(void *storage, size_t size)
 {
-    unsigned char *bytes = storage;
-    size_t index;
-
-    for (index = 0; index < size; ++index) {
-        bytes[index] = 0;
-    }
+    (void)micros_runtime_memset(storage, 0, size);
 }
 
 static bool range_bytes_are_zero(

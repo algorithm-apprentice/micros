@@ -439,7 +439,7 @@ The existing runner accepts nine finite current-evidence scopes:
 | `scheduler-return` | `test-qemu-scheduler`: exact selected context counts, including 1/2/1 validation |
 | `runtime-memory` | `test-qemu-user-runtime`: actual linked memory object, ELF/map/Ninja recipe and non-stack wide transfers |
 | `selected-ipc` | `test-qemu-ipc-syscall`: all six syscall and four completion classes, complete actual work snapshots and zero ordinary complete audits |
-| `bootstrap-command` | `test-qemu-bootstrap-launcher`: captured release/readiness/seal, selected context admission and zero ordinary complete audits |
+| `bootstrap-command` | `test-qemu-bootstrap-launcher`: captured release/readiness/seal, selected context admission, zero ordinary complete audits and actual linked bootstrap copy/fill provider edges |
 | `tty-bootstrap-command` | `test-qemu-tty`: captured VM/PM/TTY/service roles, console begin, fixed UART points and sealed completion without complete command audits |
 | `diagnostic-history` | `test-qemu-panic`: the unique aligned 12,012-byte local BSS history and complete seeded panic witness |
 

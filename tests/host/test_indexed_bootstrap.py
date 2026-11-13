@@ -7,7 +7,7 @@ import unittest
 from unittest.mock import patch
 
 from tests.host.indexed_bootstrap_evidence import (
-    CASES, NATIVE_SOURCES, OBSERVED_HEADERS, OWNER_MASK, PRODUCER,
+    CASES, MOVEMENT_COUNTS, MOVEMENT_KINDS, NATIVE_SOURCES, OBSERVED_HEADERS, OWNER_MASK, PRODUCER,
     expected_cases, parse_native_output, work_failures,
 )
 from tests.host.indexed_bootstrap_source import (
@@ -26,6 +26,8 @@ def transcript(channel="work"):
             "counts": [[0] * len(Kind) for _ in Owner],
         }
         work["counts"][Owner.KERNEL_BOOT][Kind.COMPLETE_VALIDATOR_CALL] = spec[7]
+        for kind, count in zip(MOVEMENT_KINDS, MOVEMENT_COUNTS.get(row["name"], (0, 0, 0, 0)), strict=True):
+            work["counts"][Owner.RUNTIME][kind] = count
         lines.append("MICROS_BOOT01_CASE " + json.dumps(row))
         if channel == "work":
             lines.append("MICROS_BOOT01_WORK " + json.dumps(work))
@@ -81,6 +83,25 @@ class IndexedBootstrapTest(unittest.TestCase):
         with self.assertRaises(ValueError):
             work_failures(changed, work)
 
+    def test_delegated_units_and_bytes_cannot_disappear_or_be_counted_twice(self):
+        records, work = parse_native_output(transcript(), "work")
+        index = next(index for index, row in enumerate(records) if row["name"] == "runtime-release-many")
+        for kind, value in (
+            (Kind.COPY_UNIT, 160), (Kind.CLEAR_UNIT, 64),
+            (Kind.COPIED_BYTE, 0), (Kind.CLEARED_BYTE, 0),
+        ):
+            changed = copy.deepcopy(work)
+            changed[index]["counts"][Owner.RUNTIME][kind] = value
+            with self.subTest(kind=kind):
+                self.assertTrue(work_failures(records, changed))
+        moved = copy.deepcopy(work)
+        moved[index]["counts"][Owner.KERNEL_BOOT] = moved[index]["counts"][Owner.RUNTIME][:]
+        moved[index]["counts"][Owner.RUNTIME] = [0] * len(Kind)
+        self.assertEqual((), work_failures(records, moved))
+        doubled = copy.deepcopy(work)
+        doubled[index]["counts"][Owner.KERNEL_BOOT] = doubled[index]["counts"][Owner.RUNTIME][:]
+        self.assertTrue(work_failures(records, doubled))
+
     def test_retained_control_and_runtime_audits_cannot_disappear(self):
         root = Path(__file__).resolve().parents[2]
         subjects = audit_subjects(root)
@@ -112,6 +133,58 @@ class IndexedBootstrapTest(unittest.TestCase):
             with patch("tests.host.native_observations.source_bytes", return_value=json.dumps(changed).encode()):
                 with self.subTest(kind=kind), self.assertRaises(ValueError):
                     validate_native_sites(root, path, text)
+
+    def test_shared_provider_cannot_lose_or_duplicate_primitive_observations(self):
+        root = Path(__file__).resolve().parents[2]
+        path = "lib/runtime/memory.c"
+        text = (root / path).read_text()
+        original = json.loads((root / "tests/host/native_observations.json").read_text())
+        changed = copy.deepcopy(original)
+        changed["families"]["BOOT01"]["sites"][path]["micros_runtime_memcpy"] = [[["work"], [
+            "duplicate-copy", "insert", "RUNTIME", "COPY_UNIT", 1, "entry", "", [], 0, 0,
+        ]]]
+        with patch("tests.host.native_observations.source_bytes", return_value=json.dumps(changed).encode()):
+            with self.assertRaises(ValueError):
+                validate_native_sites(root, path, text)
+        for label in ("copy-word-unit", "fill-word-unit"):
+            with self.subTest(label=label), self.assertRaises(ValueError):
+                validate_native_sites(root, path, text.replace('"' + label + '"', '"missing-unit"', 1))
+
+    def test_target_transfer_ownership_rejects_missing_duplicate_and_foreign_commands(self):
+        import shlex
+        from tempfile import TemporaryDirectory
+
+        from tests.host.indexed_bootstrap_evidence import _target_transfer_objects
+        from tests.host.indexed_bootstrap_source import MOVEMENT_HELPERS
+
+        with TemporaryDirectory(prefix="micros-boot-transfer-owners-") as temporary:
+            root = Path(temporary).resolve()
+            directory = root / "build"
+            directory.mkdir()
+            compiler = "/closed/clang"
+            names = (*MOVEMENT_HELPERS, "lib/runtime/memory.c")
+            outputs = {name: directory / ("object-" + str(index) + ".o") for index, name in enumerate(names)}
+            owners = {str(path.relative_to(directory)) for path in outputs.values()}
+            commands = [{
+                "directory": str(directory), "file": str(root / name), "output": str(output),
+                "command": shlex.join((compiler, "-c", str(root / name), "-o", str(output))),
+            } for name, output in outputs.items()]
+            self.assertEqual(outputs, _target_transfer_objects(root, directory, commands, owners, compiler))
+            changes = [commands[:-1], [*commands, commands[0]]]
+            for field, value in (
+                ("directory", str(root)),
+                ("command", commands[0]["command"] + " @foreign.rsp"),
+                ("command", commands[0]["command"].replace(compiler, "/foreign/clang", 1)),
+                ("command", commands[0]["command"].replace("object-0.o", "foreign.o")),
+            ):
+                changed = copy.deepcopy(commands)
+                changed[0][field] = value
+                changes.append(changed)
+            for changed in changes:
+                with self.assertRaises(ValueError):
+                    _target_transfer_objects(root, directory, changed, owners, compiler)
+            with self.assertRaises(ValueError):
+                _target_transfer_objects(root, directory, commands, owners - {"object-0.o"}, compiler)
 
     def test_headers_cannot_hide_code_or_escape_the_compiled_inputs(self):
         from tools import generate_indexed_bootstrap_fixture as generator
@@ -152,6 +225,7 @@ class IndexedBootstrapTest(unittest.TestCase):
             ("struct bootstrap_transition_plan candidate;", "struct micros_bootstrap_runtime snapshot;"),
             ("sizeof(plan->entry)", "sizeof(*runtime)"),
             ("runtime->phase = plan->phase;", "memcpy(runtime, plan, sizeof(*runtime));"),
+            ("runtime->phase = plan->phase;", "micros_runtime_memcpy(runtime, plan, sizeof(*runtime));"),
             ("runtime->phase = plan->phase;", "*runtime = *runtime;"),
         ):
             with self.subTest(after=after), self.assertRaises(ValueError):

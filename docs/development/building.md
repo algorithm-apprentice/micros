@@ -242,6 +242,8 @@ ctest --test-dir build/host-debug --output-on-failure --no-tests=error -R '^inde
 The pair belongs to complete `test-unit`, not the fast loop. It measures
 selected bootstrap lookup/copy and audit-free ordinary control work;
 explicit complete diagnostics retain positive audit controls.
+Transfer summaries compose BOOT and RUNTIME primitive units and bytes,
+so delegation to the shared provider cannot turn a byte check into zero.
 It also runs the actual deadline/diagnostic code with injected counter
 values, real TTY deadline predicates and bounded output/panic backends.
 It does not replace the original bootstrap model or actual launcher,
@@ -253,6 +255,12 @@ guest, after their original semantic completion. They require zero complete
 command audits and exact selected context/UART query counts; scalar memory
 geometry admission is measured separately. Native address-space cases
 exercise the actual read-only UART path and selected VM/TTY role boundaries.
+The bootstrap-launcher workflow additionally binds all seven bootstrap
+copy/clear helpers to their actual linked shared provider and proves its
+non-stack eight-byte copy and four-byte fill transfers. This uses the same
+accepted guest and existing artifact proof engines. The provider remains
+uninstrumented in that kernel; BOOT02's separate command collector stays
+within its existing scope.
 
 ## Validation planning
 
