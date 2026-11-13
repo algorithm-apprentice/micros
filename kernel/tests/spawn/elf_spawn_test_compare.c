@@ -150,6 +150,66 @@ static bool same_objects(
     return true;
 }
 
+static bool idle_grant_index_is_valid(const struct micros_grant_registry *registry)
+{
+    uint64_t free_slots = 0, seen = 0;
+    micros_grant_t cursor = registry->free_head;
+    const uint32_t slot_mask = (UINT32_C(1) << MICROS_GRANT_SLOT_BITS) - 1;
+
+    if (registry->active_count != 0) {
+        return false;
+    }
+    for (size_t slot = 0; slot < MICROS_GRANT_CAPACITY; ++slot) {
+        const struct micros_grant_record *record = &registry->grants[slot];
+        const unsigned char *bytes = (const unsigned char *)record;
+
+        if (record->generation == 0 || record->generation > MICROS_GRANT_GENERATION_MAX
+            || record->grantor_link.previous != MICROS_GRANT_NONE || record->grantor_link.next != MICROS_GRANT_NONE
+            || record->grantee_link.previous != MICROS_GRANT_NONE || record->grantee_link.next != MICROS_GRANT_NONE) {
+            return false;
+        }
+        for (size_t byte = offsetof(struct micros_grant_record, grantor); byte < sizeof(*record); ++byte) {
+            if (bytes[byte] != 0) {
+                return false;
+            }
+        }
+        if (record->state == MICROS_GRANT_SLOT_FREE) {
+            if (((record->generation << MICROS_GRANT_SLOT_BITS) | (uint32_t)slot) == MICROS_GRANT_NONE) {
+                return false;
+            }
+            free_slots |= UINT64_C(1) << slot;
+        } else if (record->state != MICROS_GRANT_SLOT_QUARANTINED || record->free_next != MICROS_GRANT_NONE
+                   || (record->generation != MICROS_GRANT_GENERATION_MAX
+                       && (slot != MICROS_GRANT_CAPACITY - 1 || record->generation != MICROS_GRANT_GENERATION_MAX - 1))) {
+            return false;
+        }
+    }
+    for (size_t slot = 0; slot < MICROS_PROCESS_CAPACITY; ++slot) {
+        if (registry->participants[slot].endpoint != MICROS_ENDPOINT_NONE
+            || registry->participants[slot].head != MICROS_GRANT_NONE) {
+            return false;
+        }
+    }
+    while (cursor != MICROS_GRANT_NONE) {
+        size_t slot = cursor & slot_mask;
+        uint32_t generation = cursor >> MICROS_GRANT_SLOT_BITS;
+        const struct micros_grant_record *record;
+        uint64_t bit;
+
+        if (slot >= MICROS_GRANT_CAPACITY || generation == 0) {
+            return false;
+        }
+        record = &registry->grants[slot];
+        bit = UINT64_C(1) << slot;
+        if ((seen & bit) != 0 || record->state != MICROS_GRANT_SLOT_FREE || record->generation != generation) {
+            return false;
+        }
+        seen |= bit;
+        cursor = record->free_next;
+    }
+    return seen == free_slots;
+}
+
 static bool same_grants(
     const struct micros_grant_registry *a, const struct micros_grant_registry *b
 )
@@ -158,25 +218,20 @@ static bool same_grants(
 
     if (
         a->initialization_magic != b->initialization_magic
-        || a->active_count != 0 || b->active_count != 0
+        || !idle_grant_index_is_valid(a) || !idle_grant_index_is_valid(b)
     ) {
         return false;
     }
     for (index = 0; index < MICROS_GRANT_CAPACITY; ++index) {
-        struct micros_grant_record current;
-
-        micros_elf_spawn_resource_copy(&current, &b->grants[index], sizeof(current));
+        const struct micros_grant_record *baseline = &a->grants[index];
+        const struct micros_grant_record *current = &b->grants[index];
 
         if (
-            a->grants[index].state != current.state
-            || current.state == MICROS_GRANT_SLOT_ACTIVE
+            baseline->state != current->state
+            || current->generation < baseline->generation
+            || (baseline->state == MICROS_GRANT_SLOT_QUARANTINED
+                && current->generation != baseline->generation)
         ) {
-            return false;
-        }
-        current.generation = a->grants[index].generation;
-        if (!micros_elf_spawn_resource_bytes_equal(
-            &a->grants[index], &current, sizeof(current)
-        )) {
             return false;
         }
     }

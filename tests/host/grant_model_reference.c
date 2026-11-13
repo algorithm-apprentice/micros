@@ -19,6 +19,11 @@ bool grant_test_records_equal(
     return (
         left->state == right->state
         && left->generation == right->generation
+        && left->free_next == right->free_next
+        && left->grantor_link.previous == right->grantor_link.previous
+        && left->grantor_link.next == right->grantor_link.next
+        && left->grantee_link.previous == right->grantee_link.previous
+        && left->grantee_link.next == right->grantee_link.next
         && grant_test_process_handles_equal(left->grantor, right->grantor)
         && left->grantor_endpoint == right->grantor_endpoint
         && left->grantee_endpoint == right->grantee_endpoint
@@ -38,6 +43,7 @@ bool grant_test_registries_equal(
     if (
         left->initialization_magic != right->initialization_magic
         || left->active_count != right->active_count
+        || left->free_head != right->free_head
     ) {
         return false;
     }
@@ -49,7 +55,109 @@ bool grant_test_registries_equal(
             return false;
         }
     }
+    for (index = 0; index < MICROS_PROCESS_CAPACITY; ++index) {
+        if (left->participants[index].endpoint != right->participants[index].endpoint
+            || left->participants[index].head != right->participants[index].head) {
+            return false;
+        }
+    }
     return true;
+}
+
+static micros_grant_t reference_token(const struct micros_grant_registry *expected, size_t slot)
+{
+    return (expected->grants[slot].generation << MICROS_GRANT_SLOT_BITS) | (uint32_t)slot;
+}
+
+void grant_test_model_project_indexes(
+    struct micros_grant_registry *expected, const struct grant_model_index *index
+)
+{
+    const struct micros_grant_link empty = {MICROS_GRANT_NONE, MICROS_GRANT_NONE};
+
+    expected->free_head = index->free_count == 0 ? MICROS_GRANT_NONE
+        : reference_token(expected, index->free_slots[index->free_count - 1]);
+    for (size_t slot = 0; slot < MICROS_PROCESS_CAPACITY; ++slot) {
+        expected->participants[slot] = (struct micros_grant_endpoint_index){MICROS_ENDPOINT_NONE, MICROS_GRANT_NONE};
+    }
+    for (size_t slot = 0; slot < MICROS_GRANT_CAPACITY; ++slot) {
+        expected->grants[slot].free_next = MICROS_GRANT_NONE;
+        expected->grants[slot].grantor_link = empty;
+        expected->grants[slot].grantee_link = empty;
+    }
+    for (size_t position = 1; position < index->free_count; ++position) {
+        expected->grants[index->free_slots[position]].free_next = reference_token(expected, index->free_slots[position - 1]);
+    }
+    for (size_t slot = 0; slot < MICROS_GRANT_CAPACITY; ++slot) {
+        struct micros_grant_record *record = &expected->grants[slot];
+
+        if (record->state != MICROS_GRANT_SLOT_ACTIVE) {
+            continue;
+        }
+        for (size_t role = 0; role < 2; ++role) {
+            micros_endpoint_t endpoint = role == 0 ? record->grantor_endpoint : record->grantee_endpoint;
+            struct micros_grant_link *link = role == 0 ? &record->grantor_link : &record->grantee_link;
+            size_t previous = MICROS_GRANT_CAPACITY, next = MICROS_GRANT_CAPACITY;
+
+            for (size_t other = 0; other < MICROS_GRANT_CAPACITY; ++other) {
+                const struct micros_grant_record *candidate = &expected->grants[other];
+
+                if (candidate->state != MICROS_GRANT_SLOT_ACTIVE
+                    || (candidate->grantor_endpoint != endpoint && candidate->grantee_endpoint != endpoint)) {
+                    continue;
+                }
+                if (index->publication[other] > index->publication[slot]
+                    && (previous == MICROS_GRANT_CAPACITY || index->publication[other] < index->publication[previous])) {
+                    previous = other;
+                }
+                if (index->publication[other] < index->publication[slot]
+                    && (next == MICROS_GRANT_CAPACITY || index->publication[other] > index->publication[next])) {
+                    next = other;
+                }
+            }
+            link->previous = previous == MICROS_GRANT_CAPACITY ? MICROS_GRANT_NONE : reference_token(expected, previous);
+            link->next = next == MICROS_GRANT_CAPACITY ? MICROS_GRANT_NONE : reference_token(expected, next);
+            if (previous == MICROS_GRANT_CAPACITY) {
+                size_t owner = endpoint & ((UINT32_C(1) << MICROS_ENDPOINT_SLOT_BITS) - 1);
+
+                expected->participants[owner] = (struct micros_grant_endpoint_index){endpoint, reference_token(expected, slot)};
+            }
+        }
+    }
+}
+
+void grant_test_model_initialize_reference(
+    struct micros_grant_registry *expected, struct grant_model_index *index, uint64_t magic
+)
+{
+    memset(expected, 0, sizeof(*expected));
+    memset(index, 0, sizeof(*index));
+    expected->initialization_magic = magic;
+    index->free_count = MICROS_GRANT_CAPACITY;
+    for (size_t slot = 0; slot < MICROS_GRANT_CAPACITY; ++slot) {
+        expected->grants[slot].generation = 1;
+        index->free_slots[MICROS_GRANT_CAPACITY - 1 - slot] = (uint16_t)slot;
+    }
+    grant_test_model_project_indexes(expected, index);
+}
+
+void grant_test_model_retire_reference(
+    struct micros_grant_registry *expected, struct grant_model_index *index, size_t slot
+)
+{
+    struct micros_grant_record *record = &expected->grants[slot];
+    uint32_t generation = record->generation;
+    bool terminal = generation == MICROS_GRANT_GENERATION_MAX
+        || (slot == MICROS_GRANT_CAPACITY - 1 && generation == MICROS_GRANT_GENERATION_MAX - 1);
+
+    memset(record, 0, sizeof(*record));
+    record->state = terminal ? MICROS_GRANT_SLOT_QUARANTINED : MICROS_GRANT_SLOT_FREE;
+    record->generation = terminal ? generation : generation + 1;
+    if (!terminal) {
+        index->free_slots[index->free_count++] = (uint16_t)slot;
+    }
+    index->publication[slot] = 0;
+    --expected->active_count;
 }
 
 uint32_t grant_test_model_next(uint32_t *state)
@@ -187,10 +295,7 @@ bool grant_test_cancel_plan_matches_reference(
         if (selected) {
             selected_slots |= UINT64_C(1) << index;
         }
-        if (
-            plan->expected_generation[index]
-                != (selected ? record->generation : 0)
-        ) {
+        if (selected && plan->expected_generation[index] != record->generation) {
             return false;
         }
     }

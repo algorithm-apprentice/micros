@@ -95,5 +95,6 @@ retains exact head/link checking.
 
 [ADR-0130](../adr/0130-quiescent-grant-resource-equivalence.md) and
 [the canonical predicate](../architecture/elf-spawn-integration.md#quiescent-grant-resource-equivalence)
-own the Accepted decision. Implementation remains blocked until that
-separate reviewed design merges.
+own the Accepted decision, separately merged as #261. The restarted GRANT02
+implementation must earn its own complete acceptance; the failed candidate
+and diagnostics above remain discovery evidence, not Green.

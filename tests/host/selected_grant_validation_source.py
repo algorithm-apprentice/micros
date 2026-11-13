@@ -3,7 +3,7 @@
 from pathlib import Path
 import re
 
-from tests.host.c_source_records import c_lexical_text, function_records
+from tests.host.c_source_records import c_lexical_text, function_records, tokens
 from tests.host.native_observations import bind_sites, declarations
 from tests.host.source_snapshot import source_bytes
 from tests.host.work_count_lexical import (
@@ -13,20 +13,19 @@ from tests.host.work_count_lexical import (
 
 INDEX_FIELDS = frozenset((
     "processes", "threads", "harts", "endpoints", "profiles", "grants", "expected_generation",
-    "pending_events", "ready_head", "ready_tail", "transitions", "entries", "bindings", "chunks",
+    "pending_events", "ready_head", "ready_tail", "transitions", "entries", "bindings", "chunks", "participants",
 ))
 AUDITS = frozenset((
     "micros_kernel_objects_validate", "micros_kernel_objects_validate_base",
     "micros_scheduler_core_validate", "micros_endpoint_registry_validate",
     "micros_endpoint_registry_validate_objects", "micros_grant_registry_validate",
-    "validate_registry_storage", "micros_grant_runtime_validate", "micros_ipc_runtime_validate",
+    "validate_registry_storage", "validate_registry_indexes", "micros_grant_runtime_validate", "micros_ipc_runtime_validate",
     "micros_tty_handoff_runtime_validate",
 ))
 
 RETAINED_AUDITS = (
     ("kernel/boot/bootstrap_runtime_validation.c", "micros_bootstrap_runtime_validate", "micros_grant_runtime_validate", 1),
-    ("kernel/grant/grant.c", "micros_grant_commit_endpoint_cancel", "validate_registry_storage", 1),
-    ("kernel/grant/grant.c", "micros_grant_prepare_endpoint_cancel", "micros_grant_registry_validate", 1),
+    ("kernel/grant/grant.c", "micros_grant_registry_validate", "validate_registry_indexes", 1),
     ("kernel/grant/grant.c", "micros_grant_registry_validate", "validate_registry_storage", 1),
     ("kernel/grant/grant_runtime.c", "micros_grant_runtime_initialize", "micros_grant_registry_validate", 1),
     ("kernel/grant/grant_runtime.c", "micros_grant_runtime_validate", "micros_grant_registry_validate", 1),
@@ -48,14 +47,38 @@ def audit_subjects(root):
     }
 
 
+def validate_sparse_plan_storage(record):
+    body = c_lexical_text(record.body)
+    for declaration in re.finditer(r"\bstruct\s+micros_grant_cancel_plan\s+(\w+)\s*([^;]*);", body):
+        name, initializer = declaration.groups()
+        if initializer.strip() or re.search(r"\b" + name + r"\s*=", body):
+            raise ValueError("GRANT02 cancellation storage regained a whole-plan initializer or assignment")
+        if re.search(r"\bsizeof\s*(?:\(\s*" + name + r"\s*\)|" + name + r"\b)", body):
+            raise ValueError("GRANT02 cancellation lifetime regained capacity-sized plan work")
+        if re.search(r"\b(?:memcpy|memset|copy_bytes|clear_bytes)\s*\(\s*&?\s*" + name + r"\b", body):
+            raise ValueError("GRANT02 cancellation candidate is moved as bulk storage")
+    if record.name == "publish_cancel_plan":
+        values = tokens(record.body)
+        calls = [
+            values[index:matching_tokens(values, index + 1) + 1]
+            for index, value in enumerate(values[:-1]) if value == "copy_bytes" and values[index + 1] == "("
+        ]
+        if calls != [tokens("copy_bytes(&plan->expected_generation[slot], &candidate->expected_generation[slot], "
+                            "sizeof(plan->expected_generation[slot]))")]:
+            raise ValueError("GRANT02 plan publication no longer copies only a selected generation")
+        if re.search(r"\*\s*plan\s*=|\b(?:memcpy|memset|clear_bytes)\s*\(", body):
+            raise ValueError("GRANT02 plan publication regained whole-plan movement")
+
+
 def validate_audit_boundaries(root, subjects=None):
     subjects = audit_subjects(root) if subjects is None else subjects
     rows, devices = [], []
     for path, text in subjects.items():
         for name, record in function_records(text).items():
+            validate_sparse_plan_storage(record)
             body = c_lexical_text(record.body)
             for callee in {row[2] for row in RETAINED_AUDITS}:
-                if callee == "validate_registry_storage" and path != "kernel/grant/grant.c":
+                if callee in ("validate_registry_storage", "validate_registry_indexes") and path != "kernel/grant/grant.c":
                     continue
                 calls = len(re.findall(r"\b" + callee + r"\s*\(", body))
                 if calls != len(re.findall(r"\b" + callee + r"\b", body)):

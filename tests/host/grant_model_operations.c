@@ -31,18 +31,8 @@ bool grant_test_model_create(
             ),
         &produced
     );
-    for (
-        expected_slot = 0;
-        expected_slot < MICROS_GRANT_CAPACITY;
-        ++expected_slot
-    ) {
-        if (
-            run->expected.grants[expected_slot].state
-                == MICROS_GRANT_SLOT_FREE
-        ) {
-            break;
-        }
-    }
+    expected_slot = run->index.free_count == 0 ? MICROS_GRANT_CAPACITY
+        : run->index.free_slots[run->index.free_count - 1];
     if (expected_slot == MICROS_GRANT_CAPACITY) {
         if (iteration->actual != MICROS_GRANT_ERROR_CAPACITY) {
             return grant_test_model_fail(fixture, step, "capacity result diverged");
@@ -81,6 +71,8 @@ bool grant_test_model_create(
                 ),
         };
         ++run->expected.active_count;
+        --run->index.free_count;
+        run->index.publication[expected_slot] = ++run->index.last_publication;
     }
     return true;
 }
@@ -118,15 +110,10 @@ bool grant_test_model_revoke(
             return grant_test_model_fail(fixture, step, "owner revoke diverged");
         }
     } else {
-        uint32_t generation = record->generation + 1;
-
         if (iteration->actual != MICROS_GRANT_OK) {
             return grant_test_model_fail(fixture, step, "revoke failed");
         }
-        memset(record, 0, sizeof(*record));
-        record->state = MICROS_GRANT_SLOT_FREE;
-        record->generation = generation;
-        --run->expected.active_count;
+        grant_test_model_retire_reference(&run->expected, &run->index, iteration->slot);
     }
     return true;
 }
@@ -217,12 +204,7 @@ bool grant_test_model_cancel(
                     == fixture->endpoints[iteration->grantor]
             )
         ) {
-            uint32_t generation = record->generation + 1;
-
-            memset(record, 0, sizeof(*record));
-            record->state = MICROS_GRANT_SLOT_FREE;
-            record->generation = generation;
-            --run->expected.active_count;
+            grant_test_model_retire_reference(&run->expected, &run->index, index);
         }
     }
     return true;
@@ -284,12 +266,7 @@ bool grant_test_model_close_reuse(
                 || record->grantee_endpoint == old_endpoint
             )
         ) {
-            uint32_t generation = record->generation + 1;
-
-            memset(record, 0, sizeof(*record));
-            record->state = MICROS_GRANT_SLOT_FREE;
-            record->generation = generation;
-            --run->expected.active_count;
+            grant_test_model_retire_reference(&run->expected, &run->index, index);
         }
     }
     run->expected_process_generation[iteration->grantor] =

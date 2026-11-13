@@ -210,7 +210,10 @@ ordinary/observed agreement; it does not replace the grant model or real
 grant, syscall, device and cross-service evidence.
 It executes the actual captured C adapter and copy/TTY orchestration, with
 native-only IRQ, memory-boundary and panic backends. Add `--verbose` to the
-CTest command for per-case audit, grant-prefix, record and index work.
+CTest command for per-case audit, grant/index-record and indexed-read work.
+The same pair includes GRANT02 free-head allocation and sparse cancellation
+prepare/commit cases, including exact poisoned-witness preservation and
+commit after endpoint close. It adds no separate workflow.
 
 ## Validation planning
 

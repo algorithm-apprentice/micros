@@ -5,9 +5,10 @@
 This is the independently reviewed GRANT02 design Accepted by
 [ADR-0129](../adr/0129-grant-free-lists-and-targeted-cancellation.md).
 Its actual prerequisites, GRANT01 #259 and IPC03 #255, are merged.
-Design #260 is separately merged. Its uncommitted implementation is blocked
-on the [quiescent resource-witness correction](../adr/0130-quiescent-grant-resource-equivalence.md);
-only that corrective design task is active.
+Design #260 and the
+[quiescent resource-witness correction](../adr/0130-quiescent-grant-resource-equivalence.md)
+#261 are separately merged. The paired implementation proceeds from that
+main; neither design alone closes a GRANT02 finding.
 
 GRANT02 owns B05-F003/F004. The
 [fixed local study](../research/minix-grant-free-lists-and-targeted-cancellation.md)
@@ -355,3 +356,26 @@ build scaffold or reusable prototype belongs to the design task.
 Independent design review precedes its first commit. Only the separately
 merged Accepted design activates implementation; only accepted
 implementation closes B05-F003/F004.
+
+## Current implementation and evidence owners
+
+The implementation keeps registry/index lifecycle in `grant.c`,
+representation in `include/micros/grant.h` and constant create planning in
+`grant_internal.h`. The existing runtime, copy, adapter and endpoint
+authorities do not acquire a second registry or new policy.
+
+The existing [selected-grant native pair](../development/building.md#native-unit-tests)
+covers initial/LIFO allocation, exact index state, sparse prepare/commit,
+mixed-role neighbors, corrupted links, poisoned unselected witnesses and
+commit after actual endpoint close. Its independent model uses a free-slot
+stack and publication order, then projects expected membership by flat
+reference enumeration rather than production splice helpers. All original
+seeds, transition counts and scenario purposes remain.
+
+Current primitive/audit and sparse-plan storage guards remain in
+`tests/host/selected_grant_validation_source.py`. They reject whole-plan
+initialization/movement, including at the existing production PM caller.
+The shared ELF-spawn comparator and its native resource fixture own only
+ADR-0130's quiescent inventory equivalence. Actual target and stack gates
+remain required before acceptance; these owners do not by themselves close
+the findings.
