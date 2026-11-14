@@ -241,15 +241,43 @@ bool vm_core_initial_frame_is_free(
     uint64_t frame_index
 )
 {
-    size_t word_index = (size_t)(frame_index / 64);
-    uint64_t bit = UINT64_C(1) << (frame_index % 64);
+    uint8_t local;
 
-    return (
-        state->initial_free_bitmap[word_index] & bit
-    ) != 0;
+    if (frame_index >= state->boot_summary.managed_frame_count) {
+        return false;
+    }
+    local = state->boot_info->frame_states[frame_index];
+    return local == MICROS_VM_LOCAL_FRAME_FREE
+        || (local >= MICROS_VM_LOCAL_FRAME_TRANSFERABLE && local <= MICROS_VM_LOCAL_FRAME_PROCESS_PAGE_TABLE);
 }
 
-static void vm_core_mark_initial_frame_free(
+bool vm_core_frame_availability_is_valid(const struct micros_vm_state *state, uint64_t frame_index)
+{
+    uint8_t local;
+    bool available;
+
+    if (frame_index >= state->boot_summary.managed_frame_count) {
+        return false;
+    }
+    local = state->boot_info->frame_states[frame_index];
+    if (local != MICROS_VM_LOCAL_FRAME_FREE && local != MICROS_VM_LOCAL_FRAME_KERNEL
+        && local != MICROS_VM_LOCAL_FRAME_SELF_WIRED && local != MICROS_VM_LOCAL_FRAME_SERVICE_WIRED
+        && (local < MICROS_VM_LOCAL_FRAME_TRANSFERABLE || local > MICROS_VM_LOCAL_FRAME_PROCESS_PAGE_TABLE)) {
+        return false;
+    }
+    available = (state->free_bitmap[frame_index / 64] & (UINT64_C(1) << (frame_index % 64))) != 0;
+    return available == (local == MICROS_VM_LOCAL_FRAME_FREE);
+}
+
+bool vm_core_allocator_metadata_is_valid(const struct micros_vm_state *state)
+{
+    return state->boot_summary.managed_frame_count != 0
+        && state->boot_summary.managed_frame_count <= MICROS_VM_MAX_MANAGED_FRAMES
+        && state->free_page_cache_count <= MICROS_VM_FREE_PAGE_CACHE_CAPACITY
+        && state->allocation_origin <= state->boot_summary.managed_frame_count;
+}
+
+static void vm_core_mark_frame_available(
     struct micros_vm_state *state,
     uint64_t frame_index
 )
@@ -257,7 +285,7 @@ static void vm_core_mark_initial_frame_free(
     size_t word_index = (size_t)(frame_index / 64);
     uint64_t bit = UINT64_C(1) << (frame_index % 64);
 
-    state->initial_free_bitmap[word_index] |= bit;
+    state->free_bitmap[word_index] |= bit;
 }
 
 static uint64_t vm_core_page_digest_byte(uint64_t digest, uint8_t byte)
@@ -387,10 +415,25 @@ enum micros_vm_core_error micros_vm_state_initialize(
                 boot_info->frame_states[frame_index]
                     == MICROS_VM_FRAME_FREE
             ) {
-                vm_core_mark_initial_frame_free(
+                vm_core_mark_frame_available(
                     state,
                     frame_index
                 );
+            }
+        }
+    }
+    state->allocation_origin = (uint32_t)summary.managed_frame_count;
+    for (size_t range_index = summary.managed_range_count;
+         range_index != 0 && state->free_page_cache_count < MICROS_VM_FREE_PAGE_CACHE_CAPACITY;
+         --range_index) {
+        const struct micros_vm_managed_range *range = &boot_info->managed_ranges[range_index - 1];
+
+        for (uint64_t index = range->frame_index;
+             index < range->frame_index + range->frame_count
+                 && state->free_page_cache_count < MICROS_VM_FREE_PAGE_CACHE_CAPACITY;
+             ++index) {
+            if (boot_info->frame_states[index] == MICROS_VM_FRAME_FREE) {
+                state->free_page_cache[state->free_page_cache_count++] = (uint32_t)index;
             }
         }
     }

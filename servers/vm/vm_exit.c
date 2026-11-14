@@ -109,8 +109,7 @@ enum micros_vm_core_error micros_vm_exit_release_complete(
         (void)vm_core_physical_to_frame_index(
             state, record->entries[entry_index].physical_address, &frame_index
         );
-        state->boot_info->frame_states[frame_index] =
-            MICROS_VM_LOCAL_FRAME_FREE;
+        vm_core_release_frame_prevalidated(state, frame_index);
     }
     vm_core_zero_bytes(record, sizeof(*record));
     state->phase = MICROS_VM_LOADER_IDLE;

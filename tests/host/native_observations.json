@@ -11175,9 +11175,15 @@
         },
         "servers/vm/vm_core.c": {
           "micros_vm_state_initialize": [
-            [["work"],["vm01/servers/vm/vm_core.c/micros_vm_state_initialize/loop-158","insert","VM_SERVICE","RECORD_VISIT",1,"entry","",[["{",3],["for ( frame_index = 0 ; frame_index < summary . managed_frame_count ; ++ frame_index ) {",0]],0,0]],
-            [["work"],["vm01/servers/vm/vm_core.c/micros_vm_state_initialize/index-164","wrap","VM_SERVICE","INDEX_PROBE",1,"value","frame_index",[["{",3],["for ( frame_index = 0 ; frame_index < summary . managed_frame_count ; ++ frame_index ) {",0]],0,1]]
+            [["work"],["vm03/servers/vm/vm_core.c/micros_vm_state_initialize/loop-158","insert","VM_SERVICE","RECORD_VISIT",1,"entry","",[["{",3],["for ( frame_index = 0 ; frame_index < summary . managed_frame_count ; ++ frame_index ) {",0]],0,0]],
+            [["work"],["vm03/servers/vm/vm_core.c/micros_vm_state_initialize/index-164","wrap","VM_SERVICE","INDEX_PROBE",1,"value","frame_index",[["{",3],["for ( frame_index = 0 ; frame_index < summary . managed_frame_count ; ++ frame_index ) {",0]],0,1]],
+            [["work"],["vm03/servers/vm/vm_core.c/micros_vm_state_initialize/loop-214","insert","VM_SERVICE","RECORD_VISIT",1,"entry","",[["for ( size_t range_index = summary . managed_range_count ; range_index != 0 && state -> free_page_cache_count < MICROS_VM_FREE_PAGE_CACHE_CAPACITY ; -- range_index ) {",0]],0,0]],
+            [["work"],["vm03/servers/vm/vm_core.c/micros_vm_state_initialize/index-225","wrap","VM_SERVICE","INDEX_PROBE",1,"value","range_index - 1",[["for ( size_t range_index = summary . managed_range_count ; range_index != 0 && state -> free_page_cache_count < MICROS_VM_FREE_PAGE_CACHE_CAPACITY ; -- range_index ) {",0]],0,1]],
+            [["work"],["vm03/servers/vm/vm_core.c/micros_vm_state_initialize/loop-259","insert","VM_SERVICE","RECORD_VISIT",1,"entry","",[["for ( size_t range_index = summary . managed_range_count ; range_index != 0 && state -> free_page_cache_count < MICROS_VM_FREE_PAGE_CACHE_CAPACITY ; -- range_index ) {",0],["for ( uint64_t index = range -> frame_index ; index < range -> frame_index + range -> frame_count && state -> free_page_cache_count < MICROS_VM_FREE_PAGE_CACHE_CAPACITY ; ++ index ) {",0]],0,0]],
+            [["work"],["vm03/servers/vm/vm_core.c/micros_vm_state_initialize/index-265","wrap","VM_SERVICE","INDEX_PROBE",1,"value","index",[["for ( size_t range_index = summary . managed_range_count ; range_index != 0 && state -> free_page_cache_count < MICROS_VM_FREE_PAGE_CACHE_CAPACITY ; -- range_index ) {",0],["for ( uint64_t index = range -> frame_index ; index < range -> frame_index + range -> frame_count && state -> free_page_cache_count < MICROS_VM_FREE_PAGE_CACHE_CAPACITY ; ++ index ) {",0]],0,1]],
+            [["work"],["vm03/servers/vm/vm_core.c/micros_vm_state_initialize/index-275","wrap","VM_SERVICE","INDEX_PROBE",1,"value","state -> free_page_cache_count ++",[["for ( size_t range_index = summary . managed_range_count ; range_index != 0 && state -> free_page_cache_count < MICROS_VM_FREE_PAGE_CACHE_CAPACITY ; -- range_index ) {",0],["for ( uint64_t index = range -> frame_index ; index < range -> frame_index + range -> frame_count && state -> free_page_cache_count < MICROS_VM_FREE_PAGE_CACHE_CAPACITY ; ++ index ) {",0],["if ( boot_info -> frame_states [ index ] == MICROS_VM_FRAME_FREE ) {",0]],0,1]]
           ],
+          "vm_core_allocator_metadata_is_valid": [],
           "vm_core_bytes_are_zero": [
             [["work"],["vm01/servers/vm/vm_core.c/vm_core_bytes_are_zero/loop-13","insert","VM_SERVICE","COMPARISON",1,"entry","",[["while ( size >= 8 ) {",0]],0,0]],
             [["work"],["vm01/servers/vm/vm_core.c/vm_core_bytes_are_zero/loop-80","insert","VM_SERVICE","COMPARISON",1,"entry","",[["while ( size != 0 ) {",0]],0,0]]
@@ -11190,8 +11196,12 @@
             [["work"],["vm01/servers/vm/vm_core.c/vm_core_copy_bytes/loop-119","insert","VM_SERVICE","COPIED_BYTE",1,"entry","",[["while ( size != 0 ) {",0]],0,0]]
           ],
           "vm_core_endpoint_is_canonical": [],
+          "vm_core_frame_availability_is_valid": [
+            [["work"],["vm03/servers/vm/vm_core.c/vm_core_frame_availability_is_valid/index-28","wrap","VM_SERVICE","INDEX_PROBE",1,"value","frame_index",[],1,4]],
+            [["work"],["vm03/servers/vm/vm_core.c/vm_core_frame_availability_is_valid/index-71","wrap","VM_SERVICE","INDEX_PROBE",1,"value","frame_index / 64",[],0,1]]
+          ],
           "vm_core_initial_frame_is_free": [
-            [["work"],["vm01/servers/vm/vm_core.c/vm_core_initial_frame_is_free/index-31","wrap","VM_SERVICE","INDEX_PROBE",1,"value","word_index",[],1,2]]
+            [["work"],["vm03/servers/vm/vm_core.c/vm_core_initial_frame_is_free/index-25","wrap","VM_SERVICE","INDEX_PROBE",1,"value","frame_index",[],1,2]]
           ],
           "vm_core_load_page_digest": [
             [["work"],["vm01/servers/vm/vm_core.c/vm_core_load_page_digest/loop-58","insert","VM_SERVICE","RECORD_VISIT",1,"entry","",[["for ( index = 0 ; index < transaction -> page_count ; ++ index ) {",0]],0,0]],
@@ -11199,8 +11209,8 @@
             [["work"],["vm01/servers/vm/vm_core.c/vm_core_load_page_digest/index-99","wrap","VM_SERVICE","INDEX_PROBE",1,"value","index",[["for ( index = 0 ; index < transaction -> page_count ; ++ index ) {",0]],3,5]],
             [["work"],["vm01/servers/vm/vm_core.c/vm_core_load_page_digest/index-129","wrap","VM_SERVICE","INDEX_PROBE",1,"value","index",[["for ( index = 0 ; index < transaction -> page_count ; ++ index ) {",0]],4,5]]
           ],
-          "vm_core_mark_initial_frame_free": [
-            [["work"],["vm01/servers/vm/vm_core.c/vm_core_mark_initial_frame_free/index-29","wrap","VM_SERVICE","INDEX_PROBE",1,"value","word_index",[],1,2]]
+          "vm_core_mark_frame_available": [
+            [["work"],["vm03/servers/vm/vm_core.c/vm_core_mark_frame_available/index-29","wrap","VM_SERVICE","INDEX_PROBE",1,"value","word_index",[],1,2]]
           ],
           "vm_core_page_digest_byte": [],
           "vm_core_page_digest_u32": [
@@ -11247,13 +11257,22 @@
             [["work"],["vm01/servers/vm/vm_exit.c/micros_vm_exit_release_begin/index-196","wrap","VM_SERVICE","INDEX_PROBE",1,"value","slot",[],6,7]]
           ],
           "micros_vm_exit_release_complete": [
-            [["work"],["vm01/servers/vm/vm_exit.c/micros_vm_exit_release_complete/index-70","wrap","VM_SERVICE","INDEX_PROBE",1,"value","action -> process_slot",[],1,5]],
-            [["work"],["vm01/servers/vm/vm_exit.c/micros_vm_exit_release_complete/loop-178","insert","VM_SERVICE","RECORD_VISIT",1,"entry","",[["for ( entry_index = 0 ; entry_index < record -> entry_count ; ++ entry_index ) {",0]],0,0]],
-            [["work"],["vm01/servers/vm/vm_exit.c/micros_vm_exit_release_complete/index-192","wrap","VM_SERVICE","INDEX_PROBE",1,"value","entry_index",[["for ( entry_index = 0 ; entry_index < record -> entry_count ; ++ entry_index ) {",0]],0,1]],
-            [["work"],["vm01/servers/vm/vm_exit.c/micros_vm_exit_release_complete/index-207","wrap","VM_SERVICE","INDEX_PROBE",1,"value","frame_index",[["for ( entry_index = 0 ; entry_index < record -> entry_count ; ++ entry_index ) {",0]],2,3]]
+            [["work"],["vm03/servers/vm/vm_exit.c/micros_vm_exit_release_complete/index-70","wrap","VM_SERVICE","INDEX_PROBE",1,"value","action -> process_slot",[],1,5]],
+            [["work"],["vm03/servers/vm/vm_exit.c/micros_vm_exit_release_complete/loop-178","insert","VM_SERVICE","RECORD_VISIT",1,"entry","",[["for ( entry_index = 0 ; entry_index < record -> entry_count ; ++ entry_index ) {",0]],0,0]],
+            [["work"],["vm03/servers/vm/vm_exit.c/micros_vm_exit_release_complete/index-192","wrap","VM_SERVICE","INDEX_PROBE",1,"value","entry_index",[["for ( entry_index = 0 ; entry_index < record -> entry_count ; ++ entry_index ) {",0]],0,1]]
           ]
         },
         "servers/vm/vm_frames.c": {
+          "make_frame_available": [
+            [["work"],["vm03/servers/vm/vm_frames.c/make_frame_available/index-3","wrap","VM_SERVICE","INDEX_PROBE",1,"value","frame_index / 64",[],0,1]],
+            [["work"],["vm03/servers/vm/vm_frames.c/make_frame_available/index-25","wrap","VM_SERVICE","INDEX_PROBE",1,"value","frame_index",[],2,3]]
+          ],
+          "order_reserved_frames": [
+            [["work"],["vm03/servers/vm/vm_frames.c/order_reserved_frames/loop-44","insert","VM_SERVICE","RECORD_VISIT",1,"entry","",[["for ( size_t index = 0 ; index < count ; ++ index ) {",0]],0,0]],
+            [["work"],["vm03/servers/vm/vm_frames.c/order_reserved_frames/loop-109","insert","VM_SERVICE","RECORD_VISIT",1,"entry","",[["for ( size_t index = 0 ; index < count ; ++ index ) {",1]],0,0]],
+            [["work"],["vm03/servers/vm/vm_frames.c/order_reserved_frames/index-125","wrap","VM_SERVICE","INDEX_PROBE",1,"value","index",[["for ( size_t index = 0 ; index < count ; ++ index ) {",1],["if ( index < MICROS_VM_PAGE_TABLE_FRAME_COUNT ) {",0]],1,2]],
+            [["work"],["vm03/servers/vm/vm_frames.c/order_reserved_frames/index-142","wrap","VM_SERVICE","INDEX_PROBE",1,"value","index",[["for ( size_t index = 0 ; index < count ; ++ index ) {",1],["else {",0]],1,2]]
+          ],
           "reduce_membership_keys": [
             [["work"],["vm01/servers/vm/vm_frames.c/reduce_membership_keys/loop-15","insert","VM_SERVICE","RECORD_VISIT",1,"entry","",[["while ( index < view -> keys . count ) {",0]],0,0]],
             [["work"],["vm01/servers/vm/vm_frames.c/reduce_membership_keys/index-24","wrap","VM_SERVICE","INDEX_PROBE",1,"value","index ++",[["while ( index < view -> keys . count ) {",0]],0,1]],
@@ -11261,6 +11280,22 @@
             [["work"],["vm01/servers/vm/vm_frames.c/reduce_membership_keys/loop-93","insert","VM_SERVICE","RECORD_VISIT",1,"entry","",[["while ( index < view -> keys . count ) {",0],["while ( index < view -> keys . count && ( view -> keys . keys64 [ index ] & ~ ( uint64_t ) ( MICROS_FRAME_SIZE - 1 ) ) == physical ) {",0]],0,0]],
             [["work"],["vm01/servers/vm/vm_frames.c/reduce_membership_keys/index-102","wrap","VM_SERVICE","INDEX_PROBE",1,"value","index",[["while ( index < view -> keys . count ) {",0],["while ( index < view -> keys . count && ( view -> keys . keys64 [ index ] & ~ ( uint64_t ) ( MICROS_FRAME_SIZE - 1 ) ) == physical ) {",0]],0,2]],
             [["work"],["vm01/servers/vm/vm_frames.c/reduce_membership_keys/index-130","wrap","VM_SERVICE","INDEX_PROBE",1,"value","view -> group_count ++",[["while ( index < view -> keys . count ) {",0]],0,1]]
+          ],
+          "reserve_cached_frame": [
+            [["work"],["vm03/servers/vm/vm_frames.c/reserve_cached_frame/loop-8","insert","VM_SERVICE","RECORD_VISIT",1,"entry","",[["while ( state -> free_page_cache_count != 0 ) {",0]],0,0]],
+            [["work"],["vm03/servers/vm/vm_frames.c/reserve_cached_frame/index-28","wrap","VM_SERVICE","INDEX_PROBE",1,"value","state -> free_page_cache_count - 1",[["while ( state -> free_page_cache_count != 0 ) {",0]],0,1]],
+            [["work"],["vm03/servers/vm/vm_frames.c/reserve_cached_frame/index-71","wrap","VM_SERVICE","INDEX_PROBE",1,"value","frame_index",[["while ( state -> free_page_cache_count != 0 ) {",0]],4,5]]
+          ],
+          "reserve_frame": [
+            [["work"],["vm03/servers/vm/vm_frames.c/reserve_frame/index-26","wrap","VM_SERVICE","INDEX_PROBE",1,"value","frame_index",[],2,8]],
+            [["work"],["vm03/servers/vm/vm_frames.c/reserve_frame/index-51","wrap","VM_SERVICE","INDEX_PROBE",1,"value","frame_index / 64",[],0,1]],
+            [["work"],["vm03/servers/vm/vm_frames.c/reserve_frame/index-76","wrap","VM_SERVICE","INDEX_PROBE",1,"value","frame_index",[],6,8]]
+          ],
+          "reserve_next_frame": [],
+          "reserve_scanned_frame": [
+            [["work"],["vm03/servers/vm/vm_frames.c/reserve_scanned_frame/loop-25","insert","VM_SERVICE","RECORD_VISIT",1,"entry","",[["for ( ; ; ) {",0]],0,0]],
+            [["work"],["vm03/servers/vm/vm_frames.c/reserve_scanned_frame/index-45","wrap","VM_SERVICE","INDEX_PROBE",1,"value","word_index",[["for ( ; ; ) {",0]],0,3]],
+            [["work"],["vm03/servers/vm/vm_frames.c/reserve_scanned_frame/loop-80","insert","VM_SERVICE","RECORD_VISIT",1,"entry","",[["for ( ; ; ) {",0],["if ( word != 0 ) {",0],["while ( ( word & ( UINT64_C ( 1 ) << bit ) ) == 0 ) {",0]],0,0]]
           ],
           "vm_core_frame_index_to_physical": [
             [["work"],["vm01/servers/vm/vm_frames.c/vm_core_frame_index_to_physical/loop-43","insert","VM_SERVICE","RANGE_VISIT",1,"entry","",[["while ( first < end ) {",0]],0,0]],
@@ -11283,19 +11318,18 @@
             [["work"],["vm01/servers/vm/vm_frames.c/vm_core_record_contains_physical/index-36","wrap","VM_SERVICE","INDEX_PROBE",1,"value","entry_index",[["for ( entry_index = 0 ; entry_index < record -> entry_count ; ++ entry_index ) {",0]],0,1]]
           ],
           "vm_core_record_is_zero": [],
-          "vm_core_select_lowest_frames": [
-            [["work"],["vm01/servers/vm/vm_frames.c/vm_core_select_lowest_frames/loop-76","insert","VM_SERVICE","RECORD_VISIT",1,"entry","",[["for ( frame_index = 0 ; frame_index < state -> boot_summary . managed_frame_count ; ++ frame_index ) {",0]],0,0]],
-            [["work"],["vm01/servers/vm/vm_frames.c/vm_core_select_lowest_frames/index-121","wrap","VM_SERVICE","INDEX_PROBE",1,"value","frame_index",[["for ( frame_index = 0 ; frame_index < state -> boot_summary . managed_frame_count ; ++ frame_index ) {",0]],2,6]],
-            [["work"],["vm01/servers/vm/vm_frames.c/vm_core_select_lowest_frames/index-133","wrap","VM_SERVICE","INDEX_PROBE",1,"value","frame_index",[["for ( frame_index = 0 ; frame_index < state -> boot_summary . managed_frame_count ; ++ frame_index ) {",0]],3,6]],
-            [["work"],["vm01/servers/vm/vm_frames.c/vm_core_select_lowest_frames/index-144","wrap","VM_SERVICE","INDEX_PROBE",1,"value","frame_index",[["for ( frame_index = 0 ; frame_index < state -> boot_summary . managed_frame_count ; ++ frame_index ) {",0]],4,6]],
-            [["work"],["vm01/servers/vm/vm_frames.c/vm_core_select_lowest_frames/index-173","wrap","VM_SERVICE","INDEX_PROBE",1,"value","ignored_slot",[["for ( frame_index = 0 ; frame_index < state -> boot_summary . managed_frame_count ; ++ frame_index ) {",0]],1,3]],
-            [["work"],["vm01/servers/vm/vm_frames.c/vm_core_select_lowest_frames/index-197","wrap","VM_SERVICE","INDEX_PROBE",1,"value","frame_index",[["for ( frame_index = 0 ; frame_index < state -> boot_summary . managed_frame_count ; ++ frame_index ) {",0]],5,6]]
+          "vm_core_release_frame_prevalidated": [
+            [["work"],["vm03/servers/vm/vm_frames.c/vm_core_release_frame_prevalidated/index-19","wrap","VM_SERVICE","INDEX_PROBE",1,"value","state -> free_page_cache_count ++",[["if ( state -> free_page_cache_count < MICROS_VM_FREE_PAGE_CACHE_CAPACITY ) {",0]],0,1]]
           ],
-          "vm_core_selected_frames_match": [
-            [["work"],["vm01/servers/vm/vm_frames.c/vm_core_selected_frames_match/loop-62","insert","VM_SERVICE","RECORD_VISIT",1,"entry","",[["for ( index = 0 ; index < MICROS_VM_PAGE_TABLE_FRAME_COUNT ; ++ index ) {",0]],0,0]],
-            [["work"],["vm01/servers/vm/vm_frames.c/vm_core_selected_frames_match/index-75","wrap","VM_SERVICE","INDEX_PROBE",1,"value","index",[["for ( index = 0 ; index < MICROS_VM_PAGE_TABLE_FRAME_COUNT ; ++ index ) {",0]],1,2]],
-            [["work"],["vm01/servers/vm/vm_frames.c/vm_core_selected_frames_match/loop-102","insert","VM_SERVICE","RECORD_VISIT",1,"entry","",[["for ( index = 0 ; index < state -> transaction . page_count ; ++ index ) {",0]],0,0]],
-            [["work"],["vm01/servers/vm/vm_frames.c/vm_core_selected_frames_match/index-115","wrap","VM_SERVICE","INDEX_PROBE",1,"value","index",[["for ( index = 0 ; index < state -> transaction . page_count ; ++ index ) {",0]],1,2]]
+          "vm_core_reserve_frames": [
+            [["work"],["vm03/servers/vm/vm_frames.c/vm_core_reserve_frames/loop-86","insert","VM_SERVICE","RECORD_VISIT",1,"entry","",[["for ( ; selected < MICROS_VM_PAGE_TABLE_FRAME_COUNT + data_count ; ++ selected ) {",0]],0,0]],
+            [["work"],["vm03/servers/vm/vm_frames.c/vm_core_reserve_frames/loop-172","insert","VM_SERVICE","RECORD_VISIT",1,"entry","",[["if ( error != MICROS_VM_CORE_OK ) {",0],["for ( size_t index = 0 ; index < selected ; ++ index ) {",0]],0,0]]
+          ],
+          "vm_core_transaction_frames_match": [
+            [["work"],["vm03/servers/vm/vm_frames.c/vm_core_transaction_frames_match/loop-29","insert","VM_SERVICE","RECORD_VISIT",1,"entry","",[["for ( size_t index = 0 ; index < MICROS_VM_PAGE_TABLE_FRAME_COUNT + transaction -> page_count ; ++ index ) {",0]],0,0]],
+            [["work"],["vm03/servers/vm/vm_frames.c/vm_core_transaction_frames_match/index-56","wrap","VM_SERVICE","INDEX_PROBE",1,"value","index",[["for ( size_t index = 0 ; index < MICROS_VM_PAGE_TABLE_FRAME_COUNT + transaction -> page_count ; ++ index ) {",0]],2,3]],
+            [["work"],["vm03/servers/vm/vm_frames.c/vm_core_transaction_frames_match/index-63","wrap","VM_SERVICE","INDEX_PROBE",1,"value","page",[["for ( size_t index = 0 ; index < MICROS_VM_PAGE_TABLE_FRAME_COUNT + transaction -> page_count ; ++ index ) {",0]],1,4]],
+            [["work"],["vm03/servers/vm/vm_frames.c/vm_core_transaction_frames_match/index-155","wrap","VM_SERVICE","INDEX_PROBE",1,"value","frame_index",[["for ( size_t index = 0 ; index < MICROS_VM_PAGE_TABLE_FRAME_COUNT + transaction -> page_count ; ++ index ) {",0]],4,5]]
           ]
         },
         "servers/vm/vm_image.c": {
@@ -11339,14 +11373,15 @@
             [["work"],["vm01/servers/vm/vm_load.c/load_record_identity_is_available/index-27","wrap","VM_SERVICE","INDEX_PROBE",1,"value","slot",[["for ( slot = 0 ; slot < MICROS_VM_MAPPING_RECORD_CAPACITY ; ++ slot ) {",0]],0,1]]
           ],
           "micros_vm_load_aborted": [
-            [["work"],["vm03/servers/vm/vm_load.c/micros_vm_load_aborted/loop-112","insert","VM_SERVICE","RECORD_VISIT",1,"entry","",[["for ( index = 0 ; index < MICROS_VM_PAGE_TABLE_FRAME_COUNT ; ++ index ) {",0]],0,0]],
-            [["work"],["vm03/servers/vm/vm_load.c/micros_vm_load_aborted/index-128","wrap","VM_SERVICE","INDEX_PROBE",1,"value","index",[["for ( index = 0 ; index < MICROS_VM_PAGE_TABLE_FRAME_COUNT ; ++ index ) {",0]],0,1]],
-            [["work"],["vm03/servers/vm/vm_load.c/micros_vm_load_aborted/index-141","wrap","VM_SERVICE","INDEX_PROBE",1,"value","frame_index",[["for ( index = 0 ; index < MICROS_VM_PAGE_TABLE_FRAME_COUNT ; ++ index ) {",0]],2,3]],
-            [["work"],["vm03/servers/vm/vm_load.c/micros_vm_load_aborted/loop-165","insert","VM_SERVICE","RECORD_VISIT",1,"entry","",[["for ( index = 0 ; index < state -> transaction . page_count ; ++ index ) {",0]],0,0]],
-            [["work"],["vm03/servers/vm/vm_load.c/micros_vm_load_aborted/index-181","wrap","VM_SERVICE","INDEX_PROBE",1,"value","index",[["for ( index = 0 ; index < state -> transaction . page_count ; ++ index ) {",0]],0,1]],
-            [["work"],["vm03/servers/vm/vm_load.c/micros_vm_load_aborted/index-194","wrap","VM_SERVICE","INDEX_PROBE",1,"value","frame_index",[["for ( index = 0 ; index < state -> transaction . page_count ; ++ index ) {",0]],2,3]],
-            [["work"],["vm03/servers/vm/vm_load.c/micros_vm_load_aborted/index-207","wrap","VM_SERVICE","INDEX_PROBE",1,"value","state -> transaction . process . slot",[],0,1]],
-            [["work"],["vm03/servers/vm/vm_load.c/micros_vm_load_aborted/index-222","wrap","VM_SERVICE","INDEX_PROBE",1,"value","0",[],2,3]]
+            [["work"],["vm03/servers/vm/vm_load.c/micros_vm_load_aborted/loop-66","insert","VM_SERVICE","RECORD_VISIT",1,"entry","",[["if ( state -> phase == MICROS_VM_LOADER_INPUT_COPIED ) {",0],["for ( index = 0 ; index < MICROS_VM_PAGE_TABLE_FRAME_COUNT + state -> transaction . page_count ; ++ index ) {",0]],0,0]],
+            [["work"],["vm03/servers/vm/vm_load.c/micros_vm_load_aborted/index-82","wrap","VM_SERVICE","INDEX_PROBE",1,"value","index",[["if ( state -> phase == MICROS_VM_LOADER_INPUT_COPIED ) {",0],["for ( index = 0 ; index < MICROS_VM_PAGE_TABLE_FRAME_COUNT + state -> transaction . page_count ; ++ index ) {",0]],1,3]],
+            [["work"],["vm03/servers/vm/vm_load.c/micros_vm_load_aborted/index-91","wrap","VM_SERVICE","INDEX_PROBE",1,"value","index - MICROS_VM_PAGE_TABLE_FRAME_COUNT",[["if ( state -> phase == MICROS_VM_LOADER_INPUT_COPIED ) {",0],["for ( index = 0 ; index < MICROS_VM_PAGE_TABLE_FRAME_COUNT + state -> transaction . page_count ; ++ index ) {",0]],0,1]],
+            [["work"],["vm03/servers/vm/vm_load.c/micros_vm_load_aborted/loop-183","insert","VM_SERVICE","RECORD_VISIT",1,"entry","",[["for ( index = 0 ; index < MICROS_VM_PAGE_TABLE_FRAME_COUNT ; ++ index ) {",0]],0,0]],
+            [["work"],["vm03/servers/vm/vm_load.c/micros_vm_load_aborted/index-199","wrap","VM_SERVICE","INDEX_PROBE",1,"value","index",[["for ( index = 0 ; index < MICROS_VM_PAGE_TABLE_FRAME_COUNT ; ++ index ) {",0]],0,1]],
+            [["work"],["vm03/servers/vm/vm_load.c/micros_vm_load_aborted/loop-232","insert","VM_SERVICE","RECORD_VISIT",1,"entry","",[["for ( index = 0 ; index < state -> transaction . page_count ; ++ index ) {",0]],0,0]],
+            [["work"],["vm03/servers/vm/vm_load.c/micros_vm_load_aborted/index-248","wrap","VM_SERVICE","INDEX_PROBE",1,"value","index",[["for ( index = 0 ; index < state -> transaction . page_count ; ++ index ) {",0]],0,1]],
+            [["work"],["vm03/servers/vm/vm_load.c/micros_vm_load_aborted/index-270","wrap","VM_SERVICE","INDEX_PROBE",1,"value","state -> transaction . process . slot",[],0,1]],
+            [["work"],["vm03/servers/vm/vm_load.c/micros_vm_load_aborted/index-285","wrap","VM_SERVICE","INDEX_PROBE",1,"value","0",[],2,3]]
           ],
           "micros_vm_load_bind": [
             [["work"],["vm01/servers/vm/vm_load.c/micros_vm_load_bind/index-78","wrap","VM_SERVICE","INDEX_PROBE",1,"value","process . slot",[],1,8]],
@@ -11398,13 +11433,13 @@
           "prepare_source_shape_is_valid": [],
           "publish_load_input": [],
           "selected_frame_is_available": [
-            [["work"],["vm01/servers/vm/vm_load.c/selected_frame_is_available/index-23","wrap","VM_SERVICE","INDEX_PROBE",1,"value","frame_index",[],2,3]]
+            [["work"],["vm03/servers/vm/vm_load.c/selected_frame_is_available/index-30","wrap","VM_SERVICE","INDEX_PROBE",1,"value","frame_index",[],3,4]]
           ],
           "vm_core_clear_input_buffers": [],
           "vm_core_clear_transaction": [],
           "vm_core_prepare_failure": [],
           "vm_load_prepare_transaction": [
-            [["work"],["vm01/servers/vm/vm_load.c/vm_load_prepare_transaction/index-221","wrap","VM_SERVICE","INDEX_PROBE",1,"value","0",[],0,1]]
+            [["work"],["vm03/servers/vm/vm_load.c/vm_load_prepare_transaction/index-219","wrap","VM_SERVICE","INDEX_PROBE",1,"value","0",[],0,1]]
           ]
         },
         "servers/vm/vm_service_core.c": {
@@ -11486,6 +11521,10 @@
           "vm_image_plan_decoded_stack": []
         },
         "servers/vm/vm_validation.c": {
+          "cached_frames_are_valid": [
+            [["work"],["vm03/servers/vm/vm_validation.c/cached_frames_are_valid/loop-16","insert","VM_SERVICE","RECORD_VISIT",1,"entry","",[["for ( size_t index = 0 ; index < state -> free_page_cache_count ; ++ index ) {",0]],0,0]],
+            [["work"],["vm03/servers/vm/vm_validation.c/cached_frames_are_valid/index-27","wrap","VM_SERVICE","INDEX_PROBE",1,"value","index",[["for ( size_t index = 0 ; index < state -> free_page_cache_count ; ++ index ) {",0]],0,1]]
+          ],
           "finish_mapping_key_check": [
             [["work"],["vm01/servers/vm/vm_validation.c/finish_mapping_key_check/loop-29","insert","VM_SERVICE","RECORD_VISIT",1,"entry","",[["if ( unique ) {",0],["for ( size_t index = 1 ; index < keys -> count ; ++ index ) {",0]],0,0]],
             [["work"],["vm01/servers/vm/vm_validation.c/finish_mapping_key_check/index-35","wrap","VM_SERVICE","INDEX_PROBE",1,"value","index - 1",[["if ( unique ) {",0],["for ( size_t index = 1 ; index < keys -> count ; ++ index ) {",0]],0,1]],
@@ -11517,11 +11556,11 @@
             [["work"],["vm01/servers/vm/vm_validation.c/selected_geometry_is_valid/loop-136","insert","VM_SERVICE","RECORD_VISIT",1,"entry","",[["for ( size_t index = 0 ; index < header -> managed_range_count ; ++ index ) {",0]],0,0]],
             [["work"],["vm01/servers/vm/vm_validation.c/selected_geometry_is_valid/index-149","wrap","VM_SERVICE","INDEX_PROBE",1,"value","index",[["for ( size_t index = 0 ; index < header -> managed_range_count ; ++ index ) {",0]],0,2]]
           ],
-          "selected_input_frames_are_free": [
-            [["work"],["vm01/servers/vm/vm_validation.c/selected_input_frames_are_free/loop-29","insert","VM_SERVICE","RECORD_VISIT",1,"entry","",[["for ( size_t index = 0 ; index < MICROS_VM_PAGE_TABLE_FRAME_COUNT + transaction -> page_count ; ++ index ) {",0]],0,0]],
-            [["work"],["vm01/servers/vm/vm_validation.c/selected_input_frames_are_free/index-40","wrap","VM_SERVICE","INDEX_PROBE",1,"value","index",[["for ( size_t index = 0 ; index < MICROS_VM_PAGE_TABLE_FRAME_COUNT + transaction -> page_count ; ++ index ) {",0]],1,3]],
-            [["work"],["vm01/servers/vm/vm_validation.c/selected_input_frames_are_free/index-47","wrap","VM_SERVICE","INDEX_PROBE",1,"value","index - MICROS_VM_PAGE_TABLE_FRAME_COUNT",[["for ( size_t index = 0 ; index < MICROS_VM_PAGE_TABLE_FRAME_COUNT + transaction -> page_count ; ++ index ) {",0]],0,1]],
-            [["work"],["vm01/servers/vm/vm_validation.c/selected_input_frames_are_free/index-82","wrap","VM_SERVICE","INDEX_PROBE",1,"value","frame_index",[["for ( size_t index = 0 ; index < MICROS_VM_PAGE_TABLE_FRAME_COUNT + transaction -> page_count ; ++ index ) {",0]],3,4]]
+          "selected_input_frames_are_reserved": [
+            [["work"],["vm03/servers/vm/vm_validation.c/selected_input_frames_are_reserved/loop-29","insert","VM_SERVICE","RECORD_VISIT",1,"entry","",[["for ( size_t index = 0 ; index < MICROS_VM_PAGE_TABLE_FRAME_COUNT + transaction -> page_count ; ++ index ) {",0]],0,0]],
+            [["work"],["vm03/servers/vm/vm_validation.c/selected_input_frames_are_reserved/index-40","wrap","VM_SERVICE","INDEX_PROBE",1,"value","index",[["for ( size_t index = 0 ; index < MICROS_VM_PAGE_TABLE_FRAME_COUNT + transaction -> page_count ; ++ index ) {",0]],1,3]],
+            [["work"],["vm03/servers/vm/vm_validation.c/selected_input_frames_are_reserved/index-47","wrap","VM_SERVICE","INDEX_PROBE",1,"value","index - MICROS_VM_PAGE_TABLE_FRAME_COUNT",[["for ( size_t index = 0 ; index < MICROS_VM_PAGE_TABLE_FRAME_COUNT + transaction -> page_count ; ++ index ) {",0]],0,1]],
+            [["work"],["vm03/servers/vm/vm_validation.c/selected_input_frames_are_reserved/index-90","wrap","VM_SERVICE","INDEX_PROBE",1,"value","frame_index",[["for ( size_t index = 0 ; index < MICROS_VM_PAGE_TABLE_FRAME_COUNT + transaction -> page_count ; ++ index ) {",0]],4,5]]
           ],
           "selected_load_page_is_valid": [
             [["work"],["vm03/servers/vm/vm_validation.c/selected_load_page_is_valid/index-21","wrap","VM_SERVICE","INDEX_PROBE",1,"value","transaction -> process . slot",[],0,1]],
@@ -11535,37 +11574,37 @@
           ],
           "validate_exit_releasing_phase": [],
           "validate_frozen_phase": [
-            [["work"],["vm01/servers/vm/vm_validation.c/validate_frozen_phase/index-97","wrap","VM_SERVICE","INDEX_PROBE",1,"value","counts -> frozen_slot",[],1,3]]
+            [["work"],["vm03/servers/vm/vm_validation.c/validate_frozen_phase/index-97","wrap","VM_SERVICE","INDEX_PROBE",1,"value","counts -> frozen_slot",[],1,2]]
           ],
           "validate_idle_phase": [],
           "validate_input_copied_phase": [],
           "validate_loader_phase": [],
           "validate_loading_phase": [
-            [["work"],["vm01/servers/vm/vm_validation.c/validate_loading_phase/index-95","wrap","VM_SERVICE","INDEX_PROBE",1,"value","counts -> loading_slot",[],1,3]]
+            [["work"],["vm03/servers/vm/vm_validation.c/validate_loading_phase/index-121","wrap","VM_SERVICE","INDEX_PROBE",1,"value","counts -> loading_slot",[],1,2]]
           ],
           "validate_local_frame_states": [
-            [["work"],["vm01/servers/vm/vm_validation.c/validate_local_frame_states/loop-20","insert","VM_SERVICE","RECORD_VISIT",1,"entry","",[["for ( frame_index = 0 ; frame_index < state -> boot_summary . managed_frame_count ; ++ frame_index ) {",0]],0,0]],
-            [["work"],["vm01/servers/vm/vm_validation.c/validate_local_frame_states/index-29","wrap","VM_SERVICE","INDEX_PROBE",1,"value","frame_index",[["for ( frame_index = 0 ; frame_index < state -> boot_summary . managed_frame_count ; ++ frame_index ) {",0]],0,2]],
-            [["work"],["vm01/servers/vm/vm_validation.c/validate_local_frame_states/index-132","wrap","VM_SERVICE","INDEX_PROBE",1,"value","state -> boot_summary . managed_frame_count",[],1,3]]
+            [["work"],["vm03/servers/vm/vm_validation.c/validate_local_frame_states/loop-20","insert","VM_SERVICE","RECORD_VISIT",1,"entry","",[["for ( frame_index = 0 ; frame_index < state -> boot_summary . managed_frame_count ; ++ frame_index ) {",0]],0,0]],
+            [["work"],["vm03/servers/vm/vm_validation.c/validate_local_frame_states/index-29","wrap","VM_SERVICE","INDEX_PROBE",1,"value","frame_index",[["for ( frame_index = 0 ; frame_index < state -> boot_summary . managed_frame_count ; ++ frame_index ) {",0]],0,3]],
+            [["work"],["vm03/servers/vm/vm_validation.c/validate_local_frame_states/index-147","wrap","VM_SERVICE","INDEX_PROBE",1,"value","state -> boot_summary . managed_frame_count",[],1,3]]
           ],
           "validate_mapping_records": [
             [["work"],["vm01/servers/vm/vm_validation.c/validate_mapping_records/loop-16","insert","VM_SERVICE","RECORD_VISIT",1,"entry","",[["for ( slot = 0 ; slot < MICROS_VM_MAPPING_RECORD_CAPACITY ; ++ slot ) {",0]],0,0]],
             [["work"],["vm01/servers/vm/vm_validation.c/validate_mapping_records/index-27","wrap","VM_SERVICE","INDEX_PROBE",1,"value","slot",[["for ( slot = 0 ; slot < MICROS_VM_MAPPING_RECORD_CAPACITY ; ++ slot ) {",0]],0,3]]
           ],
           "validate_record_entries": [
-            [["work"],["vm01/servers/vm/vm_validation.c/validate_record_entries/index-10","wrap","VM_SERVICE","INDEX_PROBE",1,"value","slot",[],0,1]],
-            [["work"],["vm01/servers/vm/vm_validation.c/validate_record_entries/loop-32","insert","VM_SERVICE","RECORD_VISIT",1,"entry","",[["for ( entry_index = 0 ; entry_index < record -> entry_count ; ++ entry_index ) {",0]],0,0]],
-            [["work"],["vm01/servers/vm/vm_validation.c/validate_record_entries/index-43","wrap","VM_SERVICE","INDEX_PROBE",1,"value","entry_index",[["for ( entry_index = 0 ; entry_index < record -> entry_count ; ++ entry_index ) {",0]],0,6]],
-            [["work"],["vm01/servers/vm/vm_validation.c/validate_record_entries/index-107","wrap","VM_SERVICE","INDEX_PROBE",1,"value","entry_index - 1",[["for ( entry_index = 0 ; entry_index < record -> entry_count ; ++ entry_index ) {",0]],0,1]],
-            [["work"],["vm01/servers/vm/vm_validation.c/validate_record_entries/index-202","wrap","VM_SERVICE","INDEX_PROBE",1,"value","record -> entry_count",[],1,3]],
-            [["work"],["vm01/servers/vm/vm_validation.c/validate_record_entries/index-221","wrap","VM_SERVICE","INDEX_PROBE",1,"value","0",[],1,2]]
+            [["work"],["vm03/servers/vm/vm_validation.c/validate_record_entries/index-10","wrap","VM_SERVICE","INDEX_PROBE",1,"value","slot",[],0,1]],
+            [["work"],["vm03/servers/vm/vm_validation.c/validate_record_entries/loop-32","insert","VM_SERVICE","RECORD_VISIT",1,"entry","",[["for ( entry_index = 0 ; entry_index < record -> entry_count ; ++ entry_index ) {",0]],0,0]],
+            [["work"],["vm03/servers/vm/vm_validation.c/validate_record_entries/index-43","wrap","VM_SERVICE","INDEX_PROBE",1,"value","entry_index",[["for ( entry_index = 0 ; entry_index < record -> entry_count ; ++ entry_index ) {",0]],0,6]],
+            [["work"],["vm03/servers/vm/vm_validation.c/validate_record_entries/index-115","wrap","VM_SERVICE","INDEX_PROBE",1,"value","entry_index - 1",[["for ( entry_index = 0 ; entry_index < record -> entry_count ; ++ entry_index ) {",0]],0,1]],
+            [["work"],["vm03/servers/vm/vm_validation.c/validate_record_entries/index-210","wrap","VM_SERVICE","INDEX_PROBE",1,"value","record -> entry_count",[],1,3]],
+            [["work"],["vm03/servers/vm/vm_validation.c/validate_record_entries/index-229","wrap","VM_SERVICE","INDEX_PROBE",1,"value","0",[],1,2]]
           ],
           "validate_table_entry": [
             [["work"],["vm01/servers/vm/vm_validation.c/validate_table_entry/index-29","wrap","VM_SERVICE","INDEX_PROBE",1,"value","entry_index",[],0,2]],
             [["work"],["vm01/servers/vm/vm_validation.c/validate_table_entry/index-74","wrap","VM_SERVICE","INDEX_PROBE",1,"value","frame_index",[],0,1]]
           ],
           "vm_core_boot_database_is_immutable": [
-            [["work"],["vm01/servers/vm/vm_validation.c/vm_core_boot_database_is_immutable/index-176","wrap","VM_SERVICE","INDEX_PROBE",1,"value","active_frame_count",[],4,6]]
+            [["work"],["vm03/servers/vm/vm_validation.c/vm_core_boot_database_is_immutable/index-176","wrap","VM_SERVICE","INDEX_PROBE",1,"value","active_frame_count",[],4,6]]
           ],
           "vm_core_boot_header_matches_summary": [],
           "vm_core_record_matches_transaction": [
@@ -11579,12 +11618,12 @@
             [["work"],["vm01/servers/vm/vm_validation.c/vm_core_record_matches_transaction/index-276","wrap","VM_SERVICE","INDEX_PROBE",1,"value","index",[["for ( index = 0 ; index < transaction -> page_count ; ++ index ) {",0]],5,6]]
           ],
           "vm_core_selected_record_is_valid": [
-            [["work"],["vm01/servers/vm/vm_validation.c/vm_core_selected_record_is_valid/index-27","wrap","VM_SERVICE","INDEX_PROBE",1,"value","slot",[],1,2]],
-            [["work"],["vm01/servers/vm/vm_validation.c/vm_core_selected_record_is_valid/loop-63","insert","VM_SERVICE","RECORD_VISIT",1,"entry","",[["for ( size_t index = 0 ; index < record -> entry_count ; ++ index ) {",0]],0,0]],
-            [["work"],["vm01/servers/vm/vm_validation.c/vm_core_selected_record_is_valid/index-74","wrap","VM_SERVICE","INDEX_PROBE",1,"value","index",[["for ( size_t index = 0 ; index < record -> entry_count ; ++ index ) {",0]],0,6]],
-            [["work"],["vm01/servers/vm/vm_validation.c/vm_core_selected_record_is_valid/index-127","wrap","VM_SERVICE","INDEX_PROBE",1,"value","index - 1",[["for ( size_t index = 0 ; index < record -> entry_count ; ++ index ) {",0]],0,1]],
-            [["work"],["vm01/servers/vm/vm_validation.c/vm_core_selected_record_is_valid/index-182","wrap","VM_SERVICE","INDEX_PROBE",1,"value","record -> entry_count",[],1,3]],
-            [["work"],["vm01/servers/vm/vm_validation.c/vm_core_selected_record_is_valid/index-201","wrap","VM_SERVICE","INDEX_PROBE",1,"value","0",[],1,2]]
+            [["work"],["vm03/servers/vm/vm_validation.c/vm_core_selected_record_is_valid/index-27","wrap","VM_SERVICE","INDEX_PROBE",1,"value","slot",[],1,2]],
+            [["work"],["vm03/servers/vm/vm_validation.c/vm_core_selected_record_is_valid/loop-63","insert","VM_SERVICE","RECORD_VISIT",1,"entry","",[["for ( size_t index = 0 ; index < record -> entry_count ; ++ index ) {",0]],0,0]],
+            [["work"],["vm03/servers/vm/vm_validation.c/vm_core_selected_record_is_valid/index-74","wrap","VM_SERVICE","INDEX_PROBE",1,"value","index",[["for ( size_t index = 0 ; index < record -> entry_count ; ++ index ) {",0]],0,6]],
+            [["work"],["vm03/servers/vm/vm_validation.c/vm_core_selected_record_is_valid/index-135","wrap","VM_SERVICE","INDEX_PROBE",1,"value","index - 1",[["for ( size_t index = 0 ; index < record -> entry_count ; ++ index ) {",0]],0,1]],
+            [["work"],["vm03/servers/vm/vm_validation.c/vm_core_selected_record_is_valid/index-190","wrap","VM_SERVICE","INDEX_PROBE",1,"value","record -> entry_count",[],1,3]],
+            [["work"],["vm03/servers/vm/vm_validation.c/vm_core_selected_record_is_valid/index-209","wrap","VM_SERVICE","INDEX_PROBE",1,"value","0",[],1,2]]
           ],
           "vm_core_transaction_buffers_are_canonical": [],
           "vm_core_transaction_common_is_canonical": [],
@@ -11604,16 +11643,14 @@
           "vm_core_transaction_plans_are_canonical": [],
           "vm_core_validate_selected_load_plan": [],
           "vm_core_validate_selected_state": [
-            [["work"],["vm03/servers/vm/vm_validation.c/vm_core_validate_selected_state/index-265","wrap","VM_SERVICE","INDEX_PROBE",1,"value","transaction -> process . slot",[],0,3]],
-            [["work"],["vm03/servers/vm/vm_validation.c/vm_core_validate_selected_state/index-471","wrap","VM_SERVICE","INDEX_PROBE",1,"value","index - 1",[["if ( transaction -> completed_page_count < transaction -> page_count ) {",0]],1,2]],
-            [["work"],["vm03/servers/vm/vm_validation.c/vm_core_validate_selected_state/index-480","wrap","VM_SERVICE","INDEX_PROBE",1,"value","index",[["if ( transaction -> completed_page_count < transaction -> page_count ) {",0]],5,6]]
+            [["work"],["vm03/servers/vm/vm_validation.c/vm_core_validate_selected_state/index-271","wrap","VM_SERVICE","INDEX_PROBE",1,"value","transaction -> process . slot",[],0,3]],
+            [["work"],["vm03/servers/vm/vm_validation.c/vm_core_validate_selected_state/index-477","wrap","VM_SERVICE","INDEX_PROBE",1,"value","index - 1",[["if ( transaction -> completed_page_count < transaction -> page_count ) {",0]],1,2]],
+            [["work"],["vm03/servers/vm/vm_validation.c/vm_core_validate_selected_state/index-486","wrap","VM_SERVICE","INDEX_PROBE",1,"value","index",[["if ( transaction -> completed_page_count < transaction -> page_count ) {",0]],5,6]]
           ],
           "vm_core_validate_state": [],
           "vm_validation_digest_active_frame_states": [
-            [["work"],["vm01/servers/vm/vm_validation.c/vm_validation_digest_active_frame_states/loop-21","insert","VM_SERVICE","RECORD_VISIT",1,"entry","",[["for ( word_index = 0 ; frame_index < managed_frame_count ; ++ word_index ) {",0]],0,0]],
-            [["work"],["vm01/servers/vm/vm_validation.c/vm_validation_digest_active_frame_states/index-28","wrap","VM_SERVICE","INDEX_PROBE",1,"value","word_index",[["for ( word_index = 0 ; frame_index < managed_frame_count ; ++ word_index ) {",0]],0,1]],
-            [["work"],["vm01/servers/vm/vm_validation.c/vm_validation_digest_active_frame_states/loop-58","insert","VM_SERVICE","RECORD_VISIT",1,"entry","",[["for ( word_index = 0 ; frame_index < managed_frame_count ; ++ word_index ) {",0],["for ( ; frame_index < managed_frame_count && bit != 0 ; ++ frame_index , bit <<= 1 ) {",0]],0,0]],
-            [["work"],["vm01/servers/vm/vm_validation.c/vm_validation_digest_active_frame_states/index-77","wrap","VM_SERVICE","INDEX_PROBE",1,"value","frame_index",[["for ( word_index = 0 ; frame_index < managed_frame_count ; ++ word_index ) {",0],["for ( ; frame_index < managed_frame_count && bit != 0 ; ++ frame_index , bit <<= 1 ) {",0]],0,1]]
+            [["work"],["vm03/servers/vm/vm_validation.c/vm_validation_digest_active_frame_states/loop-14","insert","VM_SERVICE","RECORD_VISIT",1,"entry","",[["for ( size_t frame_index = 0 ; frame_index < managed_frame_count ; ++ frame_index ) {",0]],0,0]],
+            [["work"],["vm03/servers/vm/vm_validation.c/vm_validation_digest_active_frame_states/index-23","wrap","VM_SERVICE","INDEX_PROBE",1,"value","frame_index",[["for ( size_t frame_index = 0 ; frame_index < managed_frame_count ; ++ frame_index ) {",0]],0,1]]
           ],
           "vm_validation_digest_bytes": [
             [["work"],["vm01/servers/vm/vm_validation.c/vm_validation_digest_bytes/loop-6","insert","VM_SERVICE","RECORD_VISIT",1,"entry","",[["while ( size >= 8 ) {",0]],0,0]],
@@ -11622,10 +11659,10 @@
           "vm_validation_digest_zero_bytes": [
             [["work"],["vm01/servers/vm/vm_validation.c/vm_validation_digest_zero_bytes/loop-11","insert","VM_SERVICE","CLEARED_BYTE",1,"entry","",[["while ( zero_count != 0 ) {",0]],0,0]]
           ],
-          "vm_validation_initial_free_tail_is_zero": [
-            [["work"],["vm01/servers/vm/vm_validation.c/vm_validation_initial_free_tail_is_zero/index-34","wrap","VM_SERVICE","INDEX_PROBE",1,"value","first_word",[["if ( boundary_bit != 0 ) {",0]],0,2]],
-            [["work"],["vm01/servers/vm/vm_validation.c/vm_validation_initial_free_tail_is_zero/loop-62","insert","VM_SERVICE","RECORD_VISIT",1,"entry","",[["for ( ; first_word < MICROS_VM_INITIAL_FREE_BITMAP_WORDS ; ++ first_word ) {",0]],0,0]],
-            [["work"],["vm01/servers/vm/vm_validation.c/vm_validation_initial_free_tail_is_zero/index-68","wrap","VM_SERVICE","INDEX_PROBE",1,"value","first_word",[["for ( ; first_word < MICROS_VM_INITIAL_FREE_BITMAP_WORDS ; ++ first_word ) {",0]],0,1]]
+          "vm_validation_free_tail_is_zero": [
+            [["work"],["vm03/servers/vm/vm_validation.c/vm_validation_free_tail_is_zero/index-34","wrap","VM_SERVICE","INDEX_PROBE",1,"value","first_word",[["if ( boundary_bit != 0 ) {",0]],0,2]],
+            [["work"],["vm03/servers/vm/vm_validation.c/vm_validation_free_tail_is_zero/loop-62","insert","VM_SERVICE","RECORD_VISIT",1,"entry","",[["for ( ; first_word < MICROS_VM_FREE_BITMAP_WORDS ; ++ first_word ) {",0]],0,0]],
+            [["work"],["vm03/servers/vm/vm_validation.c/vm_validation_free_tail_is_zero/index-68","wrap","VM_SERVICE","INDEX_PROBE",1,"value","first_word",[["for ( ; first_word < MICROS_VM_FREE_BITMAP_WORDS ; ++ first_word ) {",0]],0,1]]
           ]
         }
       },
@@ -27165,16 +27202,34 @@
       "functions": {
         "micros_vm_state_initialize": {
           "accesses": [
-            ["frame_states [ frame_index ]",[["{",3],["for ( frame_index = 0 ; frame_index < summary . managed_frame_count ; ++ frame_index ) {",0]]]
+            ["frame_states [ frame_index ]",[["{",3],["for ( frame_index = 0 ; frame_index < summary . managed_frame_count ; ++ frame_index ) {",0]]],
+            ["managed_ranges [ range_index - 1 ]",[["for ( size_t range_index = summary . managed_range_count ; range_index != 0 && state -> free_page_cache_count < MICROS_VM_FREE_PAGE_CACHE_CAPACITY ; -- range_index ) {",0]]],
+            ["frame_states [ index ]",[["for ( size_t range_index = summary . managed_range_count ; range_index != 0 && state -> free_page_cache_count < MICROS_VM_FREE_PAGE_CACHE_CAPACITY ; -- range_index ) {",0],["for ( uint64_t index = range -> frame_index ; index < range -> frame_index + range -> frame_count && state -> free_page_cache_count < MICROS_VM_FREE_PAGE_CACHE_CAPACITY ; ++ index ) {",0]]],
+            ["free_page_cache [ state -> free_page_cache_count ++ ]",[["for ( size_t range_index = summary . managed_range_count ; range_index != 0 && state -> free_page_cache_count < MICROS_VM_FREE_PAGE_CACHE_CAPACITY ; -- range_index ) {",0],["for ( uint64_t index = range -> frame_index ; index < range -> frame_index + range -> frame_count && state -> free_page_cache_count < MICROS_VM_FREE_PAGE_CACHE_CAPACITY ; ++ index ) {",0],["if ( boot_info -> frame_states [ index ] == MICROS_VM_FRAME_FREE ) {",0]]]
           ],
-          "aliases": [],
-          "calls": ["micros_vm_boot_validate","vm_core_endpoint_is_canonical","vm_core_mark_initial_frame_free","vm_core_ranges_overlap","vm_core_zero_bytes"],
+          "aliases": [
+            ["managed_ranges",["["]],
+            ["free_page_cache",["["]]
+          ],
+          "calls": ["micros_vm_boot_validate","vm_core_endpoint_is_canonical","vm_core_mark_frame_available","vm_core_ranges_overlap","vm_core_zero_bytes"],
           "directives": [],
           "guards": [],
           "loops": [
-            ["for ( frame_index = 0 ; frame_index < summary . managed_frame_count ; ++ frame_index ) {",[["{",3]]]
+            ["for ( frame_index = 0 ; frame_index < summary . managed_frame_count ; ++ frame_index ) {",[["{",3]]],
+            ["for ( size_t range_index = summary . managed_range_count ; range_index != 0 && state -> free_page_cache_count < MICROS_VM_FREE_PAGE_CACHE_CAPACITY ; -- range_index ) {",[]],
+            ["for ( uint64_t index = range -> frame_index ; index < range -> frame_index + range -> frame_count && state -> free_page_cache_count < MICROS_VM_FREE_PAGE_CACHE_CAPACITY ; ++ index ) {",[["for ( size_t range_index = summary . managed_range_count ; range_index != 0 && state -> free_page_cache_count < MICROS_VM_FREE_PAGE_CACHE_CAPACITY ; -- range_index ) {",0]]]
           ],
           "signature": "enum micros_vm_core_error micros_vm_state_initialize ( struct micros_vm_state * state , struct micros_vm_boot_info * boot_info , uint32_t expected_service_id , uint32_t expected_self_endpoint , uint32_t expected_address_space_count )",
+          "storage": []
+        },
+        "vm_core_allocator_metadata_is_valid": {
+          "accesses": [],
+          "aliases": [],
+          "calls": [],
+          "directives": [],
+          "guards": [],
+          "loops": [],
+          "signature": "bool vm_core_allocator_metadata_is_valid ( const struct micros_vm_state * state )",
           "storage": []
         },
         "vm_core_bytes_are_zero": {
@@ -27254,9 +27309,24 @@
           "signature": "bool vm_core_endpoint_is_canonical ( uint32_t endpoint )",
           "storage": []
         },
+        "vm_core_frame_availability_is_valid": {
+          "accesses": [
+            ["frame_states [ frame_index ]",[]],
+            ["free_bitmap [ frame_index / 64 ]",[]]
+          ],
+          "aliases": [
+            ["free_bitmap",["["]]
+          ],
+          "calls": [],
+          "directives": [],
+          "guards": [],
+          "loops": [],
+          "signature": "bool vm_core_frame_availability_is_valid ( const struct micros_vm_state * state , uint64_t frame_index )",
+          "storage": []
+        },
         "vm_core_initial_frame_is_free": {
           "accesses": [
-            ["initial_free_bitmap [ word_index ]",[]]
+            ["frame_states [ frame_index ]",[]]
           ],
           "aliases": [],
           "calls": [],
@@ -27282,16 +27352,18 @@
           "signature": "uint64_t vm_core_load_page_digest ( const struct micros_vm_state * state )",
           "storage": []
         },
-        "vm_core_mark_initial_frame_free": {
+        "vm_core_mark_frame_available": {
           "accesses": [
-            ["initial_free_bitmap [ word_index ]",[]]
+            ["free_bitmap [ word_index ]",[]]
           ],
-          "aliases": [],
+          "aliases": [
+            ["free_bitmap",["["]]
+          ],
           "calls": [],
           "directives": [],
           "guards": [],
           "loops": [],
-          "signature": "static void vm_core_mark_initial_frame_free ( struct micros_vm_state * state , uint64_t frame_index )",
+          "signature": "static void vm_core_mark_frame_available ( struct micros_vm_state * state , uint64_t frame_index )",
           "storage": []
         },
         "vm_core_page_digest_byte": {
@@ -27528,13 +27600,12 @@
         "micros_vm_exit_release_complete": {
           "accesses": [
             ["mapping_records [ action -> process_slot ]",[]],
-            ["entries [ entry_index ]",[["for ( entry_index = 0 ; entry_index < record -> entry_count ; ++ entry_index ) {",0]]],
-            ["frame_states [ frame_index ]",[["for ( entry_index = 0 ; entry_index < record -> entry_count ; ++ entry_index ) {",0]]]
+            ["entries [ entry_index ]",[["for ( entry_index = 0 ; entry_index < record -> entry_count ; ++ entry_index ) {",0]]]
           ],
           "aliases": [
             ["entries",["["]]
           ],
-          "calls": ["vm_core_physical_to_frame_index","vm_core_record_header_is_valid","vm_core_selected_record_is_valid","vm_core_validate_selected_state","vm_core_zero_bytes"],
+          "calls": ["vm_core_physical_to_frame_index","vm_core_record_header_is_valid","vm_core_release_frame_prevalidated","vm_core_selected_record_is_valid","vm_core_validate_selected_state","vm_core_zero_bytes"],
           "directives": [],
           "guards": [],
           "loops": [
@@ -27549,6 +27620,44 @@
     "servers/vm/vm_frames.c": {
       "complete": 1,
       "functions": {
+        "make_frame_available": {
+          "accesses": [
+            ["free_bitmap [ frame_index / 64 ]",[]],
+            ["frame_states [ frame_index ]",[]]
+          ],
+          "aliases": [
+            ["free_bitmap",["["]]
+          ],
+          "calls": [],
+          "directives": [],
+          "guards": [],
+          "loops": [],
+          "signature": "static void make_frame_available ( struct micros_vm_state * state , uint64_t frame_index )",
+          "storage": []
+        },
+        "order_reserved_frames": {
+          "accesses": [
+            ["table_frames [ index ]",[["for ( size_t index = 0 ; index < count ; ++ index ) {",0]]],
+            ["data_frames [ index - MICROS_VM_PAGE_TABLE_FRAME_COUNT ]",[["for ( size_t index = 0 ; index < count ; ++ index ) {",0]]],
+            ["table_frames [ index ]",[["for ( size_t index = 0 ; index < count ; ++ index ) {",1],["if ( index < MICROS_VM_PAGE_TABLE_FRAME_COUNT ) {",0]]],
+            ["keys64 [ index ]",[["for ( size_t index = 0 ; index < count ; ++ index ) {",1],["if ( index < MICROS_VM_PAGE_TABLE_FRAME_COUNT ) {",0]]],
+            ["data_frames [ index - MICROS_VM_PAGE_TABLE_FRAME_COUNT ]",[["for ( size_t index = 0 ; index < count ; ++ index ) {",1],["else {",0]]],
+            ["keys64 [ index ]",[["for ( size_t index = 0 ; index < count ; ++ index ) {",1],["else {",0]]]
+          ],
+          "aliases": [
+            ["keys64",["["]],
+            ["keys64",["["]]
+          ],
+          "calls": ["micros_vm_keys_append64","micros_vm_keys_begin64","micros_vm_keys_end","micros_vm_keys_sort"],
+          "directives": [],
+          "guards": [],
+          "loops": [
+            ["for ( size_t index = 0 ; index < count ; ++ index ) {",[]],
+            ["for ( size_t index = 0 ; index < count ; ++ index ) {",[]]
+          ],
+          "signature": "static bool order_reserved_frames ( size_t data_count , uint64_t table_frames [ MICROS_VM_PAGE_TABLE_FRAME_COUNT ] , uint64_t data_frames [ MICROS_APPLICATION_RESIDENT_PAGE_MAX ] )",
+          "storage": []
+        },
         "reduce_membership_keys": {
           "accesses": [
             ["keys64 [ index ++ ]",[["while ( index < view -> keys . count ) {",0]]],
@@ -27570,6 +27679,66 @@
             ["while ( index < view -> keys . count && ( view -> keys . keys64 [ index ] & ~ ( uint64_t ) ( MICROS_FRAME_SIZE - 1 ) ) == physical ) {",[["while ( index < view -> keys . count ) {",0]]]
           ],
           "signature": "static void reduce_membership_keys ( struct vm_core_membership_view * view )",
+          "storage": []
+        },
+        "reserve_cached_frame": {
+          "accesses": [
+            ["free_page_cache [ state -> free_page_cache_count - 1 ]",[["while ( state -> free_page_cache_count != 0 ) {",0]]],
+            ["frame_states [ frame_index ]",[["while ( state -> free_page_cache_count != 0 ) {",0]]]
+          ],
+          "aliases": [
+            ["free_page_cache",["["]]
+          ],
+          "calls": ["MICROS_VM01_WORK_HIT","reserve_frame","vm_core_frame_availability_is_valid","vm_core_initial_frame_is_free"],
+          "directives": [],
+          "guards": [],
+          "loops": [
+            ["while ( state -> free_page_cache_count != 0 ) {",[]]
+          ],
+          "signature": "static enum micros_vm_core_error reserve_cached_frame ( struct micros_vm_state * state , uint64_t * physical )",
+          "storage": []
+        },
+        "reserve_frame": {
+          "accesses": [
+            ["frame_states [ frame_index ]",[]],
+            ["free_bitmap [ frame_index / 64 ]",[]],
+            ["frame_states [ frame_index ]",[]]
+          ],
+          "aliases": [
+            ["free_bitmap",["["]]
+          ],
+          "calls": ["vm_core_frame_availability_is_valid","vm_core_frame_index_to_physical","vm_core_initial_frame_is_free"],
+          "directives": [],
+          "guards": [],
+          "loops": [],
+          "signature": "static enum micros_vm_core_error reserve_frame ( struct micros_vm_state * state , uint64_t frame_index , uint64_t * physical )",
+          "storage": []
+        },
+        "reserve_next_frame": {
+          "accesses": [],
+          "aliases": [],
+          "calls": ["reserve_cached_frame","reserve_scanned_frame"],
+          "directives": [],
+          "guards": [],
+          "loops": [],
+          "signature": "static enum micros_vm_core_error reserve_next_frame ( struct micros_vm_state * state , uint64_t * physical )",
+          "storage": []
+        },
+        "reserve_scanned_frame": {
+          "accesses": [
+            ["free_bitmap [ word_index ]",[["for ( ; ; ) {",0]]]
+          ],
+          "aliases": [
+            ["free_bitmap",["["]]
+          ],
+          "calls": ["MICROS_VM01_WORK_HIT","reserve_frame"],
+          "directives": [],
+          "guards": [],
+          "loops": [
+            ["for ( ; ; ) {",[]],
+            ["while ( ( word & ( UINT64_C ( 1 ) << bit ) ) == 0 ) {",[["for ( ; ; ) {",0],["if ( word != 0 ) {",0]]]
+          ],
+          "signature": "static enum micros_vm_core_error reserve_scanned_frame ( struct micros_vm_state * state , uint32_t origin , uint64_t * physical )",
           "storage": []
         },
         "vm_core_frame_index_to_physical": {
@@ -27669,44 +27838,52 @@
           "signature": "bool vm_core_record_is_zero ( const struct micros_vm_mapping_record * record )",
           "storage": []
         },
-        "vm_core_select_lowest_frames": {
+        "vm_core_release_frame_prevalidated": {
           "accesses": [
-            ["frame_states [ frame_index ]",[["for ( frame_index = 0 ; frame_index < state -> boot_summary . managed_frame_count ; ++ frame_index ) {",0]]],
-            ["frame_states [ frame_index ]",[["for ( frame_index = 0 ; frame_index < state -> boot_summary . managed_frame_count ; ++ frame_index ) {",0]]],
-            ["frame_states [ frame_index ]",[["for ( frame_index = 0 ; frame_index < state -> boot_summary . managed_frame_count ; ++ frame_index ) {",0]]],
-            ["mapping_records [ ignored_slot ]",[["for ( frame_index = 0 ; frame_index < state -> boot_summary . managed_frame_count ; ++ frame_index ) {",0]]],
-            ["frame_states [ frame_index ]",[["for ( frame_index = 0 ; frame_index < state -> boot_summary . managed_frame_count ; ++ frame_index ) {",0]]],
-            ["table_frames [ selected_count ]",[["for ( frame_index = 0 ; frame_index < state -> boot_summary . managed_frame_count ; ++ frame_index ) {",0],["if ( selected_count < MICROS_VM_PAGE_TABLE_FRAME_COUNT ) {",0]]],
-            ["data_frames [ selected_count - MICROS_VM_PAGE_TABLE_FRAME_COUNT ]",[["for ( frame_index = 0 ; frame_index < state -> boot_summary . managed_frame_count ; ++ frame_index ) {",0],["else {",0]]]
+            ["free_page_cache [ state -> free_page_cache_count ++ ]",[["if ( state -> free_page_cache_count < MICROS_VM_FREE_PAGE_CACHE_CAPACITY ) {",0]]]
           ],
-          "aliases": [],
-          "calls": ["vm_core_frame_index_to_physical","vm_core_initial_frame_is_free","vm_core_membership_begin","vm_core_membership_end","vm_core_membership_query","vm_core_record_contains_physical"],
+          "aliases": [
+            ["free_page_cache",["["]]
+          ],
+          "calls": ["make_frame_available"],
           "directives": [],
           "guards": [],
-          "loops": [
-            ["for ( frame_index = 0 ; frame_index < state -> boot_summary . managed_frame_count ; ++ frame_index ) {",[]]
-          ],
-          "signature": "enum micros_vm_core_error vm_core_select_lowest_frames ( const struct micros_vm_state * state , size_t ignored_slot , size_t data_count , uint64_t table_frames [ MICROS_VM_PAGE_TABLE_FRAME_COUNT ] , uint64_t data_frames [ MICROS_APPLICATION_RESIDENT_PAGE_MAX ] )",
+          "loops": [],
+          "signature": "void vm_core_release_frame_prevalidated ( struct micros_vm_state * state , uint64_t frame_index )",
           "storage": []
         },
-        "vm_core_selected_frames_match": {
+        "vm_core_reserve_frames": {
           "accesses": [
-            ["table_frames [ MICROS_VM_PAGE_TABLE_FRAME_COUNT ]",[]],
-            ["data_frames [ MICROS_APPLICATION_RESIDENT_PAGE_MAX ]",[]],
-            ["table_frames [ index ]",[["for ( index = 0 ; index < MICROS_VM_PAGE_TABLE_FRAME_COUNT ; ++ index ) {",0]]],
-            ["table_frames [ index ]",[["for ( index = 0 ; index < MICROS_VM_PAGE_TABLE_FRAME_COUNT ; ++ index ) {",0]]],
-            ["data_frames [ index ]",[["for ( index = 0 ; index < state -> transaction . page_count ; ++ index ) {",0]]],
-            ["data_frames [ index ]",[["for ( index = 0 ; index < state -> transaction . page_count ; ++ index ) {",0]]]
+            ["table_frames [ selected ]",[["for ( ; selected < MICROS_VM_PAGE_TABLE_FRAME_COUNT + data_count ; ++ selected ) {",0]]],
+            ["data_frames [ selected - MICROS_VM_PAGE_TABLE_FRAME_COUNT ]",[["for ( ; selected < MICROS_VM_PAGE_TABLE_FRAME_COUNT + data_count ; ++ selected ) {",0]]],
+            ["table_frames [ index ]",[["if ( error != MICROS_VM_CORE_OK ) {",0],["for ( size_t index = 0 ; index < selected ; ++ index ) {",0]]],
+            ["data_frames [ index - MICROS_VM_PAGE_TABLE_FRAME_COUNT ]",[["if ( error != MICROS_VM_CORE_OK ) {",0],["for ( size_t index = 0 ; index < selected ; ++ index ) {",0]]]
           ],
           "aliases": [],
-          "calls": ["vm_core_select_lowest_frames"],
+          "calls": ["make_frame_available","order_reserved_frames","reserve_next_frame","vm_core_allocator_metadata_is_valid","vm_core_physical_to_frame_index"],
           "directives": [],
           "guards": [],
           "loops": [
-            ["for ( index = 0 ; index < MICROS_VM_PAGE_TABLE_FRAME_COUNT ; ++ index ) {",[]],
-            ["for ( index = 0 ; index < state -> transaction . page_count ; ++ index ) {",[]]
+            ["for ( ; selected < MICROS_VM_PAGE_TABLE_FRAME_COUNT + data_count ; ++ selected ) {",[]],
+            ["for ( size_t index = 0 ; index < selected ; ++ index ) {",[["if ( error != MICROS_VM_CORE_OK ) {",0]]]
           ],
-          "signature": "bool vm_core_selected_frames_match ( const struct micros_vm_state * state , size_t ignored_slot )",
+          "signature": "enum micros_vm_core_error vm_core_reserve_frames ( struct micros_vm_state * state , size_t data_count , uint64_t table_frames [ MICROS_VM_PAGE_TABLE_FRAME_COUNT ] , uint64_t data_frames [ MICROS_APPLICATION_RESIDENT_PAGE_MAX ] )",
+          "storage": []
+        },
+        "vm_core_transaction_frames_match": {
+          "accesses": [
+            ["table_frames [ index ]",[["for ( size_t index = 0 ; index < MICROS_VM_PAGE_TABLE_FRAME_COUNT + transaction -> page_count ; ++ index ) {",0]]],
+            ["data_frames [ page ]",[["for ( size_t index = 0 ; index < MICROS_VM_PAGE_TABLE_FRAME_COUNT + transaction -> page_count ; ++ index ) {",0]]],
+            ["frame_states [ frame_index ]",[["for ( size_t index = 0 ; index < MICROS_VM_PAGE_TABLE_FRAME_COUNT + transaction -> page_count ; ++ index ) {",0]]]
+          ],
+          "aliases": [],
+          "calls": ["vm_core_frame_availability_is_valid","vm_core_initial_frame_is_free","vm_core_physical_to_frame_index"],
+          "directives": [],
+          "guards": [],
+          "loops": [
+            ["for ( size_t index = 0 ; index < MICROS_VM_PAGE_TABLE_FRAME_COUNT + transaction -> page_count ; ++ index ) {",[]]
+          ],
+          "signature": "bool vm_core_transaction_frames_match ( const struct micros_vm_state * state )",
           "storage": []
         }
       },
@@ -27906,18 +28083,19 @@
         },
         "micros_vm_load_aborted": {
           "accesses": [
+            ["table_frames [ index ]",[["if ( state -> phase == MICROS_VM_LOADER_INPUT_COPIED ) {",0],["for ( index = 0 ; index < MICROS_VM_PAGE_TABLE_FRAME_COUNT + state -> transaction . page_count ; ++ index ) {",0]]],
+            ["data_frames [ index - MICROS_VM_PAGE_TABLE_FRAME_COUNT ]",[["if ( state -> phase == MICROS_VM_LOADER_INPUT_COPIED ) {",0],["for ( index = 0 ; index < MICROS_VM_PAGE_TABLE_FRAME_COUNT + state -> transaction . page_count ; ++ index ) {",0]]],
             ["table_frames [ index ]",[["for ( index = 0 ; index < MICROS_VM_PAGE_TABLE_FRAME_COUNT ; ++ index ) {",0]]],
-            ["frame_states [ frame_index ]",[["for ( index = 0 ; index < MICROS_VM_PAGE_TABLE_FRAME_COUNT ; ++ index ) {",0]]],
             ["data_frames [ index ]",[["for ( index = 0 ; index < state -> transaction . page_count ; ++ index ) {",0]]],
-            ["frame_states [ frame_index ]",[["for ( index = 0 ; index < state -> transaction . page_count ; ++ index ) {",0]]],
             ["mapping_records [ state -> transaction . process . slot ]",[]],
             ["mapping_records [ 0 ]",[]]
           ],
           "aliases": [],
-          "calls": ["vm_core_clear_transaction","vm_core_physical_to_frame_index","vm_core_validate_selected_load_plan","vm_core_zero_bytes"],
+          "calls": ["vm_core_clear_transaction","vm_core_physical_to_frame_index","vm_core_release_frame_prevalidated","vm_core_validate_selected_load_plan","vm_core_zero_bytes"],
           "directives": [],
           "guards": [],
           "loops": [
+            ["for ( index = 0 ; index < MICROS_VM_PAGE_TABLE_FRAME_COUNT + state -> transaction . page_count ; ++ index ) {",[["if ( state -> phase == MICROS_VM_LOADER_INPUT_COPIED ) {",0]]],
             ["for ( index = 0 ; index < MICROS_VM_PAGE_TABLE_FRAME_COUNT ; ++ index ) {",[]],
             ["for ( index = 0 ; index < state -> transaction . page_count ; ++ index ) {",[]]
           ],
@@ -28091,7 +28269,7 @@
             ["frame_states [ frame_index ]",[]]
           ],
           "aliases": [],
-          "calls": ["vm_core_membership_query","vm_core_physical_to_frame_index"],
+          "calls": ["vm_core_frame_availability_is_valid","vm_core_membership_query","vm_core_physical_to_frame_index"],
           "directives": [],
           "guards": [],
           "loops": [],
@@ -28135,7 +28313,7 @@
             ["data_frames [ 0 ]",[]]
           ],
           "aliases": [],
-          "calls": ["prepare_binary_plans","publish_load_input","vm_core_copy_bytes","vm_core_prepare_failure","vm_core_select_lowest_frames","vm_core_zero_bytes"],
+          "calls": ["prepare_binary_plans","publish_load_input","vm_core_copy_bytes","vm_core_prepare_failure","vm_core_reserve_frames","vm_core_zero_bytes"],
           "directives": [],
           "guards": [],
           "loops": [],
@@ -28518,6 +28696,22 @@
     "servers/vm/vm_validation.c": {
       "complete": 1,
       "functions": {
+        "cached_frames_are_valid": {
+          "accesses": [
+            ["free_page_cache [ index ]",[["for ( size_t index = 0 ; index < state -> free_page_cache_count ; ++ index ) {",0]]]
+          ],
+          "aliases": [
+            ["free_page_cache",["["]]
+          ],
+          "calls": ["vm_core_initial_frame_is_free"],
+          "directives": [],
+          "guards": [],
+          "loops": [
+            ["for ( size_t index = 0 ; index < state -> free_page_cache_count ; ++ index ) {",[]]
+          ],
+          "signature": "static bool cached_frames_are_valid ( const struct micros_vm_state * state )",
+          "storage": []
+        },
         "finish_mapping_key_check": {
           "accesses": [
             ["keys64 [ index - 1 ]",[["if ( unique ) {",0],["for ( size_t index = 1 ; index < keys -> count ; ++ index ) {",0]]],
@@ -28585,7 +28779,7 @@
             ["mapping_records [ state -> transaction . process . slot ]",[]]
           ],
           "aliases": [],
-          "calls": ["retained_image_page_is_valid","selected_input_frames_are_free","vm_core_record_matches_transaction","vm_core_selected_record_is_valid","vm_core_transaction_frames_are_ordered"],
+          "calls": ["retained_image_page_is_valid","selected_input_frames_are_reserved","vm_core_record_matches_transaction","vm_core_selected_record_is_valid","vm_core_transaction_frames_are_ordered"],
           "directives": [],
           "guards": [],
           "loops": [
@@ -28634,20 +28828,20 @@
           "signature": "static bool selected_geometry_is_valid ( const struct micros_vm_state * state )",
           "storage": []
         },
-        "selected_input_frames_are_free": {
+        "selected_input_frames_are_reserved": {
           "accesses": [
             ["table_frames [ index ]",[["for ( size_t index = 0 ; index < MICROS_VM_PAGE_TABLE_FRAME_COUNT + transaction -> page_count ; ++ index ) {",0]]],
             ["data_frames [ index - MICROS_VM_PAGE_TABLE_FRAME_COUNT ]",[["for ( size_t index = 0 ; index < MICROS_VM_PAGE_TABLE_FRAME_COUNT + transaction -> page_count ; ++ index ) {",0]]],
             ["frame_states [ frame_index ]",[["for ( size_t index = 0 ; index < MICROS_VM_PAGE_TABLE_FRAME_COUNT + transaction -> page_count ; ++ index ) {",0]]]
           ],
           "aliases": [],
-          "calls": ["vm_core_initial_frame_is_free","vm_core_physical_to_frame_index"],
+          "calls": ["vm_core_frame_availability_is_valid","vm_core_initial_frame_is_free","vm_core_physical_to_frame_index"],
           "directives": [],
           "guards": [],
           "loops": [
             ["for ( size_t index = 0 ; index < MICROS_VM_PAGE_TABLE_FRAME_COUNT + transaction -> page_count ; ++ index ) {",[]]
           ],
-          "signature": "static bool selected_input_frames_are_free ( const struct micros_vm_state * state )",
+          "signature": "static bool selected_input_frames_are_reserved ( const struct micros_vm_state * state )",
           "storage": []
         },
         "selected_load_page_is_valid": {
@@ -28660,7 +28854,7 @@
           "aliases": [
             ["entries",["["]]
           ],
-          "calls": ["retained_image_page_is_valid","validate_data_entry","vm_core_bytes_are_zero","vm_core_initial_frame_is_free","vm_core_physical_to_frame_index"],
+          "calls": ["retained_image_page_is_valid","validate_data_entry","vm_core_bytes_are_zero","vm_core_frame_availability_is_valid","vm_core_initial_frame_is_free","vm_core_physical_to_frame_index"],
           "directives": [],
           "guards": [],
           "loops": [],
@@ -28697,7 +28891,7 @@
             ["mapping_records [ counts -> frozen_slot ]",[]]
           ],
           "aliases": [],
-          "calls": ["vm_core_process_is_canonical","vm_core_record_matches_transaction","vm_core_selected_frames_match"],
+          "calls": ["vm_core_process_is_canonical","vm_core_record_matches_transaction","vm_core_transaction_frames_match"],
           "directives": [],
           "guards": [],
           "loops": [],
@@ -28717,7 +28911,7 @@
         "validate_input_copied_phase": {
           "accesses": [],
           "aliases": [],
-          "calls": ["vm_core_selected_frames_match"],
+          "calls": ["vm_core_transaction_frames_match"],
           "directives": [],
           "guards": [],
           "loops": [],
@@ -28739,7 +28933,7 @@
             ["mapping_records [ counts -> loading_slot ]",[]]
           ],
           "aliases": [],
-          "calls": ["vm_core_process_is_canonical","vm_core_record_matches_transaction","vm_core_selected_frames_match"],
+          "calls": ["vm_core_process_is_canonical","vm_core_record_matches_transaction","vm_core_transaction_frames_match"],
           "directives": [],
           "guards": [],
           "loops": [],
@@ -28752,7 +28946,7 @@
             ["frame_states [ state -> boot_summary . managed_frame_count ]",[]]
           ],
           "aliases": [],
-          "calls": ["vm_core_bytes_are_zero","vm_core_initial_frame_is_free"],
+          "calls": ["vm_core_bytes_are_zero","vm_core_frame_availability_is_valid","vm_core_initial_frame_is_free"],
           "directives": [],
           "guards": [],
           "loops": [
@@ -28789,7 +28983,7 @@
             ["entries",["["]],
             ["entries",["["]]
           ],
-          "calls": ["validate_data_entry","validate_table_entry","vm_core_bytes_are_zero","vm_core_initial_frame_is_free","vm_core_physical_to_frame_index"],
+          "calls": ["validate_data_entry","validate_table_entry","vm_core_bytes_are_zero","vm_core_frame_availability_is_valid","vm_core_initial_frame_is_free","vm_core_physical_to_frame_index"],
           "directives": [],
           "guards": [],
           "loops": [
@@ -28821,7 +29015,7 @@
             ["frame_states [ active_frame_count ]",[]]
           ],
           "aliases": [],
-          "calls": ["offsetof","vm_core_bytes_are_zero","vm_validation_digest_active_frame_states","vm_validation_digest_bytes","vm_validation_digest_zero_bytes","vm_validation_initial_free_tail_is_zero"],
+          "calls": ["offsetof","vm_core_bytes_are_zero","vm_validation_digest_active_frame_states","vm_validation_digest_bytes","vm_validation_digest_zero_bytes","vm_validation_free_tail_is_zero"],
           "directives": [],
           "guards": [],
           "loops": [],
@@ -28877,7 +29071,7 @@
             ["entries",["["]],
             ["entries",["["]]
           ],
-          "calls": ["validate_data_entry","validate_table_entry","vm_core_bytes_are_zero","vm_core_initial_frame_is_free","vm_core_physical_to_frame_index","vm_core_record_header_is_valid","vm_core_record_is_zero"],
+          "calls": ["validate_data_entry","validate_table_entry","vm_core_bytes_are_zero","vm_core_frame_availability_is_valid","vm_core_initial_frame_is_free","vm_core_physical_to_frame_index","vm_core_record_header_is_valid","vm_core_record_is_zero"],
           "directives": [],
           "guards": [],
           "loops": [
@@ -28968,7 +29162,7 @@
             ["data_frames [ index ]",[["if ( transaction -> completed_page_count < transaction -> page_count ) {",0]]]
           ],
           "aliases": [],
-          "calls": ["MICROS_VM01_WORK_HIT","retained_load_set_is_valid","retained_segments_are_valid","retained_stack_is_valid","selected_geometry_is_valid","selected_load_page_is_valid","vm_core_bytes_are_zero","vm_core_process_is_canonical","vm_core_ranges_overlap","vm_core_record_header_is_valid","vm_core_transaction_header_is_canonical"],
+          "calls": ["MICROS_VM01_WORK_HIT","retained_load_set_is_valid","retained_segments_are_valid","retained_stack_is_valid","selected_geometry_is_valid","selected_load_page_is_valid","vm_core_allocator_metadata_is_valid","vm_core_bytes_are_zero","vm_core_process_is_canonical","vm_core_ranges_overlap","vm_core_record_header_is_valid","vm_core_transaction_header_is_canonical"],
           "directives": [],
           "guards": [],
           "loops": [],
@@ -28978,7 +29172,7 @@
         "vm_core_validate_state": {
           "accesses": [],
           "aliases": [],
-          "calls": ["MICROS_VM01_WORK_HIT","validate_loader_phase","validate_local_frame_states","validate_mapping_records","vm_core_boot_database_is_immutable","vm_core_boot_header_matches_summary","vm_core_ranges_overlap","vm_core_transaction_buffers_are_canonical","vm_core_transaction_common_is_canonical"],
+          "calls": ["MICROS_VM01_WORK_HIT","cached_frames_are_valid","validate_loader_phase","validate_local_frame_states","validate_mapping_records","vm_core_allocator_metadata_is_valid","vm_core_boot_database_is_immutable","vm_core_boot_header_matches_summary","vm_core_ranges_overlap","vm_core_transaction_buffers_are_canonical","vm_core_transaction_common_is_canonical"],
           "directives": [],
           "guards": [],
           "loops": [],
@@ -28987,16 +29181,14 @@
         },
         "vm_validation_digest_active_frame_states": {
           "accesses": [
-            ["initial_free_bitmap [ word_index ]",[["for ( word_index = 0 ; frame_index < managed_frame_count ; ++ word_index ) {",0]]],
-            ["frame_states [ frame_index ]",[["for ( word_index = 0 ; frame_index < managed_frame_count ; ++ word_index ) {",0],["for ( ; frame_index < managed_frame_count && bit != 0 ; ++ frame_index , bit <<= 1 ) {",0]]]
+            ["frame_states [ frame_index ]",[["for ( size_t frame_index = 0 ; frame_index < managed_frame_count ; ++ frame_index ) {",0]]]
           ],
           "aliases": [],
           "calls": [],
           "directives": [],
           "guards": [],
           "loops": [
-            ["for ( word_index = 0 ; frame_index < managed_frame_count ; ++ word_index ) {",[]],
-            ["for ( ; frame_index < managed_frame_count && bit != 0 ; ++ frame_index , bit <<= 1 ) {",[["for ( word_index = 0 ; frame_index < managed_frame_count ; ++ word_index ) {",0]]]
+            ["for ( size_t frame_index = 0 ; frame_index < managed_frame_count ; ++ frame_index ) {",[]]
           ],
           "signature": "static uint64_t vm_validation_digest_active_frame_states ( const struct micros_vm_state * state , size_t managed_frame_count , uint64_t digest )",
           "storage": []
@@ -29035,19 +29227,22 @@
           "signature": "static uint64_t vm_validation_digest_zero_bytes ( uint64_t digest , size_t zero_count )",
           "storage": []
         },
-        "vm_validation_initial_free_tail_is_zero": {
+        "vm_validation_free_tail_is_zero": {
           "accesses": [
-            ["initial_free_bitmap [ first_word ]",[["if ( boundary_bit != 0 ) {",0]]],
-            ["initial_free_bitmap [ first_word ]",[["for ( ; first_word < MICROS_VM_INITIAL_FREE_BITMAP_WORDS ; ++ first_word ) {",0]]]
+            ["free_bitmap [ first_word ]",[["if ( boundary_bit != 0 ) {",0]]],
+            ["free_bitmap [ first_word ]",[["for ( ; first_word < MICROS_VM_FREE_BITMAP_WORDS ; ++ first_word ) {",0]]]
           ],
-          "aliases": [],
+          "aliases": [
+            ["free_bitmap",["["]],
+            ["free_bitmap",["["]]
+          ],
           "calls": [],
           "directives": [],
           "guards": [],
           "loops": [
-            ["for ( ; first_word < MICROS_VM_INITIAL_FREE_BITMAP_WORDS ; ++ first_word ) {",[]]
+            ["for ( ; first_word < MICROS_VM_FREE_BITMAP_WORDS ; ++ first_word ) {",[]]
           ],
-          "signature": "static bool vm_validation_initial_free_tail_is_zero ( const struct micros_vm_state * state , size_t managed_frame_count )",
+          "signature": "static bool vm_validation_free_tail_is_zero ( const struct micros_vm_state * state , size_t managed_frame_count )",
           "storage": []
         }
       },

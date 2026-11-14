@@ -10,6 +10,11 @@ Design #275 and independently reviewed implementation #276 are separately
 merged. Complete acceptance closes B07-F002. VM04's allocator correction
 remains a separate outcome.
 
+[VM04's allocation contract](vm-frame-allocation.md) subsequently refines
+only the deliberately retained allocation policy, local reservation/class
+representation and diagnostic allocation replay. The per-page plan,
+authority and pre-write stack boundaries here remain.
+
 Close only B07-F002: publish one useful load description and consume its
 selected page/progress relations without reparsing the complete ELF/stack
 or re-proving every previously completed mapping at each page step.
@@ -108,8 +113,10 @@ to match that intersection. A wholly zero-filled page retains canonical
 zero file offset and length. Checked subtraction/addition precedes every
 source or destination access.
 
-Before map, the selected local frame is `FREE`; while scratch is mapped
-it is `TRANSFERABLE`. The record, transaction and selected action agree on
+Before map, the selected local frame follows the current allocation
+contract: VM04 reserves the complete local set during preparation.
+While scratch is mapped it is `TRANSFERABLE`. The record, transaction and
+selected action agree on
 VA/frame/permissions/index. Previous mappings are not rediscovered merely
 to establish uniqueness: actual FREE claim and the protected append
 invariant preserve that property.

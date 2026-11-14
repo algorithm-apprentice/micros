@@ -40,7 +40,7 @@ INITIAL = tokens("""
 """)
 FINAL = tokens("return MICROS_VM_CORE_OK;")
 WORKER_CALLEES = frozenset((
-    "prepare_binary_plans", "vm_core_select_lowest_frames", "vm_core_prepare_failure",
+    "prepare_binary_plans", "vm_core_reserve_frames", "vm_core_prepare_failure",
     "vm_core_zero_bytes", "vm_core_copy_bytes", "publish_load_input",
 ))
 

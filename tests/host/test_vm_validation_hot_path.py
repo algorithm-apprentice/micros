@@ -17,7 +17,7 @@ ROOT = Path(__file__).resolve().parents[2]
 VALIDATOR = ROOT / "servers/vm/vm_validation.c"
 WORK_HELPERS = (
     "vm_validation_digest_bytes", "vm_validation_digest_zero_bytes",
-    "vm_validation_digest_active_frame_states", "vm_validation_initial_free_tail_is_zero",
+    "vm_validation_digest_active_frame_states", "vm_validation_free_tail_is_zero",
     "vm_core_boot_database_is_immutable",
 )
 
@@ -160,37 +160,41 @@ def assert_active_scan(tree):
         raise AssertionError("active digest declaration is unsupported")
     loops = top_level_loops(function)
     if len(loops) != 1 or loops[0].get("kind") != "ForStmt":
-        raise AssertionError("active digest must own one outer word loop")
-    outer = loops[0]
-    inner_loops = [
-        node
-        for node in loop_body(outer).get("inner", ())
-        if node.get("kind") == "ForStmt"
+        raise AssertionError("active digest must own one frame loop")
+    loop = loops[0]
+    if any(node.get("kind") in {"ForStmt", "WhileStmt", "DoStmt"} for node in ast_walk(loop_body(loop))):
+        raise AssertionError("active digest contains a nested scan")
+    indexes = named_variables(function, "frame_index")
+    conditions = [node for node in loop.get("inner", ()) if node.get("kind") == "BinaryOperator"]
+    increments = [
+        node for node in loop.get("inner", ())
+        if node.get("kind") == "UnaryOperator" and node.get("opcode") == "++"
     ]
-    if len(inner_loops) != 1:
-        raise AssertionError("active digest must own one inner frame loop")
-    inner = inner_loops[0]
-    bitmap = member_subscripts(function, "initial_free_bitmap")
-    if len(bitmap) != 1:
-        raise AssertionError("active digest must load one bitmap word")
-    words = named_variables(function, "initial_free_word")
     if (
-        len(words) != 1
-        or words[0].get("type", {}).get("qualType") != "uint64_t"
-        or member_subscripts(words[0], "initial_free_bitmap") != bitmap
-        or referenced_names(bitmap[0]) != {"state", "word_index"}
+        len(indexes) != 1 or scalar_expression(indexes[0]["inner"][-1]) != ("integer", 0)
+        or len(conditions) != 1
+        or scalar_expression(conditions[0]) != ("<", ("name", "frame_index"), ("name", "managed_frame_count"))
+        or len(increments) != 1 or referenced_names(increments[0]) != {"frame_index"}
     ):
-        raise AssertionError("active bitmap word is not a scalar word load")
-    if member_subscripts(inner, "initial_free_bitmap"):
-        raise AssertionError("active inner loop reloads the bitmap")
-    if not {"initial_free_word", "bit"} <= referenced_names(inner):
-        raise AssertionError("active inner loop does not consume the word")
-    frame_states = member_subscripts(inner, "frame_states")
+        raise AssertionError("active frame bounds are incomplete")
+    if member_subscripts(function, "free_bitmap"):
+        raise AssertionError("active digest uses current availability as original provenance")
+    frame_states = member_subscripts(function, "frame_states")
+    local = named_variables(function, "local")
     if (
         len(frame_states) != 1
         or referenced_names(frame_states[0]) != {"state", "frame_index"}
+        or len(local) != 1 or local[0].get("type", {}).get("qualType") != "uint8_t"
+        or member_subscripts(local[0], "frame_states") != frame_states
     ):
-        raise AssertionError("active frame-state access is unsupported")
+        raise AssertionError("active frame-state scalar load is unsupported")
+    choices = [node for node in ast_walk(function) if node.get("kind") == "ConditionalOperator"]
+    if len(choices) != 1 or tuple(scalar_expression(node) for node in choices[0]["inner"]) != (
+        ("&&", (">=", ("name", "local"), ("name", "MICROS_VM_LOCAL_FRAME_TRANSFERABLE")),
+         ("<=", ("name", "local"), ("name", "MICROS_VM_LOCAL_FRAME_PROCESS_PAGE_TABLE"))),
+        ("name", "MICROS_VM_FRAME_FREE"), ("name", "local"),
+    ):
+        raise AssertionError("active original-class reconstruction changed")
     if call_targets(function):
         raise AssertionError("active digest calls an unreviewed helper")
 
@@ -198,7 +202,7 @@ def assert_active_scan(tree):
 def assert_inactive_bitmap_scan(tree):
     function = function_decl(
         tree,
-        "vm_validation_initial_free_tail_is_zero",
+        "vm_validation_free_tail_is_zero",
     )
     if (
         function.get("storageClass") != "static"
@@ -211,7 +215,7 @@ def assert_inactive_bitmap_scan(tree):
     if len(loops) != 1 or loops[0].get("kind") != "ForStmt":
         raise AssertionError("inactive bitmap must own one full-word loop")
     loop = loops[0]
-    subscripts = member_subscripts(function, "initial_free_bitmap")
+    subscripts = member_subscripts(function, "free_bitmap")
     if len(subscripts) != 2:
         raise AssertionError("inactive bitmap access is incomplete")
     first_words = named_variables(function, "first_word")
@@ -247,12 +251,12 @@ def assert_inactive_bitmap_scan(tree):
         if node.get("kind") == "BinaryOperator" and node.get("opcode") == "<"
     ]
     if len(conditions) != 1 or scalar_expression(conditions[0]) != (
-        "<", ("name", "first_word"), ("name", "MICROS_VM_INITIAL_FREE_BITMAP_WORDS"),
+        "<", ("name", "first_word"), ("name", "MICROS_VM_FREE_BITMAP_WORDS"),
     ):
         raise AssertionError("inactive bitmap loop bounds are incomplete")
     if not {
         "first_word",
-        "MICROS_VM_INITIAL_FREE_BITMAP_WORDS",
+        "MICROS_VM_FREE_BITMAP_WORDS",
         "state",
     } <= referenced_names(loop):
         raise AssertionError("inactive bitmap loop bounds are unsupported")
@@ -288,7 +292,7 @@ def assert_immutable_orchestration(tree):
         "vm_validation_digest_bytes",
         "vm_validation_digest_zero_bytes",
         "vm_validation_digest_active_frame_states",
-        "vm_validation_initial_free_tail_is_zero",
+        "vm_validation_free_tail_is_zero",
         "vm_core_bytes_are_zero",
     }
     if call_targets(immutable) != expected_calls:
@@ -323,40 +327,53 @@ class VmValidationHotPathTests(unittest.TestCase):
         with self.assertRaisesRegex(AssertionError, pattern):
             assert_bounded_vm_validation(changed)
 
-    def test_per_frame_bitmap_helper_is_rejected(self):
+    def test_per_frame_state_helper_is_rejected(self):
         text = VALIDATOR.read_text(encoding="utf-8")
         active = function_source(
             text,
             "vm_validation_digest_active_frame_states",
         )
         changed_active = active.replace(
-            "(initial_free_word & bit) != 0",
-            "vm_core_initial_frame_is_free(state, frame_index)",
+            "state->boot_info->frame_states[frame_index];",
+            "vm_core_initial_frame_is_free(state, frame_index) ? MICROS_VM_FRAME_FREE"
+            " : state->boot_info->frame_states[frame_index];",
             1,
         )
+        self.assertNotEqual(active, changed_active)
         self.assert_mutation_rejected(
             text.replace(active, changed_active, 1),
-            "consume the word|unreviewed helper",
+            "reconstruction|unreviewed helper",
         )
 
-    def test_per_frame_bitmap_reload_is_rejected(self):
+    def test_current_bitmap_cannot_replace_original_class(self):
         text = VALIDATOR.read_text(encoding="utf-8")
         active = function_source(
             text,
             "vm_validation_digest_active_frame_states",
         )
         changed_active = active.replace(
-            "(initial_free_word & bit) != 0",
-            "(\n"
-            "                state->initial_free_bitmap[frame_index / 64]\n"
-            "                & bit\n"
-            "            ) != 0",
+            "local >= MICROS_VM_LOCAL_FRAME_TRANSFERABLE\n"
+            "                && local <= MICROS_VM_LOCAL_FRAME_PROCESS_PAGE_TABLE",
+            "(state->free_bitmap[frame_index / 64] & (UINT64_C(1) << (frame_index % 64))) != 0",
             1,
         )
+        self.assertNotEqual(active, changed_active)
         self.assert_mutation_rejected(
             text.replace(active, changed_active, 1),
-            "reviewed work-shape identity|bitmap word|reloads",
+            "current availability",
         )
+
+    def test_active_scan_cannot_skip_frame_boundaries(self):
+        text = VALIDATOR.read_text(encoding="utf-8")
+        active = function_source(text, "vm_validation_digest_active_frame_states")
+        for old, new in (
+            ("frame_index = 0;", "frame_index = 1;"),
+            ("frame_index < managed_frame_count;", "frame_index + 1 < managed_frame_count;"),
+            ("++frame_index)", "frame_index += 2)"),
+        ):
+            changed = active.replace(old, new, 1)
+            self.assertNotEqual(active, changed)
+            self.assert_mutation_rejected(text.replace(active, changed, 1), "active frame bounds")
 
     def test_missing_inactive_frame_tail_check_is_rejected(self):
         text = VALIDATOR.read_text(encoding="utf-8")
@@ -389,7 +406,7 @@ class VmValidationHotPathTests(unittest.TestCase):
         text = VALIDATOR.read_text(encoding="utf-8")
         tail = function_source(
             text,
-            "vm_validation_initial_free_tail_is_zero",
+            "vm_validation_free_tail_is_zero",
         )
         changed_tail = tail.replace(
             "++first_word\n"
@@ -406,8 +423,8 @@ class VmValidationHotPathTests(unittest.TestCase):
     def test_early_inactive_word_end_is_rejected(self):
         text = VALIDATOR.read_text(encoding="utf-8")
         changed = text.replace(
-            "first_word < MICROS_VM_INITIAL_FREE_BITMAP_WORDS;",
-            "first_word + 1 < MICROS_VM_INITIAL_FREE_BITMAP_WORDS;",
+            "first_word < MICROS_VM_FREE_BITMAP_WORDS;",
+            "first_word + 1 < MICROS_VM_FREE_BITMAP_WORDS;",
             1,
         )
         self.assert_mutation_rejected(

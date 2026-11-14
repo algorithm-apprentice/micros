@@ -8,7 +8,7 @@ from tests.host.work_count_lexical import (
 
 
 INDEX_FIELDS = frozenset((
-    "mapping_records", "mappings", "managed_ranges", "frame_states", "initial_free_bitmap",
+    "mapping_records", "mappings", "managed_ranges", "frame_states", "free_bitmap", "free_page_cache",
     "entries", "table_frames", "data_frames", "pages", "segments", "arguments", "environment",
     "keys32", "keys64", "key_partitions",
     "owners", "handoff_targets", "allocated_bitmap", "owner_counts",

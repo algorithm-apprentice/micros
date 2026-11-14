@@ -30,7 +30,7 @@ MEASURED_ARRAY_FIELDS = frozenset((
     "process_frames", "words", "positions", "entries", "managed_ranges",
     "processes", "threads", "harts", "endpoints", "owner_counts", "mappings",
     "ready_head", "ready_tail", "requests", "transitions",
-    "keys32", "keys64", "key_partitions", "leaves",
+    "keys32", "keys64", "key_partitions", "leaves", "free_bitmap", "free_page_cache",
 ))
 
 

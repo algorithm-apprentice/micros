@@ -286,6 +286,14 @@ entries supply the latter counts. Cold handoff/TTY validation is
 outside that capture. Source/producer ownership and the original stack,
 image and serial boundaries remain required.
 
+VM04 reuses these same producers for current-bitmap/cache allocation.
+The original three minimal loads require 24 cache entries and no fallback
+search-word visits. Native boundary/maximal bitmap cases separately
+exercise actual descending word search, and the composed reference retains
+its full mixed transition count. Allocator hints may change on release;
+the resource oracle still compares exact frame availability, mappings,
+inputs and boot state and rejects malformed consumed hints.
+
 Generate a changed-path plan with:
 
 ```bash

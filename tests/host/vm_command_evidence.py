@@ -11,6 +11,7 @@ from tests.host.runtime_memory_evidence import json_pairs
 from tests.host.source_snapshot import source_bytes
 from tests.host.work_count_snapshots import compose_snapshots
 from tests.host.work_count_types import Capture, Kind, Owner, Snapshot, Status
+from tests.host.work_count_lexical import compound_layout, matches_at, region_header
 from tools.stack_artifact_files import read_regular
 
 
@@ -47,6 +48,20 @@ SITES = (
     ("kernel/memory/user_address_space_validation.c", "micros_user_address_space_validate_vm_table_plan_locked", "memory-root", "KERNEL_MEMORY", "COMPLETE_VALIDATOR_CALL"),
     ("kernel/memory/user_address_space_validation.c", "micros_user_address_space_validate_all_process_roots_locked", "root-enumeration", "KERNEL_MEMORY", "RECORD_VISIT"),
 )
+LOOP_SITES = (
+    (
+        "servers/vm/vm_frames.c", "reserve_scanned_frame", "allocator-search",
+        "VM_SERVICE", "BITMAP_WORD_LOAD",
+        "for (;;) {", "state->free_bitmap[word_index]",
+    ),
+    (
+        "servers/vm/vm_frames.c", "reserve_cached_frame", "allocator-cache",
+        "VM_SERVICE", "RECORD_VISIT",
+        "while (state->free_page_cache_count != 0) {",
+        "state->free_page_cache[state->free_page_cache_count - 1]",
+    ),
+)
+ALL_SITES = SITES + tuple(row[:5] for row in LOOP_SITES)
 OPTIONALLY_UNLINKED = {
     ("kernel/memory/user_address_space_validation.c", "micros_user_address_space_validate_all_process_roots_locked"),
 }
@@ -157,6 +172,18 @@ def target_failures(measured):
         actual = captures[1]["counts"][owner][kind]
         if actual != expected:
             failures.append((owner.name, label, actual, expected))
+    selected_frames = commands[1] + 4 * commands[0]
+    # Only the second load can exhaust the twenty initially cached frames;
+    # the repeated child has at least eight frames and is released in between.
+    max_fallback = min(20, max(0, selected_frames - 20 - 8))
+    cache = captures[1]["counts"][Owner.VM_SERVICE][Kind.RECORD_VISIT]
+    searched = captures[1]["counts"][Owner.VM_SERVICE][Kind.BITMAP_WORD_LOAD]
+    if not selected_frames - max_fallback <= cache <= selected_frames:
+        failures.append(("VM_SERVICE", "allocator-cache", cache,
+                         (selected_frames - max_fallback, selected_frames)))
+    bound = 2 * max_fallback * (262144 // 64)
+    if searched > bound:
+        failures.append(("VM_SERVICE", "allocator-search", searched, bound))
     return tuple(failures)
 
 
@@ -191,6 +218,22 @@ def validate_target_observations(root):
         )
         if tokens(prefix):
             raise ValueError("VM01 validator observation moved after executed work")
+    for path, name, label, owner, kind, loop, primitive in LOOP_SITES:
+        values = tokens(function_records(source_bytes(root, root / path).decode())[name].body)
+        expected = tokens(
+            f'MICROS_VM01_WORK_HIT("vm01-{label}", MICROS_WORK_OWNER_{owner}, '
+            f'MICROS_WORK_KIND_{kind}, 1);'
+        )
+        markers = tuple(matches_at(values, expected, 0, len(values)))
+        primitives = tuple(matches_at(values, tokens(primitive), 0, len(values)))
+        if len(markers) != 1 or len(primitives) != 1 or markers[0] >= primitives[0]:
+            raise ValueError("VM allocator observation lost its actual primitive")
+        stacks, _ = compound_layout(values)
+        if stacks[markers[0]] != stacks[primitives[0]] or not any(
+            values[region_header(values, opening):opening + 1] == tokens(loop)
+            for opening in stacks[markers[0]]
+        ):
+            raise ValueError("VM allocator observation escaped its executing loop")
     dispatch = tokens(function_records(source_bytes(root, root / "kernel/trap/syscall.c").decode())["syscall_dispatch_operation"].body)
     if dispatch.count("MICROS_VM01_DISPATCH") != 1 or "micros_vm_handoff_handle_captured_user_ecall" in dispatch:
         raise ValueError("VM01 capture no longer encloses the actual operation-12 handler")
@@ -290,12 +333,13 @@ def validate_target_products(root):
     compiler_version(version, target=True)
     commands = runtime_compile_commands(directory)
     subjects = {
-        "kernel/micros.elf": tuple(sorted({path for path, *_ in SITES if path.startswith("kernel/")})) + (
+        "kernel/micros.elf": tuple(sorted({path for path, *_ in ALL_SITES if path.startswith("kernel/")})) + (
             "tests/qemu/vm_command_work.c", "kernel/tests/spawn/elf_spawn_test_services.c",
             "tests/work/work_counts.c", *UNSCOPED_SOURCES, *KEY_SOURCES,
         ),
         "bootstrap/micros-vm-server.elf": (
-            "servers/vm/vm_validation.c", "servers/vm/vm_elf.c", "lib/spawn/spawn_request.c",
+            "servers/vm/vm_validation.c", "servers/vm/vm_elf.c", "servers/vm/vm_frames.c",
+            "lib/spawn/spawn_request.c",
             "tests/qemu/vm_server_control.c",
             "tests/qemu/selected_vm_work.c",
             "tests/qemu/vm_server_fixture.c", "tests/work/work_counts.c", "lib/runtime/memory.c",
@@ -338,7 +382,7 @@ def validate_target_products(root):
             if source in UNSCOPED_SOURCES:
                 continue
             symbols = function_symbols(obj)
-            for path, name, *_ in SITES:
+            for path, name, *_ in ALL_SITES:
                 if path != source:
                     continue
                 if name not in symbols or (
@@ -372,7 +416,7 @@ def validate_target_products(root):
                         if symbol.name == "service_context" and symbol.section_index != SYMBOL_UNDEFINED]
             if len(contexts) != 1:
                 raise ValueError("VM01 service capture lost its generated context owner")
-            size = (contexts[0].size - 201632 + storage("tests/work/work_counts.c")
+            size = (contexts[0].size - (201632 + 88) + storage("tests/work/work_counts.c")
                     + storage("tests/qemu/vm_server_control.c") + storage("tests/qemu/selected_vm_work.c"))
             if not 0 < size <= 2 * 4096:
                 raise ValueError("VM01 service test storage exceeded the fixed-design two-page addition")

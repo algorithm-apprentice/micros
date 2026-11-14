@@ -12,7 +12,8 @@ from tests.host.selected_vm_source import validate_native_sites
 from tests.host.work_count_types import Kind, Owner
 
 
-def target_transcript(audits=0, root_certificates=None, root_enumerations=0, elf_plans=3, request_decodes=9):
+def target_transcript(audits=0, root_certificates=None, root_enumerations=0, elf_plans=3,
+                      request_decodes=9, allocator_cache=24, allocator_search=0):
     def line(name, fields):
         return "# " + name + " " + " ".join(f"{key}=0x{value:016x}" for key, value in fields) + "\n"
 
@@ -41,6 +42,8 @@ def target_transcript(audits=0, root_certificates=None, root_enumerations=0, elf
             elif owner == Owner.VM_SERVICE:
                 counts[Kind.INDEX_PROBE] = sum(commands)
                 counts[Kind.RANGE_VISIT] = elf_plans
+                counts[Kind.RECORD_VISIT] = allocator_cache
+                counts[Kind.BITMAP_WORD_LOAD] = allocator_search
             elif owner == Owner.LIB_SPAWN:
                 counts[Kind.INDEX_PROBE] = request_decodes
             text += line("MICROS_VM01_COUNTS", (
@@ -51,6 +54,43 @@ def target_transcript(audits=0, root_certificates=None, root_enumerations=0, elf
 
 
 class SelectedVmTargetTest(unittest.TestCase):
+    def test_original_guest_requires_cache_hits_without_restarted_search(self):
+        for cached in (0, 23, 25):
+            with self.subTest(cached=cached):
+                self.assertEqual(
+                    (("VM_SERVICE", "allocator-cache", cached, (24, 24)),),
+                    target.target_failures(target.parse_target_output(target_transcript(allocator_cache=cached), 0)),
+                )
+        self.assertEqual(
+            (("VM_SERVICE", "allocator-search", 1, 0),),
+            target.target_failures(target.parse_target_output(target_transcript(allocator_search=1), 0)),
+        )
+
+    def test_allocator_counter_cannot_move_outside_the_search_loop(self):
+        from tests.host.c_source_records import function_records
+
+        root = Path(__file__).resolve().parents[2]
+        path, name, label, owner, kind, _, _ = target.LOOP_SITES[0]
+        source = (root / path).read_text()
+        record = function_records(source)[name]
+        marker = (
+            f'        MICROS_VM01_WORK_HIT("vm01-{label}", MICROS_WORK_OWNER_{owner},\n'
+            f'                            MICROS_WORK_KIND_{kind}, 1);\n'
+        )
+        self.assertIn(marker, record.body)
+        original = target.source_bytes
+        for body in (record.body.replace(marker, "", 1),
+                     marker + record.body.replace(marker, "", 1)):
+            changed = source.replace(record.signature + "{" + record.body + "}",
+                                     record.signature + "{" + body + "}", 1)
+            self.assertNotEqual(source, changed)
+
+            def read(source_root, requested):
+                return changed.encode() if requested == root / path else original(source_root, requested)
+
+            with patch.object(target, "source_bytes", read), self.assertRaises(ValueError):
+                target.validate_target_observations(root)
+
     def test_retained_load_plan_rejects_repeated_or_missing_source_reconstruction(self):
         for plans in (0, 2, 4, 66):
             with self.subTest(plans=plans):
@@ -246,6 +286,8 @@ def native_transcript(channel):
             counts[owner][Kind.COMPLETE_VALIDATOR_CALL] = spec[4]
             if row["name"] in native.GEOMETRY_EXTENTS:
                 counts[owner][Kind.RANGE_VISIT] = native.GEOMETRY_EXTENTS[row["name"]].bit_length()
+            if row["name"] in native.ALLOCATOR_EXTENTS:
+                counts[owner][Kind.BITMAP_WORD_LOAD] = (native.ALLOCATOR_EXTENTS[row["name"]] + 63) // 64 + 7
             lines.append("MICROS_VM01_WORK " + json.dumps({
                 "version": 1, "reserved0": 0, "producer": native.PRODUCER, "case": row["case"],
                 "owner_mask": native.OWNER_MASK, "reserved1": 0, "counts": counts,
@@ -280,6 +322,9 @@ class SelectedVmNativeTest(unittest.TestCase):
             ("kernel-long-map", Kind.COMPARISON, 1),
             ("service-stack-min", Kind.RECORD_VISIT, 5297),
             ("service-stack-max", Kind.INDEX_PROBE, 34993),
+            ("service-prepare", Kind.BITMAP_WORD_LOAD, 1),
+            ("service-bitmap-boundary", Kind.BITMAP_WORD_LOAD, 130),
+            ("service-bitmap-max", Kind.BITMAP_WORD_LOAD, 262144),
         ):
             changed = copy.deepcopy(work)
             index = next(index for index, row in enumerate(observed) if row["name"] == name)

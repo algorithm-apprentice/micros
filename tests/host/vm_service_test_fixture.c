@@ -108,7 +108,7 @@ static micros_runtime_result_t service_test_map(
     if (token != 195 || fixture->mapped || page->page_index != fixture->maps
         || fixture->context->state.phase != MICROS_VM_LOADER_LOADING
         || page->virtual_address != expected_va || page->permissions != expected_permissions
-        || page->physical_address != vm_core_test_frame_address(TEST_FIRST_FREE_FRAME + 4 + fixture->maps)
+        || page->physical_address != vm_core_test_frame_address(TEST_FIRST_LOAD_FRAME + 4 + fixture->maps)
         || page->reserved != 0) {
         fixture->violation = true;
         return MICROS_SYSCALL_ABI_STATE;
@@ -209,7 +209,7 @@ static micros_runtime_result_t service_test_freeze(
         return MICROS_SYSCALL_ABI_STATE;
     }
     for (size_t index = 0; index < 4; ++index) {
-        if (plan->table_frames[index] != vm_core_test_frame_address(TEST_FIRST_FREE_FRAME + index)) {
+        if (plan->table_frames[index] != vm_core_test_frame_address(TEST_FIRST_LOAD_FRAME + index)) {
             fixture->violation = true;
             return MICROS_SYSCALL_ABI_STATE;
         }

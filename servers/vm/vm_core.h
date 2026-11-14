@@ -19,8 +19,9 @@ enum {
     MICROS_VM_MAPPING_RECORD_ARRAY_SIZE =
         MICROS_VM_MAPPING_RECORD_CAPACITY
             * MICROS_VM_MAPPING_RECORD_SIZE,
-    MICROS_VM_INITIAL_FREE_BITMAP_WORDS =
+    MICROS_VM_FREE_BITMAP_WORDS =
         MICROS_VM_MAX_MANAGED_FRAMES / 64,
+    MICROS_VM_FREE_PAGE_CACHE_CAPACITY = 20,
 };
 
 enum micros_vm_core_error {
@@ -60,7 +61,7 @@ enum micros_vm_local_frame_state {
     MICROS_VM_LOCAL_FRAME_SERVICE_WIRED =
         MICROS_VM_FRAME_SERVICE_WIRED,
     MICROS_VM_LOCAL_FRAME_TRANSFERABLE =
-        MICROS_VM_FRAME_TRANSFERABLE,
+        0x80 | MICROS_VM_FRAME_TRANSFERABLE,
     MICROS_VM_LOCAL_FRAME_LOAD_RESERVED,
     MICROS_VM_LOCAL_FRAME_PROCESS_WIRED,
     MICROS_VM_LOCAL_FRAME_PROCESS_PAGE_TABLE,
@@ -156,7 +157,10 @@ struct micros_vm_state {
     struct micros_vm_mapping_record
         mapping_records[MICROS_VM_MAPPING_RECORD_CAPACITY];
     uint64_t
-        initial_free_bitmap[MICROS_VM_INITIAL_FREE_BITMAP_WORDS];
+        free_bitmap[MICROS_VM_FREE_BITMAP_WORDS];
+    uint32_t allocation_origin;
+    uint32_t free_page_cache_count;
+    uint32_t free_page_cache[MICROS_VM_FREE_PAGE_CACHE_CAPACITY];
     uint8_t executable_bytes[MICROS_APPLICATION_EXECUTABLE_SIZE_MAX];
     uint8_t request_bytes[MICROS_SPAWN_REQUEST_SIZE_MAX];
 };
@@ -291,9 +295,14 @@ _Static_assert(
     "VM mapping record array must remain exactly eight pages"
 );
 _Static_assert(
-    sizeof(((struct micros_vm_state *)0)->initial_free_bitmap)
+    sizeof(((struct micros_vm_state *)0)->free_bitmap)
         == 32768,
-    "VM initial free-frame bitmap must remain exactly eight pages"
+    "VM current free-frame bitmap must remain exactly eight pages"
+);
+_Static_assert(
+    offsetof(struct micros_vm_state, executable_bytes)
+        - offsetof(struct micros_vm_state, allocation_origin) <= 128,
+    "VM allocator metadata exceeds its existing-image allowance"
 );
 _Static_assert(
     sizeof(struct micros_vm_state)
