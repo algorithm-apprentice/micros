@@ -4,9 +4,9 @@
 
 This is the Accepted VM02 contract under
 [ADR-0136](../adr/0136-vm-mapping-plan-uniqueness.md). VM01 #272 and MEM04
-#228 are merged. Independent design review is clean and design #273 is
-separately merged. Implementation is active; the three findings remain open
-until its complete acceptance and independent review.
+#228 are merged. Design #273 and independently reviewed implementation #274
+are separately merged. Complete acceptance closes the three findings below;
+the next load-plan correction remains separately owned by VM03.
 
 Close only B02-F008, B02-F009 and B07-F004: replace all-process VM mapping
 audits and pairwise uniqueness searches with selected-root/owner indexes
