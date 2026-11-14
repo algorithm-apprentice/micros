@@ -12,7 +12,7 @@ from tests.host.selected_vm_source import validate_native_sites
 from tests.host.work_count_types import Kind, Owner
 
 
-def target_transcript(audits=0):
+def target_transcript(audits=0, root_certificates=None, root_enumerations=0):
     def line(name, fields):
         return "# " + name + " " + " ".join(f"{key}=0x{value:016x}" for key, value in fields) + "\n"
 
@@ -33,7 +33,11 @@ def target_transcript(audits=0):
                 elif owner == Owner.KERNEL_VM:
                     counts[Kind.INDEX_PROBE] = 4 * sum(commands)
                 elif owner == Owner.KERNEL_MEMORY:
-                    counts[Kind.COMPLETE_VALIDATOR_CALL] = 6 * (commands[1] + commands[2] + commands[3] + commands[4] + commands[6]) + commands[3]
+                    counts[Kind.RECORD_VISIT] = root_enumerations
+                    counts[Kind.COMPLETE_VALIDATOR_CALL] = (
+                        commands[3] + commands[4] + commands[6]
+                        if root_certificates is None else root_certificates
+                    )
             elif owner == Owner.VM_SERVICE:
                 counts[Kind.INDEX_PROBE] = sum(commands)
             text += line("MICROS_VM01_COUNTS", (
@@ -114,6 +118,21 @@ class SelectedVmTargetTest(unittest.TestCase):
         self.assertEqual(
             (("KERNEL_VM", "complete-audits", 1, 0),),
             target.target_failures(target.parse_target_output(target_transcript(1), 0)),
+        )
+
+    def test_selected_root_certificates_reject_all_process_walks_and_missing_proof(self):
+        self.assertEqual((), target.target_failures(target.parse_target_output(target_transcript(), 0)))
+        for roots in (0, 4, 6, 199):
+            with self.subTest(roots=roots):
+                self.assertEqual(
+                    (("KERNEL_MEMORY", "selected-root-certificates", roots, 5),),
+                    target.target_failures(target.parse_target_output(
+                        target_transcript(root_certificates=roots), 0
+                    )),
+                )
+        self.assertEqual(
+            (("KERNEL_MEMORY", "root-enumeration", 1, 0),),
+            target.target_failures(target.parse_target_output(target_transcript(root_enumerations=1), 0)),
         )
 
     def test_missing_borrowed_reordered_and_incomplete_evidence_fails(self):
@@ -205,7 +224,11 @@ def native_transcript(channel):
         lines.append("MICROS_VM01_CASE " + json.dumps(row))
         if channel == "work":
             counts = [[0] * len(Kind) for _ in Owner]
-            counts[Owner.KERNEL_VM if row["name"].startswith("kernel-") else Owner.VM_SERVICE][Kind.COMPLETE_VALIDATOR_CALL] = spec[4]
+            owner = (Owner.KERNEL_VM if row["name"].startswith("kernel-")
+                     else Owner.LIB_VM if row["name"].startswith("boot-") else Owner.VM_SERVICE)
+            counts[owner][Kind.COMPLETE_VALIDATOR_CALL] = spec[4]
+            if row["name"] in native.GEOMETRY_EXTENTS:
+                counts[owner][Kind.RANGE_VISIT] = native.GEOMETRY_EXTENTS[row["name"]].bit_length()
             lines.append("MICROS_VM01_WORK " + json.dumps({
                 "version": 1, "reserved0": 0, "producer": native.PRODUCER, "case": row["case"],
                 "owner_mask": native.OWNER_MASK, "reserved1": 0, "counts": counts,
@@ -226,10 +249,20 @@ class SelectedVmNativeTest(unittest.TestCase):
             ("service-max-ranges-pages", Kind.COMPARISON, 131072),
             ("kernel-dense-records", Kind.INDEX_PROBE, 262144),
             ("service-diagnostic", Kind.COMPLETE_VALIDATOR_CALL, 0),
+            ("boot-mapping-max", Kind.RECORD_VISIT, 4096 * 4095 // 2),
+            ("boot-mapping-duplicate", Kind.INDEX_PROBE, 4096 * 4095 // 2),
+            ("service-range-to-index", Kind.RANGE_VISIT, 96),
+            ("service-index-to-range", Kind.RANGE_VISIT, 0),
+            ("kernel-global-records", Kind.INDEX_PROBE, 1260 * 1259 // 2),
+            ("service-global-records", Kind.RECORD_VISIT, 1260 * 1259 // 2),
+            ("service-membership-max", Kind.RECORD_VISIT, 601777),
+            ("kernel-owner-unvisited", Kind.RECORD_VISIT, 33),
+            ("kernel-scanned-count", Kind.RECORD_VISIT, 33),
         ):
             changed = copy.deepcopy(work)
             index = next(index for index, row in enumerate(observed) if row["name"] == name)
-            owner = Owner.KERNEL_VM if name.startswith("kernel-") else Owner.VM_SERVICE
+            owner = (Owner.KERNEL_VM if name.startswith("kernel-")
+                     else Owner.LIB_VM if name.startswith("boot-") else Owner.VM_SERVICE)
             changed[index]["counts"][owner][kind] = value
             with self.subTest(name=name):
                 self.assertTrue(native.work_failures(observed, changed))
@@ -240,6 +273,7 @@ class SelectedVmNativeTest(unittest.TestCase):
         for damaged in (
             good[:-1], "".join(lines[:-1]), "".join(lines[:1] + lines[2:]),
             good.replace('"preserved": 1', '"preserved": true', 1),
+            good.replace('"extent": 4096', '"extent": 0', 1),
             good.replace('"producer": ' + str(native.PRODUCER), '"producer": ' + str(native.PRODUCER + 1), 1),
             native_transcript("ordinary"),
         ):

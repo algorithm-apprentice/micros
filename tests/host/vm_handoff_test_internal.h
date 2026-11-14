@@ -5,7 +5,23 @@
 #include <stdint.h>
 
 #include "kernel/vm/vm_handoff_core.h"
+#include "micros/frame_ownership.h"
 #include "micros/sv39.h"
+
+struct vm_handoff_test_memory {
+    struct micros_frame_allocator allocator;
+    struct micros_frame_ownership ownership;
+};
+
+struct vm_handoff_test_memory *vm_handoff_test_memory_get(void);
+bool vm_handoff_test_commit_scratch(
+    struct micros_vm_handoff_state *state, const struct micros_vm_scratch_plan *plan);
+bool vm_handoff_test_commit_freeze(
+    struct micros_vm_handoff_state *state, const struct micros_vm_load_freeze_state_plan *plan);
+bool vm_handoff_test_commit_abort(
+    struct micros_vm_handoff_state *state, const struct micros_vm_load_abort_action *action);
+bool vm_handoff_test_commit_exit(
+    struct micros_vm_handoff_state *state, const struct micros_vm_exit_release_action *action);
 
 struct micros_vm_boot_summary vm_handoff_test_valid_summary(void);
 struct micros_syscall_arguments vm_handoff_test_valid_arguments(void);

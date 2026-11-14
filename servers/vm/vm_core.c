@@ -1,4 +1,5 @@
 #include "servers/vm/vm_internal.h"
+#include "lib/vm/vm_load_token.h"
 
 #include <stdbool.h>
 #include <stddef.h>
@@ -198,6 +199,7 @@ bool vm_core_record_header_is_valid(const struct micros_vm_state *state, size_t 
         return vm_core_bytes_are_zero(record, offsetof(struct micros_vm_mapping_record, entries));
     }
     return record->load_token != 0 && record->semantic_pid != 0
+        && micros_vm_load_token_slot(record->load_token) == slot
         && record->process_slot == slot && record->process_generation != 0
         && record->process_generation <= MICROS_PROCESS_GENERATION_MAX
         && record->entry_count >= MICROS_VM_PAGE_TABLE_FRAME_COUNT + MICROS_APPLICATION_IMAGE_PAGE_MIN + 1

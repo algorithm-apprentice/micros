@@ -109,21 +109,6 @@ static enum micros_user_address_space_error resolve_process(
     );
 }
 
-static enum micros_user_address_space_error acquire_scratch(
-    const struct micros_user_address_space_runtime_view *view,
-    struct micros_user_address_space_scratch_lease *lease
-)
-{
-    return micros_user_address_space_acquire_scratch(view, lease);
-}
-
-static void release_scratch(
-    struct micros_user_address_space_scratch_lease *lease
-)
-{
-    micros_user_address_space_release_scratch(lease);
-}
-
 static bool owner_is_ownerless_kind(
     struct micros_frame_owner owner,
     enum micros_frame_owner_kind kind
@@ -269,26 +254,24 @@ preflight_vm_freeze(
 }
 
 static enum micros_user_address_space_error
-validate_vm_freeze_address_spaces(
+validate_vm_freeze_address_space(
     struct micros_user_address_space_runtime_view *runtime,
-    const struct vm_freeze_context *context,
-    struct micros_user_address_space_scratch_lease *scratch
+    const struct vm_freeze_context *context
 )
 {
+    const struct micros_process_frame_index *index;
+
     if (
         micros_frame_ownership_runtime_validate_metadata(context->objects)
             != MICROS_FRAME_OWNERSHIP_OK
-        || table_at(context->kernel_report->root_physical_address)
-                ->entries[MICROS_USER_ADDRESS_SPACE_USER_ROOT_INDEX]
-            != 0
     ) {
         return MICROS_USER_ADDRESS_SPACE_ERROR_INVARIANT;
     }
-    return micros_user_address_space_validate_vm_plan_roots_locked(
-        runtime,
-        context->objects,
-        scratch
-    );
+    index = &context->ledger->process_frames[runtime->process_handle.slot];
+    if (index->head != 0 || index->count != 0) {
+        return MICROS_USER_ADDRESS_SPACE_ERROR_OWNERSHIP;
+    }
+    return micros_user_address_space_validate_vm_kernel_root(runtime);
 }
 
 static enum micros_user_address_space_error
@@ -297,7 +280,7 @@ validate_vm_freeze_data_frames(
     const struct micros_vm_load_freeze_action *action
 )
 {
-    struct micros_frame_owner owner;
+    struct micros_frame_reference reference;
     size_t index;
 
     if (
@@ -308,13 +291,13 @@ validate_vm_freeze_data_frames(
     }
     for (index = 0; index < action->entry_count; ++index) {
         if (
-            micros_frame_ownership_lookup(
+            micros_frame_ownership_lookup_prevalidated(
                 ledger,
                 action->entries[index].physical_address,
-                &owner
+                &reference
             ) != MICROS_FRAME_OWNERSHIP_OK
             || !owner_is_ownerless_kind(
-                owner,
+                reference.owner,
                 MICROS_FRAME_OWNER_VM_TRANSFERABLE
             )
         ) {
@@ -330,7 +313,7 @@ validate_vm_freeze_table_frames(
     const struct micros_vm_load_freeze_action *action
 )
 {
-    struct micros_frame_owner owner;
+    struct micros_frame_reference reference;
     size_t index;
 
     for (
@@ -339,13 +322,13 @@ validate_vm_freeze_table_frames(
         ++index
     ) {
         if (
-            micros_frame_ownership_lookup(
+            micros_frame_ownership_lookup_prevalidated(
                 ledger,
                 action->table_frames[index],
-                &owner
+                &reference
             ) != MICROS_FRAME_OWNERSHIP_OK
             || !owner_is_ownerless_kind(
-                owner,
+                reference.owner,
                 MICROS_FRAME_OWNER_FREE
             )
         ) {
@@ -395,7 +378,6 @@ micros_user_address_space_prepare_vm_freeze(
     struct micros_user_address_space_vm_freeze_plan candidate;
     struct vm_freeze_context context;
     struct micros_user_address_space_runtime_view runtime;
-    struct micros_user_address_space_scratch_lease scratch;
     enum micros_user_address_space_error error;
     uintptr_t saved_status;
 
@@ -412,41 +394,38 @@ micros_user_address_space_prepare_vm_freeze(
     if (error != MICROS_USER_ADDRESS_SPACE_OK) {
         goto done;
     }
-    error = acquire_scratch(&runtime, &scratch);
+    error = micros_user_address_space_require_idle(&runtime);
     if (error != MICROS_USER_ADDRESS_SPACE_OK) {
         goto done;
     }
-    error = validate_vm_freeze_address_spaces(
+    error = validate_vm_freeze_address_space(
         &runtime,
-        &context,
-        &scratch
+        &context
     );
     if (error != MICROS_USER_ADDRESS_SPACE_OK) {
-        goto done_with_scratch;
+        goto done;
     }
     error = validate_vm_freeze_data_frames(
         context.ledger,
         action
     );
     if (error != MICROS_USER_ADDRESS_SPACE_OK) {
-        goto done_with_scratch;
+        goto done;
     }
     error = validate_vm_freeze_table_frames(
         context.ledger,
         action
     );
     if (error != MICROS_USER_ADDRESS_SPACE_OK) {
-        goto done_with_scratch;
+        goto done;
     }
     error = prepare_vm_freeze_candidate(action, &candidate);
     if (error != MICROS_USER_ADDRESS_SPACE_OK) {
-        goto done_with_scratch;
+        goto done;
     }
     copy_bytes(plan, &candidate, sizeof(candidate));
     error = MICROS_USER_ADDRESS_SPACE_OK;
 
-done_with_scratch:
-    release_scratch(&scratch);
 done:
     micros_user_address_space_runtime_unlock(saved_status);
     return error;
@@ -553,29 +532,48 @@ void micros_user_address_space_install_vm_freeze_prevalidated(
     struct micros_user_address_space_vm_freeze_plan *plan
 )
 {
-    const struct micros_kernel_address_space_report *kernel_report =
-        micros_kernel_address_space_report();
+    struct micros_user_address_space_runtime_view runtime;
+    struct micros_user_address_space_scratch_lease scratch;
+    const struct micros_process *resolved;
+    enum micros_user_address_space_error error;
+    uintptr_t saved_status;
 
     if (
         plan == NULL
         || plan->phase
             != MICROS_USER_ADDRESS_SPACE_VM_FREEZE_PLAN_CONSTRUCTED
-        || kernel_report == NULL
-        || !micros_user_address_space_vm_table_plan_matches_memory(
-            &plan->tables,
-            kernel_report
-        )
+        || plan->reserved != 0
+    ) {
+        panic_invariant("vm-freeze-install");
+    }
+    saved_status = micros_user_address_space_runtime_lock();
+    if (
+        micros_user_address_space_runtime_require_read(&runtime) != MICROS_USER_ADDRESS_SPACE_OK
+        || micros_user_address_space_runtime_resolve_process(
+            &runtime, plan->tables.process, false, &resolved) != MICROS_USER_ADDRESS_SPACE_OK
+        || !process_is_empty_for_vm_freeze(resolved)
+        || micros_user_address_space_acquire_selected_scratch(&runtime, &scratch)
+            != MICROS_USER_ADDRESS_SPACE_OK
+    ) {
+        panic_invariant("vm-freeze-install");
+    }
+    error = micros_user_address_space_validate_vm_table_plan_locked(&runtime, &scratch, &plan->tables);
+    micros_user_address_space_release_scratch(&scratch);
+    if (
+        error != MICROS_USER_ADDRESS_SPACE_OK
         || micros_kernel_object_runtime_attach_address_space(
             plan->tables.process,
             plan->tables.table_frames[
                 MICROS_USER_ADDRESS_SPACE_VM_TABLE_ROOT
             ]
         ) != MICROS_KERNEL_OBJECT_OK
-        || micros_user_address_space_validate_vm_constructed_root(
-            &plan->tables
-        ) != MICROS_USER_ADDRESS_SPACE_OK
+        || micros_user_address_space_runtime_resolve_process(
+            &runtime, plan->tables.process, true, &resolved) != MICROS_USER_ADDRESS_SPACE_OK
+        || resolved->address_space_root
+            != plan->tables.table_frames[MICROS_USER_ADDRESS_SPACE_VM_TABLE_ROOT]
     ) {
         panic_invariant("vm-freeze-install");
     }
     clear_bytes(plan, sizeof(*plan));
+    micros_user_address_space_runtime_unlock(saved_status);
 }

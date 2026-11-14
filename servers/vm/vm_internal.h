@@ -3,6 +3,7 @@
 
 #include <stdbool.h>
 
+#include "lib/vm/vm_keys.h"
 #include "servers/vm/vm_core.h"
 #include "servers/vm/vm_admission.h"
 
@@ -47,11 +48,25 @@ bool vm_core_record_contains_physical(
     const struct micros_vm_mapping_record *record,
     uint64_t physical_address
 );
-bool vm_core_physical_is_in_record_other_than(
+struct vm_core_membership_view {
+    struct micros_vm_key_view keys;
+    size_t group_count;
+};
+
+_Static_assert(sizeof(struct vm_core_membership_view) <= 64,
+               "VM membership borrows must remain bounded");
+
+enum micros_vm_core_error vm_core_membership_begin(
     const struct micros_vm_state *state,
-    uint64_t physical_address,
-    size_t ignored_slot
+    struct vm_core_membership_view *view
 );
+enum micros_vm_core_error vm_core_membership_query(
+    const struct vm_core_membership_view *view,
+    uint64_t physical_address,
+    size_t ignored_slot,
+    bool *present
+);
+bool vm_core_membership_end(struct vm_core_membership_view *view);
 enum micros_vm_core_error vm_core_select_lowest_frames(
     const struct micros_vm_state *state,
     size_t ignored_slot,

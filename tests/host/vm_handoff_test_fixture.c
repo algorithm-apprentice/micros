@@ -5,6 +5,129 @@
 #include <stdlib.h>
 #include <string.h>
 
+static struct vm_handoff_test_memory memory;
+
+struct vm_handoff_test_memory *vm_handoff_test_memory_get(void)
+{
+    return &memory;
+}
+
+static void reset_memory(void)
+{
+    const struct micros_physical_range ranges[] = {
+        {UINT64_C(0x200000), 512 * MICROS_FRAME_SIZE},
+        {UINT64_C(0x800000), 3584 * MICROS_FRAME_SIZE},
+    };
+
+    memset(&memory, 0, sizeof(memory));
+    if (micros_frame_allocator_initialize(&memory.allocator, ranges, 2, NULL, 0)
+            != MICROS_FRAME_ALLOCATOR_OK
+        || micros_frame_ownership_initialize(&memory.ownership, &memory.allocator)
+            != MICROS_FRAME_OWNERSHIP_OK
+        || micros_frame_ownership_complete_handoff(&memory.ownership) != MICROS_FRAME_OWNERSHIP_OK) {
+        abort();
+    }
+}
+
+bool vm_handoff_test_commit_scratch(
+    struct micros_vm_handoff_state *state, const struct micros_vm_scratch_plan *plan)
+{
+    struct micros_frame_vm_claim_plan claim;
+
+    if (micros_frame_ownership_vm_claim_preflight(
+        &memory.ownership, plan->entry.physical_address, &claim) != MICROS_FRAME_OWNERSHIP_OK) {
+        return false;
+    }
+    micros_vm_scratch_map_bind_prevalidated(state, plan);
+    micros_frame_ownership_vm_claim_commit_prevalidated(&memory.ownership, &claim);
+    micros_vm_scratch_map_finish_prevalidated(state);
+    return true;
+}
+
+bool vm_handoff_test_commit_freeze(
+    struct micros_vm_handoff_state *state, const struct micros_vm_load_freeze_state_plan *plan)
+{
+    struct micros_frame_vm_freeze_plan freeze;
+    uint64_t frames[MICROS_APPLICATION_RESIDENT_PAGE_MAX];
+
+    if (plan->action.entry_count > MICROS_APPLICATION_RESIDENT_PAGE_MAX) {
+        return false;
+    }
+    for (size_t index = 0; index < plan->action.entry_count; ++index) {
+        frames[index] = plan->action.entries[index].physical_address;
+    }
+    if (micros_frame_ownership_vm_freeze_preflight(
+        &memory.ownership, plan->action.process, frames, plan->action.entry_count,
+        plan->action.table_frames, &freeze) != MICROS_FRAME_OWNERSHIP_OK) {
+        return false;
+    }
+    micros_frame_ownership_vm_freeze_commit_prevalidated(&memory.ownership, &freeze);
+    micros_vm_load_freeze_commit_prevalidated(state, plan);
+    return true;
+}
+
+bool vm_handoff_test_commit_abort(
+    struct micros_vm_handoff_state *state, const struct micros_vm_load_abort_action *action)
+{
+    uint64_t frames[MICROS_APPLICATION_RESIDENT_PAGE_MAX];
+    size_t count = action->entry_count;
+
+    if (count > MICROS_APPLICATION_RESIDENT_PAGE_MAX) {
+        return false;
+    }
+    for (size_t index = 0; index < count; ++index) {
+        frames[index] = action->entries[index].physical_address;
+    }
+    if (action->frozen) {
+        struct micros_frame_vm_process_release_plan release;
+
+        if (micros_frame_ownership_vm_release_process_preflight(
+            &memory.ownership, action->process, frames, count, action->table_frames, &release)
+                != MICROS_FRAME_OWNERSHIP_OK) {
+            return false;
+        }
+        micros_frame_ownership_vm_release_process_commit_prevalidated(&memory.ownership, &release);
+    } else {
+        struct micros_frame_vm_transferable_release_plan release;
+
+        if (action->scratch_mapped) {
+            if (count == MICROS_APPLICATION_RESIDENT_PAGE_MAX) {
+                return false;
+            }
+            frames[count++] = action->scratch_physical_address;
+        }
+        if (micros_frame_ownership_vm_release_transferable_preflight(
+            &memory.ownership, frames, count, &release) != MICROS_FRAME_OWNERSHIP_OK) {
+            return false;
+        }
+        micros_frame_ownership_vm_release_transferable_commit_prevalidated(&memory.ownership, &release);
+    }
+    micros_vm_load_abort_commit_prevalidated(state);
+    return true;
+}
+
+bool vm_handoff_test_commit_exit(
+    struct micros_vm_handoff_state *state, const struct micros_vm_exit_release_action *action)
+{
+    struct micros_frame_vm_process_release_plan release;
+    uint64_t frames[MICROS_APPLICATION_RESIDENT_PAGE_MAX];
+
+    if (action->entry_count > MICROS_APPLICATION_RESIDENT_PAGE_MAX) {
+        return false;
+    }
+    for (size_t index = 0; index < action->entry_count; ++index) {
+        frames[index] = action->entries[index].physical_address;
+    }
+    if (micros_frame_ownership_vm_release_process_preflight(
+        &memory.ownership, action->process, frames, action->entry_count, action->table_frames, &release)
+            != MICROS_FRAME_OWNERSHIP_OK) {
+        return false;
+    }
+    micros_frame_ownership_vm_release_process_commit_prevalidated(&memory.ownership, &release);
+    micros_vm_exit_release_commit_prevalidated(state, action->process);
+    return true;
+}
+
 struct micros_vm_boot_summary vm_handoff_test_valid_summary(void)
 {
     return (struct micros_vm_boot_summary){
@@ -64,6 +187,7 @@ struct micros_vm_handoff_state vm_handoff_test_handed_off_state(void)
     struct micros_vm_boot_summary summary = vm_handoff_test_valid_summary();
     struct micros_vm_handoff_state state;
 
+    reset_memory();
     memset(&state, 0, sizeof(state));
     if (
         micros_vm_handoff_state_prepare(
@@ -169,12 +293,14 @@ bool vm_handoff_test_append_page(
     struct micros_vm_scratch_plan plan;
 
     if (
-        micros_vm_scratch_map_preflight(state, &map_request, &plan)
+        micros_vm_scratch_map_preflight(state, &memory.ownership, &map_request, &plan)
         != MICROS_VM_HANDOFF_OK
     ) {
         return false;
     }
-    micros_vm_scratch_map_commit_prevalidated(state, &plan);
+    if (!vm_handoff_test_commit_scratch(state, &plan)) {
+        return false;
+    }
     if (
         micros_vm_scratch_commit_preflight(state, &commit_request, &plan)
         != MICROS_VM_HANDOFF_OK

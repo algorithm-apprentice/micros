@@ -24,6 +24,7 @@ enum micros_syscall_return micros_vm_handoff_syscall_handle_scratch_map(
     micros_vm_handoff_syscall_clear_bytes(&address_plan, sizeof(address_plan));
     vm_error = micros_vm_scratch_map_preflight(
         state,
+        micros_frame_ownership_runtime_ledger(),
         request,
         &scratch
     );

@@ -12,6 +12,13 @@ and commit/ABI contracts. Its separate design is merged as #271; that
 contract, not the historical source-only preservation below, authorizes
 the selected runtime cadence.
 
+The later [VM02 contract](vm-mapping-plan-uniqueness.md) passes the actual
+read-only frame ledger into portable scratch/freeze preflights. The core owns
+the owner-directed record relation, load owns token issuance, and release owns
+direct exit selection through the shared `lib/vm/vm_load_token.c` codec.
+Native fixtures compose the real allocator/ownership transitions; the remaining
+legacy dispatcher seams are not authority evidence.
+
 Implementation must not begin until
 [ADR-0055](../adr/0055-kernel-vm-handoff-source-decomposition.md) is Accepted
 and its design pull request is merged.

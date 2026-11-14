@@ -75,7 +75,7 @@ static micros_runtime_result_t service_test_begin(
     memset(result, 0, sizeof(*result));
     result->version = MICROS_VM_LOAD_BEGIN_RESULT_VERSION;
     result->size = MICROS_VM_LOAD_BEGIN_RESULT_SIZE;
-    result->load_token = 201;
+    result->load_token = 195;
     result->process_slot = 3;
     result->process_generation = 1;
     switch (fixture->corrupt_begin) {
@@ -105,7 +105,7 @@ static micros_runtime_result_t service_test_map(
     } else if (fixture->maps >= 2) {
         expected_permissions |= MICROS_SV39_PERMISSION_WRITE;
     }
-    if (token != 201 || fixture->mapped || page->page_index != fixture->maps
+    if (token != 195 || fixture->mapped || page->page_index != fixture->maps
         || fixture->context->state.phase != MICROS_VM_LOADER_LOADING
         || page->virtual_address != expected_va || page->permissions != expected_permissions
         || page->physical_address != vm_core_test_frame_address(TEST_FIRST_FREE_FRAME + 4 + fixture->maps)
@@ -175,7 +175,7 @@ static micros_runtime_result_t service_test_scratch_commit(
 {
     struct vm_service_test_fixture *fixture = opaque;
 
-    if (token != 201 || !fixture->mapped || page->page_index != fixture->commits
+    if (token != 195 || !fixture->mapped || page->page_index != fixture->commits
         || fixture->context->state.transaction.scratch_filled != 1
         || !service_test_page_is_correct(fixture)) {
         fixture->violation = true;
@@ -200,7 +200,7 @@ static micros_runtime_result_t service_test_freeze(
     struct vm_service_test_fixture *fixture = opaque;
 
     if (fixture->mapped || fixture->commits != 4 || plan->version != 1 || plan->size != 96
-        || plan->load_token != 201 || plan->image_page_count != 3 || plan->data_page_count != 4
+        || plan->load_token != 195 || plan->image_page_count != 3 || plan->data_page_count != 4
         || plan->entry != MICROS_APPLICATION_ENTRY
         || plan->stack_pointer != UINT64_C(0x7fffff70)
         || plan->reserved[0] != 0 || plan->reserved[1] != 0
@@ -238,7 +238,7 @@ static micros_runtime_result_t service_test_abort(void *opaque, uint64_t token, 
 {
     struct vm_service_test_fixture *fixture = opaque;
 
-    if (!fixture->frozen || fixture->active || token != 201 || generation != 301) {
+    if (!fixture->frozen || fixture->active || token != 195 || generation != 301) {
         fixture->violation = true;
         return MICROS_SYSCALL_ABI_STATE;
     }
@@ -254,7 +254,7 @@ static micros_runtime_result_t service_test_commit(void *opaque, uint64_t token,
 {
     struct vm_service_test_fixture *fixture = opaque;
 
-    if (!fixture->frozen || fixture->active || token != 201 || generation != 301) {
+    if (!fixture->frozen || fixture->active || token != 195 || generation != 301) {
         fixture->violation = true;
         return MICROS_SYSCALL_ABI_STATE;
     }
@@ -273,7 +273,7 @@ static micros_runtime_result_t service_test_exit(
 {
     struct vm_service_test_fixture *fixture = opaque;
 
-    if (!fixture->active || exit_token != 701 || token != 201 || generation != 301
+    if (!fixture->active || exit_token != 701 || token != 195 || generation != 301
         || fixture->context->state.phase != MICROS_VM_LOADER_EXIT_RELEASING) {
         fixture->violation = true;
         return MICROS_SYSCALL_ABI_STATE;
@@ -367,7 +367,7 @@ bool vm_service_test_load(struct vm_service_test_fixture *fixture)
         token |= (uint64_t)reply.payload[16 + index] << (index * 8);
     }
     VM_SERVICE_EXPECT(
-        token == 201 && vm_service_test_read_word(&reply.payload[0]) == UINT64_C(0x100000001)
+        token == 195 && vm_service_test_read_word(&reply.payload[0]) == UINT64_C(0x100000001)
         && vm_service_test_read_word(&reply.payload[8]) == 0
         && vm_service_test_read_word(&reply.payload[24]) == 301
         && vm_service_test_read_word(&reply.payload[32]) == MICROS_APPLICATION_ENTRY

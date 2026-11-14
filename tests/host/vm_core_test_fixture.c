@@ -467,7 +467,7 @@ bool vm_core_test_run_to_frozen(
         || micros_vm_load_bind(
             &context->state,
             (struct micros_process_handle){2, 7},
-            UINT64_C(0x2222)
+            UINT64_C(0x2202)
         ) != MICROS_VM_CORE_OK
     ) {
         return false;

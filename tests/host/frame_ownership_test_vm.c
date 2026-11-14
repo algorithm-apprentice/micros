@@ -1,4 +1,5 @@
 #include "frame_ownership_test_internal.h"
+#include "lib/vm/vm_keys.h"
 
 #include <stdbool.h>
 #include <stdint.h>
@@ -470,6 +471,76 @@ static bool wrong_process_release_is_rejected(
     return true;
 }
 
+static bool ordered_frame_failures_are_atomic(
+    struct frame_ownership_test_context *context,
+    const struct vm_atomic_fixture *fixture
+)
+{
+    struct micros_frame_vm_transferable_release_plan plan, sentinel;
+    struct micros_vm_key_view keys;
+    enum micros_frame_ownership_error error;
+    uint64_t addresses[3] = {
+        fixture->table_frames[0], fixture->table_frames[0], fixture->data_frames[1] + 1,
+    };
+
+    memset(&sentinel, 0xa5, sizeof(sentinel));
+    plan = sentinel;
+    frame_ownership_test_snapshot(context);
+    EXPECT_ERROR(MICROS_FRAME_OWNERSHIP_ERROR_NOT_ALLOCATED,
+        micros_frame_ownership_vm_release_transferable_preflight(
+            &context->ownership, addresses, 3, &plan));
+    EXPECT_TRUE(memcmp(&plan, &sentinel, sizeof(plan)) == 0);
+    addresses[0] = fixture->data_frames[0];
+    addresses[1] = fixture->data_frames[0];
+    EXPECT_ERROR(MICROS_FRAME_OWNERSHIP_ERROR_TRANSITION,
+        micros_frame_ownership_vm_release_transferable_preflight(
+            &context->ownership, addresses, 3, &plan));
+    EXPECT_TRUE(memcmp(&plan, &sentinel, sizeof(plan)) == 0);
+    EXPECT_TRUE(micros_vm_keys_begin64(&keys));
+    error = micros_frame_ownership_vm_release_transferable_preflight(
+        &context->ownership, fixture->data_frames, 2, &plan);
+    EXPECT_TRUE(micros_vm_keys_end(&keys));
+    EXPECT_TRUE(error == MICROS_FRAME_OWNERSHIP_ERROR_INVARIANT);
+    EXPECT_TRUE(memcmp(&plan, &sentinel, sizeof(plan)) == 0);
+    EXPECT_TRUE(frame_ownership_test_snapshot_matches(context));
+    EXPECT_ERROR(MICROS_FRAME_OWNERSHIP_OK,
+        micros_frame_ownership_vm_release_transferable_preflight(
+            &context->ownership, fixture->data_frames, 2, &plan));
+    EXPECT_TRUE(frame_ownership_test_snapshot_matches(context));
+    return true;
+}
+
+static bool selected_reference_checks_its_index(
+    struct frame_ownership_test_context *context,
+    const struct vm_atomic_fixture *fixture
+)
+{
+    struct micros_frame_reference reference, sentinel;
+    struct micros_frame_owner owner;
+
+    memset(&sentinel, 0xa5, sizeof(sentinel));
+    EXPECT_ERROR(MICROS_FRAME_OWNERSHIP_OK,
+        micros_frame_ownership_validate_metadata(&context->ownership));
+    EXPECT_ERROR(MICROS_FRAME_OWNERSHIP_OK,
+        micros_frame_ownership_lookup_prevalidated(&context->ownership, fixture->data_frames[0], &reference));
+    EXPECT_TRUE(reference.frame_index == 0 && reference.owner.kind == MICROS_FRAME_OWNER_VM_TRANSFERABLE);
+    context->ownership.owner_links[0].next = 1;
+    reference = sentinel;
+    EXPECT_ERROR(MICROS_FRAME_OWNERSHIP_OK,
+        micros_frame_ownership_lookup(&context->ownership, fixture->data_frames[0], &owner));
+    EXPECT_ERROR(MICROS_FRAME_OWNERSHIP_ERROR_INVARIANT,
+        micros_frame_ownership_lookup_prevalidated(&context->ownership, fixture->data_frames[0], &reference));
+    EXPECT_TRUE(memcmp(&reference, &sentinel, sizeof(reference)) == 0);
+    context->ownership.owner_links[0].next = 0;
+    EXPECT_ERROR(MICROS_FRAME_OWNERSHIP_ERROR_UNALIGNED,
+        micros_frame_ownership_lookup_prevalidated(&context->ownership, fixture->data_frames[0] + 1, &reference));
+    EXPECT_TRUE(memcmp(&reference, &sentinel, sizeof(reference)) == 0);
+    EXPECT_ERROR(MICROS_FRAME_OWNERSHIP_ERROR_UNMANAGED,
+        micros_frame_ownership_lookup_prevalidated(&context->ownership, UINT64_MAX - 4095, &reference));
+    EXPECT_TRUE(memcmp(&reference, &sentinel, sizeof(reference)) == 0);
+    return true;
+}
+
 bool frame_ownership_test_post_handoff_vm_ownership_preflight_is_atomic(
     struct frame_ownership_test_context *context
 )
@@ -483,6 +554,8 @@ bool frame_ownership_test_post_handoff_vm_ownership_preflight_is_atomic(
             &fixture
         )
         && duplicate_freeze_frames_are_rejected(context, &fixture)
+        && ordered_frame_failures_are_atomic(context, &fixture)
+        && selected_reference_checks_its_index(context, &fixture)
         && wrong_process_release_is_rejected(context, &fixture)
     );
 }

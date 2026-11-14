@@ -1,4 +1,5 @@
 #include "micros/user_address_space_core.h"
+#include "lib/vm/vm_keys.h"
 
 #include <stdbool.h>
 #include <stddef.h>
@@ -10,6 +11,7 @@ struct vm_plan_builder {
     bool saw_read_only;
     bool saw_writable;
     int prior_permission_group;
+    size_t first_duplicate;
 };
 
 struct vm_mapping_indices {
@@ -71,19 +73,16 @@ static int permission_group(uint32_t permissions) {
 
 static enum micros_user_address_space_error
 prepare_table_frames(const uint64_t table_frames[MICROS_VM_LOAD_PAGE_TABLE_FRAME_COUNT],
+                     size_t first_duplicate,
                      struct micros_user_address_space_vm_table_plan *candidate) {
     size_t index;
 
     for (index = 0; index < MICROS_VM_LOAD_PAGE_TABLE_FRAME_COUNT; ++index) {
-        size_t prior_index;
-
         if (!frame_address_is_valid(table_frames[index])) {
             return MICROS_USER_ADDRESS_SPACE_ERROR_ARGUMENT;
         }
-        for (prior_index = 0; prior_index < index; ++prior_index) {
-            if (table_frames[prior_index] == table_frames[index]) {
-                return MICROS_USER_ADDRESS_SPACE_ERROR_OWNERSHIP;
-            }
+        if (index == first_duplicate) {
+            return MICROS_USER_ADDRESS_SPACE_ERROR_OWNERSHIP;
         }
         candidate->table_frames[index] = table_frames[index];
     }
@@ -104,24 +103,27 @@ prepare_table_links(const uint64_t table_frames[MICROS_VM_LOAD_PAGE_TABLE_FRAME_
     return MICROS_USER_ADDRESS_SPACE_OK;
 }
 
-static enum micros_user_address_space_error
-validate_mapping_frame_ownership(const uint64_t table_frames[MICROS_VM_LOAD_PAGE_TABLE_FRAME_COUNT],
-                                 const struct micros_user_address_space_vm_mapping *mappings,
-                                 size_t mapping_index) {
-    const uint64_t physical_address = mappings[mapping_index].physical_address;
-    size_t prior_index;
+static bool first_duplicate_frame(
+    const uint64_t table_frames[MICROS_VM_LOAD_PAGE_TABLE_FRAME_COUNT],
+    const struct micros_user_address_space_vm_mapping *mappings, size_t mapping_count,
+    size_t *first_duplicate) {
+    struct micros_vm_key_view keys;
+    size_t total = MICROS_VM_LOAD_PAGE_TABLE_FRAME_COUNT + mapping_count;
 
-    for (prior_index = 0; prior_index < MICROS_VM_LOAD_PAGE_TABLE_FRAME_COUNT; ++prior_index) {
-        if (physical_address == table_frames[prior_index]) {
-            return MICROS_USER_ADDRESS_SPACE_ERROR_OWNERSHIP;
+    if (!micros_vm_keys_begin64(&keys)) {
+        return false;
+    }
+    for (size_t index = 0; index < total; ++index) {
+        uint64_t physical = index < MICROS_VM_LOAD_PAGE_TABLE_FRAME_COUNT
+            ? table_frames[index]
+            : mappings[index - MICROS_VM_LOAD_PAGE_TABLE_FRAME_COUNT].physical_address;
+
+        if (!micros_vm_keys_append_page(&keys, physical, index)) {
+            (void)micros_vm_keys_end(&keys);
+            return false;
         }
     }
-    for (prior_index = 0; prior_index < mapping_index; ++prior_index) {
-        if (mappings[prior_index].physical_address == physical_address) {
-            return MICROS_USER_ADDRESS_SPACE_ERROR_OWNERSHIP;
-        }
-    }
-    return MICROS_USER_ADDRESS_SPACE_OK;
+    return micros_vm_keys_finish_pages(&keys, first_duplicate);
 }
 
 static enum micros_user_address_space_error
@@ -175,7 +177,6 @@ prepare_stack_leaf(struct vm_plan_builder *builder,
 
 static enum micros_user_address_space_error
 prepare_mapping_leaf(struct vm_plan_builder *builder,
-                     const uint64_t table_frames[MICROS_VM_LOAD_PAGE_TABLE_FRAME_COUNT],
                      const struct micros_user_address_space_vm_mapping *mappings,
                      size_t mapping_index) {
     const struct micros_user_address_space_vm_mapping *mapping = &mappings[mapping_index];
@@ -189,9 +190,8 @@ prepare_mapping_leaf(struct vm_plan_builder *builder,
         !frame_address_is_valid(mapping->physical_address)) {
         return MICROS_USER_ADDRESS_SPACE_ERROR_ARGUMENT;
     }
-    error = validate_mapping_frame_ownership(table_frames, mappings, mapping_index);
-    if (error != MICROS_USER_ADDRESS_SPACE_OK) {
-        return error;
+    if (mapping_index + MICROS_VM_LOAD_PAGE_TABLE_FRAME_COUNT == builder->first_duplicate) {
+        return MICROS_USER_ADDRESS_SPACE_ERROR_OWNERSHIP;
     }
     error = read_mapping_indices(mapping->virtual_address, &indices);
     if (error != MICROS_USER_ADDRESS_SPACE_OK) {
@@ -229,7 +229,10 @@ enum micros_user_address_space_error micros_user_address_space_prepare_vm_table_
     }
     clear_bytes(&builder, sizeof(builder));
     builder.image_page_count = mapping_count - 1;
-    error = prepare_table_frames(table_frames, &builder.candidate);
+    if (!first_duplicate_frame(table_frames, mappings, mapping_count, &builder.first_duplicate)) {
+        return MICROS_USER_ADDRESS_SPACE_ERROR_INVARIANT;
+    }
+    error = prepare_table_frames(table_frames, builder.first_duplicate, &builder.candidate);
     if (error != MICROS_USER_ADDRESS_SPACE_OK) {
         return error;
     }
@@ -238,7 +241,7 @@ enum micros_user_address_space_error micros_user_address_space_prepare_vm_table_
         return error;
     }
     for (mapping_index = 0; mapping_index < mapping_count; ++mapping_index) {
-        error = prepare_mapping_leaf(&builder, table_frames, mappings, mapping_index);
+        error = prepare_mapping_leaf(&builder, mappings, mapping_index);
         if (error != MICROS_USER_ADDRESS_SPACE_OK) {
             return error;
         }

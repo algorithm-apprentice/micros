@@ -27,7 +27,7 @@ class BootstrapAllocationSourceTest(unittest.TestCase):
     def test_current_native_recipe_contains_every_declared_source_once(self):
         text = (ROOT / "CMakeLists.txt").read_text()
         block = cmake_command(text, "set", "MEM01_NATIVE_INPUTS")
-        observed = re.findall(r"kernel/[A-Za-z0-9_/]+\.c", block)
+        observed = re.findall(r"(?:kernel|lib)/[A-Za-z0-9_/]+\.c", block)
         expected = native_observations.declarations(ROOT)["families"]["MEM01"]["native_sources"]
         self.assertEqual(len(observed), len(set(observed)))
         self.assertEqual(set(expected), set(observed))

@@ -78,6 +78,7 @@ uint32_t pm_control_execution_test_process_endpoint(
 
 static bool append_page(
     struct micros_vm_handoff_state *vm,
+    struct micros_frame_ownership *ownership,
     uint64_t virtual_address,
     uint64_t physical_address,
     uint32_t permissions
@@ -95,14 +96,19 @@ static bool append_page(
         .physical_address = physical_address,
     };
     struct micros_vm_scratch_plan plan;
+    struct micros_frame_vm_claim_plan claim;
 
     if (
-        micros_vm_scratch_map_preflight(vm, &map, &plan)
+        micros_vm_scratch_map_preflight(vm, ownership, &map, &plan)
             != MICROS_VM_HANDOFF_OK
+        || micros_frame_ownership_vm_claim_preflight(ownership, physical_address, &claim)
+            != MICROS_FRAME_OWNERSHIP_OK
     ) {
         return false;
     }
-    micros_vm_scratch_map_commit_prevalidated(vm, &plan);
+    micros_vm_scratch_map_bind_prevalidated(vm, &plan);
+    micros_frame_ownership_vm_claim_commit_prevalidated(ownership, &claim);
+    micros_vm_scratch_map_finish_prevalidated(vm);
     if (
         micros_vm_scratch_commit_preflight(vm, &commit, &plan)
             != MICROS_VM_HANDOFF_OK
@@ -110,34 +116,6 @@ static bool append_page(
         return false;
     }
     micros_vm_scratch_commit_commit_prevalidated(vm, &plan);
-    return true;
-}
-
-static bool claim_child_data_frames(
-    struct pm_control_execution_test_context *context,
-    uint64_t frame_base,
-    uint64_t data_frames[4]
-)
-{
-    size_t index;
-
-    for (index = 0; index < 4; ++index) {
-        struct micros_frame_vm_claim_plan claim;
-
-        data_frames[index] =
-            frame_base + index * MICROS_SV39_PAGE_SIZE;
-        EXPECT_TRUE(
-            micros_frame_ownership_vm_claim_preflight(
-                &context->ownership,
-                data_frames[index],
-                &claim
-            ) == MICROS_FRAME_OWNERSHIP_OK
-        );
-        micros_frame_ownership_vm_claim_commit_prevalidated(
-            &context->ownership,
-            &claim
-        );
-    }
     return true;
 }
 
@@ -149,6 +127,7 @@ static bool append_child_pages(
     return (
         append_page(
             &context->vm,
+            &context->ownership,
             MICROS_APPLICATION_ENTRY,
             data_frames[0],
             MICROS_SV39_PERMISSION_USER
@@ -157,6 +136,7 @@ static bool append_child_pages(
         )
         && append_page(
             &context->vm,
+            &context->ownership,
             MICROS_APPLICATION_ENTRY + MICROS_SV39_PAGE_SIZE,
             data_frames[1],
             MICROS_SV39_PERMISSION_USER
@@ -164,6 +144,7 @@ static bool append_child_pages(
         )
         && append_page(
             &context->vm,
+            &context->ownership,
             MICROS_APPLICATION_ENTRY + 2 * MICROS_SV39_PAGE_SIZE,
             data_frames[2],
             MICROS_SV39_PERMISSION_USER
@@ -172,6 +153,7 @@ static bool append_child_pages(
         )
         && append_page(
             &context->vm,
+            &context->ownership,
             MICROS_APPLICATION_STACK_BASE,
             data_frames[3],
             MICROS_SV39_PERMISSION_USER
@@ -216,10 +198,10 @@ static bool freeze_child(
         ) == MICROS_VM_HANDOFF_OK
     );
     micros_vm_load_begin_commit_prevalidated(&context->vm, &begin);
-    EXPECT_TRUE(
-        claim_child_data_frames(context, frame_base, data_frames)
-        && append_child_pages(context, data_frames)
-    );
+    for (size_t index = 0; index < 4; ++index) {
+        data_frames[index] = frame_base + index * MICROS_SV39_PAGE_SIZE;
+    }
+    EXPECT_TRUE(append_child_pages(context, data_frames));
     request.load_token = context->vm.load.load_token;
     request.page_plan_digest = micros_vm_load_page_plan_digest(
         request.image_page_count,
@@ -229,6 +211,7 @@ static bool freeze_child(
     EXPECT_TRUE(
         micros_vm_load_freeze_preflight(
             &context->vm,
+            &context->ownership,
             &request,
             &freeze
         ) == MICROS_VM_HANDOFF_OK

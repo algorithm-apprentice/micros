@@ -43,7 +43,7 @@
 
 #define TEST_SENTINEL UINT64_C(0xfeedfacefeedface)
 #define TEST_PRODUCER UINT64_C(0x4d454d3034000000)
-#define TEST_OWNER_MASK UINT32_C(11388)
+#define TEST_OWNER_MASK UINT32_C(44156)
 #define ARENA_BYTES \
     (((size_t)MICROS_FRAME_ALLOCATOR_MAX_MANAGED_FRAMES + 16) * MICROS_FRAME_SIZE)
 
@@ -897,13 +897,13 @@ static bool prepare_vm_fixture(unsigned int phase, uint64_t *low_physical, uint6
     if (phase >= 2) {
         objects = micros_kernel_object_runtime_authoritative_registry();
         REQUIRE(micros_process_create_at(objects, 2, &child) == MICROS_KERNEL_OBJECT_OK);
-        state->last_load_token = 1;
+        state->last_load_token = 2;
         state->load = (struct micros_vm_load_transaction){
             .phase = MICROS_VM_LOAD_PHASE_LOADING, .process_reservation_token = 1,
-            .load_token = 1, .process = child, .scratch_phase = MICROS_VM_SCRATCH_CLEAR,
+            .load_token = 2, .process = child, .scratch_phase = MICROS_VM_SCRATCH_CLEAR,
         };
         state->mappings[child.slot] = (struct micros_vm_kernel_mapping_record){
-            .load_token = 1, .process = child, .phase = MICROS_VM_KERNEL_MAPPING_LOADING,
+            .load_token = 2, .process = child, .phase = MICROS_VM_KERNEL_MAPPING_LOADING,
         };
         if (phase == 3) {
             state->load.scratch_phase = MICROS_VM_SCRATCH_MAPPED;

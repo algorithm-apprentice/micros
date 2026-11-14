@@ -81,7 +81,7 @@ bool test_capacity_and_invariants(
         && micros_vm_load_bind(
             &context->state,
             (struct micros_process_handle){2, 7},
-            UINT64_C(0x2222)
+            UINT64_C(0x2202)
         ) == MICROS_VM_CORE_OK
         && context->state.mapping_records[2].entry_count
             == MICROS_VM_MAPPING_ENTRY_CAPACITY

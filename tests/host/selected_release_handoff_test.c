@@ -2352,12 +2352,206 @@ static bool scratch_lifetime_guards(void)
     return true;
 }
 
+struct vm_certificate_fixture {
+    struct micros_user_address_space_vm_table_plan plan;
+    struct micros_process_handle foreign;
+    size_t pages;
+};
+
+static bool initialize_vm_certificate(
+    struct vm_certificate_fixture *fixture, uint64_t frames, size_t pages)
+{
+    const struct release_handoff_case test = {.frames = frames, .ranges = 3};
+    struct micros_frame_ownership *ownership = micros_as_native_ownership();
+    struct micros_frame_vm_freeze_plan freeze;
+    struct micros_user_address_space_vm_mapping mappings[MICROS_APPLICATION_RESIDENT_PAGE_MAX] = {0};
+    struct micros_process_handle process;
+    struct micros_user_address_space_page_table *root, *middle;
+    uint64_t data[MICROS_APPLICATION_RESIDENT_PAGE_MAX];
+    uint64_t tables[MICROS_VM_LOAD_PAGE_TABLE_FRAME_COUNT];
+
+    REQUIRE(initialize_kernel(&test) && create_root(1, &fixture->foreign));
+    REQUIRE(micros_process_create_at(micros_kernel_object_runtime_authoritative_registry(), 63, &process)
+            == MICROS_KERNEL_OBJECT_OK);
+    REQUIRE(micros_frame_ownership_complete_handoff(ownership) == MICROS_FRAME_OWNERSHIP_OK);
+    fixture->pages = pages;
+    for (size_t index = 0; index < pages; ++index) {
+        struct micros_frame_vm_claim_plan claim;
+
+        REQUIRE(physical_address(2 + 3 * index, &data[index]));
+        REQUIRE(micros_frame_ownership_vm_claim_preflight(ownership, data[index], &claim) == MICROS_FRAME_OWNERSHIP_OK);
+        micros_frame_ownership_vm_claim_commit_prevalidated(ownership, &claim);
+        mappings[index] = (struct micros_user_address_space_vm_mapping){
+            .virtual_address = index + 1 == pages ? MICROS_APPLICATION_STACK_BASE
+                : MICROS_APPLICATION_ENTRY + index * MICROS_FRAME_SIZE,
+            .physical_address = data[index],
+            .permissions = MICROS_SV39_PERMISSION_USER | MICROS_SV39_PERMISSION_READ
+                | (index == 0 ? MICROS_SV39_PERMISSION_EXECUTE
+                   : index == 1 ? 0 : MICROS_SV39_PERMISSION_WRITE),
+        };
+    }
+    for (size_t index = 0; index < MICROS_VM_LOAD_PAGE_TABLE_FRAME_COUNT; ++index) {
+        REQUIRE(physical_address(frames - 4 + index, &tables[index]));
+    }
+    REQUIRE(micros_user_address_space_prepare_vm_table_plan(
+        process, tables, mappings, pages, &fixture->plan) == MICROS_USER_ADDRESS_SPACE_OK);
+    REQUIRE(fixture->plan.entry_count == pages);
+    REQUIRE(micros_frame_ownership_vm_freeze_preflight(
+        ownership, process, data, pages, tables, &freeze) == MICROS_FRAME_OWNERSHIP_OK);
+    for (size_t index = 0; index < MICROS_VM_LOAD_PAGE_TABLE_FRAME_COUNT; ++index) {
+        micros_user_address_space_clear_page(tables[index]);
+    }
+    root = micros_user_address_space_table_at(tables[0]);
+    middle = micros_user_address_space_table_at(tables[1]);
+    memcpy(root, micros_user_address_space_table_at(micros_kernel_address_space_report()->root_physical_address),
+           MICROS_FRAME_SIZE);
+    root->entries[fixture->plan.root_index] = fixture->plan.root_pte;
+    middle->entries[fixture->plan.image_middle_index] = fixture->plan.image_middle_pte;
+    middle->entries[fixture->plan.stack_middle_index] = fixture->plan.stack_middle_pte;
+    for (size_t index = 0; index < pages; ++index) {
+        const struct micros_user_address_space_vm_leaf_plan *leaf = &fixture->plan.leaves[index];
+        struct micros_user_address_space_page_table *table = micros_user_address_space_table_at(tables[leaf->table_role]);
+
+        table->entries[leaf->leaf_index] = leaf->pte;
+    }
+    micros_frame_ownership_vm_freeze_commit_prevalidated(ownership, &freeze);
+    REQUIRE(micros_frame_ownership_validate(ownership) == MICROS_FRAME_OWNERSHIP_OK);
+    return true;
+}
+
+static bool check_vm_certificate(
+    struct vm_certificate_fixture *fixture, const char *name, enum micros_user_address_space_error expected)
+{
+    struct micros_user_address_space_runtime_view runtime;
+    struct micros_user_address_space_scratch_lease lease;
+    enum micros_user_address_space_error error;
+
+    REQUIRE(snapshot_expected(true));
+    REQUIRE(micros_user_address_space_runtime_require_read(&runtime) == MICROS_USER_ADDRESS_SPACE_OK);
+    REQUIRE(begin_capture());
+    REQUIRE(micros_user_address_space_acquire_selected_scratch(&runtime, &lease) == MICROS_USER_ADDRESS_SPACE_OK);
+    error = micros_user_address_space_validate_vm_table_plan_locked(&runtime, &lease, &fixture->plan);
+    micros_user_address_space_release_scratch(&lease);
+    REQUIRE(end_capture() && error == expected && snapshot_state_matches());
+#if defined(MICROS_TEST_WORK_COUNTS)
+    if (expected == MICROS_USER_ADDRESS_SPACE_OK) {
+        const uint64_t *counts = context.observation.counts[MICROS_WORK_OWNER_KERNEL_MEMORY];
+        uint64_t bound = 5 * MICROS_SV39_TABLE_ENTRY_COUNT + fixture->pages + 4;
+
+        if (MICROS_MEM05_NATIVE_CHANNEL == 0 || MICROS_MEM05_NATIVE_CHANNEL == 2) {
+            if (counts[MICROS_WORK_KIND_PTE_VISIT] > bound) {
+                fprintf(stderr, "VM02_ROOT_PTE_BOUND actual=%" PRIu64 " bound=%" PRIu64 "\n",
+                        counts[MICROS_WORK_KIND_PTE_VISIT], bound);
+                return false;
+            }
+            REQUIRE(counts[MICROS_WORK_KIND_PTE_VISIT] >= 4 * MICROS_SV39_TABLE_ENTRY_COUNT
+                    && counts[MICROS_WORK_KIND_COMPLETE_VALIDATOR_CALL] == 1);
+        } else {
+            REQUIRE(counts[MICROS_WORK_KIND_PTE_VISIT] == 0);
+        }
+        REQUIRE(counts[MICROS_WORK_KIND_INDEX_PROBE] <= 96 * (fixture->pages + 4) + 64 * 3 + 1024);
+    }
+#endif
+    report_guard("vm-certificate", name, error);
+    return true;
+}
+
+static void add_unplanned_vm_owner(struct vm_certificate_fixture *fixture, bool indexed)
+{
+    struct micros_frame_ownership *ownership = micros_as_native_ownership();
+    struct micros_process_handle process = indexed ? fixture->plan.process : fixture->foreign;
+
+    ownership->owners[3] = (struct micros_frame_owner){process.generation, process.slot, MICROS_FRAME_OWNER_VM_WIRED, 0};
+    ownership->allocator->allocated_bitmap[0] |= UINT64_C(1) << 3;
+    --ownership->allocator->free_frame_count;
+    ++ownership->owned_frame_count;
+    ++ownership->owner_counts[MICROS_FRAME_OWNER_VM_WIRED];
+    if (indexed) {
+        uint32_t previous_head = ownership->process_frames[process.slot].head;
+
+        ownership->owner_links[3] = (struct micros_frame_owner_links){0, previous_head};
+        ownership->owner_links[previous_head - 1].previous = 4;
+        ownership->process_frames[process.slot].head = 4;
+        ++ownership->process_frames[process.slot].count;
+    }
+}
+
+static bool vm_certificate_guards(void)
+{
+    static const char *const names[] = {
+        "shared-root", "middle-hole", "image-hole", "stack-hole", "substituted-table",
+        "unmanaged-table", "owner-bit", "owner-generation", "owner-link", "indexed-orphan",
+        "unvisited-root", "unindexed-foreign", "oversized-plan",
+    };
+    static const enum micros_user_address_space_error errors[] = {
+        MICROS_USER_ADDRESS_SPACE_ERROR_PTE, MICROS_USER_ADDRESS_SPACE_ERROR_PTE,
+        MICROS_USER_ADDRESS_SPACE_ERROR_PTE, MICROS_USER_ADDRESS_SPACE_ERROR_PTE,
+        MICROS_USER_ADDRESS_SPACE_ERROR_OWNERSHIP, MICROS_USER_ADDRESS_SPACE_ERROR_OWNERSHIP,
+        MICROS_USER_ADDRESS_SPACE_ERROR_INVARIANT, MICROS_USER_ADDRESS_SPACE_ERROR_OWNERSHIP,
+        MICROS_USER_ADDRESS_SPACE_ERROR_INVARIANT, MICROS_USER_ADDRESS_SPACE_ERROR_OWNERSHIP,
+        MICROS_USER_ADDRESS_SPACE_OK, MICROS_USER_ADDRESS_SPACE_OK, MICROS_USER_ADDRESS_SPACE_ERROR_ARGUMENT,
+    };
+    struct vm_certificate_fixture fixture;
+#if defined(MICROS_TEST_WORK_COUNTS)
+    uint64_t minimum[MICROS_WORK_KIND_COUNT];
+#endif
+
+    REQUIRE(initialize_vm_certificate(&fixture, 96, 4) && check_vm_certificate(&fixture, "minimum", 0));
+#if defined(MICROS_TEST_WORK_COUNTS)
+    memcpy(minimum, context.observation.counts[MICROS_WORK_OWNER_KERNEL_MEMORY], sizeof(minimum));
+#endif
+    REQUIRE(initialize_vm_certificate(&fixture, 262143, 4)
+            && check_vm_certificate(&fixture, "maximum-memory", 0));
+#if defined(MICROS_TEST_WORK_COUNTS)
+    REQUIRE(memcmp(minimum, context.observation.counts[MICROS_WORK_OWNER_KERNEL_MEMORY], sizeof(minimum)) == 0);
+#endif
+    REQUIRE(initialize_vm_certificate(&fixture, 96, 16) && check_vm_certificate(&fixture, "maximum-pages", 0));
+    REQUIRE(micros_kernel_object_runtime_attach_address_space(fixture.plan.process, fixture.plan.table_frames[0])
+            == MICROS_KERNEL_OBJECT_OK);
+    REQUIRE(check_vm_certificate(&fixture, "attached", 0));
+    for (unsigned mutation = 0; mutation < sizeof(names) / sizeof(names[0]); ++mutation) {
+        struct micros_frame_ownership *ownership = micros_as_native_ownership();
+        struct micros_kernel_objects *objects = micros_kernel_object_runtime_authoritative_registry();
+
+        REQUIRE(initialize_vm_certificate(&fixture, 96, 16));
+        if (mutation < 4) {
+            struct micros_user_address_space_page_table *table =
+                micros_user_address_space_table_at(fixture.plan.table_frames[mutation]);
+
+            table->entries[mutation == 0 ? 2 : mutation == 1 ? 1 : mutation == 2 ? 500 : 0] = UINT64_C(1);
+        } else if (mutation == 4 || mutation == 5) {
+            fixture.plan.table_frames[2] = mutation == 4
+                ? objects->processes[fixture.foreign.slot].address_space_root : UINT64_MAX - 4095;
+        } else if (mutation == 6) {
+            ownership->allocator->allocated_bitmap[0] ^= UINT64_C(1) << 2;
+        } else if (mutation == 7) {
+            ++ownership->owners[2].generation;
+        } else if (mutation == 8) {
+            ownership->owner_links[92].previous = 93;
+        } else if (mutation == 9 || mutation == 11) {
+            add_unplanned_vm_owner(&fixture, mutation == 9);
+        } else if (mutation == 10) {
+            micros_user_address_space_table_at(objects->processes[fixture.foreign.slot].address_space_root)
+                ->entries[1] = UINT64_MAX;
+        } else {
+            fixture.plan.entry_count = MICROS_APPLICATION_RESIDENT_PAGE_MAX + 1;
+        }
+        REQUIRE(check_vm_certificate(&fixture, names[mutation], errors[mutation]));
+        if (mutation == 10) {
+            REQUIRE(micros_user_address_space_validate(fixture.foreign) != MICROS_USER_ADDRESS_SPACE_OK);
+        } else if (mutation == 11) {
+            REQUIRE(micros_frame_ownership_validate(ownership) == MICROS_FRAME_OWNERSHIP_ERROR_INVARIANT);
+        }
+    }
+    return true;
+}
+
 static bool current_guards(void)
 {
     return selection_publication_guards() && selection_shape_guards()
         && index_mutation_guards() && index_rejection_guards() && complete_index_guards()
         && lifecycle_guards() && root_atomicity_guards() && handoff_atomicity_guards()
-        && precedence_guards() && scratch_lifetime_guards();
+        && precedence_guards() && scratch_lifetime_guards() && vm_certificate_guards();
 }
 #endif
 

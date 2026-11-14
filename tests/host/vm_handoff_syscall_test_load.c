@@ -36,7 +36,7 @@ bool vm_handoff_syscall_test_load_begin_dispatches(
         && frame.a0 == MICROS_SYSCALL_ABI_OK
         && result->version == MICROS_VM_LOAD_BEGIN_RESULT_VERSION
         && result->size == MICROS_VM_LOAD_BEGIN_RESULT_SIZE
-        && result->load_token == 1
+        && result->load_token == fixture->child_process.slot
         && result->process_slot == fixture->child_process.slot
         && result->process_generation == fixture->child_process.generation
         && fixture->vm_state.load.phase == MICROS_VM_LOAD_PHASE_LOADING

@@ -4,6 +4,12 @@ This document defines the exact behavior-preserving source decomposition for
 the kernel address-space and user-execution family. It applies ADR-0051 to
 the second correction identified by the source-module audit.
 
+The later [VM02 contract](vm-mapping-plan-uniqueness.md) keeps the same
+`kernel/memory` owners while replacing their VM-specific all-root bridge.
+The validation owner supplies `micros_user_address_space_validate_vm_table_plan_locked`;
+freeze owns its pre-attachment use and binding postcondition, and teardown
+uses the same selected proof. Public complete diagnostics remain separate.
+
 Implementation must not begin until
 [ADR-0053](../adr/0053-kernel-address-space-source-decomposition.md) is
 Accepted and its design pull request is merged.

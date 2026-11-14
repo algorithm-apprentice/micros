@@ -63,6 +63,7 @@ struct vm_handoff_syscall_test_context {
     struct micros_vm_handoff_state vm_state;
     struct micros_pm_control_state pm_state;
     struct micros_tty_handoff_runtime_state tty_state;
+    struct micros_frame_allocator allocator;
     struct micros_frame_ownership ownership;
     jmp_buf panic_target;
     bool panic_armed;

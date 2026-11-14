@@ -55,6 +55,11 @@ struct micros_frame_range_snapshot {
     uint64_t bitmap_offset;
 };
 
+struct micros_frame_reference {
+    uint64_t frame_index;
+    struct micros_frame_owner owner;
+};
+
 struct micros_frame_owner_links {
     uint32_t previous;
     uint32_t next;
@@ -203,6 +208,13 @@ enum micros_frame_ownership_error micros_frame_ownership_lookup(
     const struct micros_frame_ownership *ownership,
     uint64_t physical_address,
     struct micros_frame_owner *owner
+);
+
+/* Requires admitted metadata in the same protected, non-mutating epoch. */
+enum micros_frame_ownership_error micros_frame_ownership_lookup_prevalidated(
+    const struct micros_frame_ownership *ownership,
+    uint64_t physical_address,
+    struct micros_frame_reference *reference
 );
 
 enum micros_frame_ownership_error

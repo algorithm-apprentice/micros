@@ -1,8 +1,22 @@
 #include "kernel/vm/vm_handoff_internal.h"
+#include "lib/vm/vm_load_token.h"
 
 #include <stdbool.h>
 #include <stddef.h>
 #include <stdint.h>
+
+static uint64_t next_load_token(uint64_t previous, uint16_t slot)
+{
+    uint64_t token = (previous & ~(uint64_t)(MICROS_VM_LOAD_TOKEN_SLOT_COUNT - 1)) | slot;
+
+    if (token <= previous) {
+        if (token > UINT64_MAX - MICROS_VM_LOAD_TOKEN_SLOT_COUNT) {
+            return 0;
+        }
+        token += MICROS_VM_LOAD_TOKEN_SLOT_COUNT;
+    }
+    return token;
+}
 
 enum micros_vm_handoff_error micros_vm_load_begin_preflight(
     const struct micros_vm_handoff_state *state,
@@ -45,7 +59,7 @@ enum micros_vm_handoff_error micros_vm_load_begin_preflight(
     if (!micros_vm_handoff_mapping_record_is_zero(&state->mappings[process.slot])) {
         return MICROS_VM_HANDOFF_ERROR_STATE;
     }
-    load_token = micros_vm_handoff_next_nonzero_token(state->last_load_token);
+    load_token = next_load_token(state->last_load_token, process.slot);
     if (load_token == 0) {
         return MICROS_VM_HANDOFF_ERROR_CAPACITY;
     }

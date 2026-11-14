@@ -86,21 +86,6 @@ static enum micros_user_address_space_error resolve_process_with_root(
     );
 }
 
-static enum micros_user_address_space_error acquire_scratch(
-    const struct micros_user_address_space_runtime_view *view,
-    struct micros_user_address_space_scratch_lease *lease
-)
-{
-    return micros_user_address_space_acquire_scratch(view, lease);
-}
-
-static void release_scratch(
-    struct micros_user_address_space_scratch_lease *lease
-)
-{
-    micros_user_address_space_release_scratch(lease);
-}
-
 static bool owner_is_ownerless_kind(
     struct micros_frame_owner owner,
     enum micros_frame_owner_kind kind
@@ -337,7 +322,6 @@ micros_user_address_space_prepare_vm_scratch_mapping(
     struct vm_scratch_operation_context context;
     struct micros_user_address_space_vm_scratch_plan candidate;
     struct micros_user_address_space_runtime_view runtime;
-    struct micros_user_address_space_scratch_lease scratch;
     enum micros_user_address_space_error error;
     uintptr_t saved_status;
 
@@ -361,7 +345,7 @@ micros_user_address_space_prepare_vm_scratch_mapping(
     if (error != MICROS_USER_ADDRESS_SPACE_OK) {
         goto done;
     }
-    error = acquire_scratch(&runtime, &scratch);
+    error = micros_user_address_space_require_idle(&runtime);
     if (error != MICROS_USER_ADDRESS_SPACE_OK) {
         goto done;
     }
@@ -370,20 +354,11 @@ micros_user_address_space_prepare_vm_scratch_mapping(
             != MICROS_FRAME_OWNERSHIP_OK
     ) {
         error = MICROS_USER_ADDRESS_SPACE_ERROR_INVARIANT;
-        goto done_with_scratch;
-    }
-    error =
-        micros_user_address_space_validate_vm_plan_roots_locked(
-        &runtime,
-        context.objects,
-        &scratch
-    );
-    if (error != MICROS_USER_ADDRESS_SPACE_OK) {
-        goto done_with_scratch;
+        goto done;
     }
     if (active_root() != context.resolved->address_space_root) {
         error = MICROS_USER_ADDRESS_SPACE_ERROR_STATE;
-        goto done_with_scratch;
+        goto done;
     }
     error = validate_vm_scratch_frame(
         context.ledger,
@@ -391,7 +366,7 @@ micros_user_address_space_prepare_vm_scratch_mapping(
         MICROS_FRAME_OWNER_FREE
     );
     if (error != MICROS_USER_ADDRESS_SPACE_OK) {
-        goto done_with_scratch;
+        goto done;
     }
     error = prepare_vm_scratch_mapping_leaf(
         &runtime,
@@ -400,7 +375,7 @@ micros_user_address_space_prepare_vm_scratch_mapping(
         &candidate
     );
     if (error != MICROS_USER_ADDRESS_SPACE_OK) {
-        goto done_with_scratch;
+        goto done;
     }
     candidate.active = true;
     candidate.process = process;
@@ -410,8 +385,6 @@ micros_user_address_space_prepare_vm_scratch_mapping(
     copy_bytes(plan, &candidate, sizeof(candidate));
     error = MICROS_USER_ADDRESS_SPACE_OK;
 
-done_with_scratch:
-    release_scratch(&scratch);
 done:
     micros_user_address_space_runtime_unlock(saved_status);
     return error;
@@ -460,7 +433,6 @@ micros_user_address_space_prepare_vm_scratch_removal(
     struct vm_scratch_operation_context context;
     struct micros_user_address_space_vm_scratch_plan candidate;
     struct micros_user_address_space_runtime_view runtime;
-    struct micros_user_address_space_scratch_lease scratch;
     enum micros_user_address_space_error error;
     uintptr_t saved_status;
 
@@ -484,22 +456,13 @@ micros_user_address_space_prepare_vm_scratch_removal(
     if (error != MICROS_USER_ADDRESS_SPACE_OK) {
         goto done;
     }
-    error = acquire_scratch(&runtime, &scratch);
+    error = micros_user_address_space_require_idle(&runtime);
     if (error != MICROS_USER_ADDRESS_SPACE_OK) {
         goto done;
     }
-    error =
-        micros_user_address_space_validate_vm_plan_roots_locked(
-        &runtime,
-        context.objects,
-        &scratch
-    );
-    if (error != MICROS_USER_ADDRESS_SPACE_OK) {
-        goto done_with_scratch;
-    }
     if (active_root() != context.resolved->address_space_root) {
         error = MICROS_USER_ADDRESS_SPACE_ERROR_STATE;
-        goto done_with_scratch;
+        goto done;
     }
     error = validate_vm_scratch_frame(
         context.ledger,
@@ -507,7 +470,7 @@ micros_user_address_space_prepare_vm_scratch_removal(
         MICROS_FRAME_OWNER_VM_TRANSFERABLE
     );
     if (error != MICROS_USER_ADDRESS_SPACE_OK) {
-        goto done_with_scratch;
+        goto done;
     }
     error = prepare_vm_scratch_removal_leaf(
         &runtime,
@@ -516,7 +479,7 @@ micros_user_address_space_prepare_vm_scratch_removal(
         &candidate
     );
     if (error != MICROS_USER_ADDRESS_SPACE_OK) {
-        goto done_with_scratch;
+        goto done;
     }
     candidate.active = true;
     candidate.process = process;
@@ -526,8 +489,6 @@ micros_user_address_space_prepare_vm_scratch_removal(
     copy_bytes(plan, &candidate, sizeof(candidate));
     error = MICROS_USER_ADDRESS_SPACE_OK;
 
-done_with_scratch:
-    release_scratch(&scratch);
 done:
     micros_user_address_space_runtime_unlock(saved_status);
     return error;

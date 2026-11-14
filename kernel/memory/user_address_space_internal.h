@@ -291,19 +291,14 @@ micros_user_address_space_validate_all_process_roots_locked(
     const struct micros_user_address_space_scratch_lease *lease
 );
 
-enum micros_user_address_space_error
-micros_user_address_space_validate_vm_plan_roots_locked(
+enum micros_user_address_space_error micros_user_address_space_validate_vm_table_plan_locked(
     struct micros_user_address_space_runtime_view *runtime,
-    const struct micros_kernel_objects *objects,
-    const struct micros_user_address_space_scratch_lease *lease
-);
-enum micros_user_address_space_error micros_user_address_space_validate_vm_constructed_root(
+    struct micros_user_address_space_scratch_lease *lease,
     const struct micros_user_address_space_vm_table_plan *plan
 );
 
-bool micros_user_address_space_vm_table_plan_matches_memory(
-    const struct micros_user_address_space_vm_table_plan *plan,
-    const struct micros_kernel_address_space_report *kernel_report
+enum micros_user_address_space_error micros_user_address_space_validate_vm_kernel_root(
+    const struct micros_user_address_space_runtime_view *runtime
 );
 
 enum micros_user_address_space_error

@@ -68,7 +68,11 @@ micros_frame_ownership_runtime_vm_claim_preflight(
     if (fixture->claim_preflight_error != MICROS_FRAME_OWNERSHIP_OK) {
         return fixture->claim_preflight_error;
     }
-    plan->frame_index = physical_address / MICROS_SV39_PAGE_SIZE;
+    enum micros_frame_ownership_error error =
+        micros_frame_ownership_vm_claim_preflight(&fixture->ownership, physical_address, plan);
+    if (error != MICROS_FRAME_OWNERSHIP_OK) {
+        return error;
+    }
     fixture->vm_operation_stage = 1;
     return MICROS_FRAME_OWNERSHIP_OK;
 }
@@ -92,6 +96,7 @@ void micros_frame_ownership_runtime_vm_claim_commit_prevalidated(
         fixture->vm_order_violation = true;
         return;
     }
+    micros_frame_ownership_vm_claim_commit_prevalidated(&fixture->ownership, plan);
     fixture->vm_operation_stage = 3;
 }
 
@@ -128,8 +133,8 @@ micros_frame_ownership_runtime_vm_release_transferable_preflight(
         fixture->vm_order_violation = true;
         return MICROS_FRAME_OWNERSHIP_ERROR_INVARIANT;
     }
-    plan->frame_count = (uint32_t)physical_address_count;
-    return MICROS_FRAME_OWNERSHIP_OK;
+    return micros_frame_ownership_vm_release_transferable_preflight(
+        &fixture->ownership, physical_addresses, physical_address_count, plan);
 }
 
 void
@@ -150,6 +155,7 @@ micros_frame_ownership_runtime_vm_release_transferable_commit_prevalidated(
         fixture->vm_order_violation = true;
         return;
     }
+    micros_frame_ownership_vm_release_transferable_commit_prevalidated(&fixture->ownership, plan);
     fixture->vm_operation_stage = 4;
 }
 
@@ -184,8 +190,12 @@ micros_frame_ownership_runtime_vm_freeze_preflight(
         fixture->vm_order_violation = true;
         return MICROS_FRAME_OWNERSHIP_ERROR_INVARIANT;
     }
-    plan->process = process;
-    plan->data_frame_count = (uint32_t)data_physical_address_count;
+    enum micros_frame_ownership_error error = micros_frame_ownership_vm_freeze_preflight(
+        &fixture->ownership, process, data_physical_addresses, data_physical_address_count,
+        table_physical_addresses, plan);
+    if (error != MICROS_FRAME_OWNERSHIP_OK) {
+        return error;
+    }
     fixture->vm_operation_stage = 1;
     if (fixture->mutate_freeze_input) {
         struct micros_vm_load_freeze_plan *input =
@@ -216,6 +226,7 @@ void micros_frame_ownership_runtime_vm_freeze_commit_prevalidated(
         fixture->vm_order_violation = true;
         return;
     }
+    micros_frame_ownership_vm_freeze_commit_prevalidated(&fixture->ownership, plan);
     fixture->vm_operation_stage = 4;
 }
 
@@ -253,8 +264,12 @@ micros_frame_ownership_runtime_vm_release_process_preflight(
         fixture->vm_order_violation = true;
         return MICROS_FRAME_OWNERSHIP_ERROR_INVARIANT;
     }
-    plan->process = process;
-    plan->data_frame_count = (uint32_t)data_physical_address_count;
+    enum micros_frame_ownership_error error = micros_frame_ownership_vm_release_process_preflight(
+        &fixture->ownership, process, data_physical_addresses, data_physical_address_count,
+        table_physical_addresses, plan);
+    if (error != MICROS_FRAME_OWNERSHIP_OK) {
+        return error;
+    }
     fixture->vm_operation_stage = 2;
     return MICROS_FRAME_OWNERSHIP_OK;
 }
@@ -281,6 +296,7 @@ micros_frame_ownership_runtime_vm_release_process_commit_prevalidated(
         fixture->vm_order_violation = true;
         return;
     }
+    micros_frame_ownership_vm_release_process_commit_prevalidated(&fixture->ownership, plan);
     fixture->vm_operation_stage = 4;
 }
 

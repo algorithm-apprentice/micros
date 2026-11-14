@@ -125,7 +125,7 @@ static bool report_transactions_are_clear(const struct pm_report_authority *auth
         )
         || authority->control->last_exit_token != UINT64_C(1)
         || !bytes_are_zero(&authority->control->exit, sizeof(authority->control->exit))
-        || authority->handoff->last_load_token != UINT64_C(1)
+        || authority->handoff->last_load_token != MICROS_PM_TEST_RESERVED_PROCESS_SLOT
         || authority->handoff->last_mapping_generation != UINT64_C(1)
         || authority->handoff->load.phase != MICROS_VM_LOAD_PHASE_IDLE
         || !bytes_are_zero(

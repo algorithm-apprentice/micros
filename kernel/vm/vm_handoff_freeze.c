@@ -1,60 +1,35 @@
 #include "kernel/vm/vm_handoff_internal.h"
+#include "lib/vm/vm_keys.h"
 
 #include <stdbool.h>
 #include <stddef.h>
 #include <stdint.h>
 
-static bool freeze_table_frames_are_valid(
-    const struct micros_vm_handoff_state *state,
+static enum micros_vm_handoff_error freeze_frames_are_unique(
     const struct micros_vm_kernel_mapping_record *record,
     const struct micros_vm_load_freeze_plan *request
 )
 {
-    size_t slot;
-    size_t table_index;
-    size_t prior_index;
+    struct micros_vm_key_view keys;
+    size_t data_count = record == NULL ? 0 : record->entry_count;
+    size_t duplicate;
 
-    for (
-        table_index = 0;
-        table_index < MICROS_VM_LOAD_PAGE_TABLE_FRAME_COUNT;
-        ++table_index
-    ) {
-        if (!micros_vm_handoff_address_is_page_aligned(request->table_frames[table_index])) {
-            return false;
-        }
-        for (prior_index = 0; prior_index < table_index; ++prior_index) {
-            if (
-                request->table_frames[prior_index]
-                == request->table_frames[table_index]
-            ) {
-                return false;
-            }
-        }
-        for (
-            prior_index = 0;
-            prior_index < record->entry_count;
-            ++prior_index
-        ) {
-            if (
-                record->entries[prior_index].physical_address
-                == request->table_frames[table_index]
-            ) {
-                return false;
-            }
-        }
-        for (slot = 0; slot < MICROS_PROCESS_CAPACITY; ++slot) {
-            if (
-                &state->mappings[slot] != record
-                && micros_vm_handoff_record_contains_physical_address(
-                    &state->mappings[slot],
-                    request->table_frames[table_index]
-                )
-            ) {
-                return false;
-            }
+    if (!micros_vm_keys_begin64(&keys)) {
+        return MICROS_VM_HANDOFF_ERROR_INVARIANT;
+    }
+    for (size_t index = 0; index < data_count + MICROS_VM_LOAD_PAGE_TABLE_FRAME_COUNT; ++index) {
+        uint64_t physical = index < data_count
+            ? record->entries[index].physical_address : request->table_frames[index - data_count];
+
+        if (!micros_vm_keys_append_page(&keys, physical, index)) {
+            (void)micros_vm_keys_end(&keys);
+            return MICROS_VM_HANDOFF_ERROR_INVARIANT;
         }
     }
-    return true;
+    if (!micros_vm_keys_finish_pages(&keys, &duplicate)) {
+        return MICROS_VM_HANDOFF_ERROR_INVARIANT;
+    }
+    return duplicate == SIZE_MAX ? MICROS_VM_HANDOFF_OK : MICROS_VM_HANDOFF_ERROR_ARGUMENT;
 }
 
 static bool freeze_request_fields_are_valid(
@@ -62,7 +37,6 @@ static bool freeze_request_fields_are_valid(
 )
 {
     size_t table_index;
-    size_t prior_index;
 
     if (
         request->version != MICROS_VM_LOAD_FREEZE_PLAN_VERSION
@@ -85,20 +59,13 @@ static bool freeze_request_fields_are_valid(
         if (!micros_vm_handoff_address_is_page_aligned(request->table_frames[table_index])) {
             return false;
         }
-        for (prior_index = 0; prior_index < table_index; ++prior_index) {
-            if (
-                request->table_frames[prior_index]
-                == request->table_frames[table_index]
-            ) {
-                return false;
-            }
-        }
     }
     return true;
 }
 
 enum micros_vm_handoff_error micros_vm_load_freeze_preflight(
     const struct micros_vm_handoff_state *state,
+    const struct micros_frame_ownership *ownership,
     const struct micros_vm_load_freeze_plan *request,
     struct micros_vm_load_freeze_state_plan *plan
 )
@@ -129,6 +96,10 @@ enum micros_vm_handoff_error micros_vm_load_freeze_preflight(
     if (!freeze_request_fields_are_valid(request)) {
         return MICROS_VM_HANDOFF_ERROR_ARGUMENT;
     }
+    error = freeze_frames_are_unique(NULL, request);
+    if (error != MICROS_VM_HANDOFF_OK) {
+        return error;
+    }
     if (
         state->phase != MICROS_VM_HANDOFF_PHASE_HANDED_OFF
         || state->load.phase != MICROS_VM_LOAD_PHASE_LOADING
@@ -138,17 +109,31 @@ enum micros_vm_handoff_error micros_vm_load_freeze_preflight(
         return MICROS_VM_HANDOFF_ERROR_STATE;
     }
     record = &state->mappings[state->load.process.slot];
-    for (size_t slot = 0; slot < MICROS_PROCESS_CAPACITY; ++slot) {
-        if (!micros_vm_handoff_record_header_is_valid(state, slot)) {
-            return MICROS_VM_HANDOFF_ERROR_INVARIANT;
-        }
-    }
     if (
         request->data_page_count != record->entry_count
         || !micros_vm_handoff_record_entries_are_frozen_shape(record)
-        || !freeze_table_frames_are_valid(state, record, request)
     ) {
         return MICROS_VM_HANDOFF_ERROR_ARGUMENT;
+    }
+    error = freeze_frames_are_unique(record, request);
+    if (error != MICROS_VM_HANDOFF_OK) {
+        return error;
+    }
+    if (micros_frame_ownership_validate_metadata(ownership) != MICROS_FRAME_OWNERSHIP_OK
+        || ownership->phase != MICROS_FRAME_OWNERSHIP_PHASE_HANDED_OFF) {
+        return MICROS_VM_HANDOFF_ERROR_INVARIANT;
+    }
+    for (size_t index = 0; index < MICROS_VM_LOAD_PAGE_TABLE_FRAME_COUNT; ++index) {
+        bool present;
+
+        error = micros_vm_handoff_frame_membership_prevalidated(
+            state, ownership, request->table_frames[index], &present);
+        if (error != MICROS_VM_HANDOFF_OK) {
+            return error;
+        }
+        if (present) {
+            return MICROS_VM_HANDOFF_ERROR_ARGUMENT;
+        }
     }
     if (
         request->page_plan_digest

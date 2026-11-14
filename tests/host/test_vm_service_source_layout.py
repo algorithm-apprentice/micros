@@ -33,6 +33,8 @@ GENERATOR_PATH = "tools/generate_vm_scratch_preemption_fixture.py"
 SOURCE_SETS = {
     "MICROS_VM_BOOT_VALIDATION_SOURCES": (
         "lib/vm/vm_boot_validate.c",
+        "lib/vm/vm_keys.c",
+        "lib/vm/vm_load_token.c",
     ),
     "MICROS_VM_IMAGE_SOURCES": (
         "servers/vm/vm_image.c",
@@ -92,6 +94,8 @@ SOURCE_SETS = {
 
 PRIVATE_HEADERS = (
     "lib/vm/vm_boot_internal.h",
+    "lib/vm/vm_keys.h",
+    "lib/vm/vm_load_token.h",
     "servers/vm/vm_admission.h",
     "servers/vm/vm_internal.h",
     "servers/vm/vm_image_internal.h",
@@ -160,6 +164,16 @@ TEST_FINAL_OWNERS = {
 }
 
 PRIVATE_FUNCTION_OWNERS = {
+    "lib/vm/vm_load_token.c": ("micros_vm_load_token_slot",),
+    "lib/vm/vm_keys.c": (
+        "begin_keys", "micros_vm_keys_begin32", "micros_vm_keys_begin64",
+        "micros_vm_keys_view_is_valid", "micros_vm_keys_append32", "micros_vm_keys_append64",
+        "micros_vm_keys_append_page", "micros_vm_keys_finish_pages",
+        "read_key", "write_key", "partition_keys", "micros_vm_keys_sort", "micros_vm_keys_end",
+    ),
+    "lib/vm/vm_boot_validate.c": (
+        "vm_boot_header_is_valid", "vm_boot_physical_to_frame_index",
+    ),
     "servers/vm/vm_core.c": (
         "vm_core_zero_bytes", "vm_core_copy_bytes", "vm_core_bytes_are_zero",
         "vm_core_bytes_equal", "vm_core_ranges_overlap",
@@ -171,7 +185,8 @@ PRIVATE_FUNCTION_OWNERS = {
     "servers/vm/vm_frames.c": (
         "vm_core_physical_to_frame_index", "vm_core_frame_index_to_physical",
         "vm_core_record_is_zero", "vm_core_record_contains_physical",
-        "vm_core_physical_is_in_record_other_than", "vm_core_select_lowest_frames",
+        "vm_core_membership_begin", "vm_core_membership_query", "vm_core_membership_end",
+        "vm_core_select_lowest_frames",
         "vm_core_selected_frames_match",
     ),
     "servers/vm/vm_validation.c": (
@@ -268,23 +283,28 @@ TARGET_FUNCTION_OWNERS = {
 }
 
 PERMITTED_OWNER_DEPENDENCIES = {
-    "lib/vm/vm_boot_validate.c": (),
+    "lib/vm/vm_load_token.c": (),
+    "lib/vm/vm_keys.c": (),
+    "lib/vm/vm_boot_validate.c": ("lib/vm/vm_keys.c",),
     "servers/vm/vm_image.c": (),
     "servers/vm/vm_stack.c": ("servers/vm/vm_image.c",),
     "servers/vm/vm_elf.c": ("servers/vm/vm_image.c",),
-    "servers/vm/vm_core.c": ("lib/vm/vm_boot_validate.c",),
-    "servers/vm/vm_frames.c": ("servers/vm/vm_core.c",),
+    "servers/vm/vm_core.c": ("lib/vm/vm_boot_validate.c", "lib/vm/vm_load_token.c"),
+    "servers/vm/vm_frames.c": ("servers/vm/vm_core.c", "lib/vm/vm_keys.c"),
     "servers/vm/vm_validation.c": (
         "lib/vm/vm_boot_validate.c",
+        "lib/vm/vm_keys.c",
         "servers/vm/vm_core.c", "servers/vm/vm_frames.c",
         "servers/vm/vm_stack.c", "servers/vm/vm_elf.c",
     ),
     "servers/vm/vm_load.c": (
+        "lib/vm/vm_load_token.c",
         "servers/vm/vm_core.c", "servers/vm/vm_frames.c",
         "servers/vm/vm_validation.c",
         "servers/vm/vm_stack.c", "servers/vm/vm_elf.c",
     ),
     "servers/vm/vm_exit.c": (
+        "lib/vm/vm_load_token.c",
         "servers/vm/vm_core.c", "servers/vm/vm_frames.c",
         "servers/vm/vm_validation.c",
     ),
@@ -335,6 +355,9 @@ PERMITTED_OWNER_DEPENDENCIES = {
 }
 
 FILE_SCOPE_OBJECT_OWNERS = {
+    "lib/vm/vm_keys.c": (
+        r"static\s+struct\s+vm_key_workspace\s+workspace\s*;",
+    ),
     "tests/host/vm_core_test_fixture.c": (
         r"static\s+struct\s+vm_core_test_context\s+test_context\s*(?:=|;)",
     ),
@@ -441,8 +464,8 @@ def discovered_family_paths() -> tuple[str, ...]:
     patterns = (
         "servers/vm/vm*.c",
         "servers/vm/vm*.h",
-        "lib/vm/vm_boot*.c",
-        "lib/vm/vm_boot*.h",
+        "lib/vm/vm*.c",
+        "lib/vm/vm*.h",
         'kernel/tests/vm/vm_scratch_preemption_test*.c',
         'kernel/tests/vm/vm_scratch_preemption_test*.h',
         "tests/host/vm_core*.c",
@@ -833,6 +856,9 @@ class VmServiceSourceLayoutTest(unittest.TestCase):
                 name: sorted(owners - allowed)
                 for name, owners in symbol_owners.items()
                 if owners - allowed
+                and not (relative == "servers/vm/vm_frames.c"
+                         and name == "vm_boot_physical_to_frame_index"
+                         and owners == {"lib/vm/vm_boot_validate.c"})
                 and re.search(rf"\b{re.escape(name)}\b", text)
             }
             with self.subTest(owner=relative):

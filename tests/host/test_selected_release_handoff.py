@@ -186,7 +186,7 @@ class SelectedReleaseHandoffSourceTest(unittest.TestCase):
 
         with patch.object(source, "fixed_source", side_effect=AssertionError("historical audit input"), create=True):
             measured = source.measure_audit_boundaries(ROOT, Stage.GREEN)
-        self.assertEqual(17, len(measured["retained"]))
+        self.assertEqual(12, len(measured["retained"]))
         self.assertEqual(4, len(measured["plans"]))
 
     def test_current_native_generation_does_not_restore_an_ancestor(self):
@@ -366,12 +366,16 @@ class SelectedReleaseHandoffNativeTest(unittest.TestCase):
         ending = ["MICROS_MEM05_NATIVE_PASS cases=128"]
         parsed = parse_native_output("\n".join(lines + guards + ending) + "\n", Stage.GREEN, "ordinary")
         self.assertEqual(tuple({**case, "state": True} for case in expected_guards()), parsed["guards"])
+        panic_index = next(index for index, case in enumerate(expected_guards()) if case["panic"])
+        wrong_panic = guards.copy()
+        wrong_panic[panic_index] = wrong_panic[panic_index].replace("scratch-release", "unrelated-panic")
         for changed in (
             guards[1:], [guards[1], guards[0], *guards[2:]],
             [guards[0].replace('"state": true', '"state": false'), *guards[1:]],
             [guards[0].replace('"result": 0', '"result": true'), *guards[1:]],
-            [*guards[:-1], guards[-1].replace("scratch-release", "unrelated-panic")],
+            wrong_panic,
         ):
+            self.assertNotEqual(guards, changed)
             with self.subTest(first=changed[0]), self.assertRaises(ValueError):
                 parse_native_output("\n".join(lines + changed + ending) + "\n", Stage.GREEN, "ordinary")
 

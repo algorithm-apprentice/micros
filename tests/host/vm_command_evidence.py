@@ -42,8 +42,13 @@ SITES = (
     ("kernel/vm/vm_handoff_core.c", "micros_vm_handoff_validate_selected", "kernel-selected", "KERNEL_VM", "INDEX_PROBE"),
     ("kernel/vm/vm_handoff_runtime.c", "micros_vm_handoff_runtime_validate_command", "command-selected", "KERNEL_VM", "INDEX_PROBE"),
     ("kernel/pm/pm_control_runtime.c", "micros_pm_control_runtime_validate_vm_command", "pm-selected", "KERNEL_PM", "INDEX_PROBE"),
-    ("kernel/memory/user_address_space_validation.c", "validate_vm_plan_root_locked", "memory-root", "KERNEL_MEMORY", "COMPLETE_VALIDATOR_CALL"),
+    ("kernel/memory/user_address_space_validation.c", "micros_user_address_space_validate_vm_table_plan_locked", "memory-root", "KERNEL_MEMORY", "COMPLETE_VALIDATOR_CALL"),
+    ("kernel/memory/user_address_space_validation.c", "micros_user_address_space_validate_all_process_roots_locked", "root-enumeration", "KERNEL_MEMORY", "RECORD_VISIT"),
 )
+OPTIONALLY_UNLINKED = {
+    ("kernel/memory/user_address_space_validation.c", "micros_user_address_space_validate_all_process_roots_locked"),
+}
+KEY_SOURCES = ("lib/vm/vm_keys.c", "lib/vm/vm_load_token.c")
 UNSCOPED_SOURCES = (
     "arch/riscv64/uart.c", "kernel/diagnostic/diagnostic_history_core.c", "lib/runtime/memory.c",
 )
@@ -135,11 +140,13 @@ def target_failures(measured):
         if not lower <= count <= upper:
             failures.append((owner.name, "selected-admissions", count, (lower, upper)))
     commands = captures[0]["commands"]
-    walks = commands[1] + commands[2] + commands[3] + commands[4] + commands[6]
     roots = totals.per_owner[Owner.KERNEL_MEMORY][Kind.COMPLETE_VALIDATOR_CALL]
-    lower, upper = 6 * walks + commands[3], 8 * walks + commands[3]
-    if not lower <= roots <= upper:
-        failures.append(("KERNEL_MEMORY", "retained-root-walks", roots, (lower, upper)))
+    certificates = commands[3] + commands[4] + commands[6]
+    if roots != certificates:
+        failures.append(("KERNEL_MEMORY", "selected-root-certificates", roots, certificates))
+    enumerations = totals.per_owner[Owner.KERNEL_MEMORY][Kind.RECORD_VISIT]
+    if enumerations:
+        failures.append(("KERNEL_MEMORY", "root-enumeration", enumerations, 0))
     return tuple(failures)
 
 
@@ -275,12 +282,13 @@ def validate_target_products(root):
     subjects = {
         "kernel/micros.elf": tuple(sorted({path for path, *_ in SITES if path.startswith("kernel/")})) + (
             "tests/qemu/vm_command_work.c", "kernel/tests/spawn/elf_spawn_test_services.c",
-            "tests/work/work_counts.c", *UNSCOPED_SOURCES,
+            "tests/work/work_counts.c", *UNSCOPED_SOURCES, *KEY_SOURCES,
         ),
         "bootstrap/micros-vm-server.elf": (
             "servers/vm/vm_validation.c", "tests/qemu/vm_server_control.c",
             "tests/qemu/selected_vm_work.c",
             "tests/qemu/vm_server_fixture.c", "tests/work/work_counts.c", "lib/runtime/memory.c",
+            *KEY_SOURCES,
         ),
     }
     inputs = {
@@ -320,7 +328,9 @@ def validate_target_products(root):
             for path, name, *_ in SITES:
                 if path != source:
                     continue
-                if name not in symbols or symbols[name].section_index not in retained:
+                if name not in symbols or (
+                    symbols[name].section_index not in retained and (path, name) not in OPTIONALLY_UNLINKED
+                ):
                     raise ValueError("VM01 primitive is absent from its linked owner")
                 flow = function_flow(obj, symbols[name])
                 reachable = reachable_instructions(flow)
@@ -328,6 +338,14 @@ def validate_target_products(root):
                     calls = [call for call in flow.calls if call.target_symbol == callee]
                     if len(calls) != 1 or calls[0].offset not in reachable:
                         raise ValueError("VM01 primitive lost its actual scoped machine call")
+        workspaces = [symbol for symbol in image.symbols
+                      if symbol.name == "workspace" and symbol.section_index != SYMBOL_UNDEFINED]
+        backing = [symbol for symbol in objects["lib/vm/vm_keys.c"].symbols
+                   if symbol.name == "workspace" and symbol.section_index != SYMBOL_UNDEFINED]
+        if (len(workspaces) != 1 or len(backing) != 1
+            or workspaces[0].size != backing[0].size
+            or not 16 * 1024 < backing[0].size <= 16 * 1024 + 256):
+            raise ValueError("VM02 image lost its single bounded key workspace")
         def storage(source):
             return sum(section.size for section in objects[source].sections
                        if section.flags & SECTION_ALLOC and not section.flags & SECTION_EXECUTE)

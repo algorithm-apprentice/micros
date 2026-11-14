@@ -184,9 +184,16 @@ static void reset_vm_pm_tty_state(
     ) {
         abort();
     }
-    fixture->ownership = (struct micros_frame_ownership){
-        .phase = MICROS_FRAME_OWNERSHIP_PHASE_HANDED_OFF,
-    };
+    const struct micros_physical_range memory = {UINT64_C(0x800000), 32 * MICROS_FRAME_SIZE};
+    fixture->allocator = (struct micros_frame_allocator){0};
+    fixture->ownership = (struct micros_frame_ownership){0};
+    if (micros_frame_allocator_initialize(&fixture->allocator, &memory, 1, NULL, 0)
+            != MICROS_FRAME_ALLOCATOR_OK
+        || micros_frame_ownership_initialize(&fixture->ownership, &fixture->allocator)
+            != MICROS_FRAME_OWNERSHIP_OK
+        || micros_frame_ownership_complete_handoff(&fixture->ownership) != MICROS_FRAME_OWNERSHIP_OK) {
+        abort();
+    }
 }
 
 static void reset_object_records(

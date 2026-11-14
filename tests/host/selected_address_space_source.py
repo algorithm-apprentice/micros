@@ -7,6 +7,8 @@ from tests.host.work_count_types import Stage
 
 RECIPE_ADMISSION = {
     "native_source_members": (
+    "lib/vm/vm_keys.c",
+    "lib/vm/vm_load_token.c",
     "kernel/memory/frame_allocator.c",
     "kernel/memory/bootstrap_memory.c",
     "kernel/memory/frame_ownership.c",
@@ -94,7 +96,7 @@ OBSERVED_HEADERS = ("kernel/boot/bootstrap_control_internal.h",)
 STATE_WORK_CONTRACT = {
     "version": 1,
     "dimensions": (27, 14),
-    "owner_mask": 11388,
+    "owner_mask": 44156,
     "channels": ("aggregate", "path", "context"),
     "producer_base": 5567941383739670528,
     "current_producer_offset": 256,
@@ -123,7 +125,7 @@ STATE_WORK_CONTRACT = {
     "allocation_prefix_frames": (3, 2, 1),
     "target_workflows": ("test-qemu-user-address-space", "test-qemu-address-space-handoff"),
     "preservation": (
-        "full-diagnostic-bodies-and-20-retained-caller-rows",
+        "explicit-current-diagnostics-and-selected-vm-certificates",
         "selected-owner-before-dereference-and-scalar-ancestry",
         "exact-allocator-ledger-object-pte-scratch-controller-and-output-state",
         "irq-restoration-and-full-same-root-hardware-commit",
@@ -157,7 +159,7 @@ VM_RUNTIME_FUNCTIONS = (
 
 NATIVE_PREFIX = '#include "tests/host/selected_address_space_test.h"\n'
 CHANNELS = ("aggregate", "path", "context", "ordinary")
-OWNER_MASK = 11388
+OWNER_MASK = 44156
 
 
 def definitions(text, names):

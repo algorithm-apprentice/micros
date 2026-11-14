@@ -45,7 +45,7 @@ bool test_abort_paths(
         && micros_vm_load_bind(
             &context->state,
             (struct micros_process_handle){2, 7},
-            UINT64_C(0x2222)
+            UINT64_C(0x2202)
         ) == MICROS_VM_CORE_OK
         && micros_vm_load_next_page(&context->state, &action)
             == MICROS_VM_CORE_OK
@@ -65,7 +65,7 @@ bool test_abort_paths(
             == MICROS_VM_CORE_OK
         && micros_vm_load_aborted(
             &context->state,
-            UINT64_C(0x2222),
+            UINT64_C(0x2202),
             0
         ) == MICROS_VM_CORE_OK
         && context->state.phase == MICROS_VM_LOADER_IDLE
@@ -94,7 +94,7 @@ bool test_abort_paths(
         && context->state.phase == MICROS_VM_LOADER_FROZEN
         && micros_vm_load_aborted(
             &context->state,
-            UINT64_C(0x2222),
+            UINT64_C(0x2202),
             UINT64_C(0x3333)
         ) == MICROS_VM_CORE_OK
         && context->state.phase == MICROS_VM_LOADER_IDLE

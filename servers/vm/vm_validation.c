@@ -1,5 +1,6 @@
 #include "servers/vm/vm_internal.h"
 #include "lib/vm/vm_boot_internal.h"
+#include "lib/vm/vm_keys.h"
 #include "tests/qemu/vm_validation_work.h"
 
 #include "micros/endpoint.h"
@@ -580,33 +581,6 @@ static bool validate_data_entry(
     return state->boot_info->frame_states[frame_index] == expected_state;
 }
 
-static bool record_entry_is_unique(
-    const struct micros_vm_state *state,
-    size_t slot,
-    size_t entry_index
-)
-{
-    uint64_t physical =
-        state->mapping_records[slot].entries[entry_index].physical_address;
-    size_t prior_slot;
-
-    for (prior_slot = 0; prior_slot <= slot; ++prior_slot) {
-        const struct micros_vm_mapping_record *prior =
-            &state->mapping_records[prior_slot];
-        size_t limit = prior_slot == slot
-            ? entry_index
-            : (vm_core_record_is_zero(prior) ? 0 : prior->entry_count);
-        size_t prior_entry;
-
-        for (prior_entry = 0; prior_entry < limit; ++prior_entry) {
-            if (prior->entries[prior_entry].physical_address == physical) {
-                return false;
-            }
-        }
-    }
-    return true;
-}
-
 static bool validate_record_entries(
     const struct micros_vm_state *state,
     size_t slot,
@@ -641,7 +615,7 @@ static bool validate_record_entries(
         role_is_valid = entry_index < MICROS_VM_PAGE_TABLE_FRAME_COUNT
             ? validate_table_entry(state, record, entry_index, frame_index)
             : validate_data_entry(state, record, entry_index, frame_index);
-        if (!role_is_valid || !record_entry_is_unique(state, slot, entry_index)) {
+        if (!role_is_valid) {
             return false;
         }
         if (record->phase != MICROS_VM_MAPPING_RECORD_LOADING) {
@@ -659,34 +633,55 @@ static bool validate_record_entries(
     );
 }
 
-static bool record_identity_is_unique(
-    const struct micros_vm_state *state,
-    size_t slot
-)
+static bool finish_mapping_key_check(struct micros_vm_key_view *keys)
 {
-    const struct micros_vm_mapping_record *record =
-        &state->mapping_records[slot];
-    size_t other_slot;
+    bool unique = micros_vm_keys_sort(keys);
 
-    for (other_slot = 0; other_slot < slot; ++other_slot) {
-        const struct micros_vm_mapping_record *other =
-            &state->mapping_records[other_slot];
+    if (unique) {
+        for (size_t index = 1; index < keys->count; ++index) {
+            if (keys->keys64[index - 1] == keys->keys64[index]) {
+                unique = false;
+                break;
+            }
+        }
+    }
+    return micros_vm_keys_end(keys) && unique;
+}
 
-        if (
-            !vm_core_record_is_zero(other)
-            && (
-                other->load_token == record->load_token
-                || other->semantic_pid == record->semantic_pid
-                || (
-                    other->process_generation == record->process_generation
-                    && other->process_slot == record->process_slot
-                )
-            )
-        ) {
+static bool mapping_keys_are_unique(const struct micros_vm_state *state)
+{
+    struct micros_vm_key_view keys;
+
+    for (unsigned domain = 0; domain < 2; ++domain) {
+        if (!micros_vm_keys_begin64(&keys)) {
+            return false;
+        }
+        for (size_t slot = 0; slot < MICROS_VM_MAPPING_RECORD_CAPACITY; ++slot) {
+            const struct micros_vm_mapping_record *record = &state->mapping_records[slot];
+
+            if (record->phase == MICROS_VM_MAPPING_RECORD_UNUSED) {
+                continue;
+            }
+            if (domain == 0) {
+                for (size_t index = 0; index < record->entry_count; ++index) {
+                    if (!micros_vm_keys_append64(&keys, record->entries[index].physical_address)) {
+                        goto invalid;
+                    }
+                }
+            } else if (!micros_vm_keys_append64(
+                &keys, record->semantic_pid
+            )) {
+                goto invalid;
+            }
+        }
+        if (!finish_mapping_key_check(&keys)) {
             return false;
         }
     }
     return true;
+invalid:
+    (void)micros_vm_keys_end(&keys);
+    return false;
 }
 
 static bool validate_mapping_records(
@@ -707,7 +702,6 @@ static bool validate_mapping_records(
             !vm_core_record_header_is_valid(state, slot)
             || record->phase == MICROS_VM_MAPPING_RECORD_UNUSED
             || !validate_record_entries(state, slot, counts)
-            || !record_identity_is_unique(state, slot)
         ) {
             return false;
         }
@@ -729,7 +723,7 @@ static bool validate_mapping_records(
             return false;
         }
     }
-    return true;
+    return mapping_keys_are_unique(state);
 }
 
 static bool validate_idle_phase(

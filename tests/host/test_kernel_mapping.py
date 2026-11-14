@@ -15,7 +15,7 @@ ROOT = Path(__file__).resolve().parents[2]
 class KernelMappingSourceTest(unittest.TestCase):
     def test_current_native_recipe_contains_every_declared_source_once(self):
         text = (ROOT / "CMakeLists.txt").read_text()
-        observed = re.findall(r"kernel/[A-Za-z0-9_/]+\.c", cmake_command(text, "set", "MEM02_NATIVE_INPUTS"))
+        observed = re.findall(r"(?:kernel|lib)/[A-Za-z0-9_/]+\.c", cmake_command(text, "set", "MEM02_NATIVE_INPUTS"))
         expected = native_observations.declarations(ROOT)["families"]["MEM02"]["native_sources"]
         self.assertEqual(len(observed), len(set(observed)))
         self.assertEqual(set(expected), set(observed))

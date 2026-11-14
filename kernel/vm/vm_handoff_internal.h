@@ -6,6 +6,14 @@
 #include <stdint.h>
 
 #include "kernel/vm/vm_handoff_core.h"
+#include "micros/frame_ownership.h"
+
+enum micros_vm_handoff_error micros_vm_handoff_frame_membership_prevalidated(
+    const struct micros_vm_handoff_state *state,
+    const struct micros_frame_ownership *ownership,
+    uint64_t physical_address,
+    bool *present
+);
 
 #define MICROS_VM_HANDOFF_MAGIC UINT64_C(0x4d4943524f535648)
 
