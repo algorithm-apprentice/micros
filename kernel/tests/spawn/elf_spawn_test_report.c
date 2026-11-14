@@ -3,6 +3,7 @@
 #include "arch/riscv64/platform.h"
 #include "micros/panic.h"
 #include "micros/trap.h"
+#include "tests/qemu/vm_command_work.h"
 
 static _Noreturn void elf_spawn_report_failure(
     struct micros_hart *hart, struct micros_trap_frame *frame, const char *reason
@@ -173,7 +174,13 @@ bool elf_spawn_test_process_report(struct micros_hart *hart, struct micros_trap_
             if (frame->a1 != MICROS_ELF_SPAWN_CHILD_PID || !elf_spawn_final(context, process)) {
                 elf_spawn_report_failure(hart, frame, "elf-spawn-final-resources");
             }
-            MICROS_TEST_STACK_REPORT(); (void)sbi_system_reset(SBI_RESET_TYPE_SHUTDOWN, SBI_RESET_REASON_NONE);
+            if (!MICROS_VM01_FINISH()) {
+                elf_spawn_report_failure(hart, frame, "elf-spawn-vm-work");
+            }
+            MICROS_TEST_STACK_REPORT(); if (!MICROS_VM01_REPORT()) {
+                elf_spawn_report_failure(hart, frame, "elf-spawn-vm-work-report");
+            }
+            (void)sbi_system_reset(SBI_RESET_TYPE_SHUTDOWN, SBI_RESET_REASON_NONE);
             for (;;) {
                 __asm__ volatile("wfi");
             }

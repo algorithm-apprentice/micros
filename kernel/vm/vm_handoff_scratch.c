@@ -27,7 +27,7 @@ enum micros_vm_handoff_error micros_vm_scratch_map_preflight(
     ) {
         return MICROS_VM_HANDOFF_ERROR_ARGUMENT;
     }
-    error = micros_vm_handoff_state_validate(state);
+    error = micros_vm_handoff_validate_selected(state);
     if (error != MICROS_VM_HANDOFF_OK) {
         return error;
     }
@@ -52,6 +52,9 @@ enum micros_vm_handoff_error micros_vm_scratch_map_preflight(
         return MICROS_VM_HANDOFF_ERROR_STATE;
     }
     for (slot = 0; slot < MICROS_PROCESS_CAPACITY; ++slot) {
+        if (!micros_vm_handoff_record_header_is_valid(state, slot)) {
+            return MICROS_VM_HANDOFF_ERROR_INVARIANT;
+        }
         if (
             micros_vm_handoff_record_contains_physical_address(
                 &state->mappings[slot],
@@ -112,7 +115,7 @@ enum micros_vm_handoff_error micros_vm_scratch_commit_preflight(
     ) {
         return MICROS_VM_HANDOFF_ERROR_ARGUMENT;
     }
-    error = micros_vm_handoff_state_validate(state);
+    error = micros_vm_handoff_validate_selected(state);
     if (error != MICROS_VM_HANDOFF_OK) {
         return error;
     }

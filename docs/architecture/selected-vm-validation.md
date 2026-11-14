@@ -6,8 +6,9 @@ This Accepted VM01 contract owns B07-F001 under
 [ADR-0135](../adr/0135-selected-vm-validation.md).
 BOOT02 #268, MEM04 #228 and GRANT01 #259 are its merged prerequisites.
 BOOT03 #270 is the completed preferred predecessor, not a new graph edge.
-Independent design review is clean. Implementation remains pending the
-separate design merge.
+The independently reviewed design is merged as #271. Its separate
+implementation is active; B07-F001 closes only after the required final
+evidence, independent implementation review and merge.
 
 The [fixed study](../research/minix-selected-vm-validation.md) owns current
 source/reference provenance, caller counts and hidden audit paths.
@@ -367,3 +368,27 @@ One sufficient current author plan and fresh independent review precede
 the first permanent implementation commit and exact-tree publication.
 Current native/source/recipe/consumer maintenance stays in this outcome
 under ADR-0123, not another metadata prerequisite or historical replay.
+
+## Current implementation and evidence owners
+
+| Responsibility | Current owner |
+| --- | --- |
+| Shared boot-header facts and mapping-search headers | `lib/vm/vm_boot_internal.h` / `vm_boot_validate.c`, and `servers/vm/vm_core.c`; frame selection never depends upward on complete validation. |
+| Selected service admission | `servers/vm/vm_validation.c`; `vm_admission.h` exposes only the two read-only checks needed by the adapter, not the general core-private interface. |
+| Kernel VM, sealed service and PM relations | Existing `kernel/vm`, `kernel/boot/bootstrap_control_core.c` and `kernel/pm` owners; complete APIs remain separate. |
+| VM memory certificates | The existing memory validation owner shares its complete tree/owner walk and root iterator between diagnostics and the narrowly named VM-plan entries. |
+| Native semantic/work evidence | `selected_vm_test.c` / `selected_vm_evidence.py`: 48 ordinary/observed cases, unchanged original fixtures, full diagnostic controls and maximal frame/range/page/record shapes. Existing dispatcher-mock tests retain their old seam but are not VM01 authority evidence. |
+| Same-guest producers and readback | `vm_command_work.c` and `selected_vm_work.c`, with the existing generated VM-context descriptor. Cross-image capture flags are integer fields with exact canonical checks. |
+| Source, machine and storage qualification | `vm_command_evidence.py` checks actual linked observation calls, one collector per image, exact compiler/object/image ownership and the fixed two/four-page additions. Unrelated UART, copy and history work annotations remain disabled in this guest; their actual objects must have no work-observer references. Stack instrumentation and fatal-path qualification remain unchanged. |
+
+The [build guide](../development/building.md) owns the focused native and
+same-guest commands. The [stack contract](stack-bound-evidence.md#phase-bounded-vm-preparation)
+retains separate preparation frames and actual return dominance without
+reintroducing the superseded final complete audit.
+
+The VM callback qualification admits only the callback-free mapping-header
+guard at its exact position before `service_copy_inputs`. It retains the
+original constructor, table, carrier and forwarded arguments, returns the
+actual current source record, and proves the real guard call's normal-return
+continuation dominates the copy call. Actual frames and direct callees are
+fully counted; no other callback anchor or expected target is rebaselined.

@@ -11,6 +11,7 @@
 #include "servers/vm/vm_core.h"
 #include "servers/vm/vm_service_core.h"
 #include "tests/qemu/vm_handoff_protocol.h"
+#include "tests/qemu/vm_validation_work.h"
 
 #if defined(MICROS_VM_SCRATCH_PREEMPTION_TEST)
 #include "tests/qemu/vm_scratch_preemption_protocol.h"
@@ -86,6 +87,9 @@ struct vm_server_context {
     struct micros_vm_state vm_state;
     struct micros_vm_service control;
     enum vm_server_control_mode control_mode;
+#if defined(MICROS_TEST_VM_COMMAND_COUNTS)
+    struct micros_vm01_work_capture work;
+#endif
 #if !defined(MICROS_PM_SERVICE_TEST) \
     && !defined(MICROS_VM_TTY_HANDOFF_TEST) \
     && !defined(MICROS_VM_SCRATCH_PREEMPTION_TEST)

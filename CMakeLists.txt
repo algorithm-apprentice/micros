@@ -3520,6 +3520,9 @@ if(MICROS_BUILD_HOST_TESTS)
         "${CMAKE_CURRENT_SOURCE_DIR}/arch/*.h"
         "${CMAKE_CURRENT_SOURCE_DIR}/kernel/*.h"
     )
+    list(APPEND MEM04_NATIVE_HEADERS
+        "${CMAKE_CURRENT_SOURCE_DIR}/tests/qemu/vm_validation_work.h"
+        "${CMAKE_CURRENT_SOURCE_DIR}/tests/work/work_counts.h")
     set(MEM04_NATIVE_OUTPUTS)
     set(MEM04_SOURCES_0)
     foreach(mem04_source IN LISTS MEM04_NATIVE_INPUTS)
@@ -3723,6 +3726,9 @@ if(MICROS_BUILD_HOST_TESTS)
         "${CMAKE_CURRENT_SOURCE_DIR}/arch/*.h"
         "${CMAKE_CURRENT_SOURCE_DIR}/kernel/*.h"
     )
+    list(APPEND MEM05_NATIVE_HEADERS
+        "${CMAKE_CURRENT_SOURCE_DIR}/tests/qemu/vm_validation_work.h"
+        "${CMAKE_CURRENT_SOURCE_DIR}/tests/work/work_counts.h")
     set(MEM05_NATIVE_OUTPUTS)
     set(MEM05_SOURCES_0)
     foreach(mem05_source IN LISTS MEM05_NATIVE_INPUTS)
@@ -4423,7 +4429,8 @@ if(MICROS_BUILD_HOST_TESTS)
         kernel/tty/tty_handoff_runtime.h
         kernel/tty/tty_handoff_runtime_internal.h
         kernel/vm/vm_snapshot.h
-        lib/runtime/memory.h)
+        lib/runtime/memory.h
+        tests/qemu/vm_validation_work.h tests/work/work_counts.h)
     set(BOOT01_NATIVE_DEPENDENCIES ${BOOT01_NATIVE_INPUTS} ${BOOT01_NATIVE_HEADERS})
     list(TRANSFORM BOOT01_NATIVE_DEPENDENCIES PREPEND "${CMAKE_CURRENT_SOURCE_DIR}/")
     set(BOOT01_NATIVE_OUTPUTS)
@@ -4495,6 +4502,85 @@ if(MICROS_BUILD_HOST_TESTS)
         "$<TARGET_FILE:indexed_bootstrap_ordinary>")
     set_tests_properties(indexed-bootstrap PROPERTIES LABELS slow)
     add_dependencies(test-unit indexed_bootstrap_ordinary indexed_bootstrap_test)
+
+    set(VM01_NATIVE_ROOT "${CMAKE_BINARY_DIR}/selected-vm")
+    set(VM01_NATIVE_INPUTS
+        ${MICROS_VM_HANDOFF_CORE_SOURCES} kernel/vm/vm_bootstrap.c
+        ${MICROS_VM_BOOT_VALIDATION_SOURCES} ${MICROS_SPAWN_REQUEST_SOURCES}
+        ${MICROS_VM_IMAGE_SOURCES} ${MICROS_VM_CORE_SOURCES} ${MICROS_VM_SERVICE_CORE_SOURCES})
+    set(VM01_NATIVE_HEADERS
+        include/micros/bootstrap.h include/micros/endpoint.h include/micros/frame_allocator.h
+        include/micros/frame_ownership.h include/micros/grant.h include/micros/ipc.h
+        include/micros/kernel_objects.h include/micros/runtime.h include/micros/spawn.h
+        include/micros/sv39.h include/micros/syscall_abi.h include/micros/tty.h
+        include/micros/user_address_space.h include/micros/user_address_space_core.h
+        include/micros/user_context.h include/micros/vm.h include/micros/vm_bootstrap.h
+        include/micros/vm_service.h include/micros/work_observation.h
+        kernel/vm/vm_handoff_core.h kernel/vm/vm_handoff_internal.h
+        lib/spawn/spawn_request.h lib/vm/vm_boot_internal.h servers/vm/vm_core.h servers/vm/vm_image.h
+        servers/vm/vm_image_internal.h servers/vm/vm_internal.h servers/vm/vm_admission.h
+        servers/vm/vm_service_core.h servers/vm/vm_service_internal.h
+        tests/qemu/vm_validation_work.h tests/work/work_counts.h)
+    set(VM01_NATIVE_DEPENDENCIES ${VM01_NATIVE_INPUTS} ${VM01_NATIVE_HEADERS})
+    list(TRANSFORM VM01_NATIVE_DEPENDENCIES PREPEND "${CMAKE_CURRENT_SOURCE_DIR}/")
+    set(VM01_NATIVE_OUTPUTS)
+    foreach(vm01_channel IN ITEMS ordinary work)
+        set(VM01_SOURCES_${vm01_channel})
+        foreach(vm01_source IN LISTS VM01_NATIVE_INPUTS)
+            list(APPEND VM01_SOURCES_${vm01_channel}
+                "${VM01_NATIVE_ROOT}/${vm01_channel}/${vm01_source}")
+        endforeach()
+        list(APPEND VM01_NATIVE_OUTPUTS ${VM01_SOURCES_${vm01_channel}})
+        foreach(vm01_header IN LISTS VM01_NATIVE_HEADERS)
+            list(APPEND VM01_NATIVE_OUTPUTS "${VM01_NATIVE_ROOT}/${vm01_channel}/${vm01_header}")
+        endforeach()
+    endforeach()
+    add_custom_command(
+        OUTPUT ${VM01_NATIVE_OUTPUTS}
+        COMMAND "${MICROS_PYTHON}" ${MICROS_PYTHON_ARGS}
+            "${CMAKE_CURRENT_SOURCE_DIR}/tools/generate_selected_vm_fixture.py"
+        DEPENDS ${VM01_NATIVE_DEPENDENCIES}
+            tests/host/selected_vm_test.c
+            tests/host/vm_core_test_fixture.c tests/host/vm_core_test_internal.h
+            tests/host/vm_handoff_test_fixture.c tests/host/vm_handoff_test_internal.h
+            tests/host/vm_service_test_fixture.c tests/host/vm_service_test_internal.h
+            tests/host/selected_vm_evidence.py tests/host/selected_vm_source.py
+            tests/host/native_observations.py tests/host/native_observations.json
+            tests/host/source_snapshot.py tests/host/c_source_records.py
+            tests/host/work_count_lexical.py tests/host/work_count_projection.py
+            tests/host/work_count_types.py tools/generate_selected_vm_fixture.py
+        WORKING_DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}"
+        VERBATIM
+    )
+    set(VM01_FIXTURES tests/host/selected_vm_test.c tests/host/vm_core_test_fixture.c
+        tests/host/vm_handoff_test_fixture.c tests/host/vm_service_test_fixture.c)
+    add_executable(selected_vm_ordinary ${VM01_SOURCES_ordinary} ${VM01_FIXTURES})
+    add_executable(selected_vm_test ${VM01_SOURCES_work} ${VM01_FIXTURES} tests/work/work_counts.c)
+    foreach(vm01_channel IN ITEMS ordinary work)
+        if(vm01_channel STREQUAL ordinary)
+            set(vm01_target selected_vm_ordinary)
+        else()
+            set(vm01_target selected_vm_test)
+        endif()
+        target_include_directories(${vm01_target} PRIVATE
+            "${VM01_NATIVE_ROOT}/${vm01_channel}" "${VM01_NATIVE_ROOT}/${vm01_channel}/include"
+            "${CMAKE_CURRENT_SOURCE_DIR}" "${CMAKE_CURRENT_SOURCE_DIR}/include")
+        target_compile_features(${vm01_target} PRIVATE c_std_17)
+        target_compile_options(${vm01_target} PRIVATE
+            -Wall -Wextra -Werror -Wpedantic -Wmissing-prototypes -Wstrict-prototypes -fno-builtin)
+        if(MICROS_ENABLE_SANITIZERS AND CMAKE_C_COMPILER_ID MATCHES "Clang|GNU")
+            target_compile_options(${vm01_target} PRIVATE -fno-omit-frame-pointer -fsanitize=address,undefined)
+            target_link_options(${vm01_target} PRIVATE -fsanitize=address,undefined)
+        endif()
+    endforeach()
+    target_compile_definitions(selected_vm_test PRIVATE
+        MICROS_TEST_WORK_COUNTS=1 MICROS_TEST_VM_COMMAND_COUNTS=1 MICROS_SELECTED_VM_LAUNCHER=1
+        "MICROS_SELECTED_VM_PYTHON=\"${MICROS_PYTHON}\""
+        "MICROS_SELECTED_VM_DRIVER=\"${CMAKE_CURRENT_SOURCE_DIR}/tools/check_selected_vm.py\""
+        "MICROS_SELECTED_VM_ROOT=\"${CMAKE_CURRENT_SOURCE_DIR}\"")
+    add_test(NAME selected-vm COMMAND selected_vm_test "$<TARGET_FILE:selected_vm_ordinary>")
+    set_tests_properties(selected-vm PROPERTIES LABELS slow)
+    add_dependencies(test-unit selected_vm_ordinary selected_vm_test)
 
     include("${CMAKE_CURRENT_SOURCE_DIR}/tests/stack/StackEvidence.cmake")
     include("${CMAKE_CURRENT_SOURCE_DIR}/tests/work/WorkCounts.cmake")
@@ -5133,7 +5219,10 @@ if(
                 micros_vm_server
                 PRIVATE
                     MICROS_BUILD_ELF_SPAWN_TEST=1
+                    MICROS_TEST_WORK_COUNTS=1
+                    MICROS_TEST_VM_COMMAND_COUNTS=1
             )
+            target_sources(micros_vm_server PRIVATE tests/qemu/selected_vm_work.c tests/work/work_counts.c)
         elseif(MICROS_BUILD_VFS_SERVICE_TEST)
             target_compile_definitions(
                 micros_vm_server
@@ -5943,7 +6032,11 @@ if(MICROS_BUILD_ELF_SPAWN_TEST)
         micros_elf_spawn_init
         micros_elf_spawn_child
     )
-    target_compile_definitions(micros PRIVATE MICROS_BUILD_ELF_SPAWN_TEST=1)
+    target_compile_definitions(micros PRIVATE
+        MICROS_BUILD_ELF_SPAWN_TEST=1 MICROS_TEST_WORK_COUNTS=1 MICROS_TEST_VM_COMMAND_COUNTS=1)
+    set_source_files_properties(
+        arch/riscv64/uart.c lib/runtime/memory.c kernel/diagnostic/diagnostic_history_core.c
+        PROPERTIES COMPILE_OPTIONS "-UMICROS_TEST_WORK_COUNTS")
     target_sources(
         micros
         PRIVATE
@@ -5955,6 +6048,8 @@ if(MICROS_BUILD_ELF_SPAWN_TEST)
             kernel/tests/spawn/elf_spawn_test_services.c
             kernel/tests/spawn/elf_spawn_test_service_checks.c
             kernel/tests/spawn/elf_spawn_test_report.c
+            tests/qemu/vm_command_work.c
+            tests/work/work_counts.c
             ${MICROS_ELF_SPAWN_RESOURCE_SOURCES}
     )
 endif()
@@ -6613,6 +6708,8 @@ if(MICROS_BUILD_ELF_SPAWN_TEST)
             --marker "MICROS_TRAP_READY"
             --marker
             "MICROS_ELF_SPAWN_TEST_PASS services=production init=dynamic rollback=post-freeze arguments=validated descriptors=inherited io=two-hop exit=normal wait=one-shot resources=baseline"
+            --require-current-evidence selected-vm
+            --report-transcript
             --require-fdt-events
             --require-fdt-reservations
             --require-trap-ready

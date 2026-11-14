@@ -141,6 +141,10 @@ static bool prepare_handed_off_vm(
     micros_vm_handoff_commit_prevalidated(
         &scenario->context->runtime_vm
     );
+    EXPECT_TRUE(micros_pm_control_runtime_validate_vm_reservation(
+        &scenario->state, &scenario->objects, &scenario->context->runtime_ownership,
+        &scenario->context->runtime_vm
+    ) == MICROS_PM_CONTROL_OK);
     return true;
 }
 
@@ -179,6 +183,10 @@ static bool begin_runtime_load(
         &scenario->context->runtime_vm,
         &begin
     );
+    EXPECT_TRUE(micros_pm_control_runtime_validate_vm_reservation(
+        &scenario->state, &scenario->objects, &scenario->context->runtime_ownership,
+        &scenario->context->runtime_vm
+    ) == MICROS_PM_CONTROL_OK);
     EXPECT_TRUE(
         micros_pm_control_runtime_validate_reservation(
             &scenario->state,
@@ -377,7 +385,25 @@ static bool validate_frozen_runtime(
             &scenario->context->runtime_vm
         ) == MICROS_PM_CONTROL_ERROR_STATE
     );
+    EXPECT_TRUE(micros_pm_control_runtime_validate_vm_reservation(
+        &scenario->state, &scenario->objects, &scenario->context->runtime_ownership,
+        &scenario->context->runtime_vm
+    ) == MICROS_PM_CONTROL_OK);
+    scenario->context->runtime_vm.mappings[MICROS_PROCESS_CAPACITY - 1].entry_count = 255;
+    EXPECT_TRUE(micros_pm_control_runtime_validate_vm_reservation(
+        &scenario->state, &scenario->objects, &scenario->context->runtime_ownership,
+        &scenario->context->runtime_vm
+    ) == MICROS_PM_CONTROL_OK);
+    EXPECT_TRUE(micros_pm_control_runtime_validate_reservation(
+        &scenario->state, &scenario->objects, &scenario->context->runtime_ownership,
+        &scenario->context->runtime_vm
+    ) == MICROS_PM_CONTROL_ERROR_INVARIANT);
+    scenario->context->runtime_vm.mappings[MICROS_PROCESS_CAPACITY - 1].entry_count = 0;
     process->address_space_root += MICROS_FRAME_SIZE;
+    EXPECT_TRUE(micros_pm_control_runtime_validate_vm_reservation(
+        &scenario->state, &scenario->objects, &scenario->context->runtime_ownership,
+        &scenario->context->runtime_vm
+    ) == MICROS_PM_CONTROL_ERROR_INVARIANT);
     EXPECT_TRUE(
         micros_pm_control_runtime_validate_reservation(
             &scenario->state,
@@ -429,6 +455,10 @@ static bool validate_activated_pending_runtime(
     scenario->state.active_transaction = 0;
     scenario->state.reserved_process =
         (struct micros_process_handle){0};
+    EXPECT_TRUE(micros_pm_control_runtime_validate_vm_reservation(
+        &scenario->state, &scenario->objects, &scenario->context->runtime_ownership,
+        &scenario->context->runtime_vm
+    ) == MICROS_PM_CONTROL_OK);
     EXPECT_TRUE(
         micros_pm_control_runtime_validate_reservation(
             &scenario->state,

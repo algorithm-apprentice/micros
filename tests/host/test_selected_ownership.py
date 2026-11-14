@@ -84,7 +84,7 @@ class SelectedOwnershipObservationTest(unittest.TestCase):
         with mock.patch.object(source, "baseline_source", side_effect=AssertionError("historical audit input"), create=True):
             measured = source.measure_audit_boundaries(ROOT, Stage.GREEN)
         self.assertEqual(8, sum(row[-1] for row in measured["complete"]))
-        self.assertEqual(18, len(measured["selected"]))
+        self.assertEqual(19, len(measured["selected"]))
 
     def test_current_work_preserves_pm_counts_without_a_historical_product(self):
         from tests.host.selected_ownership_evidence import _work_failures, expected_cases

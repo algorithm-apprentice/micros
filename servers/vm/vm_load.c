@@ -152,10 +152,14 @@ static enum micros_vm_core_error vm_load_prepare_transaction(
         return error;
     }
     page_count = elf_plan.page_count + 1;
-    if (!vm_core_select_lowest_frames(
+    error = vm_core_select_lowest_frames(
         state, MICROS_VM_MAPPING_RECORD_CAPACITY, page_count, table_frames, data_frames
-    )) {
+    );
+    if (error == MICROS_VM_CORE_ERROR_NO_SPACE) {
         return vm_core_prepare_failure(state, MICROS_VM_CORE_ERROR_NO_SPACE);
+    }
+    if (error != MICROS_VM_CORE_OK) {
+        return error;
     }
     vm_core_zero_bytes(&candidate, sizeof(candidate));
     candidate.process_reservation_token = process_reservation_token;
@@ -201,11 +205,7 @@ enum micros_vm_core_error micros_vm_load_prepare(
     ) {
         return MICROS_VM_CORE_ERROR_ARGUMENT;
     }
-    error = vm_core_validate_state(
-        state,
-        executable_bytes == state->executable_bytes
-            || request_bytes == state->request_bytes
-    );
+    error = vm_core_validate_selected_state(state);
     if (error != MICROS_VM_CORE_OK) {
         return error;
     }
@@ -225,7 +225,7 @@ enum micros_vm_core_error micros_vm_load_prepare(
     if (error != MICROS_VM_CORE_OK) {
         return error;
     }
-    return vm_core_validate_state(state, false);
+    return MICROS_VM_CORE_OK;
 }
 
 static bool load_record_identity_is_available(
@@ -327,7 +327,7 @@ enum micros_vm_core_error micros_vm_load_bind(
 )
 {
     struct micros_vm_mapping_record candidate;
-    enum micros_vm_core_error error = vm_core_validate_state(state, false);
+    enum micros_vm_core_error error = vm_core_validate_selected_state(state);
     size_t index;
 
     if (error != MICROS_VM_CORE_OK) {
@@ -337,9 +337,16 @@ enum micros_vm_core_error micros_vm_load_bind(
         state->phase != MICROS_VM_LOADER_INPUT_COPIED
         || !vm_core_process_is_canonical(process)
         || load_token == 0
-        || !vm_core_record_is_zero(&state->mapping_records[process.slot])
-        || !load_record_identity_is_available(state, load_token)
     ) {
+        return MICROS_VM_CORE_ERROR_STATE;
+    }
+    if (!vm_core_record_headers_are_valid(state)
+        || (state->mapping_records[process.slot].phase == MICROS_VM_MAPPING_RECORD_UNUSED
+            && !vm_core_record_is_zero(&state->mapping_records[process.slot]))) {
+        return MICROS_VM_CORE_ERROR_INVARIANT;
+    }
+    if (!vm_core_record_is_zero(&state->mapping_records[process.slot])
+        || !load_record_identity_is_available(state, load_token)) {
         return MICROS_VM_CORE_ERROR_STATE;
     }
     vm_core_zero_bytes(&candidate, sizeof(candidate));
@@ -370,7 +377,7 @@ enum micros_vm_core_error micros_vm_load_bind(
     state->transaction.process.generation = process.generation;
     state->transaction.load_token = load_token;
     state->phase = MICROS_VM_LOADER_LOADING;
-    return vm_core_validate_state(state, false);
+    return MICROS_VM_CORE_OK;
 }
 
 enum micros_vm_core_error micros_vm_load_next_page(
@@ -379,7 +386,7 @@ enum micros_vm_core_error micros_vm_load_next_page(
 )
 {
     struct micros_vm_load_page_action candidate;
-    enum micros_vm_core_error error = vm_core_validate_state(state, false);
+    enum micros_vm_core_error error = vm_core_validate_selected_state(state);
     size_t page_index;
 
     if (action == NULL) {
@@ -425,7 +432,7 @@ enum micros_vm_core_error micros_vm_load_scratch_mapped(
     uint32_t page_index
 )
 {
-    enum micros_vm_core_error error = vm_core_validate_state(state, false);
+    enum micros_vm_core_error error = vm_core_validate_selected_state(state);
     uint64_t frame_index;
 
     if (error != MICROS_VM_CORE_OK) {
@@ -449,7 +456,7 @@ enum micros_vm_core_error micros_vm_load_scratch_mapped(
     state->boot_info->frame_states[frame_index] =
         MICROS_VM_LOCAL_FRAME_TRANSFERABLE;
     state->transaction.scratch_page = page_index + 1;
-    return vm_core_validate_state(state, false);
+    return MICROS_VM_CORE_OK;
 }
 
 enum micros_vm_core_error micros_vm_load_fill_scratch(
@@ -460,7 +467,7 @@ enum micros_vm_core_error micros_vm_load_fill_scratch(
 )
 {
     struct micros_application_stack_plan stack_plan;
-    enum micros_vm_core_error error = vm_core_validate_state(state, false);
+    enum micros_vm_core_error error = vm_core_validate_selected_state(state);
 
     if (
         state == NULL
@@ -539,7 +546,7 @@ enum micros_vm_core_error micros_vm_load_fill_scratch(
         }
     }
     state->transaction.scratch_filled = 1;
-    return vm_core_validate_state(state, false);
+    return MICROS_VM_CORE_OK;
 }
 
 enum micros_vm_core_error micros_vm_load_scratch_committed(
@@ -547,7 +554,7 @@ enum micros_vm_core_error micros_vm_load_scratch_committed(
     uint32_t page_index
 )
 {
-    enum micros_vm_core_error error = vm_core_validate_state(state, false);
+    enum micros_vm_core_error error = vm_core_validate_selected_state(state);
     uint64_t frame_index;
 
     if (error != MICROS_VM_CORE_OK) {
@@ -571,7 +578,7 @@ enum micros_vm_core_error micros_vm_load_scratch_committed(
     state->transaction.scratch_page = 0;
     state->transaction.scratch_filled = 0;
     ++state->transaction.completed_page_count;
-    return vm_core_validate_state(state, false);
+    return MICROS_VM_CORE_OK;
 }
 
 enum micros_vm_core_error micros_vm_load_freeze_plan(
@@ -580,7 +587,7 @@ enum micros_vm_core_error micros_vm_load_freeze_plan(
 )
 {
     struct micros_vm_freeze_plan candidate;
-    enum micros_vm_core_error error = vm_core_validate_state(state, false);
+    enum micros_vm_core_error error = vm_core_validate_selected_state(state);
 
     if (plan == NULL) {
         return MICROS_VM_CORE_ERROR_ARGUMENT;
@@ -620,7 +627,7 @@ enum micros_vm_core_error micros_vm_load_frozen(
     uint64_t mapping_generation
 )
 {
-    enum micros_vm_core_error error = vm_core_validate_state(state, false);
+    enum micros_vm_core_error error = vm_core_validate_selected_state(state);
     struct micros_vm_mapping_record *record;
     size_t index;
 
@@ -702,7 +709,7 @@ enum micros_vm_core_error micros_vm_load_frozen(
     record->mapping_generation = mapping_generation;
     record->phase = MICROS_VM_MAPPING_RECORD_FROZEN;
     state->phase = MICROS_VM_LOADER_FROZEN;
-    return vm_core_validate_state(state, false);
+    return MICROS_VM_CORE_OK;
 }
 
 enum micros_vm_core_error micros_vm_load_aborted(
@@ -711,7 +718,7 @@ enum micros_vm_core_error micros_vm_load_aborted(
     uint64_t mapping_generation
 )
 {
-    enum micros_vm_core_error error = vm_core_validate_state(state, false);
+    enum micros_vm_core_error error = vm_core_validate_selected_state(state);
     size_t index;
 
     if (error != MICROS_VM_CORE_OK) {
@@ -723,7 +730,7 @@ enum micros_vm_core_error micros_vm_load_aborted(
         }
         vm_core_clear_transaction(state);
         state->phase = MICROS_VM_LOADER_IDLE;
-        return vm_core_validate_state(state, false);
+        return MICROS_VM_CORE_OK;
     }
     if (
         (
@@ -743,30 +750,18 @@ enum micros_vm_core_error micros_vm_load_aborted(
     ) {
         uint64_t frame_index;
 
-        if (
-            !vm_core_physical_to_frame_index(
-                state,
-                state->transaction.table_frames[index],
-                &frame_index
-            )
-        ) {
-            return MICROS_VM_CORE_ERROR_INVARIANT;
-        }
+        (void)vm_core_physical_to_frame_index(
+            state, state->transaction.table_frames[index], &frame_index
+        );
         state->boot_info->frame_states[frame_index] =
             MICROS_VM_LOCAL_FRAME_FREE;
     }
     for (index = 0; index < state->transaction.page_count; ++index) {
         uint64_t frame_index;
 
-        if (
-            !vm_core_physical_to_frame_index(
-                state,
-                state->transaction.data_frames[index],
-                &frame_index
-            )
-        ) {
-            return MICROS_VM_CORE_ERROR_INVARIANT;
-        }
+        (void)vm_core_physical_to_frame_index(
+            state, state->transaction.data_frames[index], &frame_index
+        );
         state->boot_info->frame_states[frame_index] =
             MICROS_VM_LOCAL_FRAME_FREE;
     }
@@ -776,7 +771,7 @@ enum micros_vm_core_error micros_vm_load_aborted(
     );
     vm_core_clear_transaction(state);
     state->phase = MICROS_VM_LOADER_IDLE;
-    return vm_core_validate_state(state, false);
+    return MICROS_VM_CORE_OK;
 }
 
 enum micros_vm_core_error micros_vm_load_committed(
@@ -786,7 +781,7 @@ enum micros_vm_core_error micros_vm_load_committed(
     uint64_t semantic_pid
 )
 {
-    enum micros_vm_core_error error = vm_core_validate_state(state, false);
+    enum micros_vm_core_error error = vm_core_validate_selected_state(state);
     struct micros_vm_mapping_record *record;
 
     if (error != MICROS_VM_CORE_OK) {
@@ -806,5 +801,5 @@ enum micros_vm_core_error micros_vm_load_committed(
     record->phase = MICROS_VM_MAPPING_RECORD_ACTIVE;
     vm_core_clear_transaction(state);
     state->phase = MICROS_VM_LOADER_IDLE;
-    return vm_core_validate_state(state, false);
+    return MICROS_VM_CORE_OK;
 }

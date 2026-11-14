@@ -136,7 +136,7 @@ bool vm_core_physical_is_in_record_other_than(
     return false;
 }
 
-bool vm_core_select_lowest_frames(
+enum micros_vm_core_error vm_core_select_lowest_frames(
     const struct micros_vm_state *state,
     size_t ignored_slot,
     size_t data_count,
@@ -153,7 +153,10 @@ bool vm_core_select_lowest_frames(
         data_count == 0
         || data_count > MICROS_APPLICATION_RESIDENT_PAGE_MAX
     ) {
-        return false;
+        return MICROS_VM_CORE_ERROR_ARGUMENT;
+    }
+    if (!vm_core_record_headers_are_valid(state)) {
+        return MICROS_VM_CORE_ERROR_INVARIANT;
     }
     for (
         frame_index = 0;
@@ -163,15 +166,14 @@ bool vm_core_select_lowest_frames(
         uint64_t physical_address;
         bool ignored_record_frame = false;
 
-        if (
-            !vm_core_initial_frame_is_free(state, frame_index)
-            || !vm_core_frame_index_to_physical(
-                state,
-                frame_index,
-                &physical_address
-            )
-        ) {
+        if (!vm_core_initial_frame_is_free(state, frame_index)) {
             continue;
+        }
+        if (!vm_core_frame_index_to_physical(state, frame_index, &physical_address)
+            || (state->boot_info->frame_states[frame_index] != MICROS_VM_LOCAL_FRAME_FREE
+                && (state->boot_info->frame_states[frame_index] < MICROS_VM_LOCAL_FRAME_TRANSFERABLE
+                    || state->boot_info->frame_states[frame_index] > MICROS_VM_LOCAL_FRAME_PROCESS_PAGE_TABLE))) {
+            return MICROS_VM_CORE_ERROR_INVARIANT;
         }
         if (
             ignored_slot < MICROS_VM_MAPPING_RECORD_CAPACITY
@@ -204,7 +206,7 @@ bool vm_core_select_lowest_frames(
                 ignored_slot
             )
         ) {
-            return false;
+            return MICROS_VM_CORE_ERROR_INVARIANT;
         }
         if (selected_count < MICROS_VM_PAGE_TABLE_FRAME_COUNT) {
             table_frames[selected_count] = physical_address;
@@ -215,10 +217,10 @@ bool vm_core_select_lowest_frames(
         }
         ++selected_count;
         if (selected_count == required_count) {
-            return true;
+            return MICROS_VM_CORE_OK;
         }
     }
-    return false;
+    return MICROS_VM_CORE_ERROR_NO_SPACE;
 }
 
 bool vm_core_selected_frames_match(
@@ -230,13 +232,13 @@ bool vm_core_selected_frames_match(
     uint64_t data_frames[MICROS_APPLICATION_RESIDENT_PAGE_MAX] = {0};
     size_t index;
 
-    if (!vm_core_select_lowest_frames(
+    if (vm_core_select_lowest_frames(
         state,
         ignored_slot,
         state->transaction.page_count,
         table_frames,
         data_frames
-    )) {
+    ) != MICROS_VM_CORE_OK) {
         return false;
     }
     for (

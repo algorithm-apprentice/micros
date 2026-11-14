@@ -264,6 +264,25 @@ within its existing scope.
 
 ## Validation planning
 
+VM01's focused full-tier native pair uses the existing complete VM fixtures
+and actual service/kernel C, with ordinary/observed agreement and independent
+work bounds:
+
+```bash
+cmake --preset host-debug
+cmake --build build/host-debug --target selected_vm_ordinary selected_vm_test
+ctest --test-dir build/host-debug --output-on-failure -R '^selected-vm$'
+```
+
+The existing `test-qemu-elf-spawn` workflow also owns VM01's dynamic
+operation-12 and VM-service work capture. Its two complete producer
+snapshots come from that same guest, after the original rollback,
+exit/wait and resource checks; no second guest is launched.
+The host requires all seven kernel and four service command classes and
+zero ordinary complete VM/BOOT/PM audits. Cold handoff/TTY validation is
+outside that capture. Source/producer ownership and the original stack,
+image and serial boundaries remain required.
+
 Generate a changed-path plan with:
 
 ```bash
@@ -666,8 +685,9 @@ PY
 Stage the complete candidate first. This uses the ordinary build seals,
 passivity checks and real linked proof; it does not publish the complete
 certificate, run the ten observed scopes, or satisfy the full author gate.
-Select `riscv64-panic-trace-test` instead of `riscv64-debug` in this same
-development command to check the closed trace fixture.
+Select `riscv64-panic-trace-test` or `riscv64-elf-spawn-test` instead of
+`riscv64-debug` in this same development command to check the closed trace
+fixture or the composed VM lifecycle images, respectively.
 
 For a focused observed bootstrap/TTY reporting check, use the existing
 sealed observed-profile builder and runner:

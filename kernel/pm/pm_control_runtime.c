@@ -1,9 +1,11 @@
 #include "kernel/pm/pm_control_runtime.h"
+#include "tests/qemu/vm_validation_work.h"
 
 #include <stddef.h>
 #include <stdint.h>
 
 #include "kernel/pm/pm_control_runtime_core.h"
+#include "kernel/pm/pm_control_internal.h"
 #include "kernel/vm/vm_handoff_runtime.h"
 #include "micros/frame_ownership_runtime.h"
 
@@ -148,6 +150,8 @@ enum micros_pm_control_error micros_pm_control_runtime_validate(
     const struct micros_kernel_objects *objects
 )
 {
+    MICROS_VM01_WORK_HIT("vm01-pm-runtime", MICROS_WORK_OWNER_KERNEL_PM,
+                        MICROS_WORK_KIND_COMPLETE_VALIDATOR_CALL, 1);
     const struct micros_bootstrap_binding *binding;
     const struct micros_bootstrap_manifest_entry *entry;
     const struct micros_privilege_profile *profile;
@@ -237,6 +241,49 @@ enum micros_pm_control_error micros_pm_control_runtime_validate(
             2
         ) != MICROS_ENDPOINT_OK
     ) {
+        return MICROS_PM_CONTROL_ERROR_INVARIANT;
+    }
+    return MICROS_PM_CONTROL_OK;
+}
+
+enum micros_pm_control_error micros_pm_control_runtime_validate_vm_command(
+    const struct micros_bootstrap_control_state *bootstrap,
+    const struct micros_endpoint_registry *registry,
+    const struct micros_kernel_objects *objects
+)
+{
+    MICROS_VM01_WORK_HIT("vm01-pm-selected", MICROS_WORK_OWNER_KERNEL_PM,
+                        MICROS_WORK_KIND_INDEX_PROBE, 1);
+    const struct micros_frame_ownership *ownership = micros_frame_ownership_runtime_ledger();
+    const struct micros_vm_handoff_state *vm = micros_vm_handoff_runtime_state();
+    const struct micros_privilege_profile *profile;
+    struct micros_bootstrap_service_selection selected;
+    struct micros_frame_owner root;
+
+    if (ownership == NULL || ownership->phase != MICROS_FRAME_OWNERSHIP_PHASE_HANDED_OFF
+        || micros_pm_control_runtime_validate_vm_reservation(&control_state, objects, ownership, vm)
+            != MICROS_PM_CONTROL_OK
+        || micros_bootstrap_control_select_sealed_service(
+            bootstrap, registry, objects, control_state.service_id, &selected
+        ) != MICROS_BOOTSTRAP_OK
+        || bootstrap->plan.pm_service_id != control_state.service_id
+        || selected.manifest->role_flags != MICROS_BOOTSTRAP_ROLE_PM
+        || selected.manifest->profile_id != control_state.profile_id
+        || selected.binding->endpoint != control_state.endpoint
+        || !process_handles_equal(selected.binding->process, control_state.process)
+        || !thread_handles_equal(selected.binding->thread, control_state.thread)
+        || micros_privilege_profile_resolve(registry, (uint8_t)control_state.profile_id, &profile)
+            != MICROS_ENDPOINT_OK
+        || profile->kernel_operations != MICROS_KERNEL_OPERATION_PM_CONTROL
+        || micros_privilege_profile_allows_kernel_operation(
+            registry, (uint8_t)control_state.profile_id, 2
+        ) != MICROS_ENDPOINT_OK
+        || micros_frame_ownership_lookup(ownership, selected.binding->root, &root) != MICROS_FRAME_OWNERSHIP_OK
+        || root.kind != MICROS_FRAME_OWNER_PROCESS_PAGE_TABLE || root.reserved != 0
+        || root.slot != control_state.process.slot || root.generation != control_state.process.generation
+        || (control_state.prepared.token != 0
+            && (!micros_pm_control_application_profile_is_exact(registry)
+                || !micros_pm_control_vm_prepared_binding_is_valid(&control_state, objects, registry, vm)))) {
         return MICROS_PM_CONTROL_ERROR_INVARIANT;
     }
     return MICROS_PM_CONTROL_OK;

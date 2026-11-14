@@ -1,4 +1,6 @@
 #include "kernel/pm/pm_control_runtime_core.h"
+#include "kernel/pm/pm_control_internal.h"
+#include "kernel/vm/vm_handoff_internal.h"
 
 #include <stdbool.h>
 #include <stddef.h>
@@ -63,7 +65,7 @@ static bool frame_has_process_owner(
     );
 }
 
-static bool frozen_vm_reservation_is_valid(
+static bool frozen_vm_reservation_relation_is_valid(
     const struct micros_pm_control_state *state,
     const struct micros_process *process,
     const struct micros_frame_ownership *ownership,
@@ -76,8 +78,6 @@ static bool frozen_vm_reservation_is_valid(
 
     if (
         vm == NULL
-        || micros_vm_handoff_state_validate(vm)
-            != MICROS_VM_HANDOFF_OK
         || vm->phase != MICROS_VM_HANDOFF_PHASE_HANDED_OFF
         || vm->load.phase != MICROS_VM_LOAD_PHASE_FROZEN
         || vm->load.process_reservation_token
@@ -148,7 +148,7 @@ static bool frozen_vm_reservation_is_valid(
     return true;
 }
 
-static bool prepared_vm_reservation_is_valid(
+static bool prepared_vm_reservation_relation_is_valid(
     const struct micros_pm_control_state *state,
     const struct micros_process *process,
     const struct micros_frame_ownership *ownership,
@@ -162,8 +162,6 @@ static bool prepared_vm_reservation_is_valid(
     if (
         state->prepared.token == 0
         || vm == NULL
-        || micros_vm_handoff_state_validate(vm)
-            != MICROS_VM_HANDOFF_OK
         || vm->phase != MICROS_VM_HANDOFF_PHASE_HANDED_OFF
         || vm->load.phase != MICROS_VM_LOAD_PHASE_FROZEN
         || vm->load.process_reservation_token
@@ -231,7 +229,7 @@ static bool prepared_vm_reservation_is_valid(
     return true;
 }
 
-static bool loading_vm_reservation_is_valid(
+static bool loading_vm_reservation_relation_is_valid(
     const struct micros_pm_control_state *state,
     const struct micros_vm_handoff_state *vm
 )
@@ -240,8 +238,6 @@ static bool loading_vm_reservation_is_valid(
 
     if (
         vm == NULL
-        || micros_vm_handoff_state_validate(vm)
-            != MICROS_VM_HANDOFF_OK
         || vm->phase != MICROS_VM_HANDOFF_PHASE_HANDED_OFF
         || vm->load.phase != MICROS_VM_LOAD_PHASE_LOADING
         || vm->load.process_reservation_token
@@ -265,7 +261,7 @@ static bool loading_vm_reservation_is_valid(
     );
 }
 
-static bool activated_pending_vm_load_is_valid(
+static bool activated_pending_vm_load_relation_is_valid(
     const struct micros_pm_control_state *state,
     const struct micros_vm_handoff_state *vm
 )
@@ -274,8 +270,6 @@ static bool activated_pending_vm_load_is_valid(
 
     if (
         vm == NULL
-        || micros_vm_handoff_state_validate(vm)
-            != MICROS_VM_HANDOFF_OK
         || state->active_transaction != 0
         || vm->phase != MICROS_VM_HANDOFF_PHASE_HANDED_OFF
         || vm->load.phase != MICROS_VM_LOAD_PHASE_FROZEN
@@ -297,7 +291,7 @@ static bool activated_pending_vm_load_is_valid(
     );
 }
 
-static bool exit_vm_state_is_valid(
+static bool exit_vm_state_relation_is_valid(
     const struct micros_pm_control_state *state,
     const struct micros_process *process,
     const struct micros_frame_ownership *ownership,
@@ -311,8 +305,6 @@ static bool exit_vm_state_is_valid(
     if (
         state->exit.phase == MICROS_PM_CONTROL_EXIT_NONE
         || vm == NULL
-        || micros_vm_handoff_state_validate(vm)
-            != MICROS_VM_HANDOFF_OK
         || vm->phase != MICROS_VM_HANDOFF_PHASE_HANDED_OFF
         || vm->load.phase != MICROS_VM_LOAD_PHASE_IDLE
     ) {
@@ -394,6 +386,57 @@ static bool exit_vm_state_is_valid(
         }
     }
     return true;
+}
+
+static bool frozen_vm_reservation_is_valid(
+    const struct micros_pm_control_state *state,
+    const struct micros_process *process,
+    const struct micros_frame_ownership *ownership,
+    const struct micros_vm_handoff_state *vm
+)
+{
+    return vm != NULL && micros_vm_handoff_state_validate(vm) == MICROS_VM_HANDOFF_OK
+        && frozen_vm_reservation_relation_is_valid(state, process, ownership, vm);
+}
+
+static bool prepared_vm_reservation_is_valid(
+    const struct micros_pm_control_state *state,
+    const struct micros_process *process,
+    const struct micros_frame_ownership *ownership,
+    const struct micros_vm_handoff_state *vm
+)
+{
+    return state->prepared.token != 0 && vm != NULL
+        && micros_vm_handoff_state_validate(vm) == MICROS_VM_HANDOFF_OK
+        && prepared_vm_reservation_relation_is_valid(state, process, ownership, vm);
+}
+
+static bool loading_vm_reservation_is_valid(
+    const struct micros_pm_control_state *state, const struct micros_vm_handoff_state *vm
+)
+{
+    return vm != NULL && micros_vm_handoff_state_validate(vm) == MICROS_VM_HANDOFF_OK
+        && loading_vm_reservation_relation_is_valid(state, vm);
+}
+
+static bool activated_pending_vm_load_is_valid(
+    const struct micros_pm_control_state *state, const struct micros_vm_handoff_state *vm
+)
+{
+    return vm != NULL && micros_vm_handoff_state_validate(vm) == MICROS_VM_HANDOFF_OK
+        && activated_pending_vm_load_relation_is_valid(state, vm);
+}
+
+static bool exit_vm_state_is_valid(
+    const struct micros_pm_control_state *state,
+    const struct micros_process *process,
+    const struct micros_frame_ownership *ownership,
+    const struct micros_vm_handoff_state *vm
+)
+{
+    return state->exit.phase != MICROS_PM_CONTROL_EXIT_NONE && vm != NULL
+        && micros_vm_handoff_state_validate(vm) == MICROS_VM_HANDOFF_OK
+        && exit_vm_state_relation_is_valid(state, process, ownership, vm);
 }
 
 static bool exit_vm_state_is_shallow_valid(
@@ -591,6 +634,56 @@ micros_pm_control_runtime_validate_reservation(
         return MICROS_PM_CONTROL_OK;
     }
     return MICROS_PM_CONTROL_ERROR_INVARIANT;
+}
+
+enum micros_pm_control_error micros_pm_control_runtime_validate_vm_reservation(
+    const struct micros_pm_control_state *state,
+    const struct micros_kernel_objects *objects,
+    const struct micros_frame_ownership *ownership,
+    const struct micros_vm_handoff_state *vm
+)
+{
+    const struct micros_process *process;
+    uint64_t frame_count = 0;
+
+    if (state == NULL || objects == NULL || ownership == NULL || vm == NULL
+        || micros_pm_control_state_validate(state) != MICROS_PM_CONTROL_OK
+        || micros_process_resolve(objects, state->process, &process) != MICROS_KERNEL_OBJECT_OK
+        || micros_frame_ownership_validate_metadata(ownership) != MICROS_FRAME_OWNERSHIP_OK
+        || micros_vm_handoff_validate_selected(vm) != MICROS_VM_HANDOFF_OK
+        || vm->phase != MICROS_VM_HANDOFF_PHASE_HANDED_OFF) {
+        return MICROS_PM_CONTROL_ERROR_INVARIANT;
+    }
+    if (state->active_transaction == 0) {
+        if (state->exit.phase != MICROS_PM_CONTROL_EXIT_NONE) {
+            return micros_process_resolve(objects, state->exit.process, &process) == MICROS_KERNEL_OBJECT_OK
+                && micros_pm_control_validate_vm_objects(state, objects) == MICROS_PM_CONTROL_OK
+                && micros_vm_handoff_selected_record_is_valid(vm, state->exit.process.slot)
+                && exit_vm_state_relation_is_valid(state, process, ownership, vm)
+                ? MICROS_PM_CONTROL_OK : MICROS_PM_CONTROL_ERROR_INVARIANT;
+        }
+        return vm->load.phase == MICROS_VM_LOAD_PHASE_IDLE
+            || activated_pending_vm_load_relation_is_valid(state, vm)
+            ? MICROS_PM_CONTROL_OK : MICROS_PM_CONTROL_ERROR_INVARIANT;
+    }
+    if (micros_process_resolve(objects, state->reserved_process, &process) != MICROS_KERNEL_OBJECT_OK) {
+        return MICROS_PM_CONTROL_ERROR_INVARIANT;
+    }
+    if (state->prepared.token != 0) {
+        return micros_pm_control_validate_vm_objects(state, objects) == MICROS_PM_CONTROL_OK
+            && prepared_vm_reservation_relation_is_valid(state, process, ownership, vm)
+            ? MICROS_PM_CONTROL_OK : MICROS_PM_CONTROL_ERROR_INVARIANT;
+    }
+    if (!process_is_empty(process)) {
+        return frozen_vm_reservation_relation_is_valid(state, process, ownership, vm)
+            ? MICROS_PM_CONTROL_OK : MICROS_PM_CONTROL_ERROR_INVARIANT;
+    }
+    if (micros_frame_ownership_count_process(ownership, state->reserved_process, &frame_count)
+            != MICROS_FRAME_OWNERSHIP_OK || frame_count != 0) {
+        return MICROS_PM_CONTROL_ERROR_INVARIANT;
+    }
+    return vm->load.phase == MICROS_VM_LOAD_PHASE_IDLE || loading_vm_reservation_relation_is_valid(state, vm)
+        ? MICROS_PM_CONTROL_OK : MICROS_PM_CONTROL_ERROR_INVARIANT;
 }
 
 enum micros_pm_control_error

@@ -16,7 +16,7 @@ static enum micros_vm_handoff_error load_record_transition(
 {
     struct micros_vm_kernel_mapping_record *record;
     enum micros_vm_handoff_error error =
-        micros_vm_handoff_state_validate(state);
+        micros_vm_handoff_validate_selected(state);
 
     if (error != MICROS_VM_HANDOFF_OK) {
         return error;
@@ -106,7 +106,7 @@ enum micros_vm_handoff_error micros_vm_load_commit_preflight(
 {
     const struct micros_vm_kernel_mapping_record *record;
     enum micros_vm_handoff_error error =
-        micros_vm_handoff_state_validate(state);
+        micros_vm_handoff_validate_selected(state);
 
     if (error != MICROS_VM_HANDOFF_OK) {
         return error;

@@ -90,6 +90,19 @@ def _validate_current_evidence(scope, result, kernel):
         failures = target_failures(parse_target_output(
             reported, "test-qemu-" + scope, Stage.GREEN, result.return_code,
         ))
+    elif scope == "selected-vm":
+        from tests.host.vm_command_evidence import (
+            parse_target_output, target_failures, validate_target_observations, validate_target_products,
+        )
+        from tools.stack_bound_manifest import owned_artifact
+
+        root = Path(__file__).resolve().parents[1]
+        if Path(kernel).absolute() != owned_artifact(root, "build/riscv64-elf-spawn-test/kernel/micros.elf"):
+            raise ValueError("VM01 evidence borrowed another configured kernel")
+        validate_target_observations(root)
+        failures = target_failures(parse_target_output(reported, result.return_code))
+        if not failures:
+            validate_target_products(root)
     else:
         raise ValueError("unknown current target evidence scope")
     if failures:

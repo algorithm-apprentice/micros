@@ -52,6 +52,7 @@ OWNER_IMPORTS = {
         "tests.host.selected_ipc_validation_evidence",
         "tests.host.bootstrap_command_evidence", "tests.host.bootstrap_command_source",
         "tests.host.indexed_bootstrap_evidence",
+        "tests.host.vm_command_evidence",
         "tools.stack_bound_manifest",
         "tools.qemu_smoke_faults",
     },

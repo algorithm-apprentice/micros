@@ -147,6 +147,8 @@ def native_inputs(root, family):
     }
     if family == "GRANT01" and "lib/runtime/memory.c" in members:
         headers.add("lib/runtime/memory.h")
+    if family in ("MEM04", "MEM05"):
+        headers.update(("tests/qemu/vm_validation_work.h", "tests/work/work_counts.h"))
     return tuple(sorted({*members, *headers}))
 
 

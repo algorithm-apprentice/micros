@@ -1,4 +1,5 @@
 #include "servers/vm/vm_service_internal.h"
+#include "servers/vm/vm_admission.h"
 
 #define VM_SERVICE_INITIALIZATION_MAGIC UINT64_C(0x564d5356434f5245)
 
@@ -52,7 +53,7 @@ static bool service_instance_is_valid(const struct micros_vm_service *service)
 {
     return service->initialization_magic == VM_SERVICE_INITIALIZATION_MAGIC
         && service->state != NULL && service_bindings_are_valid(&service->bindings)
-        && micros_vm_state_validate(service->state) == MICROS_VM_CORE_OK
+        && vm_core_validate_selected_state(service->state) == MICROS_VM_CORE_OK
         && service->bindings.self == service->state->boot_info->header.self_endpoint;
 }
 

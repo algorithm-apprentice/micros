@@ -23,5 +23,10 @@ enum micros_pm_control_error micros_pm_control_runtime_validate(
     const struct micros_endpoint_registry *registry,
     const struct micros_kernel_objects *objects
 );
+enum micros_pm_control_error micros_pm_control_runtime_validate_vm_command(
+    const struct micros_bootstrap_control_state *bootstrap,
+    const struct micros_endpoint_registry *registry,
+    const struct micros_kernel_objects *objects
+);
 
 #endif

@@ -186,6 +186,37 @@ bool vm_core_user_permissions_are_canonical(uint32_t permissions)
     );
 }
 
+bool vm_core_record_header_is_valid(const struct micros_vm_state *state, size_t slot)
+{
+    const struct micros_vm_mapping_record *record;
+
+    if (slot >= MICROS_VM_MAPPING_RECORD_CAPACITY) {
+        return false;
+    }
+    record = &state->mapping_records[slot];
+    if (record->phase == MICROS_VM_MAPPING_RECORD_UNUSED) {
+        return vm_core_bytes_are_zero(record, offsetof(struct micros_vm_mapping_record, entries));
+    }
+    return record->load_token != 0 && record->semantic_pid != 0
+        && record->process_slot == slot && record->process_generation != 0
+        && record->process_generation <= MICROS_PROCESS_GENERATION_MAX
+        && record->entry_count >= MICROS_VM_PAGE_TABLE_FRAME_COUNT + MICROS_APPLICATION_IMAGE_PAGE_MIN + 1
+        && record->entry_count <= MICROS_VM_MAPPING_ENTRY_CAPACITY
+        && record->phase >= MICROS_VM_MAPPING_RECORD_LOADING
+        && record->phase <= MICROS_VM_MAPPING_RECORD_EXIT_RELEASING
+        && ((record->phase == MICROS_VM_MAPPING_RECORD_LOADING) == (record->mapping_generation == 0));
+}
+
+bool vm_core_record_headers_are_valid(const struct micros_vm_state *state)
+{
+    for (size_t slot = 0; slot < MICROS_VM_MAPPING_RECORD_CAPACITY; ++slot) {
+        if (!vm_core_record_header_is_valid(state, slot)) {
+            return false;
+        }
+    }
+    return true;
+}
+
 bool vm_core_stack_plan_equal(
     const struct micros_application_stack_plan *left,
     const struct micros_application_stack_plan *right

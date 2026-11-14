@@ -115,6 +115,13 @@ enum micros_bootstrap_error micros_bootstrap_control_select_service(
     uint32_t service_id,
     struct micros_bootstrap_service_selection *selection
 );
+enum micros_bootstrap_error micros_bootstrap_control_select_sealed_service(
+    const struct micros_bootstrap_control_state *state,
+    const struct micros_endpoint_registry *registry,
+    const struct micros_kernel_objects *objects,
+    uint32_t service_id,
+    struct micros_bootstrap_service_selection *selection
+);
 
 enum micros_bootstrap_error micros_bootstrap_control_preflight_command(
     const struct micros_bootstrap_control_state *state,

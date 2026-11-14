@@ -139,6 +139,8 @@ bool micros_vm_handoff_syscall_vm_is_authorized(
         ) == MICROS_KERNEL_OBJECT_OK
         && process->primary_endpoint == state->endpoint
         && process->privilege_profile == state->profile_id
+        && state->profile_id != 0
+        && state->profile_id < MICROS_PRIVILEGE_PROFILE_CAPACITY
         && micros_endpoint_resolve_active(
             registry,
             objects,

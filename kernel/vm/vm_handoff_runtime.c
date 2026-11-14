@@ -1,6 +1,7 @@
 #include "kernel/vm/vm_handoff_runtime.h"
 #include "kernel/vm/vm_handoff_internal.h"
 #include "micros/work_observation.h"
+#include "tests/qemu/vm_validation_work.h"
 
 #include <stddef.h>
 #include <stdint.h>
@@ -117,6 +118,8 @@ enum micros_vm_handoff_error micros_vm_handoff_runtime_validate(
     MICROS_TEST_WORK_HIT("boot02-vm-runtime", MICROS_WORK_OWNER_KERNEL_VM,
                          MICROS_WORK_KIND_COMPLETE_VALIDATOR_CALL, 1);
 #endif
+    MICROS_VM01_WORK_HIT("vm01-kernel-runtime", MICROS_WORK_OWNER_KERNEL_VM,
+                        MICROS_WORK_KIND_COMPLETE_VALIDATOR_CALL, 1);
     const struct micros_bootstrap_binding *binding;
     const struct micros_bootstrap_manifest_entry *entry;
     const struct micros_process *process;
@@ -202,6 +205,44 @@ enum micros_vm_handoff_error micros_vm_handoff_runtime_validate(
             1
         ) != MICROS_ENDPOINT_OK
     ) {
+        return MICROS_VM_HANDOFF_ERROR_INVARIANT;
+    }
+    return MICROS_VM_HANDOFF_OK;
+}
+
+enum micros_vm_handoff_error micros_vm_handoff_runtime_validate_command(
+    const struct micros_bootstrap_control_state *bootstrap,
+    const struct micros_endpoint_registry *registry,
+    const struct micros_kernel_objects *objects
+)
+{
+    MICROS_VM01_WORK_HIT("vm01-command-selected", MICROS_WORK_OWNER_KERNEL_VM,
+                        MICROS_WORK_KIND_INDEX_PROBE, 1);
+    const struct micros_frame_ownership *ownership = micros_frame_ownership_runtime_ledger();
+    struct micros_bootstrap_service_selection selected;
+    struct micros_frame_owner root;
+
+    if (ownership == NULL || ownership->phase != MICROS_FRAME_OWNERSHIP_PHASE_HANDED_OFF
+        || micros_vm_handoff_validate_selected(&handoff_state) != MICROS_VM_HANDOFF_OK
+        || handoff_state.phase != MICROS_VM_HANDOFF_PHASE_HANDED_OFF
+        || micros_bootstrap_control_select_sealed_service(
+            bootstrap, registry, objects, handoff_state.service_id, &selected
+        ) != MICROS_BOOTSTRAP_OK
+        || bootstrap->plan.vm_service_id != handoff_state.service_id
+        || selected.manifest->role_flags != MICROS_BOOTSTRAP_ROLE_VM
+        || selected.manifest->image_id != handoff_state.image_id
+        || selected.manifest->profile_id != handoff_state.profile_id
+        || selected.binding->root != handoff_state.root_physical_address
+        || selected.binding->endpoint != handoff_state.endpoint
+        || !process_handles_equal(selected.binding->process, handoff_state.process)
+        || !thread_handles_equal(selected.binding->thread, handoff_state.thread)
+        || micros_privilege_profile_allows_kernel_operation(
+            registry, (uint8_t)handoff_state.profile_id, 1
+        ) != MICROS_ENDPOINT_OK
+        || micros_frame_ownership_lookup(ownership, handoff_state.root_physical_address, &root)
+            != MICROS_FRAME_OWNERSHIP_OK
+        || root.kind != MICROS_FRAME_OWNER_PROCESS_PAGE_TABLE || root.reserved != 0
+        || root.slot != handoff_state.process.slot || root.generation != handoff_state.process.generation) {
         return MICROS_VM_HANDOFF_ERROR_INVARIANT;
     }
     return MICROS_VM_HANDOFF_OK;

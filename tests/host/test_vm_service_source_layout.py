@@ -91,6 +91,8 @@ SOURCE_SETS = {
 }
 
 PRIVATE_HEADERS = (
+    "lib/vm/vm_boot_internal.h",
+    "servers/vm/vm_admission.h",
     "servers/vm/vm_internal.h",
     "servers/vm/vm_image_internal.h",
     "servers/vm/vm_service_internal.h",
@@ -164,6 +166,7 @@ PRIVATE_FUNCTION_OWNERS = {
         "vm_core_endpoint_is_canonical", "vm_core_process_is_canonical",
         "vm_core_user_permissions_are_canonical", "vm_core_stack_plan_equal",
         "vm_core_initial_frame_is_free", "vm_core_load_page_digest",
+        "vm_core_record_header_is_valid", "vm_core_record_headers_are_valid",
     ),
     "servers/vm/vm_frames.c": (
         "vm_core_physical_to_frame_index", "vm_core_frame_index_to_physical",
@@ -177,6 +180,7 @@ PRIVATE_FUNCTION_OWNERS = {
         "vm_validation_digest_active_frame_states",
         "vm_validation_initial_free_tail_is_zero",
         "vm_core_validate_state",
+        "vm_core_validate_selected_state", "vm_core_selected_record_is_valid",
     ),
     "servers/vm/vm_image.c": (
         "vm_image_read_u16_le", "vm_image_read_u32_le", "vm_image_read_u64_le",
@@ -271,6 +275,7 @@ PERMITTED_OWNER_DEPENDENCIES = {
     "servers/vm/vm_core.c": ("lib/vm/vm_boot_validate.c",),
     "servers/vm/vm_frames.c": ("servers/vm/vm_core.c",),
     "servers/vm/vm_validation.c": (
+        "lib/vm/vm_boot_validate.c",
         "servers/vm/vm_core.c", "servers/vm/vm_frames.c",
         "servers/vm/vm_stack.c", "servers/vm/vm_elf.c",
     ),
@@ -288,7 +293,7 @@ PERMITTED_OWNER_DEPENDENCIES = {
         "servers/vm/vm_service_release.c", "servers/vm/vm_validation.c",
     ),
     "servers/vm/vm_service_protocol.c": (),
-    "servers/vm/vm_service_load.c": ("servers/vm/vm_load.c",),
+    "servers/vm/vm_service_load.c": ("servers/vm/vm_load.c", "servers/vm/vm_core.c"),
     "servers/vm/vm_service_release.c": (
         "servers/vm/vm_load.c", "servers/vm/vm_exit.c",
     ),

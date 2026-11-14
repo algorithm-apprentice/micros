@@ -122,7 +122,7 @@ enum micros_vm_handoff_error micros_vm_load_freeze_preflight(
     ) {
         return MICROS_VM_HANDOFF_ERROR_ARGUMENT;
     }
-    error = micros_vm_handoff_state_validate(state);
+    error = micros_vm_handoff_validate_selected(state);
     if (error != MICROS_VM_HANDOFF_OK) {
         return error;
     }
@@ -138,6 +138,11 @@ enum micros_vm_handoff_error micros_vm_load_freeze_preflight(
         return MICROS_VM_HANDOFF_ERROR_STATE;
     }
     record = &state->mappings[state->load.process.slot];
+    for (size_t slot = 0; slot < MICROS_PROCESS_CAPACITY; ++slot) {
+        if (!micros_vm_handoff_record_header_is_valid(state, slot)) {
+            return MICROS_VM_HANDOFF_ERROR_INVARIANT;
+        }
+    }
     if (
         request->data_page_count != record->entry_count
         || !micros_vm_handoff_record_entries_are_frozen_shape(record)

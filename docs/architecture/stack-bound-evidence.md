@@ -632,24 +632,27 @@ mandatory after restart.
 
 ## Phase-bounded VM preparation
 
-Accepted ADR-0087 addresses the observed 4,240-byte VM chain without changing
-the 4 KiB budget or either compiler mode. It admits exactly one private
-helper in `servers/vm/vm_load.c` after separate design merge.
+Accepted ADR-0087 addressed the observed 4,240-byte VM chain without changing
+the 4 KiB budget or either compiler mode. Its private preparation-helper
+lifetime remains authoritative.
+[ADR-0135](../adr/0135-selected-vm-validation.md) refines ordinary validation
+cadence, not that storage boundary.
 
 `micros_vm_load_prepare` keeps its existing public signature. Its preflight
-remains null checks, `vm_core_validate_state` with the existing staged-input
-expression, the IDLE check, and `prepare_source_shape_is_valid`, in that
+is null checks, `vm_core_validate_selected_state`, the IDLE check, and
+`prepare_source_shape_is_valid`, in that
 order. It retains only input parameters and the scalar error needed to
 propagate results.
 
 `vm_load_prepare_transaction` takes the same eight arguments and owns the
 existing transaction candidate, ELF plan, application-stack plan,
 `table_frames` and `data_frames`, including their initial zeroing and
-temporary scalar work. It executes the unchanged original interval from
+temporary scalar work. It executes the preparation interval from
 `prepare_binary_plans` through publication of `MICROS_VM_LOADER_INPUT_COPIED`.
-It propagates every original preparation error. Success returns `OK` to the
-facade, which then returns the result of the unchanged final
-`vm_core_validate_state(state, false)`.
+It propagates preparation errors, including the selected invariant guards
+defined by VM01. Success returns `OK` to the facade, which returns `OK`
+without a complete post-transition audit. Staged-input aliasing, expected
+failure cleanup and success publication remain at their original owners.
 
 The helper cannot call complete state validation, recurse, publish pointers
 to its workspace, introduce static/heap/TLS storage, or change cleanup,
@@ -657,13 +660,15 @@ frame selection, copying, field assignment or phase order. The facade cannot
 retain the aggregate workspace. Local initializations may move only with
 the declarations into the helper, before their first read.
 
-Source evidence reconstructs the exact original function from these two
-actual bodies through one finite declared expansion. It retains the original
-independent source expectation; expansion is not stack evidence and cannot
-erase an arbitrary runtime change. Compiler `.su` and `.stack_sizes`,
-actual linked call/return instructions, and the full graph independently
-prove that the helper frame has ended before final validation. The helper
-and facade frames are both counted during preparation.
+Current source evidence checks the public/private signatures, aggregate
+ownership, sole helper call and argument forwarding, selected preflight,
+normal success return and finite preparation callees. The old full-body
+reconstruction remains historical EV03 evidence under ADR-0123; it is not
+re-hashed from the candidate. Native semantic evidence owns values, cleanup
+and publication. Compiler `.su` and `.stack_sizes`, actual linked call/return
+instructions, and the full graph independently prove the initial preflight
+dominates the helper and its fixed frame is released before the facade
+continues. Both frames remain counted while preparation is active.
 
 Native load/staged-input/capacity/rollback cases preserve the original result
 and complete state. Both compiler-mode graphs, all current variants,
@@ -671,10 +676,9 @@ ordinary image passivity against its same-candidate metadata counterpart,
 and all ten observed scenarios remain required. No observation cost is
 subtracted. An excess on any other chain remains a blocker.
 
-This narrow storage correction does not implement or retire VM01-VM06,
-change the correction graph, or open EV04 early. It is the only exception
-to EV03's production-edit non-goal and remains inactive until the separate
-ADR-0087 design merge.
+EV03's original storage correction did not close VM01-VM06. VM01 retains
+this lifetime evidence while making only its separately Accepted invocation
+changes; VM02-VM06 remain separate outcomes.
 
 ## Target high-water observations
 
@@ -859,12 +863,12 @@ Its observed-only leaves, lifecycle capture and catalog additions were
 reintroduced only after fresh native and real missing-observation Reds.
 Historical target results do not certify this restarted candidate.
 
-`tests/host/test_vm_load_stack_lifetime.py` independently reconstructs the
-original load work from the actual facade and helper; its signature/body
-expectations come from the fixed EV02 source stage. The separate
-`tools/stack_bound_vm_lifetime.py` proves actual fixed frames and the helper's
-return continuation before final validation. The lifetime facts have their
-own authority family; the earlier family fingerprints remain unchanged.
+`tests/host/test_vm_load_stack_lifetime.py` checks the current finite
+preparation/storage contract above. The separate
+`tools/stack_bound_vm_lifetime.py` proves actual fixed frames, preflight
+dominance and the helper's normal-return continuation. Historical EV02
+body identities and EV03 authority-family bookkeeping remain in their
+original records, not current ordinary acceptance.
 
 The existing VM semantic test and source check are documented in
 [the testing strategy](../testing-strategy.md). Focused stack implementation

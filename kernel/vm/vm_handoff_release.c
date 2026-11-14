@@ -24,7 +24,7 @@ enum micros_vm_handoff_error micros_vm_load_abort_preflight(
     ) {
         return MICROS_VM_HANDOFF_ERROR_ARGUMENT;
     }
-    error = micros_vm_handoff_state_validate(state);
+    error = micros_vm_handoff_validate_selected(state);
     if (error != MICROS_VM_HANDOFF_OK) {
         return error;
     }
@@ -93,7 +93,7 @@ enum micros_vm_handoff_error micros_vm_load_mark_exit_detached(
 {
     struct micros_vm_kernel_mapping_record *record;
     enum micros_vm_handoff_error error =
-        micros_vm_handoff_state_validate(state);
+        micros_vm_handoff_validate_selected(state);
 
     if (error != MICROS_VM_HANDOFF_OK) {
         return error;
@@ -106,6 +106,9 @@ enum micros_vm_handoff_error micros_vm_load_mark_exit_detached(
         return MICROS_VM_HANDOFF_ERROR_ARGUMENT;
     }
     record = &state->mappings[process.slot];
+    if (!micros_vm_handoff_selected_record_is_valid(state, process.slot)) {
+        return MICROS_VM_HANDOFF_ERROR_INVARIANT;
+    }
     if (
         record->phase != MICROS_VM_KERNEL_MAPPING_ACTIVE
         || !micros_vm_handoff_process_handles_equal(record->process, process)
@@ -141,7 +144,7 @@ enum micros_vm_handoff_error micros_vm_exit_release_preflight(
     ) {
         return MICROS_VM_HANDOFF_ERROR_ARGUMENT;
     }
-    error = micros_vm_handoff_state_validate(state);
+    error = micros_vm_handoff_validate_selected(state);
     if (error != MICROS_VM_HANDOFF_OK) {
         return error;
     }
@@ -157,6 +160,9 @@ enum micros_vm_handoff_error micros_vm_exit_release_preflight(
         const struct micros_vm_kernel_mapping_record *candidate_record =
             &state->mappings[slot];
 
+        if (!micros_vm_handoff_record_header_is_valid(state, slot)) {
+            return MICROS_VM_HANDOFF_ERROR_INVARIANT;
+        }
         if (
             candidate_record->phase == MICROS_VM_KERNEL_MAPPING_EXIT_DETACHED
             && candidate_record->exit_token == exit_token
@@ -173,6 +179,9 @@ enum micros_vm_handoff_error micros_vm_exit_release_preflight(
         || record->mapping_generation != mapping_generation
     ) {
         return MICROS_VM_HANDOFF_ERROR_STATE;
+    }
+    if (!micros_vm_handoff_selected_record_is_valid(state, record->process.slot)) {
+        return MICROS_VM_HANDOFF_ERROR_INVARIANT;
     }
 
     micros_vm_handoff_clear_bytes(&candidate, sizeof(candidate));

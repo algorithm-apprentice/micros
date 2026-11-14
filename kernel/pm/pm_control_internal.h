@@ -67,6 +67,16 @@ bool micros_pm_control_process_is_empty(
 bool micros_pm_control_application_profile_is_exact(
     const struct micros_endpoint_registry *registry
 );
+enum micros_pm_control_error micros_pm_control_validate_vm_objects(
+    const struct micros_pm_control_state *state,
+    const struct micros_kernel_objects *objects
+);
+bool micros_pm_control_vm_prepared_binding_is_valid(
+    const struct micros_pm_control_state *state,
+    const struct micros_kernel_objects *objects,
+    const struct micros_endpoint_registry *registry,
+    const struct micros_vm_handoff_state *vm
+);
 
 enum micros_pm_control_error micros_pm_control_validate_prepared_shape(
     const struct micros_pm_control_state *state,

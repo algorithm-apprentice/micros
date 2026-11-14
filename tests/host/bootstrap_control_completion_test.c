@@ -343,6 +343,44 @@ bool test_completion_rejects_launcher_ipc_dependencies(void)
     );
 }
 
+static bool sealed_service_selection_is_read_only(
+    struct micros_bootstrap_control_state *state,
+    const struct micros_endpoint_registry *registry,
+    const struct micros_kernel_objects *objects
+)
+{
+    struct micros_bootstrap_service_selection selected, sentinel;
+    struct micros_bootstrap_control_state before = *state;
+
+    memset(&sentinel, 0xa5, sizeof(sentinel));
+    selected = sentinel;
+    EXPECT_TRUE(micros_bootstrap_control_select_sealed_service(
+        state, registry, objects, state->plan.pm_service_id, &selected
+    ) == MICROS_BOOTSTRAP_OK);
+    EXPECT_TRUE(selected.manifest->role_flags == MICROS_BOOTSTRAP_ROLE_PM
+                && selected.runtime->state == MICROS_BOOTSTRAP_SERVICE_READY
+                && selected.endpoint->state == MICROS_ENDPOINT_STATE_ACTIVE
+                && memcmp(state, &before, sizeof(before)) == 0);
+    selected = sentinel;
+    EXPECT_TRUE(micros_bootstrap_control_select_sealed_service(
+        state, registry, objects, state->plan.controller_service_id, &selected
+    ) == MICROS_BOOTSTRAP_ERROR_STATE);
+    EXPECT_TRUE(memcmp(&selected, &sentinel, sizeof(selected)) == 0);
+    state->controller_endpoint = UINT32_C(0x1000);
+    EXPECT_TRUE(micros_bootstrap_control_select_sealed_service(
+        state, registry, objects, state->plan.pm_service_id, &selected
+    ) == MICROS_BOOTSTRAP_ERROR_INVARIANT);
+    EXPECT_TRUE(memcmp(&selected, &sentinel, sizeof(selected)) == 0);
+    *state = before;
+    state->transitions.controller_service_id = state->plan.controller_service_id;
+    EXPECT_TRUE(micros_bootstrap_control_select_sealed_service(
+        state, registry, objects, state->plan.pm_service_id, &selected
+    ) == MICROS_BOOTSTRAP_ERROR_INVARIANT);
+    EXPECT_TRUE(memcmp(&selected, &sentinel, sizeof(selected)) == 0);
+    *state = before;
+    return true;
+}
+
 bool test_pm_completion_queues_sealed_event_once(void)
 {
     struct micros_bootstrap_control_state state;
@@ -415,6 +453,7 @@ bool test_pm_completion_queues_sealed_event_once(void)
         ) == MICROS_BOOTSTRAP_OK
     );
 
+    EXPECT_TRUE(sealed_service_selection_is_read_only(&state, &registry, &objects));
     plan = sentinel;
     state_snapshot = state;
     registry_snapshot = registry;

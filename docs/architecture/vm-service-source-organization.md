@@ -21,8 +21,11 @@ correction below.
 
 The [Accepted VM01 contract](selected-vm-validation.md) explicitly refines ordinary
 complete-validation cadence, not the complete digest/boundary evidence,
-source owners or preparation temporary lifetimes. It remains design-only
-with clean independent review; implementation requires its separate merge.
+source owners or preparation temporary lifetimes. Its design is merged as
+#271. Shared mapping-header predicates remain in the common core, with only
+read-only adapter admission exposed through `vm_admission.h`; this avoids a
+frame-selection/validation dependency cycle. The complete validator remains
+the diagnostic owner.
 
 Implementation must not begin until
 [ADR-0057](../adr/0057-vm-service-source-decomposition.md) is Accepted and its

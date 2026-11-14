@@ -244,6 +244,7 @@ EXPECTED_PM_INCLUDES = {
     ),
     'kernel/pm/pm_control_runtime_core.c': (
         'kernel/pm/pm_control_runtime_core.h',
+        'kernel/pm/pm_control_internal.h',
     ),
     'kernel/pm/pm_control_syscall_core.c': (
         'kernel/pm/pm_control_syscall_core.h',
@@ -251,6 +252,7 @@ EXPECTED_PM_INCLUDES = {
     'kernel/pm/pm_control_runtime.c': (
         'kernel/pm/pm_control_runtime.h',
         'kernel/pm/pm_control_runtime_core.h',
+        'kernel/pm/pm_control_internal.h',
     ),
     'kernel/pm/pm_control_syscall.c': (
         'kernel/pm/pm_control_syscall.h',

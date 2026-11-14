@@ -1,6 +1,7 @@
 #include "kernel/vm/vm_handoff_internal.h"
 #include "micros/work_observation.h"
 #include "micros/user_address_space_core.h"
+#include "tests/qemu/vm_validation_work.h"
 
 #include <stddef.h>
 #include <stdint.h>
@@ -544,16 +545,21 @@ static bool record_tokens_are_unique(
     return true;
 }
 
-static bool mapping_record_is_valid(
+bool micros_vm_handoff_record_header_is_valid(
     const struct micros_vm_handoff_state *state,
     size_t slot
 )
 {
-    const struct micros_vm_kernel_mapping_record *record =
-        &state->mappings[slot];
+    const struct micros_vm_kernel_mapping_record *record;
 
+    if (slot >= MICROS_PROCESS_CAPACITY) {
+        return false;
+    }
+    record = &state->mappings[slot];
     if (record->phase == MICROS_VM_KERNEL_MAPPING_UNUSED) {
-        return micros_vm_handoff_mapping_record_is_zero(record);
+        return micros_vm_handoff_bytes_are_zero(
+            record, offsetof(struct micros_vm_kernel_mapping_record, entries)
+        );
     }
     if (
         record->entry_count > MICROS_APPLICATION_RESIDENT_PAGE_MAX
@@ -562,8 +568,6 @@ static bool mapping_record_is_valid(
         || micros_vm_handoff_process_handles_equal(record->process, state->process)
         || record->load_token == 0
         || record->load_token > state->last_load_token
-        || !record_tokens_are_unique(state, slot)
-        || record_overlaps_prior_records(state, slot)
     ) {
         return false;
     }
@@ -578,7 +582,6 @@ static bool mapping_record_is_valid(
             )
             && record->entry == 0
             && record->stack_pointer == 0
-            && record_entries_are_loading_shape(record)
         );
     }
     if (
@@ -591,8 +594,8 @@ static bool mapping_record_is_valid(
         return false;
     }
     return (
-        record->mapping_generation <= state->last_mapping_generation
-        && micros_vm_handoff_frozen_record_is_valid(record)
+        record->mapping_generation != 0
+        && record->mapping_generation <= state->last_mapping_generation
         && (
             (
                 record->phase == MICROS_VM_KERNEL_MAPPING_EXIT_DETACHED
@@ -604,6 +607,34 @@ static bool mapping_record_is_valid(
             )
         )
     );
+}
+
+bool micros_vm_handoff_selected_record_is_valid(
+    const struct micros_vm_handoff_state *state, size_t slot
+)
+{
+    const struct micros_vm_kernel_mapping_record *record;
+
+    if (slot >= MICROS_PROCESS_CAPACITY) {
+        return false;
+    }
+    record = &state->mappings[slot];
+    if (record->phase == MICROS_VM_KERNEL_MAPPING_UNUSED) {
+        return micros_vm_handoff_mapping_record_is_zero(record);
+    }
+    if (!micros_vm_handoff_record_header_is_valid(state, slot)) {
+        return false;
+    }
+    return record->phase == MICROS_VM_KERNEL_MAPPING_LOADING
+        ? record_entries_are_loading_shape(record)
+        : micros_vm_handoff_frozen_record_is_valid(record);
+}
+
+static bool mapping_record_is_valid(const struct micros_vm_handoff_state *state, size_t slot)
+{
+    return micros_vm_handoff_selected_record_is_valid(state, slot)
+        && (state->mappings[slot].phase == MICROS_VM_KERNEL_MAPPING_UNUSED
+            || (record_tokens_are_unique(state, slot) && !record_overlaps_prior_records(state, slot)));
 }
 
 bool micros_vm_handoff_identity_is_valid(
@@ -730,6 +761,54 @@ static bool active_load_identity_is_valid(
     );
 }
 
+enum micros_vm_handoff_error micros_vm_handoff_validate_selected(
+    const struct micros_vm_handoff_state *state
+)
+{
+    MICROS_VM01_WORK_HIT("vm01-kernel-selected", MICROS_WORK_OWNER_KERNEL_VM,
+                        MICROS_WORK_KIND_INDEX_PROBE, 1);
+    const struct micros_vm_kernel_mapping_record *record;
+
+    if (state == NULL
+        || !micros_vm_handoff_pointer_is_aligned(state, _Alignof(struct micros_vm_handoff_state))) {
+        return MICROS_VM_HANDOFF_ERROR_ARGUMENT;
+    }
+    if (!micros_vm_handoff_identity_is_valid(state)) {
+        return MICROS_VM_HANDOFF_ERROR_INVARIANT;
+    }
+    if (state->phase == MICROS_VM_HANDOFF_PHASE_PREPARED) {
+        return state->last_load_token == 0 && state->last_mapping_generation == 0
+            && micros_vm_handoff_bytes_are_zero(&state->load, sizeof(state->load))
+            ? MICROS_VM_HANDOFF_OK : MICROS_VM_HANDOFF_ERROR_INVARIANT;
+    }
+    if (state->load.phase == MICROS_VM_LOAD_PHASE_IDLE) {
+        return micros_vm_handoff_bytes_are_zero(&state->load, sizeof(state->load))
+            ? MICROS_VM_HANDOFF_OK : MICROS_VM_HANDOFF_ERROR_INVARIANT;
+    }
+    if (!active_load_identity_is_valid(state)
+        || !micros_vm_handoff_selected_record_is_valid(state, state->load.process.slot)) {
+        return MICROS_VM_HANDOFF_ERROR_INVARIANT;
+    }
+    record = &state->mappings[state->load.process.slot];
+    if (!micros_vm_handoff_process_handles_equal(record->process, state->load.process)
+        || record->load_token != state->load.load_token
+        || (state->load.phase == MICROS_VM_LOAD_PHASE_LOADING
+            && record->phase != MICROS_VM_KERNEL_MAPPING_LOADING)
+        || (state->load.phase == MICROS_VM_LOAD_PHASE_FROZEN
+            && record->phase != MICROS_VM_KERNEL_MAPPING_FROZEN
+            && record->phase != MICROS_VM_KERNEL_MAPPING_PREPARED
+            && record->phase != MICROS_VM_KERNEL_MAPPING_ACTIVATED_PENDING_COMMIT)) {
+        return MICROS_VM_HANDOFF_ERROR_INVARIANT;
+    }
+    if (state->load.scratch_phase == MICROS_VM_SCRATCH_CLEAR) {
+        return micros_vm_handoff_bytes_are_zero(&state->load.scratch, sizeof(state->load.scratch))
+            ? MICROS_VM_HANDOFF_OK : MICROS_VM_HANDOFF_ERROR_INVARIANT;
+    }
+    return state->load.phase == MICROS_VM_LOAD_PHASE_LOADING
+        && micros_vm_handoff_loading_record_can_append(record, &state->load.scratch)
+        ? MICROS_VM_HANDOFF_OK : MICROS_VM_HANDOFF_ERROR_INVARIANT;
+}
+
 static bool loading_transaction_is_valid(
     const struct micros_vm_handoff_state *state,
     size_t loading_slot,
@@ -813,6 +892,8 @@ enum micros_vm_handoff_error micros_vm_handoff_state_validate(
     MICROS_TEST_WORK_HIT("boot02-vm-state", MICROS_WORK_OWNER_KERNEL_VM,
                          MICROS_WORK_KIND_COMPLETE_VALIDATOR_CALL, 1);
 #endif
+    MICROS_VM01_WORK_HIT("vm01-kernel-state", MICROS_WORK_OWNER_KERNEL_VM,
+                        MICROS_WORK_KIND_COMPLETE_VALIDATOR_CALL, 1);
     size_t loading_slot;
     size_t frozen_slot;
 

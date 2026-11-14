@@ -2,6 +2,7 @@
 
 #include "arch/riscv64/mmu.h"
 #include "kernel/vm/vm_handoff_runtime.h"
+#include "kernel/vm/vm_handoff_internal.h"
 #include "micros/frame_ownership_runtime.h"
 #include "micros/kernel_object_runtime.h"
 
@@ -247,7 +248,7 @@ preflight_vm_freeze(
     state = micros_vm_handoff_runtime_state();
     if (
         state == NULL
-        || micros_vm_handoff_state_validate(state)
+        || micros_vm_handoff_validate_selected(state)
             != MICROS_VM_HANDOFF_OK
         || !freeze_action_matches_runtime(state, action)
         || active_root() != state->root_physical_address
@@ -283,7 +284,7 @@ validate_vm_freeze_address_spaces(
     ) {
         return MICROS_USER_ADDRESS_SPACE_ERROR_INVARIANT;
     }
-    return micros_user_address_space_validate_all_process_roots_locked(
+    return micros_user_address_space_validate_vm_plan_roots_locked(
         runtime,
         context->objects,
         scratch
@@ -570,8 +571,8 @@ void micros_user_address_space_install_vm_freeze_prevalidated(
                 MICROS_USER_ADDRESS_SPACE_VM_TABLE_ROOT
             ]
         ) != MICROS_KERNEL_OBJECT_OK
-        || micros_user_address_space_validate(
-            plan->tables.process
+        || micros_user_address_space_validate_vm_constructed_root(
+            &plan->tables
         ) != MICROS_USER_ADDRESS_SPACE_OK
     ) {
         panic_invariant("vm-freeze-install");

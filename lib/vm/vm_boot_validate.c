@@ -1,4 +1,5 @@
 #include "micros/vm_bootstrap.h"
+#include "lib/vm/vm_boot_internal.h"
 
 #include <stdbool.h>
 #include <stddef.h>
@@ -368,7 +369,7 @@ struct vm_boot_validation_counts {
     uint64_t wired_mappings;
 };
 
-static bool vm_boot_header_is_valid(
+bool vm_boot_header_is_valid(
     const struct micros_vm_boot_info *info
 )
 {

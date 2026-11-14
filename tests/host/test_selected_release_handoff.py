@@ -186,7 +186,7 @@ class SelectedReleaseHandoffSourceTest(unittest.TestCase):
 
         with patch.object(source, "fixed_source", side_effect=AssertionError("historical audit input"), create=True):
             measured = source.measure_audit_boundaries(ROOT, Stage.GREEN)
-        self.assertEqual(16, len(measured["retained"]))
+        self.assertEqual(17, len(measured["retained"]))
         self.assertEqual(4, len(measured["plans"]))
 
     def test_current_native_generation_does_not_restore_an_ancestor(self):

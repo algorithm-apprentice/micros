@@ -146,8 +146,8 @@ BOOTSTRAP_FUNCTIONS = (
 
 CONTROL_FUNCTIONS = (
     "process_handles_equal", "micros_bootstrap_control_find_binding",
-    "binding_matches_manifest", "binding_matches_objects", "require_running_header",
-    "selected_runtime_shape", "micros_bootstrap_control_select_service",
+    "binding_matches_manifest", "binding_matches_objects", "require_selection_header", "require_running_header",
+    "selected_runtime_shape", "select_service_relation", "micros_bootstrap_control_select_service",
 )
 VM_RUNTIME_FUNCTIONS = (
     "process_handles_equal", "thread_handles_equal", "micros_vm_handoff_runtime_state",

@@ -284,7 +284,7 @@ in [CMakePresets.json](../CMakePresets.json) and [CMakeLists.txt](../CMakeLists.
 | `cmake --workflow --preset test-qemu-tty` | Marker-paced canonical input, deferred IRQs, grant I/O, diagnostic forwarding and physical drain |
 | `cmake --workflow --preset test-qemu-ramfs` | Seed, mount, sparse I/O, cursor, balanced references and zero live grants |
 | `cmake --workflow --preset test-qemu-vfs` | Application descriptors, namespace, translated directories and two-hop file/console I/O |
-| `cmake --workflow --preset test-qemu-elf-spawn` | Real dynamic test PID 1/child, post-freeze rollback, argv/env/I/O, exit/wait and resource equality |
+| `cmake --workflow --preset test-qemu-elf-spawn` | Real dynamic test PID 1/child, post-freeze rollback, argv/env/I/O, exit/wait, resource equality and same-guest selected VM work |
 | `cmake --workflow --preset test-qemu-vm-ready-early` | Exact pre-handoff readiness rejection |
 | `cmake --workflow --preset test-qemu-vm-self-fault` | Running-phase VM fault and fatal bootstrap ordering |
 | `cmake --workflow --preset test-qemu-vm-self-fault-sealed` | Sealed-phase VM fault without revived bootstrap failure |
