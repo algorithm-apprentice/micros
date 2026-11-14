@@ -31,8 +31,8 @@ expands the active pull request.
 ## Current correction progress
 
 The counts in the fixed audit block above describe the original audit, not
-the remaining work. This table is the current closure record through VM03
-#276 and validation simplification #248. Each listed runtime outcome completed
+the remaining work. This table is the current closure record through VM04
+#278 and validation simplification #248. Each listed runtime outcome completed
 its required evidence and independent review before merge.
 
 | Outcome | Accepted implementation/barrier | Finding closure | Contract or evidence |
@@ -62,25 +62,25 @@ its required evidence and independent review before merge.
 | VM01 | #272 | B07-F001 | [Selected VM validation](../architecture/selected-vm-validation.md#current-implementation-and-evidence-owners) |
 | VM02 | #274 | B02-F008/F009, B07-F004 | [Mapping-plan uniqueness](../architecture/vm-mapping-plan-uniqueness.md) |
 | VM03 | #276 | B07-F002 | [Retained load plan](../architecture/retained-vm-load-plan.md) |
+| VM04 | #278 | B07-F003 | [Frame allocation](../architecture/vm-frame-allocation.md) |
 
-Of the original 79 pre-node finding records, these outcomes close 42:
-three evidence-foundation records and thirty-nine runtime records.
-**37 remain: 30 foundation/runtime records before node Q and seven B13
+Of the original 79 pre-node finding records, these outcomes close 43:
+three evidence-foundation records and forty runtime records.
+**36 remain: 29 foundation/runtime records before node Q and seven B13
 records.** The separately staged B04-F005 is not included in that remaining
 pre-node count. Closing foundation tooling does not certify every still-open
 operation's work bound or the future B13 stack.
 
 All nine B02 findings, the pre-node B04 findings, six B05 and four B06
 runtime findings are closed; B04-F005 retains its post-node staged
-replacement point. The next preferred runtime outcome
-is **VM04**, whose MEM01 and VM03 prerequisites are merged. Its
-[frame-allocation design](../architecture/vm-frame-allocation.md) is
-independently reviewed, Accepted and merged as #277; its separate
-implementation is active.
-VM03's implementation #276 preserves complete diagnostics, real frame/index
-authority, pre-write stack validation and the original composed/stack
-evidence while removing repeated load-plan reconstruction. Its clean
-independent review preceded the first implementation commit and merge.
+replacement point. B07 now retains only VM05 movement and VM06 snapshot
+lifetime. The next preferred runtime outcome is **VM05**, whose COPY01,
+GRANT03, BOOT03 and VM03 prerequisites are merged. Its
+[shared-transfer design](../architecture/vm-memory-transfers.md) is Accepted
+with clean independent review; implementation remains pending the separate
+design merge. VM04's current bitmap/cache/descending-origin allocator and
+failure-atomic local reservation are merged with the original model,
+resource, target and stack evidence.
 
 Validation simplification #248 follows separate design #247 / ADR-0123.
 It changes no runtime finding, node or edge. Current contracts replace the
@@ -260,8 +260,8 @@ blocking queue.
 | `VM01` | Runtime correction | `B07-F001` | `BOOT02`, `MEM04`, `GRANT01` | Independently reviewed implementation #272 follows the [selected-validation contract](../architecture/selected-vm-validation.md), retaining complete diagnostics and consumed service/kernel/PM/memory authority. | Actual native and same-guest zero ordinary audits, pre-backend/failure/corruption evidence and all inherited target/composed/stack gates passed. |
 | `VM02` | Runtime correction | `B02-F008`, `B02-F009`, `B07-F004` | `VM01`, `MEM04` | Independently reviewed implementation #274 follows the [mapping-plan contract](../architecture/vm-mapping-plan-uniqueness.md): selected root/owner indexes, bounded ordered uniqueness and direct load-record selection. | Actual root/frame/identity work, exact errors/owners, adversarial plans and complete target/stack acceptance passed. |
 | `VM03` | Runtime correction | `B07-F002` | `VM01`, `VM02` | Independently reviewed implementation #276 follows the [retained-plan contract](../architecture/retained-vm-load-plan.md), preserving exact selected and destructive boundaries. | Native equivalent-page/prefix work, actual same-guest planner/decoder counts and complete model/target/stack acceptance passed. |
-| `VM04` | Runtime correction | `B07-F003` | `MEM01`, `VM03` | [Accepted allocation contract](../architecture/vm-frame-allocation.md): current bitmap, LIFO cache, descending chunk search and retained origin within existing image storage. Design #277 is separately merged; implementation is active. | Allocator probe/chunk counts, fragmentation, exhaustion, release, and replayable model traces. |
-| `VM05` | Runtime correction | `B07-F005` | `COPY01`, `GRANT03`, `BOOT03`, `VM03` | Use reusable span/block movement for pages and snapshots while preserving scratch/freeze authority. | 4 KiB/128 KiB transfer counts, alignment, scratch, rollback, and target contents. |
+| `VM04` | Runtime correction | `B07-F003` | `MEM01`, `VM03` | Independently reviewed implementation #278 follows the [allocation contract](../architecture/vm-frame-allocation.md): current bitmap, LIFO cache, descending search, retained origin and failure-atomic reservation. | Native allocator/reference, original mixed model, same-guest cache/search/resource and full target/stack acceptance passed. |
+| `VM05` | Runtime correction | `B07-F005` | `COPY01`, `GRANT03`, `BOOT03`, `VM03` | [Accepted shared-transfer contract](../architecture/vm-memory-transfers.md): delegate fifteen VM copy/clear helpers to the existing provider, preserving exact extents, retained fixed-object plans, scratch/freeze and snapshot authority. | Independent 4 KiB/128 KiB/object transfer units/bytes, alignment/canaries, original semantic/rollback cases and same-guest linked algorithm/contents. |
 | `VM06` | Runtime correction | `B07-F006` | `BOOT02`, `VM03`, `VM05` | Transfer or release bootstrap snapshot ownership after handoff instead of permanently retaining duplicate state. | Lifetime/storage accounting, post-handoff rejection, and VM restart/fatal-boundary cases. |
 | `PM01` | Runtime correction | `B08-F001`, `B08-F002`, `B08-F003` | `BOOT02`, `OBJ01`, `IPC01`, `GRANT01`, `VM01` | Use endpoint-slot caller identity, retained free-slot search origin, and selected PM plans instead of quadratic full-table scans. | Vpm/comparison counts for spawn, rollback, exit, wait, sparse slots, and reuse. |
 | `PM02` | Runtime correction | `B08-F004` | `PM01` | Reproduce first-slot and original-parent-before-init completion ordering with explicit ADR supersession. | Multi-zombie/two-parent deterministic ordering model and target lifecycle trace. |
