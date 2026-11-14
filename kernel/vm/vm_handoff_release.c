@@ -25,7 +25,7 @@ enum micros_vm_handoff_error micros_vm_load_abort_preflight(
     ) {
         return MICROS_VM_HANDOFF_ERROR_ARGUMENT;
     }
-    error = micros_vm_handoff_validate_selected(state);
+    error = micros_vm_handoff_validate_load_plan(state);
     if (error != MICROS_VM_HANDOFF_OK) {
         return error;
     }

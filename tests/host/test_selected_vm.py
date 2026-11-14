@@ -12,7 +12,7 @@ from tests.host.selected_vm_source import validate_native_sites
 from tests.host.work_count_types import Kind, Owner
 
 
-def target_transcript(audits=0, root_certificates=None, root_enumerations=0):
+def target_transcript(audits=0, root_certificates=None, root_enumerations=0, elf_plans=3, request_decodes=9):
     def line(name, fields):
         return "# " + name + " " + " ".join(f"{key}=0x{value:016x}" for key, value in fields) + "\n"
 
@@ -40,6 +40,9 @@ def target_transcript(audits=0, root_certificates=None, root_enumerations=0):
                     )
             elif owner == Owner.VM_SERVICE:
                 counts[Kind.INDEX_PROBE] = sum(commands)
+                counts[Kind.RANGE_VISIT] = elf_plans
+            elif owner == Owner.LIB_SPAWN:
+                counts[Kind.INDEX_PROBE] = request_decodes
             text += line("MICROS_VM01_COUNTS", (
                 ("producer", producer), ("owner", owner),
                 *((name, counts.get(kind, 0)) for kind, name in enumerate(target.DIMENSIONS)),
@@ -48,6 +51,20 @@ def target_transcript(audits=0, root_certificates=None, root_enumerations=0):
 
 
 class SelectedVmTargetTest(unittest.TestCase):
+    def test_retained_load_plan_rejects_repeated_or_missing_source_reconstruction(self):
+        for plans in (0, 2, 4, 66):
+            with self.subTest(plans=plans):
+                self.assertEqual(
+                    (("VM_SERVICE", "elf-plans", plans, 3),),
+                    target.target_failures(target.parse_target_output(target_transcript(elf_plans=plans), 0)),
+                )
+        for decodes in (0, 8, 10, 72):
+            with self.subTest(decodes=decodes):
+                self.assertEqual(
+                    (("LIB_SPAWN", "request-decodes", decodes, 9),),
+                    target.target_failures(target.parse_target_output(target_transcript(request_decodes=decodes), 0)),
+                )
+
     def test_scoped_mode_rejects_unrelated_terminal_copy_and_history_calls(self):
         enabled = ("-DMICROS_TEST_WORK_COUNTS=1", "-DMICROS_TEST_VM_COMMAND_COUNTS=1")
         for source in target.UNSCOPED_SOURCES:
@@ -258,6 +275,11 @@ class SelectedVmNativeTest(unittest.TestCase):
             ("service-membership-max", Kind.RECORD_VISIT, 601777),
             ("kernel-owner-unvisited", Kind.RECORD_VISIT, 33),
             ("kernel-scanned-count", Kind.RECORD_VISIT, 33),
+            ("service-large-next", Kind.INDEX_PROBE, 1),
+            ("service-long-fill", Kind.RECORD_VISIT, 1),
+            ("kernel-long-map", Kind.COMPARISON, 1),
+            ("service-stack-min", Kind.RECORD_VISIT, 5297),
+            ("service-stack-max", Kind.INDEX_PROBE, 34993),
         ):
             changed = copy.deepcopy(work)
             index = next(index for index, row in enumerate(observed) if row["name"] == name)

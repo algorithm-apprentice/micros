@@ -264,9 +264,9 @@ within its existing scope.
 
 ## Validation planning
 
-VM01's focused full-tier native pair uses the existing complete VM fixtures
-and actual service/kernel C, with ordinary/observed agreement and independent
-work bounds:
+The VM corrections' focused full-tier native pair uses the existing complete
+VM fixtures and actual service/kernel C, with ordinary/observed agreement
+and independent selected-page, prefix, stack and whole-set work bounds:
 
 ```bash
 cmake --preset host-debug
@@ -278,8 +278,11 @@ The existing `test-qemu-elf-spawn` workflow also owns VM01's dynamic
 operation-12 and VM-service work capture. Its two complete producer
 snapshots come from that same guest, after the original rollback,
 exit/wait and resource checks; no second guest is launched.
-The host requires all seven kernel and four service command classes and
-zero ordinary complete VM/BOOT/PM audits. Cold handoff/TTY validation is
+The host requires all seven kernel and four service command classes,
+zero ordinary complete VM/BOOT/PM audits, VM02's five selected root
+certificates without root enumeration, and VM03's one ELF plan plus three
+constant stack decode/plan passes per load. Actual linked planner/decoder
+entries supply the latter counts. Cold handoff/TTY validation is
 outside that capture. Source/producer ownership and the original stack,
 image and serial boundaries remain required.
 

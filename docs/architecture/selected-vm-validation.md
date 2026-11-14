@@ -290,6 +290,13 @@ transferable child leaf, and exact process-generation teardown.
 
 ## Work and storage limits
 
+The deliberately retained VM01 costs below are subsequently refined by
+[VM02's mapping-plan contract](vm-mapping-plan-uniqueness.md) and
+[VM03's retained load-plan contract](retained-vm-load-plan.md). Their
+Accepted supersession boundaries govern current root/uniqueness and
+per-page reconstruction work; VM01's authority and zero-global-audit
+requirements remain.
+
 Service header work is `O(r)` active geometry. Selected transaction/record
 work is bounded by the current record/page/request plan and its selected
 frame translations, not managed-frame count or unrelated mapping count.
@@ -376,8 +383,8 @@ under ADR-0123, not another metadata prerequisite or historical replay.
 | Shared boot-header facts and mapping-search headers | `lib/vm/vm_boot_internal.h` / `vm_boot_validate.c`, and `servers/vm/vm_core.c`; frame selection never depends upward on complete validation. |
 | Selected service admission | `servers/vm/vm_validation.c`; `vm_admission.h` exposes only the two read-only checks needed by the adapter, not the general core-private interface. |
 | Kernel VM, sealed service and PM relations | Existing `kernel/vm`, `kernel/boot/bootstrap_control_core.c` and `kernel/pm` owners; complete APIs remain separate. |
-| VM memory certificates | The existing memory validation owner shares its complete tree/owner walk and root iterator between diagnostics and the narrowly named VM-plan entries. |
-| Native semantic/work evidence | `selected_vm_test.c` / `selected_vm_evidence.py`: 48 ordinary/observed cases, unchanged original fixtures, full diagnostic controls and maximal frame/range/page/record shapes. Existing dispatcher-mock tests retain their old seam but are not VM01 authority evidence. |
+| VM memory certificates | The existing memory validation owner supplies VM02's selected four-table/owner-index certificates; complete public diagnostics remain separate. |
+| Native semantic/work evidence | `selected_vm_test.c` / `selected_vm_evidence.py`: original ordinary/observed cases and fixtures, full diagnostic controls, maximal frame/range/page/record shapes and the subsequent VM02/VM03 cases. Existing dispatcher-mock tests retain their old seam but are not VM authority evidence. |
 | Same-guest producers and readback | `vm_command_work.c` and `selected_vm_work.c`, with the existing generated VM-context descriptor. Cross-image capture flags are integer fields with exact canonical checks. |
 | Source, machine and storage qualification | `vm_command_evidence.py` checks actual linked observation calls, one collector per image, exact compiler/object/image ownership and the fixed two/four-page additions. Unrelated UART, copy and history work annotations remain disabled in this guest; their actual objects must have no work-observer references. Stack instrumentation and fatal-path qualification remain unchanged. |
 

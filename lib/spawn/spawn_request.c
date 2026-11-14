@@ -1,4 +1,5 @@
 #include "lib/spawn/spawn_request.h"
+#include "tests/qemu/vm_validation_work.h"
 
 #include <stdbool.h>
 
@@ -279,6 +280,8 @@ enum micros_spawn_request_error micros_spawn_request_decode(
     struct micros_spawn_request *request
 )
 {
+    MICROS_VM01_WORK_HIT("vm01-request-decode", MICROS_WORK_OWNER_LIB_SPAWN,
+                        MICROS_WORK_KIND_INDEX_PROBE, 1);
     struct micros_spawn_request decoded = {0};
 
     if (bytes == NULL || request == NULL) {

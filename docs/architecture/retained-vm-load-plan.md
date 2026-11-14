@@ -6,6 +6,9 @@ This is the Accepted VM03 contract under
 [ADR-0137](../adr/0137-retained-vm-load-plan.md). VM01 #272 and VM02 #274
 are merged. The [fixed study](../research/minix-retained-vm-load-plan.md)
 owns current/reference provenance and resource measurements.
+Independent design review is clean and design #275 is separately merged.
+Implementation is active; B07-F002 remains open until complete acceptance,
+independent implementation review and merge.
 
 Close only B07-F002: publish one useful load description and consume its
 selected page/progress relations without reparsing the complete ELF/stack
@@ -320,6 +323,22 @@ Kernel VM core/scratch owners select the current loading prefix; freeze and
 release retain their complete selected boundary checks. Memory ownership,
 root certificates and other command authorities are not replaced.
 
-This independently reviewed design contains documentation only.
-Implementation stays pending its separate merge. Do not turn the
-design investigation into code, a test/model harness or a reusable prototype.
+The documentation-only design merged before implementation began.
+Subsequent changes remain within this Accepted contract; a design defect
+still requires ADR-0033's separate corrective-design barrier.
+
+## Current implementation and evidence owners
+
+| Responsibility | Owner |
+| --- | --- |
+| Prepared description and progress | Existing `vm_load.c` candidate, bind and scratch transitions; no public header or state-layout change. |
+| Selected service admission | `vm_validation.c` checks scalar/segment/stack headers and the selected page plus its immediate predecessor. Frozen admission retains complete selected-set proof before the service facade invokes a backend. |
+| Whole selected load set | `INPUT_COPIED`/`FROZEN` admission and `vm_core_validate_selected_load_plan` preserve bind/freeze/abort preflight; complete diagnostics retain their separate source-plan reconstruction. |
+| Kernel loading prefix | `vm_handoff_core.c` checks the current record header/scratch/predecessor; freeze/abort use the complete selected load-plan boundary. Real owner/PTE and command admission remain in their original owners. |
+| Native evidence | Existing `selected_vm_test.c` / `selected_vm_evidence.py` retain the original cases and add equivalent page/prefix work, corruption-scope, immutability, exact maximum-stack, BSS and pre-write-canary cases. |
+| Same-guest reconstruction evidence | Existing `vm_command_evidence.py` binds actual linked ELF-plan and request-decoder entries. The original three-load guest requires three ELF plans and nine request decodes, including both stack-fill validations per load. |
+
+The [build guide](../development/building.md#validation-planning) owns the
+commands. Exact Red/Green execution, final candidate identities and
+independent implementation review belong in the implementation PR, not a
+duplicate history here.

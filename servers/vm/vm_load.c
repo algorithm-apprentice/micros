@@ -598,7 +598,7 @@ enum micros_vm_core_error micros_vm_load_freeze_plan(
 )
 {
     struct micros_vm_freeze_plan candidate;
-    enum micros_vm_core_error error = vm_core_validate_selected_state(state);
+    enum micros_vm_core_error error = vm_core_validate_selected_load_plan(state);
 
     if (plan == NULL) {
         return MICROS_VM_CORE_ERROR_ARGUMENT;
@@ -638,7 +638,7 @@ enum micros_vm_core_error micros_vm_load_frozen(
     uint64_t mapping_generation
 )
 {
-    enum micros_vm_core_error error = vm_core_validate_selected_state(state);
+    enum micros_vm_core_error error = vm_core_validate_selected_load_plan(state);
     struct micros_vm_mapping_record *record;
     size_t index;
 
@@ -729,7 +729,7 @@ enum micros_vm_core_error micros_vm_load_aborted(
     uint64_t mapping_generation
 )
 {
-    enum micros_vm_core_error error = vm_core_validate_selected_state(state);
+    enum micros_vm_core_error error = vm_core_validate_selected_load_plan(state);
     size_t index;
 
     if (error != MICROS_VM_CORE_OK) {

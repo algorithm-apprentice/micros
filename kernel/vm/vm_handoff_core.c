@@ -288,6 +288,34 @@ static bool record_entries_have_loading_layout(
     return true;
 }
 
+static bool loading_record_has_valid_selected_prefix(
+    const struct micros_vm_kernel_mapping_record *record
+)
+{
+    const struct micros_vm_kernel_mapping_entry *previous;
+    size_t index;
+    int group;
+
+    if (record->entry_count > MICROS_APPLICATION_RESIDENT_PAGE_MAX) {
+        return false;
+    }
+    if (record->entry_count == 0) {
+        return true;
+    }
+    index = record->entry_count - 1;
+    previous = &record->entries[index];
+    if (!micros_vm_handoff_mapping_entry_is_valid(previous)) {
+        return false;
+    }
+    group = permission_group(previous->permissions);
+    if (previous->virtual_address == MICROS_APPLICATION_STACK_BASE) {
+        return index >= MICROS_APPLICATION_IMAGE_PAGE_MIN && group == 2;
+    }
+    return index < MICROS_APPLICATION_IMAGE_PAGE_MAX
+        && previous->virtual_address == MICROS_APPLICATION_ENTRY + index * MICROS_FRAME_SIZE
+        && group >= 0 && (size_t)group <= index;
+}
+
 bool micros_vm_handoff_loading_record_can_append(
     const struct micros_vm_kernel_mapping_record *record,
     const struct micros_vm_kernel_mapping_entry *entry
@@ -295,23 +323,13 @@ bool micros_vm_handoff_loading_record_can_append(
 {
     int next_group;
     int prior_group = 0;
-    size_t index;
 
     if (
-        !record_entries_have_loading_layout(record)
-        || !record_frames_are_unique(record, 0)
+        !loading_record_has_valid_selected_prefix(record)
         || !micros_vm_handoff_mapping_entry_is_valid(entry)
         || record->entry_count >= MICROS_APPLICATION_RESIDENT_PAGE_MAX
     ) {
         return false;
-    }
-    for (index = 0; index < record->entry_count; ++index) {
-        if (
-            record->entries[index].physical_address
-            == entry->physical_address
-        ) {
-            return false;
-        }
     }
     if (
         record->entry_count != 0
@@ -841,7 +859,7 @@ enum micros_vm_handoff_error micros_vm_handoff_validate_selected(
             ? MICROS_VM_HANDOFF_OK : MICROS_VM_HANDOFF_ERROR_INVARIANT;
     }
     if (!active_load_identity_is_valid(state)
-        || !micros_vm_handoff_selected_record_is_valid(state, state->load.process.slot)) {
+        || !micros_vm_handoff_record_header_is_valid(state, state->load.process.slot)) {
         return MICROS_VM_HANDOFF_ERROR_INVARIANT;
     }
     record = &state->mappings[state->load.process.slot];
@@ -855,6 +873,11 @@ enum micros_vm_handoff_error micros_vm_handoff_validate_selected(
             && record->phase != MICROS_VM_KERNEL_MAPPING_ACTIVATED_PENDING_COMMIT)) {
         return MICROS_VM_HANDOFF_ERROR_INVARIANT;
     }
+    if (!(state->load.phase == MICROS_VM_LOAD_PHASE_LOADING
+          ? loading_record_has_valid_selected_prefix(record)
+          : micros_vm_handoff_selected_record_is_valid(state, state->load.process.slot))) {
+        return MICROS_VM_HANDOFF_ERROR_INVARIANT;
+    }
     if (state->load.scratch_phase == MICROS_VM_SCRATCH_CLEAR) {
         return micros_vm_handoff_bytes_are_zero(&state->load.scratch, sizeof(state->load.scratch))
             ? MICROS_VM_HANDOFF_OK : MICROS_VM_HANDOFF_ERROR_INVARIANT;
@@ -862,6 +885,25 @@ enum micros_vm_handoff_error micros_vm_handoff_validate_selected(
     return state->load.phase == MICROS_VM_LOAD_PHASE_LOADING
         && micros_vm_handoff_loading_record_can_append(record, &state->load.scratch)
         ? MICROS_VM_HANDOFF_OK : MICROS_VM_HANDOFF_ERROR_INVARIANT;
+}
+
+enum micros_vm_handoff_error micros_vm_handoff_validate_load_plan(
+    const struct micros_vm_handoff_state *state
+)
+{
+    enum micros_vm_handoff_error error = micros_vm_handoff_validate_selected(state);
+    const struct micros_vm_kernel_mapping_record *record;
+
+    if (error != MICROS_VM_HANDOFF_OK || state->load.phase != MICROS_VM_LOAD_PHASE_LOADING) {
+        return error;
+    }
+    record = &state->mappings[state->load.process.slot];
+    if (!micros_vm_handoff_selected_record_is_valid(state, state->load.process.slot)
+        || (state->load.scratch_phase == MICROS_VM_SCRATCH_MAPPED
+            && micros_vm_handoff_record_contains_physical_address(record, state->load.scratch.physical_address))) {
+        return MICROS_VM_HANDOFF_ERROR_INVARIANT;
+    }
+    return MICROS_VM_HANDOFF_OK;
 }
 
 static bool loading_transaction_is_valid(
