@@ -6,9 +6,9 @@ This is the Accepted VM03 contract under
 [ADR-0137](../adr/0137-retained-vm-load-plan.md). VM01 #272 and VM02 #274
 are merged. The [fixed study](../research/minix-retained-vm-load-plan.md)
 owns current/reference provenance and resource measurements.
-Independent design review is clean and design #275 is separately merged.
-Implementation is active; B07-F002 remains open until complete acceptance,
-independent implementation review and merge.
+Design #275 and independently reviewed implementation #276 are separately
+merged. Complete acceptance closes B07-F002. VM04's allocator correction
+remains a separate outcome.
 
 Close only B07-F002: publish one useful load description and consume its
 selected page/progress relations without reparsing the complete ELF/stack

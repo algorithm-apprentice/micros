@@ -153,3 +153,4 @@ to make the project appear more consistent than it was.
 | [0135](0135-selected-vm-validation.md) | Selected VM validation | Accepted |
 | [0136](0136-vm-mapping-plan-uniqueness.md) | VM mapping-plan uniqueness | Accepted |
 | [0137](0137-retained-vm-load-plan.md) | Retained VM load plan | Accepted |
+| [0138](0138-minix-vm-frame-allocation.md) | MINIX VM frame allocation | Accepted |
