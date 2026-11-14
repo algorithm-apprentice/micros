@@ -152,3 +152,4 @@ to make the project appear more consistent than it was.
 | [0134](0134-shared-bootstrap-memory-transfers.md) | Shared bootstrap memory transfers | Accepted |
 | [0135](0135-selected-vm-validation.md) | Selected VM validation | Accepted |
 | [0136](0136-vm-mapping-plan-uniqueness.md) | VM mapping-plan uniqueness | Accepted |
+| [0137](0137-retained-vm-load-plan.md) | Retained VM load plan | Accepted |
