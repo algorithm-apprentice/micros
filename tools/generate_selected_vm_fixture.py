@@ -48,7 +48,7 @@ def source_bundle(root, channel):
         outputs[path] = raw
     for path, raw in outputs.items():
         for delimiter, name in re.findall(r'(?m)^\s*#\s*include\s*(["<])([^">]+)[">]', raw.decode()):
-            if delimiter == "<" and name in ("limits.h", "stdbool.h", "stddef.h", "stdint.h"):
+            if delimiter == "<" and name in ("limits.h", "stdatomic.h", "stdbool.h", "stddef.h", "stdint.h"):
                 continue
             if not any(str(candidate) in outputs for candidate in (
                 Path(path).parent / name, Path(name), Path("include") / name,

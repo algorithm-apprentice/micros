@@ -27,6 +27,15 @@ read-only adapter admission exposed through `vm_admission.h`; this avoids a
 frame-selection/validation dependency cycle. The complete validator remains
 the diagnostic owner.
 
+The [VM02 contract](vm-mapping-plan-uniqueness.md) owns the shared
+`lib/vm/vm_keys.c` workspace, `lib/vm/vm_load_token.c` codec and indexed geometry.
+`vm_frames.c` owns the temporary physical/slot membership view borrowed by
+allocation and load binding; neither operation retains it across publication.
+Frame selection may call
+the private `vm_boot_physical_to_frame_index` predicate, not the complete
+boot validator. The key workspace has one library owner and no semantic
+state or backend authority.
+
 Implementation must not begin until
 [ADR-0057](../adr/0057-vm-service-source-decomposition.md) is Accepted and its
 design pull request is merged.
@@ -414,6 +423,8 @@ satisfy the gate.
 ```text
 MICROS_VM_BOOT_VALIDATION_SOURCES
   lib/vm/vm_boot_validate.c
+  lib/vm/vm_keys.c
+  lib/vm/vm_load_token.c
 
 MICROS_VM_IMAGE_SOURCES
   servers/vm/vm_image.c

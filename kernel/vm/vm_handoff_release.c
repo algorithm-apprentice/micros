@@ -1,4 +1,5 @@
 #include "kernel/vm/vm_handoff_internal.h"
+#include "lib/vm/vm_load_token.h"
 
 #include <stdbool.h>
 #include <stddef.h>
@@ -131,7 +132,7 @@ enum micros_vm_handoff_error micros_vm_exit_release_preflight(
 )
 {
     struct micros_vm_exit_release_action candidate;
-    const struct micros_vm_kernel_mapping_record *record = NULL;
+    const struct micros_vm_kernel_mapping_record *record;
     enum micros_vm_handoff_error error;
     size_t slot;
 
@@ -156,31 +157,20 @@ enum micros_vm_handoff_error micros_vm_exit_release_preflight(
     ) {
         return MICROS_VM_HANDOFF_ERROR_ARGUMENT;
     }
-    for (slot = 0; slot < MICROS_PROCESS_CAPACITY; ++slot) {
-        const struct micros_vm_kernel_mapping_record *candidate_record =
-            &state->mappings[slot];
-
-        if (!micros_vm_handoff_record_header_is_valid(state, slot)) {
-            return MICROS_VM_HANDOFF_ERROR_INVARIANT;
-        }
-        if (
-            candidate_record->phase == MICROS_VM_KERNEL_MAPPING_EXIT_DETACHED
-            && candidate_record->exit_token == exit_token
-        ) {
-            if (record != NULL) {
-                return MICROS_VM_HANDOFF_ERROR_INVARIANT;
-            }
-            record = candidate_record;
-        }
+    slot = micros_vm_load_token_slot(load_token);
+    if (!micros_vm_handoff_record_header_is_valid(state, slot)) {
+        return MICROS_VM_HANDOFF_ERROR_INVARIANT;
     }
+    record = &state->mappings[slot];
     if (
-        record == NULL
+        record->phase != MICROS_VM_KERNEL_MAPPING_EXIT_DETACHED
+        || record->exit_token != exit_token
         || record->load_token != load_token
         || record->mapping_generation != mapping_generation
     ) {
         return MICROS_VM_HANDOFF_ERROR_STATE;
     }
-    if (!micros_vm_handoff_selected_record_is_valid(state, record->process.slot)) {
+    if (!micros_vm_handoff_selected_record_is_valid(state, slot)) {
         return MICROS_VM_HANDOFF_ERROR_INVARIANT;
     }
 

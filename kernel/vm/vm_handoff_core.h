@@ -11,6 +11,8 @@
 #include "micros/vm.h"
 #include "micros/vm_bootstrap.h"
 
+struct micros_frame_ownership;
+
 enum micros_vm_handoff_phase {
     MICROS_VM_HANDOFF_PHASE_UNINITIALIZED = 0,
     MICROS_VM_HANDOFF_PHASE_PREPARED,
@@ -324,6 +326,7 @@ void micros_vm_load_begin_commit_prevalidated(
 
 enum micros_vm_handoff_error micros_vm_scratch_map_preflight(
     const struct micros_vm_handoff_state *state,
+    const struct micros_frame_ownership *ownership,
     const struct micros_vm_scratch_map_request *request,
     struct micros_vm_scratch_plan *plan
 );
@@ -355,6 +358,7 @@ void micros_vm_scratch_commit_commit_prevalidated(
 
 enum micros_vm_handoff_error micros_vm_load_freeze_preflight(
     const struct micros_vm_handoff_state *state,
+    const struct micros_frame_ownership *ownership,
     const struct micros_vm_load_freeze_plan *request,
     struct micros_vm_load_freeze_state_plan *plan
 );

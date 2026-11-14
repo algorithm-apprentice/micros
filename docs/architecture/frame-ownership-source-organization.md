@@ -5,6 +5,13 @@ the bootstrap frame allocator evidence and typed frame-ownership ledger. It
 applies ADR-0051 to the third correction identified by the repository
 source-module audit.
 
+The later [VM02 contract](vm-mapping-plan-uniqueness.md) extends the validation
+owner with `micros_frame_ownership_lookup_prevalidated` and its compact
+`micros_frame_reference`. It shares the actual selected row/index predicates
+after metadata admission; ordinary lookup retains its original contract.
+VM frame plans borrow the `lib/vm` key owner without adding ledger state.
+The fixed source-only preservation below does not freeze these later interfaces.
+
 Implementation must not begin until
 [ADR-0054](../adr/0054-frame-ownership-source-decomposition.md) is Accepted
 and its design pull request is merged.

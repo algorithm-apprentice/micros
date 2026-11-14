@@ -107,6 +107,14 @@ def expected_guards():
         add("precedence-lifetime", case, result)
     for case in ("wrong-mode", "wrong-storage", "wrong-bitmap", "inactive-lease", "second-prefix"):
         add("precedence-lifetime", case, panic="user-address-space-scratch-release")
+    for case, result in (
+        ("minimum", 0), ("maximum-memory", 0), ("maximum-pages", 0), ("attached", 0),
+        ("shared-root", 12), ("middle-hole", 12), ("image-hole", 12), ("stack-hole", 12),
+        ("substituted-table", 11), ("unmanaged-table", 11), ("owner-bit", 14),
+        ("owner-generation", 11), ("owner-link", 14), ("indexed-orphan", 11),
+        ("unvisited-root", 0), ("unindexed-foreign", 0), ("oversized-plan", 1),
+    ):
+        add("vm-certificate", case, result)
     return tuple(rows)
 
 

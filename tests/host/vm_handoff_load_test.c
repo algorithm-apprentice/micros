@@ -34,7 +34,7 @@ bool vm_handoff_test_test_load_transaction_lifecycle(void)
     load_token = state.load.load_token;
     request = vm_handoff_test_valid_freeze_plan(&state);
     EXPECT_TRUE(
-        micros_vm_load_freeze_preflight(&state, &request, &freeze)
+        micros_vm_load_freeze_preflight(&state, &vm_handoff_test_memory_get()->ownership, &request, &freeze)
             == MICROS_VM_HANDOFF_OK
         && freeze.mapping_generation != 0
         && freeze.result.version == MICROS_VM_LOAD_FREEZE_RESULT_VERSION
@@ -46,7 +46,7 @@ bool vm_handoff_test_test_load_transaction_lifecycle(void)
         && freeze.action.entry_count == 4
         && request.page_plan_digest == UINT64_C(0x8bc20d9c24364308)
     );
-    micros_vm_load_freeze_commit_prevalidated(&state, &freeze);
+    EXPECT_TRUE(vm_handoff_test_commit_freeze(&state, &freeze));
     mapping_generation = freeze.mapping_generation;
     EXPECT_TRUE(
         state.load.phase == MICROS_VM_LOAD_PHASE_FROZEN
@@ -109,7 +109,7 @@ bool vm_handoff_test_test_load_transaction_lifecycle(void)
         && release.root_physical_address == request.table_frames[0]
         && release.entry_count == 4
     );
-    micros_vm_exit_release_commit_prevalidated(&state, process);
+    EXPECT_TRUE(vm_handoff_test_commit_exit(&state, &release));
     EXPECT_TRUE(
         state.mappings[process.slot].phase == MICROS_VM_KERNEL_MAPPING_UNUSED
         && micros_vm_handoff_state_validate(&state) == MICROS_VM_HANDOFF_OK
@@ -134,7 +134,7 @@ bool vm_handoff_test_test_load_abort_before_and_after_freeze(void)
         && !abort_action.frozen
         && abort_action.entry_count == 4
     );
-    micros_vm_load_abort_commit_prevalidated(&state);
+    EXPECT_TRUE(vm_handoff_test_commit_abort(&state, &abort_action));
     EXPECT_TRUE(
         state.load.phase == MICROS_VM_LOAD_PHASE_IDLE
         && state.mappings[process.slot].phase == MICROS_VM_KERNEL_MAPPING_UNUSED
@@ -143,10 +143,10 @@ bool vm_handoff_test_test_load_abort_before_and_after_freeze(void)
     EXPECT_TRUE(vm_handoff_test_begin_and_fill_load(&state, UINT64_C(0x71)));
     request = vm_handoff_test_valid_freeze_plan(&state);
     EXPECT_TRUE(
-        micros_vm_load_freeze_preflight(&state, &request, &freeze)
+        micros_vm_load_freeze_preflight(&state, &vm_handoff_test_memory_get()->ownership, &request, &freeze)
             == MICROS_VM_HANDOFF_OK
     );
-    micros_vm_load_freeze_commit_prevalidated(&state, &freeze);
+    EXPECT_TRUE(vm_handoff_test_commit_freeze(&state, &freeze));
     EXPECT_TRUE(
         micros_vm_load_abort_preflight(&state,
             state.load.load_token,
@@ -156,7 +156,7 @@ bool vm_handoff_test_test_load_abort_before_and_after_freeze(void)
         && abort_action.root_physical_address == request.table_frames[0]
         && abort_action.entry_count == 4
     );
-    micros_vm_load_abort_commit_prevalidated(&state);
+    EXPECT_TRUE(vm_handoff_test_commit_abort(&state, &abort_action));
     EXPECT_TRUE(
         state.load.phase == MICROS_VM_LOAD_PHASE_IDLE
         && state.mappings[process.slot].phase == MICROS_VM_KERNEL_MAPPING_UNUSED
@@ -196,7 +196,7 @@ bool vm_handoff_test_test_load_failures_preserve_state(void)
             MICROS_SV39_PERMISSION_USER | MICROS_SV39_PERMISSION_READ,
     };
     EXPECT_TRUE(
-        micros_vm_scratch_map_preflight(&state, &map_request, &scratch)
+        micros_vm_scratch_map_preflight(&state, &vm_handoff_test_memory_get()->ownership, &map_request, &scratch)
             == MICROS_VM_HANDOFF_ERROR_STATE
         && memcmp(&state, &snapshot, sizeof(state)) == 0
     );
@@ -206,7 +206,7 @@ bool vm_handoff_test_test_load_failures_preserve_state(void)
     freeze = freeze_sentinel;
     snapshot = state;
     EXPECT_TRUE(
-        micros_vm_load_freeze_preflight(&state, &request, &freeze)
+        micros_vm_load_freeze_preflight(&state, &vm_handoff_test_memory_get()->ownership, &request, &freeze)
             == MICROS_VM_HANDOFF_ERROR_SUMMARY
         && memcmp(&state, &snapshot, sizeof(state)) == 0
         && memcmp(&freeze, &freeze_sentinel, sizeof(freeze)) == 0
@@ -227,7 +227,7 @@ bool vm_handoff_test_test_freeze_stack_boundaries(void)
     request.stack_pointer =
         MICROS_APPLICATION_STACK_TOP - MICROS_APPLICATION_STACK_OCCUPIED_MAX;
     EXPECT_TRUE(
-        micros_vm_load_freeze_preflight(&state, &request, &freeze)
+        micros_vm_load_freeze_preflight(&state, &vm_handoff_test_memory_get()->ownership, &request, &freeze)
             == MICROS_VM_HANDOFF_OK
     );
 
@@ -236,7 +236,7 @@ bool vm_handoff_test_test_freeze_stack_boundaries(void)
     freeze = sentinel;
     snapshot = state;
     EXPECT_TRUE(
-        micros_vm_load_freeze_preflight(&state, &request, &freeze)
+        micros_vm_load_freeze_preflight(&state, &vm_handoff_test_memory_get()->ownership, &request, &freeze)
             == MICROS_VM_HANDOFF_ERROR_ARGUMENT
         && memcmp(&state, &snapshot, sizeof(state)) == 0
         && memcmp(&freeze, &sentinel, sizeof(freeze)) == 0
@@ -256,10 +256,10 @@ bool vm_handoff_test_test_rejects_oversized_later_mapping_record(void)
     EXPECT_TRUE(vm_handoff_test_begin_and_fill_load(&state, UINT64_C(0x91)));
     request = vm_handoff_test_valid_freeze_plan(&state);
     EXPECT_TRUE(
-        micros_vm_load_freeze_preflight(&state, &request, &freeze)
+        micros_vm_load_freeze_preflight(&state, &vm_handoff_test_memory_get()->ownership, &request, &freeze)
             == MICROS_VM_HANDOFF_OK
     );
-    micros_vm_load_freeze_commit_prevalidated(&state, &freeze);
+    EXPECT_TRUE(vm_handoff_test_commit_freeze(&state, &freeze));
     EXPECT_TRUE(
         micros_vm_load_mark_prepared(
             &state,

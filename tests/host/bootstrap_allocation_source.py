@@ -28,6 +28,7 @@ RECIPE_ADMISSION = {
     "ordinary_observations": "absent",
     "reference_cmake_sha256": "c000e9e10623c4aaf2938ca904e2e6f783b3a3e026987cde852634801d123837",
     "native_source_members": (
+        "lib/vm/vm_keys.c",
         "kernel/memory/frame_allocator.c",
         "kernel/memory/frame_ownership.c",
         "kernel/memory/frame_ownership_validation.c",

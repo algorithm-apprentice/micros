@@ -541,34 +541,6 @@ static enum micros_user_address_space_error load_validation_context(
     return bind_validation_process(runtime, context);
 }
 
-static enum micros_user_address_space_error load_vm_plan_validation_context(
-    struct micros_user_address_space_runtime_view *runtime,
-    const struct micros_user_address_space_scratch_lease *lease,
-    struct micros_process_handle process,
-    struct user_address_space_validation_context *context
-)
-{
-    enum micros_vm_scratch_authority_status vm_status;
-    enum micros_tty_device_authority_status tty_status;
-    enum micros_user_address_space_error error = initialize_validation_context(runtime, lease, process, context);
-
-    if (error != MICROS_USER_ADDRESS_SPACE_OK) {
-        return error;
-    }
-    if (runtime->ownership_phase != MICROS_FRAME_OWNERSHIP_PHASE_HANDED_OFF) {
-        return MICROS_USER_ADDRESS_SPACE_ERROR_PHASE;
-    }
-    vm_status = micros_vm_handoff_runtime_inspect_scratch_binding(&context->scratch_authority);
-    tty_status = micros_tty_handoff_runtime_inspect_device_binding(runtime->objects, &context->device_authority);
-    if ((vm_status != MICROS_VM_SCRATCH_AUTHORITY_NONE && vm_status != MICROS_VM_SCRATCH_AUTHORITY_ACTIVE)
-        || (tty_status != MICROS_TTY_DEVICE_AUTHORITY_NONE && tty_status != MICROS_TTY_DEVICE_AUTHORITY_ACTIVE)) {
-        return MICROS_USER_ADDRESS_SPACE_ERROR_INVARIANT;
-    }
-    context->scratch_authority_active = vm_status == MICROS_VM_SCRATCH_AUTHORITY_ACTIVE;
-    context->device_authority_active = tty_status == MICROS_TTY_DEVICE_AUTHORITY_ACTIVE;
-    return bind_validation_process(runtime, context);
-}
-
 static enum micros_user_address_space_error
 validate_shared_kernel_entries(
     const struct user_address_space_validation_context *context
@@ -906,20 +878,6 @@ enum micros_user_address_space_error micros_user_address_space_validate_locked(
     return error == MICROS_USER_ADDRESS_SPACE_OK ? validate_context_root(&context, resolved_process) : error;
 }
 
-static enum micros_user_address_space_error validate_vm_plan_root_locked(
-    struct micros_user_address_space_runtime_view *runtime,
-    const struct micros_user_address_space_scratch_lease *lease,
-    struct micros_process_handle process
-)
-{
-    MICROS_VM01_WORK_HIT("vm01-memory-root", MICROS_WORK_OWNER_KERNEL_MEMORY,
-                        MICROS_WORK_KIND_COMPLETE_VALIDATOR_CALL, 1);
-    struct user_address_space_validation_context context;
-    enum micros_user_address_space_error error = load_vm_plan_validation_context(runtime, lease, process, &context);
-
-    return error == MICROS_USER_ADDRESS_SPACE_OK ? validate_context_root(&context, NULL) : error;
-}
-
 enum micros_user_address_space_error
 micros_user_address_space_load_selected_bindings(
     const struct micros_user_address_space_runtime_view *runtime,
@@ -1006,15 +964,36 @@ enum micros_user_address_space_error micros_user_address_space_classify_selected
     return MICROS_USER_ADDRESS_SPACE_OK;
 }
 
+static bool kernel_root_owner_is_valid(struct micros_frame_owner owner)
+{
+    return owner.kind == MICROS_FRAME_OWNER_KERNEL_PAGE_TABLE
+        && owner.generation == 0 && owner.slot == 0 && owner.reserved == 0;
+}
+
 static bool selected_kernel_root_is_valid(const struct micros_user_address_space_runtime_view *runtime)
 {
     struct micros_frame_owner owner;
 
     return micros_frame_ownership_lookup(
         runtime->ledger, runtime->kernel_report->root_physical_address, &owner
-    ) == MICROS_FRAME_OWNERSHIP_OK
-        && owner.kind == MICROS_FRAME_OWNER_KERNEL_PAGE_TABLE
-        && owner.generation == 0 && owner.slot == 0 && owner.reserved == 0;
+    ) == MICROS_FRAME_OWNERSHIP_OK && kernel_root_owner_is_valid(owner);
+}
+
+enum micros_user_address_space_error micros_user_address_space_validate_vm_kernel_root(
+    const struct micros_user_address_space_runtime_view *runtime
+)
+{
+    struct micros_frame_reference reference;
+
+    if (micros_frame_ownership_lookup_prevalidated(
+            runtime->ledger, runtime->kernel_report->root_physical_address, &reference)
+            != MICROS_FRAME_OWNERSHIP_OK
+        || !kernel_root_owner_is_valid(reference.owner)
+        || table_at(runtime->kernel_report->root_physical_address)
+            ->entries[MICROS_USER_ADDRESS_SPACE_USER_ROOT_INDEX] != 0) {
+        return MICROS_USER_ADDRESS_SPACE_ERROR_INVARIANT;
+    }
+    return MICROS_USER_ADDRESS_SPACE_OK;
 }
 
 static enum micros_user_address_space_error validate_selected_shared_entries(
@@ -1154,31 +1133,14 @@ enum micros_user_address_space_error micros_user_address_space_validate_all_proc
     const struct micros_user_address_space_scratch_lease *lease
 )
 {
+    MICROS_VM01_WORK_HIT("vm01-root-enumeration", MICROS_WORK_OWNER_KERNEL_MEMORY,
+                        MICROS_WORK_KIND_RECORD_VISIT, 1);
     struct micros_process_handle process;
     size_t cursor = 0;
 
     while (next_root_process(objects, &cursor, &process)) {
         enum micros_user_address_space_error error =
             micros_user_address_space_validate_locked(runtime, lease, process, NULL);
-
-        if (error != MICROS_USER_ADDRESS_SPACE_OK) {
-            return error;
-        }
-    }
-    return MICROS_USER_ADDRESS_SPACE_OK;
-}
-
-enum micros_user_address_space_error micros_user_address_space_validate_vm_plan_roots_locked(
-    struct micros_user_address_space_runtime_view *runtime,
-    const struct micros_kernel_objects *objects,
-    const struct micros_user_address_space_scratch_lease *lease
-)
-{
-    struct micros_process_handle process;
-    size_t cursor = 0;
-
-    while (next_root_process(objects, &cursor, &process)) {
-        enum micros_user_address_space_error error = validate_vm_plan_root_locked(runtime, lease, process);
 
         if (error != MICROS_USER_ADDRESS_SPACE_OK) {
             return error;
@@ -1241,47 +1203,7 @@ done:
     return error;
 }
 
-enum micros_user_address_space_error micros_user_address_space_validate_vm_constructed_root(
-    const struct micros_user_address_space_vm_table_plan *plan
-)
-{
-    const struct micros_frame_ownership *ledger;
-    const struct micros_kernel_objects *objects;
-    const struct micros_kernel_address_space_report *kernel_report;
-    const struct micros_process *resolved;
-    struct micros_user_address_space_runtime_view runtime;
-    struct micros_user_address_space_scratch_lease scratch;
-    enum micros_user_address_space_error error;
-    uintptr_t saved_status;
-
-    if (plan == NULL) {
-        return MICROS_USER_ADDRESS_SPACE_ERROR_ARGUMENT;
-    }
-    saved_status = micros_user_address_space_runtime_lock();
-    error = require_read_authority(&runtime, &ledger, &objects, &kernel_report, NULL);
-    if (error != MICROS_USER_ADDRESS_SPACE_OK) {
-        goto done;
-    }
-    error = resolve_process_with_root(&runtime, plan->process, &resolved);
-    if (error != MICROS_USER_ADDRESS_SPACE_OK) {
-        goto done;
-    }
-    if (resolved->address_space_root != plan->table_frames[MICROS_USER_ADDRESS_SPACE_VM_TABLE_ROOT]) {
-        error = MICROS_USER_ADDRESS_SPACE_ERROR_STATE;
-        goto done;
-    }
-    error = acquire_scratch(&runtime, &scratch);
-    if (error != MICROS_USER_ADDRESS_SPACE_OK) {
-        goto done;
-    }
-    error = validate_vm_plan_root_locked(&runtime, &scratch, plan->process);
-    release_scratch(&scratch);
-done:
-    micros_user_address_space_runtime_unlock(saved_status);
-    return error;
-}
-
-bool micros_user_address_space_vm_table_plan_matches_memory(
+static bool vm_table_plan_matches_memory(
     const struct micros_user_address_space_vm_table_plan *plan,
     const struct micros_kernel_address_space_report *kernel_report
 )
@@ -1291,75 +1213,69 @@ bool micros_user_address_space_vm_table_plan_matches_memory(
     const struct micros_user_address_space_page_table *middle;
     const struct micros_user_address_space_page_table *image;
     const struct micros_user_address_space_page_table *stack;
+    struct micros_user_address_space_vm_leaf_plan stack_leaf;
+    uint64_t root_physical, middle_physical, image_physical, stack_physical;
+    uint64_t expected_link;
+    size_t image_count;
     size_t index;
 
     if (
         plan == NULL
         || kernel_report == NULL
+        || plan->entry_count < MICROS_APPLICATION_IMAGE_PAGE_MIN + 1
         || plan->entry_count
             > MICROS_APPLICATION_RESIDENT_PAGE_MAX
+        || plan->reserved != 0
+        || plan->root_index != MICROS_USER_ADDRESS_SPACE_USER_ROOT_INDEX
+        || plan->image_middle_index != 0
+        || plan->stack_middle_index != MICROS_SV39_TABLE_ENTRY_COUNT - 1
     ) {
         return false;
     }
+    root_physical = plan->table_frames[MICROS_USER_ADDRESS_SPACE_VM_TABLE_ROOT];
+    middle_physical = plan->table_frames[MICROS_USER_ADDRESS_SPACE_VM_TABLE_LEVEL_ONE];
+    image_physical = plan->table_frames[MICROS_USER_ADDRESS_SPACE_VM_TABLE_IMAGE];
+    stack_physical = plan->table_frames[MICROS_USER_ADDRESS_SPACE_VM_TABLE_STACK];
+    if (micros_sv39_make_table_pte(middle_physical, &expected_link) != MICROS_SV39_OK
+        || expected_link != plan->root_pte
+        || micros_sv39_make_table_pte(image_physical, &expected_link) != MICROS_SV39_OK
+        || expected_link != plan->image_middle_pte
+        || micros_sv39_make_table_pte(stack_physical, &expected_link) != MICROS_SV39_OK
+        || expected_link != plan->stack_middle_pte) {
+        return false;
+    }
+    image_count = plan->entry_count - 1;
+    stack_leaf = plan->leaves[image_count];
+    if (stack_leaf.table_role != MICROS_USER_ADDRESS_SPACE_VM_TABLE_STACK
+        || stack_leaf.leaf_index != MICROS_SV39_TABLE_ENTRY_COUNT - 1 || stack_leaf.reserved != 0) {
+        return false;
+    }
     kernel_root = table_at(kernel_report->root_physical_address);
-    root = table_at(
-        plan->table_frames[
-            MICROS_USER_ADDRESS_SPACE_VM_TABLE_ROOT
-        ]
-    );
-    middle = table_at(
-        plan->table_frames[
-            MICROS_USER_ADDRESS_SPACE_VM_TABLE_LEVEL_ONE
-        ]
-    );
-    image = table_at(
-        plan->table_frames[
-            MICROS_USER_ADDRESS_SPACE_VM_TABLE_IMAGE
-        ]
-    );
-    stack = table_at(
-        plan->table_frames[
-            MICROS_USER_ADDRESS_SPACE_VM_TABLE_STACK
-        ]
-    );
+    root = table_at(root_physical);
+    middle = table_at(middle_physical);
+    image = table_at(image_physical);
+    stack = table_at(stack_physical);
     for (index = 0; index < MICROS_SV39_TABLE_ENTRY_COUNT; ++index) {
         uint64_t expected_root = index == plan->root_index
             ? plan->root_pte
             : kernel_root->entries[index];
         uint64_t expected_middle = 0;
         uint64_t expected_image = 0;
-        uint64_t expected_stack = 0;
-        size_t leaf_index;
+        uint64_t expected_stack = index == stack_leaf.leaf_index ? stack_leaf.pte : 0;
 
         if (index == plan->image_middle_index) {
             expected_middle = plan->image_middle_pte;
         } else if (index == plan->stack_middle_index) {
             expected_middle = plan->stack_middle_pte;
         }
-        for (
-            leaf_index = 0;
-            leaf_index < plan->entry_count;
-            ++leaf_index
-        ) {
-            const struct micros_user_address_space_vm_leaf_plan
-                *leaf = &plan->leaves[leaf_index];
+        if (index < image_count) {
+            const struct micros_user_address_space_vm_leaf_plan *leaf = &plan->leaves[index];
 
-            if (leaf->leaf_index != index) {
-                continue;
-            }
-            if (
-                leaf->table_role
-                    == MICROS_USER_ADDRESS_SPACE_VM_TABLE_IMAGE
-            ) {
-                expected_image = leaf->pte;
-            } else if (
-                leaf->table_role
-                    == MICROS_USER_ADDRESS_SPACE_VM_TABLE_STACK
-            ) {
-                expected_stack = leaf->pte;
-            } else {
+            if (leaf->table_role != MICROS_USER_ADDRESS_SPACE_VM_TABLE_IMAGE
+                || leaf->leaf_index != index || leaf->reserved != 0) {
                 return false;
             }
+            expected_image = leaf->pte;
         }
         if (
             root->entries[index] != expected_root
@@ -1371,6 +1287,139 @@ bool micros_user_address_space_vm_table_plan_matches_memory(
         }
     }
     return true;
+}
+
+static enum micros_user_address_space_error collect_vm_plan_frames(
+    const struct micros_frame_ownership *ledger,
+    struct micros_frame_selection *selection,
+    const struct micros_user_address_space_vm_table_plan *plan
+)
+{
+    size_t total = plan->entry_count + MICROS_VM_LOAD_PAGE_TABLE_FRAME_COUNT;
+
+    for (size_t index = 0; index < total; ++index) {
+        struct micros_frame_reference reference;
+        uint64_t physical;
+        enum micros_frame_owner_kind kind;
+
+        if (index < plan->entry_count) {
+            struct micros_sv39_decoded_pte leaf;
+
+            if (micros_sv39_decode_pte(plan->leaves[index].pte, &leaf) != MICROS_SV39_OK
+                || leaf.kind != MICROS_SV39_PTE_LEAF
+                || (leaf.permissions & MICROS_SV39_PERMISSION_USER) == 0) {
+                return MICROS_USER_ADDRESS_SPACE_ERROR_PTE;
+            }
+            physical = leaf.physical_address;
+            kind = MICROS_FRAME_OWNER_VM_WIRED;
+        } else {
+            physical = plan->table_frames[index - plan->entry_count];
+            kind = MICROS_FRAME_OWNER_PROCESS_PAGE_TABLE;
+        }
+        if (micros_frame_ownership_lookup_prevalidated(ledger, physical, &reference)
+                != MICROS_FRAME_OWNERSHIP_OK
+            || reference.owner.kind != kind || reference.owner.slot != plan->process.slot
+            || reference.owner.generation != plan->process.generation || reference.owner.reserved != 0
+            || micros_frame_selection_contains(selection, reference.frame_index)
+            || !micros_frame_selection_add(selection, reference.frame_index)) {
+            return MICROS_USER_ADDRESS_SPACE_ERROR_OWNERSHIP;
+        }
+    }
+    return MICROS_USER_ADDRESS_SPACE_OK;
+}
+
+static bool vm_owner_chain_matches_selection(
+    const struct micros_frame_ownership *ledger,
+    struct micros_process_handle process,
+    const struct micros_frame_selection *selection,
+    uint64_t expected_count
+)
+{
+    uint32_t node = ledger->process_frames[process.slot].head;
+
+    if (selection->frame_count != expected_count) {
+        return false;
+    }
+    for (uint64_t index = 0; index < expected_count; ++index) {
+        if (node == 0 || node > ledger->managed_frame_count
+            || !micros_frame_selection_contains(selection, node - 1)) {
+            return false;
+        }
+        node = ledger->owner_links[node - 1].next;
+    }
+    return node == 0;
+}
+
+enum micros_user_address_space_error micros_user_address_space_validate_vm_table_plan_locked(
+    struct micros_user_address_space_runtime_view *runtime,
+    struct micros_user_address_space_scratch_lease *lease,
+    const struct micros_user_address_space_vm_table_plan *plan
+)
+{
+    MICROS_VM01_WORK_HIT("vm01-memory-root", MICROS_WORK_OWNER_KERNEL_MEMORY,
+                        MICROS_WORK_KIND_COMPLETE_VALIDATOR_CALL, 1);
+    const struct micros_process *resolved;
+    enum micros_user_address_space_error error;
+    enum micros_frame_ownership_error ownership_error;
+    uint64_t count;
+    uint64_t expected_count;
+
+    if (runtime == NULL || lease == NULL || plan == NULL
+        || plan->entry_count < MICROS_APPLICATION_IMAGE_PAGE_MIN + 1
+        || plan->entry_count > MICROS_APPLICATION_RESIDENT_PAGE_MAX) {
+        return MICROS_USER_ADDRESS_SPACE_ERROR_ARGUMENT;
+    }
+    error = micros_user_address_space_runtime_require_read(runtime);
+    if (error != MICROS_USER_ADDRESS_SPACE_OK) {
+        return error;
+    }
+    if (runtime->ownership_phase != MICROS_FRAME_OWNERSHIP_PHASE_HANDED_OFF) {
+        return MICROS_USER_ADDRESS_SPACE_ERROR_PHASE;
+    }
+    error = micros_user_address_space_runtime_resolve_process(runtime, plan->process, false, &resolved);
+    if (error != MICROS_USER_ADDRESS_SPACE_OK) {
+        return error;
+    }
+    if (resolved->address_space_root != 0
+        && resolved->address_space_root != plan->table_frames[MICROS_USER_ADDRESS_SPACE_VM_TABLE_ROOT]) {
+        return MICROS_USER_ADDRESS_SPACE_ERROR_STATE;
+    }
+    if (!lease->active || lease->mode != MICROS_USER_ADDRESS_SPACE_SCRATCH_SELECTED
+        || lease->reachable_selection == NULL || lease->release_selection == NULL
+        || lease->reachable_bitmap != lease->reachable_selection->bitmap
+        || lease->release_bitmap != lease->release_selection->bitmap
+        || lease->frame_count != runtime->ledger->managed_frame_count
+        || lease->word_count != (size_t)((lease->frame_count + 63) / 64)
+        || lease->reachable_selection->frame_count != 0 || lease->reachable_selection->word_count != 0
+        || lease->release_selection->frame_count != 0 || lease->release_selection->word_count != 0) {
+        return MICROS_USER_ADDRESS_SPACE_ERROR_INVARIANT;
+    }
+    expected_count = plan->entry_count + MICROS_VM_LOAD_PAGE_TABLE_FRAME_COUNT;
+    if (runtime->ledger->process_frames[plan->process.slot].count > expected_count) {
+        return MICROS_USER_ADDRESS_SPACE_ERROR_OWNERSHIP;
+    }
+    ownership_error = micros_frame_ownership_count_process(runtime->ledger, plan->process, &count);
+    if (ownership_error != MICROS_FRAME_OWNERSHIP_OK) {
+        return micros_user_address_space_map_ownership_error(ownership_error);
+    }
+    if (count != expected_count
+        || runtime->ledger->process_frames[plan->process.slot].count != expected_count) {
+        return MICROS_USER_ADDRESS_SPACE_ERROR_OWNERSHIP;
+    }
+    error = collect_vm_plan_frames(runtime->ledger, lease->reachable_selection, plan);
+    if (error != MICROS_USER_ADDRESS_SPACE_OK) {
+        return error;
+    }
+    if (!vm_owner_chain_matches_selection(runtime->ledger, plan->process,
+                                          lease->reachable_selection, expected_count)) {
+        return MICROS_USER_ADDRESS_SPACE_ERROR_OWNERSHIP;
+    }
+    error = micros_user_address_space_validate_vm_kernel_root(runtime);
+    if (error != MICROS_USER_ADDRESS_SPACE_OK) {
+        return error;
+    }
+    return vm_table_plan_matches_memory(plan, runtime->kernel_report)
+        ? MICROS_USER_ADDRESS_SPACE_OK : MICROS_USER_ADDRESS_SPACE_ERROR_PTE;
 }
 
 static enum micros_user_address_space_error bootstrap_collect_frame(

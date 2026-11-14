@@ -260,6 +260,7 @@ static bool append_runtime_pages(
             ) == MICROS_FRAME_OWNERSHIP_OK
             && micros_vm_scratch_map_preflight(
                 &scenario->context->runtime_vm,
+                &scenario->context->runtime_ownership,
                 &map_request,
                 &scratch
             ) == MICROS_VM_HANDOFF_OK
@@ -329,6 +330,7 @@ static bool freeze_runtime_mapping(
     EXPECT_TRUE(
         micros_vm_load_freeze_preflight(
             &scenario->context->runtime_vm,
+            &scenario->context->runtime_ownership,
             &request,
             &scenario->vm_freeze
         ) == MICROS_VM_HANDOFF_OK

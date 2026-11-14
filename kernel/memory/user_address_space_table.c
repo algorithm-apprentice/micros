@@ -48,24 +48,28 @@ bool micros_user_address_space_permissions_are_valid(uint32_t permissions) {
 
 bool micros_user_address_space_frame_index(const struct micros_frame_ownership *ledger,
                                            uint64_t physical_address, uint64_t *frame_index) {
-    size_t range_index;
+    size_t first = 0;
+    size_t end;
 
     if (ledger == NULL || frame_index == NULL || physical_address % MICROS_SV39_PAGE_SIZE != 0) {
         return false;
     }
-    for (range_index = 0; range_index < ledger->managed_range_count; ++range_index) {
-        const struct micros_frame_range_snapshot *range = &ledger->managed_ranges[range_index];
-        uint64_t offset;
-        uint64_t index_in_range;
+    end = ledger->managed_range_count;
+    while (first < end) {
+        size_t middle = first + (end - first) / 2;
+        const struct micros_frame_range_snapshot *range = &ledger->managed_ranges[middle];
 
         if (physical_address < range->base) {
-            continue;
-        }
-        offset = physical_address - range->base;
-        index_in_range = offset / MICROS_SV39_PAGE_SIZE;
-        if (index_in_range < range->frame_count) {
-            *frame_index = range->bitmap_offset + index_in_range;
-            return *frame_index < ledger->managed_frame_count;
+            end = middle;
+        } else {
+            uint64_t offset = (physical_address - range->base) / MICROS_SV39_PAGE_SIZE;
+
+            if (offset >= range->frame_count) {
+                first = middle + 1;
+            } else {
+                *frame_index = range->bitmap_offset + offset;
+                return *frame_index < ledger->managed_frame_count;
+            }
         }
     }
     return false;
@@ -73,19 +77,28 @@ bool micros_user_address_space_frame_index(const struct micros_frame_ownership *
 
 bool micros_user_address_space_physical_address(const struct micros_frame_ownership *ledger,
                                                 uint64_t frame_index, uint64_t *physical_address) {
-    size_t range_index;
+    size_t first = 0;
+    size_t end;
 
     if (ledger == NULL || physical_address == NULL || frame_index >= ledger->managed_frame_count) {
         return false;
     }
-    for (range_index = 0; range_index < ledger->managed_range_count; ++range_index) {
-        const struct micros_frame_range_snapshot *range = &ledger->managed_ranges[range_index];
+    end = ledger->managed_range_count;
+    while (first < end) {
+        size_t middle = first + (end - first) / 2;
+        const struct micros_frame_range_snapshot *range = &ledger->managed_ranges[middle];
 
-        if (frame_index >= range->bitmap_offset &&
-            frame_index < range->bitmap_offset + range->frame_count) {
-            *physical_address =
-                range->base + (frame_index - range->bitmap_offset) * MICROS_SV39_PAGE_SIZE;
-            return true;
+        if (frame_index < range->bitmap_offset) {
+            end = middle;
+        } else {
+            uint64_t offset = frame_index - range->bitmap_offset;
+
+            if (offset >= range->frame_count) {
+                first = middle + 1;
+            } else {
+                *physical_address = range->base + offset * MICROS_SV39_PAGE_SIZE;
+                return true;
+            }
         }
     }
     return false;

@@ -4,8 +4,9 @@
 
 This is the Accepted VM02 contract under
 [ADR-0136](../adr/0136-vm-mapping-plan-uniqueness.md). VM01 #272 and MEM04
-#228 are merged. Independent design review is clean; implementation remains
-pending the separate design merge.
+#228 are merged. Independent design review is clean and design #273 is
+separately merged. Implementation is active; the three findings remain open
+until its complete acceptance and independent review.
 
 Close only B02-F008, B02-F009 and B07-F004: replace all-process VM mapping
 audits and pairwise uniqueness searches with selected-root/owner indexes
@@ -458,10 +459,10 @@ requirements, not permission to increase a limit.
 
 | Owner | Required change |
 | --- | --- |
-| `lib/vm` | Narrow fixed-key workspace/radix mechanism, boot uniqueness and shared checked load-token routing declaration; no kernel-private dependency or comparator callbacks |
-| `kernel/memory` | Shared metadata-admitted frame/index reads, original-order frame plans, selected VM paths and the exact selected four-table/owner certificate |
+| `lib/vm` | `vm_keys.c` owns the fixed-key workspace/radix proofs; `vm_load_token.c` owns checked routing decode; boot validation borrows the same keys. No kernel-private dependency or comparator callbacks |
+| `kernel/memory` | `micros_frame_ownership_lookup_prevalidated` returns the checked compact index/owner; existing plan/path owners preserve order; `micros_user_address_space_validate_vm_table_plan_locked` owns the four-table/owner certificate |
 | `kernel/vm` | Issuer and slot-bound admission, owner-directed collision selection, local/global uniqueness and direct exit selection |
-| `servers/vm` | Selected geometry, complete uniqueness, temporary construction membership and slot-bound load/exit records |
+| `servers/vm` | `vm_frames.c` owns geometry and the temporary construction membership view; existing validation/load/exit owners consume it and the checked token selector |
 | Existing native/ELF-spawn/stack evidence owners | Real-source semantic/work controls and actual composed/artifact/storage proof, with unchanged workflows and budgets |
 
 This map authorizes no implementation until the separate design barrier.

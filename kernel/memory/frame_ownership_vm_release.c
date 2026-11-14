@@ -15,6 +15,7 @@ micros_frame_ownership_vm_release_transferable_preflight(
     struct micros_frame_vm_transferable_release_plan candidate;
     enum micros_frame_ownership_error error;
     size_t index;
+    size_t first_duplicate;
 
     if (
         plan == NULL
@@ -32,6 +33,10 @@ micros_frame_ownership_vm_release_transferable_preflight(
     if (error != MICROS_FRAME_OWNERSHIP_OK) {
         return error;
     }
+    if (!micros_frame_ownership_first_duplicate_page(
+        physical_addresses, physical_address_count, NULL, 0, &first_duplicate)) {
+        return MICROS_FRAME_OWNERSHIP_ERROR_INVARIANT;
+    }
     for (index = 0; index < physical_address_count; ++index) {
         uint64_t frame_index;
         struct micros_frame_owner owner;
@@ -44,11 +49,7 @@ micros_frame_ownership_vm_release_transferable_preflight(
         if (error != MICROS_FRAME_OWNERSHIP_OK) {
             return error;
         }
-        if (micros_frame_ownership_frame_index_is_duplicate(
-            candidate.frame_indices,
-            index,
-            frame_index
-        )) {
+        if (index == first_duplicate) {
             return MICROS_FRAME_OWNERSHIP_ERROR_TRANSITION;
         }
         error = micros_frame_ownership_selected_record(ownership, frame_index, &owner);

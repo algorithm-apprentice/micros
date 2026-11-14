@@ -1,4 +1,5 @@
 #include "kernel/memory/frame_ownership_internal.h"
+#include "lib/vm/vm_keys.h"
 #include "micros/work_observation.h"
 
 #include <stdbool.h>
@@ -138,15 +139,50 @@ enum micros_frame_ownership_error micros_frame_ownership_lookup(
     if (error != MICROS_FRAME_OWNERSHIP_OK) {
         return error;
     }
-    error = micros_frame_ownership_physical_address_to_index(
-        ownership,
-        physical_address,
-        &frame_index
-    );
+    error = micros_frame_ownership_physical_address_to_index(ownership, physical_address, &frame_index);
     if (error != MICROS_FRAME_OWNERSHIP_OK) {
         return error;
     }
     return micros_frame_ownership_selected_record(ownership, frame_index, owner);
+}
+
+enum micros_frame_ownership_error micros_frame_ownership_lookup_prevalidated(
+    const struct micros_frame_ownership *ownership,
+    uint64_t physical_address,
+    struct micros_frame_reference *reference
+)
+{
+    struct micros_frame_reference candidate;
+    enum micros_frame_ownership_error error;
+
+    if (reference == NULL) {
+        return MICROS_FRAME_OWNERSHIP_ERROR_ARGUMENT;
+    }
+    error = micros_frame_ownership_require_initialized(ownership);
+    if (error != MICROS_FRAME_OWNERSHIP_OK) {
+        return error;
+    }
+    if (ownership->managed_range_count == 0
+        || ownership->managed_range_count > MICROS_FRAME_ALLOCATOR_MAX_MANAGED_RANGES
+        || ownership->managed_frame_count == 0
+        || ownership->managed_frame_count > MICROS_FRAME_ALLOCATOR_MAX_MANAGED_FRAMES) {
+        return MICROS_FRAME_OWNERSHIP_ERROR_INVARIANT;
+    }
+    error = micros_frame_ownership_physical_address_to_index(
+        ownership, physical_address, &candidate.frame_index);
+    if (error != MICROS_FRAME_OWNERSHIP_OK) {
+        return error;
+    }
+    error = micros_frame_ownership_selected_record(
+        ownership, candidate.frame_index, &candidate.owner);
+    if (error != MICROS_FRAME_OWNERSHIP_OK) {
+        return error;
+    }
+    if (!micros_frame_ownership_index_can_remove(ownership, candidate.frame_index)) {
+        return MICROS_FRAME_OWNERSHIP_ERROR_INVARIANT;
+    }
+    *reference = candidate;
+    return MICROS_FRAME_OWNERSHIP_OK;
 }
 
 enum micros_frame_ownership_error
@@ -426,20 +462,33 @@ micros_frame_ownership_vm_transition_preflight(
     return micros_frame_ownership_validate_metadata(ownership);
 }
 
-bool micros_frame_ownership_frame_index_is_duplicate(
-    const uint64_t *frame_indices,
-    size_t frame_index_count,
-    uint64_t frame_index
+bool micros_frame_ownership_first_duplicate_page(
+    const uint64_t *data_frames,
+    size_t data_count,
+    const uint64_t *table_frames,
+    size_t table_count,
+    size_t *first_duplicate
 )
 {
-    size_t index;
+    struct micros_vm_key_view keys;
 
-    for (index = 0; index < frame_index_count; ++index) {
-        if (frame_indices[index] == frame_index) {
-            return true;
+    if (data_count > MICROS_APPLICATION_RESIDENT_PAGE_MAX
+        || table_count > MICROS_VM_LOAD_PAGE_TABLE_FRAME_COUNT
+        || (data_count != 0 && data_frames == NULL)
+        || (table_count != 0 && table_frames == NULL)
+        || first_duplicate == NULL || !micros_vm_keys_begin64(&keys)) {
+        return false;
+    }
+    for (size_t index = 0; index < data_count + table_count; ++index) {
+        uint64_t physical = index < data_count
+            ? data_frames[index] : table_frames[index - data_count];
+
+        if (!micros_vm_keys_append_page(&keys, physical, index)) {
+            (void)micros_vm_keys_end(&keys);
+            return false;
         }
     }
-    return false;
+    return micros_vm_keys_finish_pages(&keys, first_duplicate);
 }
 static struct micros_frame_owner expected_vm_frame_owner(
     enum micros_frame_owner_kind owner_kind,
@@ -471,6 +520,7 @@ static enum micros_frame_ownership_error resolve_vm_data_frames(
     size_t data_physical_address_count,
     enum micros_frame_owner_kind data_owner_kind,
     struct micros_frame_owner expected_data_owner,
+    size_t first_duplicate,
     uint64_t
         data_frame_indices[MICROS_APPLICATION_RESIDENT_PAGE_MAX]
 )
@@ -490,11 +540,7 @@ static enum micros_frame_ownership_error resolve_vm_data_frames(
         if (error != MICROS_FRAME_OWNERSHIP_OK) {
             return error;
         }
-        if (micros_frame_ownership_frame_index_is_duplicate(
-            data_frame_indices,
-            index,
-            frame_index
-        )) {
+        if (index == first_duplicate) {
             return MICROS_FRAME_OWNERSHIP_ERROR_TRANSITION;
         }
         error = micros_frame_ownership_selected_record(ownership, frame_index, &owner);
@@ -521,9 +567,8 @@ static enum micros_frame_ownership_error resolve_vm_table_frames(
         table_physical_addresses[MICROS_VM_LOAD_PAGE_TABLE_FRAME_COUNT],
     enum micros_frame_owner_kind table_owner_kind,
     struct micros_frame_owner expected_table_owner,
-    const uint64_t
-        data_frame_indices[MICROS_APPLICATION_RESIDENT_PAGE_MAX],
     size_t data_physical_address_count,
+    size_t first_duplicate,
     uint64_t
         table_frame_indices[MICROS_VM_LOAD_PAGE_TABLE_FRAME_COUNT]
 )
@@ -547,18 +592,7 @@ static enum micros_frame_ownership_error resolve_vm_table_frames(
         if (error != MICROS_FRAME_OWNERSHIP_OK) {
             return error;
         }
-        if (
-            micros_frame_ownership_frame_index_is_duplicate(
-                data_frame_indices,
-                data_physical_address_count,
-                frame_index
-            )
-            || micros_frame_ownership_frame_index_is_duplicate(
-                table_frame_indices,
-                index,
-                frame_index
-            )
-        ) {
+        if (data_physical_address_count + index == first_duplicate) {
             return MICROS_FRAME_OWNERSHIP_ERROR_TRANSITION;
         }
         error = micros_frame_ownership_selected_record(ownership, frame_index, &owner);
@@ -633,6 +667,7 @@ micros_frame_ownership_vm_process_set_preflight(
     struct micros_frame_owner expected_data_owner;
     struct micros_frame_owner expected_table_owner;
     enum micros_frame_ownership_error error;
+    size_t first_duplicate;
 
     if (
         data_physical_addresses == NULL
@@ -650,6 +685,11 @@ micros_frame_ownership_vm_process_set_preflight(
     if (error != MICROS_FRAME_OWNERSHIP_OK) {
         return error;
     }
+    if (!micros_frame_ownership_first_duplicate_page(
+        data_physical_addresses, data_physical_address_count,
+        table_physical_addresses, MICROS_VM_LOAD_PAGE_TABLE_FRAME_COUNT, &first_duplicate)) {
+        return MICROS_FRAME_OWNERSHIP_ERROR_INVARIANT;
+    }
     expected_data_owner = expected_vm_frame_owner(
         data_owner_kind,
         process
@@ -664,6 +704,7 @@ micros_frame_ownership_vm_process_set_preflight(
         data_physical_address_count,
         data_owner_kind,
         expected_data_owner,
+        first_duplicate,
         data_frame_indices
     );
     if (error != MICROS_FRAME_OWNERSHIP_OK) {
@@ -674,8 +715,8 @@ micros_frame_ownership_vm_process_set_preflight(
         table_physical_addresses,
         table_owner_kind,
         expected_table_owner,
-        data_frame_indices,
         data_physical_address_count,
+        first_duplicate,
         table_frame_indices
     );
     if (error != MICROS_FRAME_OWNERSHIP_OK) {

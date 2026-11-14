@@ -19,8 +19,8 @@ static bool release_message(
 bool test_vm_service_load_and_release(struct vm_core_test_context *context)
 {
     struct vm_service_test_fixture fixture;
-    const uint64_t commit[5] = {201, 301, 2, 0, 0};
-    const uint64_t exit[5] = {701, 201, 301, 2, 0};
+    const uint64_t commit[5] = {195, 301, 2, 0, 0};
+    const uint64_t exit[5] = {701, 195, 301, 2, 0};
 
     VM_SERVICE_EXPECT(vm_service_test_initialize(&fixture, context) && vm_service_test_load(&fixture));
     VM_SERVICE_EXPECT(release_message(&fixture, MICROS_VM_CONTROL_COMMIT_LOAD, commit));
@@ -41,7 +41,7 @@ bool test_vm_service_load_and_release(struct vm_core_test_context *context)
 bool test_vm_service_abort_and_failure(struct vm_core_test_context *context)
 {
     struct vm_service_test_fixture fixture;
-    const uint64_t abort[5] = {201, 301, 2, 0, 0};
+    const uint64_t abort[5] = {195, 301, 2, 0, 0};
 
     VM_SERVICE_EXPECT(vm_service_test_initialize(&fixture, context) && vm_service_test_load(&fixture));
     VM_SERVICE_EXPECT(release_message(&fixture, MICROS_VM_CONTROL_ABORT_LOAD, abort));
@@ -144,8 +144,8 @@ static bool service_load_disagreements(struct vm_core_test_context *context)
 bool test_vm_service_kernel_disagreement(struct vm_core_test_context *context)
 {
     struct vm_service_test_fixture fixture;
-    const uint64_t frozen[5] = {201, 301, 2, 0, 0};
-    const uint64_t exit[5] = {701, 201, 301, 2, 0};
+    const uint64_t frozen[5] = {195, 301, 2, 0, 0};
+    const uint64_t exit[5] = {701, 195, 301, 2, 0};
     uint32_t command;
 
     VM_SERVICE_EXPECT(service_load_disagreements(context));

@@ -42,6 +42,7 @@ PUBLIC_SYMBOLS = {
     ),
     "kernel/memory/frame_ownership_validation.c": (
         "micros_frame_ownership_lookup", "micros_frame_ownership_count_process", "micros_frame_ownership_validate",
+        "micros_frame_ownership_lookup_prevalidated",
     ),
     "kernel/memory/frame_ownership_bootstrap.c": (
         "micros_frame_ownership_allocate", "micros_frame_ownership_release", "micros_frame_ownership_release_process_set",

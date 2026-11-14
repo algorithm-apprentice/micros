@@ -16,8 +16,13 @@ from tools.stack_artifact_files import read_regular
 
 NATIVE_SOURCES = tuple("kernel/vm/vm_handoff_" + part + ".c" for part in (
     "core", "abi", "boot", "load", "scratch", "freeze", "commit", "release",
+)) + tuple("kernel/memory/" + part + ".c" for part in (
+    "frame_allocator", "frame_ownership", "frame_ownership_validation",
+    "frame_ownership_bootstrap", "frame_ownership_handoff", "frame_ownership_vm_claim",
+    "frame_ownership_vm_freeze", "frame_ownership_vm_release",
 )) + (
-    "kernel/vm/vm_bootstrap.c", "lib/vm/vm_boot_validate.c",
+    "kernel/vm/vm_bootstrap.c", "lib/vm/vm_boot_validate.c", "lib/vm/vm_keys.c",
+    "lib/vm/vm_load_token.c",
     "lib/spawn/spawn_request.c", "lib/spawn/spawn_stack_layout.c",
 ) + tuple("servers/vm/vm_" + part + ".c" for part in (
     "image", "stack", "elf", "core", "validation", "frames", "load", "exit",
@@ -33,7 +38,9 @@ NATIVE_HEADERS = (
     "include/micros/user_context.h", "include/micros/vm.h", "include/micros/vm_bootstrap.h",
     "include/micros/vm_service.h", "include/micros/work_observation.h",
     "kernel/vm/vm_handoff_core.h", "kernel/vm/vm_handoff_internal.h",
-    "lib/spawn/spawn_request.h", "lib/vm/vm_boot_internal.h",
+    "kernel/memory/frame_ownership_internal.h",
+    "lib/spawn/spawn_request.h", "lib/vm/vm_boot_internal.h", "lib/vm/vm_keys.h",
+    "lib/vm/vm_load_token.h",
     "servers/vm/vm_core.h", "servers/vm/vm_image.h",
     "servers/vm/vm_image_internal.h", "servers/vm/vm_internal.h", "servers/vm/vm_admission.h",
     "servers/vm/vm_service_core.h", "servers/vm/vm_service_internal.h",
@@ -41,8 +48,9 @@ NATIVE_HEADERS = (
 )
 TARGETS = ("selected_vm_ordinary", "selected_vm_test")
 PRODUCER = 0x564d30314e000001
-OWNER_MASK = sum(1 << owner for owner in (Owner.KERNEL_VM, Owner.LIB_VM, Owner.LIB_SPAWN, Owner.VM_SERVICE))
-CASE_FIELDS = ("version", "case", "name", "result", "phase", "preserved", "before_state", "after_state")
+OWNER_MASK = sum(1 << owner for owner in (
+    Owner.KERNEL_MEMORY, Owner.KERNEL_VM, Owner.LIB_VM, Owner.LIB_SPAWN, Owner.VM_SERVICE))
+CASE_FIELDS = ("version", "case", "name", "result", "extent", "phase", "preserved", "before_state", "after_state")
 WORK_FIELDS = ("version", "reserved0", "producer", "case", "owner_mask", "reserved1", "counts")
 # name, result, phase, byte-preserving state, positive complete-diagnostic control
 CASES = (
@@ -69,11 +77,32 @@ CASES = (
     ("service-cleanup-preflight", 8, 4, 1, 0),
     ("message-abort-preflight", 2, 4, 1, 0), ("message-commit-preflight", 2, 4, 1, 0),
     ("message-load-preflight", 2, 1, 1, 0),
-    ("kernel-unvisited-record", 0, 1, 1, 0), ("kernel-scanned-count", 7, 1, 1, 0),
+    ("kernel-unvisited-record", 0, 1, 1, 0), ("kernel-owner-unvisited", 0, 1, 1, 0),
+    ("kernel-scanned-count", 7, 1, 1, 0),
     ("kernel-selected-slot", 7, 1, 1, 0),
     ("service-max-frames", 0, 3, 1, 0), ("service-max-ranges-pages", 0, 3, 1, 0),
     ("kernel-dense-records", 0, 2, 0, 0),
+    ("boot-mapping-sparse", 0, 1, 1, 1), ("boot-mapping-max", 0, 1, 1, 1),
+    ("boot-mapping-duplicate", 5, 1, 1, 1),
+    ("service-range-to-index", 0, 1, 1, 0), ("service-index-to-range", 0, 1, 1, 0),
+    ("kernel-global-records", 0, 0, 1, 1), ("kernel-global-duplicate", 7, 0, 1, 1),
+    ("service-global-records", 0, 1, 1, 1), ("service-global-duplicate", 8, 1, 1, 1),
+    ("service-membership-max", 0, 1, 1, 0),
+    ("service-exit-unvisited", 0, 5, 0, 0), ("kernel-exit-unvisited", 0, 0, 1, 0),
+    ("kernel-owner-collision", 3, 1, 1, 0), ("kernel-owner-bit", 7, 1, 1, 0),
+    ("kernel-owner-link", 7, 1, 1, 0), ("kernel-owner-generation", 7, 1, 1, 0),
+    ("kernel-table-collision", 1, 1, 1, 0),
 )
+BOOT_MAPPING_EXTENTS = {
+    "boot-mapping-sparse": 257, "boot-mapping-max": 4096, "boot-mapping-duplicate": 4096,
+}
+GEOMETRY_EXTENTS = {"service-range-to-index": 96, "service-index-to-range": 96}
+GLOBAL_RECORD_EXTENTS = {
+    "kernel-global-records": 1260, "kernel-global-duplicate": 1260,
+    "service-global-records": 1260, "service-global-duplicate": 1260,
+}
+MEMBERSHIP_EXTENTS = {"service-membership-max": 1260}
+CASE_EXTENTS = {**BOOT_MAPPING_EXTENTS, **GEOMETRY_EXTENTS, **GLOBAL_RECORD_EXTENTS, **MEMBERSHIP_EXTENTS}
 POINT_CASES = frozenset((
     "service-next-page", "service-map", "service-page-commit", "service-freeze-plan",
     "service-stale-token", "kernel-page-commit", "kernel-prepare", "kernel-unprepare",
@@ -87,7 +116,7 @@ POINT_CASES = frozenset((
 def expected_cases():
     return tuple({
         "version": 1, "case": index, "name": name, "result": result,
-        "phase": phase, "preserved": preserved,
+        "extent": CASE_EXTENTS.get(name, 0), "phase": phase, "preserved": preserved,
     } for index, (name, result, phase, preserved, _) in enumerate(CASES, 1))
 
 
@@ -147,11 +176,41 @@ def work_failures(records, work):
         audits = totals.per_kind[Kind.COMPLETE_VALIDATOR_CALL]
         if audits != spec[4]:
             failures.append((row["name"], "complete-audits", audits, spec[4]))
+        if row["name"] in ("kernel-owner-unvisited", "kernel-scanned-count"):
+            visits = totals.per_owner[Owner.KERNEL_VM][Kind.RECORD_VISIT]
+            # Two local checks of the empty loading record; no other slot loop.
+            if visits > 2 * 16:
+                failures.append((row["name"], "selected-record-visits", visits, 2 * 16))
         if row["name"] in POINT_CASES:
             # Sixteen bounded request passes, local record checks and active geometry;
             # no managed-frame, inactive-input or whole-record-table term is permitted.
             bound = 16 * 4096 + 64 * 20 + 4 * 96 * 20
             for kind in (Kind.RECORD_VISIT, Kind.COMPARISON, Kind.INDEX_PROBE, Kind.RANGE_VISIT):
+                if totals.per_kind[kind] > bound:
+                    failures.append((row["name"], kind.name.lower(), totals.per_kind[kind], bound))
+        if row["name"] in BOOT_MAPPING_EXTENTS:
+            # Complete transport/tail work remains; uniqueness uses fixed-width keys.
+            count = BOOT_MAPPING_EXTENTS[row["name"]]
+            bound = 2 * 364704 + 6 * 32 * count + 4 * count + 16 * 96
+            for kind in (Kind.RECORD_VISIT, Kind.COMPARISON, Kind.INDEX_PROBE):
+                if totals.per_kind[kind] > bound:
+                    failures.append((row["name"], kind.name.lower(), totals.per_kind[kind], bound))
+        if row["name"] in GEOMETRY_EXTENTS:
+            visits = totals.per_kind[Kind.RANGE_VISIT]
+            bound = GEOMETRY_EXTENTS[row["name"]].bit_length()
+            if not 1 <= visits <= bound:
+                failures.append((row["name"], "range_visits", visits, (1, bound)))
+        if row["name"] in GLOBAL_RECORD_EXTENTS:
+            frames = GLOBAL_RECORD_EXTENTS[row["name"]]
+            keys = frames + 2 * 64
+            bound = 6 * 64 * keys + 4 * keys + 32 * frames + 4 * 4096
+            for kind in (Kind.RECORD_VISIT, Kind.INDEX_PROBE):
+                if totals.per_kind[kind] > bound:
+                    failures.append((row["name"], kind.name.lower(), totals.per_kind[kind], bound))
+        if row["name"] in MEMBERSHIP_EXTENTS:
+            keys = MEMBERSHIP_EXTENTS[row["name"]]
+            bound = 6 * 64 * keys + 4 * keys + 8 * (keys + 20) * keys.bit_length() + 4 * 64
+            for kind in (Kind.RECORD_VISIT, Kind.INDEX_PROBE):
                 if totals.per_kind[kind] > bound:
                     failures.append((row["name"], kind.name.lower(), totals.per_kind[kind], bound))
     return tuple(failures)

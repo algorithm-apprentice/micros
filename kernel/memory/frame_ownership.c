@@ -319,29 +319,29 @@ enum micros_frame_ownership_error micros_frame_ownership_physical_address_to_ind
     uint64_t *frame_index
 )
 {
-    size_t range_index;
+    size_t first = 0;
+    size_t end;
 
     if (physical_address % MICROS_FRAME_SIZE != 0) {
         return MICROS_FRAME_OWNERSHIP_ERROR_UNALIGNED;
     }
-    for (
-        range_index = 0;
-        range_index < ownership->managed_range_count;
-        ++range_index
-    ) {
+    end = ownership->managed_range_count;
+    while (first < end) {
+        size_t middle = first + (end - first) / 2;
         const struct micros_frame_range_snapshot *range =
-            &ownership->managed_ranges[range_index];
-        uint64_t offset;
-        uint64_t index_in_range;
+            &ownership->managed_ranges[middle];
 
         if (physical_address < range->base) {
-            break;
-        }
-        offset = physical_address - range->base;
-        index_in_range = offset / MICROS_FRAME_SIZE;
-        if (index_in_range < range->frame_count) {
-            *frame_index = range->bitmap_offset + index_in_range;
-            return MICROS_FRAME_OWNERSHIP_OK;
+            end = middle;
+        } else {
+            uint64_t offset = (physical_address - range->base) / MICROS_FRAME_SIZE;
+
+            if (offset >= range->frame_count) {
+                first = middle + 1;
+            } else {
+                *frame_index = range->bitmap_offset + offset;
+                return MICROS_FRAME_OWNERSHIP_OK;
+            }
         }
     }
     return MICROS_FRAME_OWNERSHIP_ERROR_UNMANAGED;

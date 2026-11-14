@@ -1,4 +1,5 @@
 #include "servers/vm/vm_internal.h"
+#include "lib/vm/vm_load_token.h"
 
 #include "micros/endpoint.h"
 #include "micros/sv39.h"
@@ -253,22 +254,25 @@ static bool load_record_identity_is_available(
 
 static bool selected_frame_is_available(
     const struct micros_vm_state *state,
+    const struct vm_core_membership_view *membership,
     uint64_t physical_address
 )
 {
     uint64_t frame_index;
+    bool present;
 
     return (
         vm_core_physical_to_frame_index(state, physical_address, &frame_index)
         && state->boot_info->frame_states[frame_index] == MICROS_VM_LOCAL_FRAME_FREE
-        && !vm_core_physical_is_in_record_other_than(
-            state, physical_address, MICROS_VM_MAPPING_RECORD_CAPACITY
-        )
+        && vm_core_membership_query(membership, physical_address,
+            MICROS_VM_MAPPING_RECORD_CAPACITY, &present) == MICROS_VM_CORE_OK
+        && !present
     );
 }
 
 static bool build_load_table_entries(
     const struct micros_vm_state *state,
+    const struct vm_core_membership_view *membership,
     struct micros_vm_mapping_record *candidate
 )
 {
@@ -283,7 +287,7 @@ static bool build_load_table_entries(
     for (index = 0; index < MICROS_VM_PAGE_TABLE_FRAME_COUNT; ++index) {
         uint64_t physical = state->transaction.table_frames[index];
 
-        if (!selected_frame_is_available(state, physical)) {
+        if (!selected_frame_is_available(state, membership, physical)) {
             return false;
         }
         candidate->entries[index].physical_address = physical;
@@ -294,6 +298,7 @@ static bool build_load_table_entries(
 
 static bool build_load_data_entries(
     const struct micros_vm_state *state,
+    const struct vm_core_membership_view *membership,
     struct micros_vm_mapping_record *candidate
 )
 {
@@ -304,7 +309,7 @@ static bool build_load_data_entries(
             &candidate->entries[MICROS_VM_PAGE_TABLE_FRAME_COUNT + index];
         uint64_t physical = state->transaction.data_frames[index];
 
-        if (!selected_frame_is_available(state, physical)) {
+        if (!selected_frame_is_available(state, membership, physical)) {
             return false;
         }
         entry->virtual_address = index < state->transaction.elf_plan.page_count
@@ -327,7 +332,9 @@ enum micros_vm_core_error micros_vm_load_bind(
 )
 {
     struct micros_vm_mapping_record candidate;
+    struct vm_core_membership_view membership;
     enum micros_vm_core_error error = vm_core_validate_selected_state(state);
+    bool available;
     size_t index;
 
     if (error != MICROS_VM_CORE_OK) {
@@ -337,6 +344,7 @@ enum micros_vm_core_error micros_vm_load_bind(
         state->phase != MICROS_VM_LOADER_INPUT_COPIED
         || !vm_core_process_is_canonical(process)
         || load_token == 0
+        || micros_vm_load_token_slot(load_token) != process.slot
     ) {
         return MICROS_VM_CORE_ERROR_STATE;
     }
@@ -358,10 +366,13 @@ enum micros_vm_core_error micros_vm_load_bind(
     candidate.entry_count = (uint8_t)(
         MICROS_VM_PAGE_TABLE_FRAME_COUNT + state->transaction.page_count
     );
-    if (
-        !build_load_table_entries(state, &candidate)
-        || !build_load_data_entries(state, &candidate)
-    ) {
+    error = vm_core_membership_begin(state, &membership);
+    if (error != MICROS_VM_CORE_OK) {
+        return error;
+    }
+    available = build_load_table_entries(state, &membership, &candidate)
+        && build_load_data_entries(state, &membership, &candidate);
+    if (!vm_core_membership_end(&membership) || !available) {
         return MICROS_VM_CORE_ERROR_INVARIANT;
     }
     for (index = 0; index < MICROS_VM_PAGE_TABLE_FRAME_COUNT; ++index) {

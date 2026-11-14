@@ -162,6 +162,7 @@ enum micros_syscall_return micros_vm_handoff_syscall_handle_load_freeze(
     }
     vm_error = micros_vm_load_freeze_preflight(
         state,
+        micros_frame_ownership_runtime_ledger(),
         &plans.request,
         &plans.state
     );

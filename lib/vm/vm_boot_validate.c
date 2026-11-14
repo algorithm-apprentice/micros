@@ -1,4 +1,5 @@
 #include "micros/vm_bootstrap.h"
+#include "lib/vm/vm_keys.h"
 #include "lib/vm/vm_boot_internal.h"
 
 #include <stdbool.h>
@@ -238,13 +239,14 @@ static bool vm_boot_managed_ranges_match_physical_database(
     );
 }
 
-static bool vm_boot_physical_to_frame_index(
+bool vm_boot_physical_to_frame_index(
     const struct micros_vm_boot_info *info,
     uint64_t physical_address,
     uint64_t *frame_index
 )
 {
-    size_t index;
+    size_t first = 0;
+    size_t end;
 
     if (
         physical_address % MICROS_FRAME_SIZE != 0
@@ -252,23 +254,22 @@ static bool vm_boot_physical_to_frame_index(
     ) {
         return false;
     }
-    for (
-        index = 0;
-        index < info->header.managed_range_count;
-        ++index
-    ) {
-        const struct micros_vm_managed_range *range =
-            &info->managed_ranges[index];
-        uint64_t size = range->frame_count * MICROS_FRAME_SIZE;
+    end = info->header.managed_range_count;
+    while (first < end) {
+        size_t middle = first + (end - first) / 2;
+        const struct micros_vm_managed_range *range = &info->managed_ranges[middle];
 
-        if (
-            physical_address >= range->base
-            && physical_address - range->base < size
-        ) {
-            *frame_index = range->frame_index
-                + (physical_address - range->base)
-                    / MICROS_FRAME_SIZE;
-            return true;
+        if (physical_address < range->base) {
+            end = middle;
+        } else {
+            uint64_t offset = (physical_address - range->base) / MICROS_FRAME_SIZE;
+
+            if (offset >= range->frame_count) {
+                first = middle + 1;
+            } else {
+                *frame_index = range->frame_index + offset;
+                return true;
+            }
         }
     }
     return false;
@@ -466,14 +467,39 @@ static bool vm_boot_ranges_are_valid(
     );
 }
 
+static bool vm_boot_first_duplicate_root(
+    const struct micros_vm_boot_info *info, size_t *first_duplicate
+)
+{
+    struct micros_vm_key_view keys;
+
+    if (!micros_vm_keys_begin64(&keys)) {
+        return false;
+    }
+    for (size_t index = 0; index < info->header.address_space_count; ++index) {
+        if (!micros_vm_keys_append_page(
+            &keys, info->address_spaces[index].root_physical_address, index)) {
+            (void)micros_vm_keys_end(&keys);
+            return false;
+        }
+    }
+    return micros_vm_keys_finish_pages(&keys, first_duplicate);
+}
+
 static enum micros_vm_boot_error vm_boot_validate_address_spaces(
     const struct micros_vm_boot_info *info
 )
 {
     uint32_t expected_mapping_index = 0;
+    uint64_t services = 0;
+    uint64_t processes = 0;
     bool found_self = false;
+    size_t first_duplicate;
     size_t index;
 
+    if (!vm_boot_first_duplicate_root(info, &first_duplicate)) {
+        return MICROS_VM_BOOT_ERROR_STATE;
+    }
     for (
         index = 0;
         index < info->header.address_space_count;
@@ -483,7 +509,6 @@ static enum micros_vm_boot_error vm_boot_validate_address_spaces(
             &info->address_spaces[index];
         uint64_t root_frame_index;
         uint32_t mapping_end;
-        size_t other;
 
         if (
             space->service_id == 0
@@ -516,20 +541,13 @@ static enum micros_vm_boot_error vm_boot_validate_address_spaces(
         if (mapping_end > info->header.mapping_count) {
             return MICROS_VM_BOOT_ERROR_RANGE;
         }
-        for (other = 0; other < index; ++other) {
-            if (
-                info->address_spaces[other].service_id
-                    == space->service_id
-                || info->address_spaces[other].endpoint
-                    == space->endpoint
-                || info->address_spaces[other].process_slot
-                    == space->process_slot
-                || info->address_spaces[other].root_physical_address
-                    == space->root_physical_address
-            ) {
-                return MICROS_VM_BOOT_ERROR_IDENTITY;
-            }
+        if (index == first_duplicate
+            || (services & (UINT64_C(1) << space->service_id)) != 0
+            || (processes & (UINT64_C(1) << space->process_slot)) != 0) {
+            return MICROS_VM_BOOT_ERROR_IDENTITY;
         }
+        services |= UINT64_C(1) << space->service_id;
+        processes |= UINT64_C(1) << space->process_slot;
         if (space->service_id == info->header.service_id) {
             if (
                 found_self
@@ -559,79 +577,58 @@ static enum micros_vm_boot_error vm_boot_validate_mappings(
     struct vm_boot_validation_counts *counts
 )
 {
-    size_t index;
+    struct micros_vm_key_view keys;
+    enum micros_vm_boot_error error = MICROS_VM_BOOT_OK;
 
-    for (index = 0; index < info->header.mapping_count; ++index) {
-        const struct micros_vm_mapping *mapping = &info->mappings[index];
-        const struct micros_vm_address_space *space = NULL;
-        uint64_t frame_index;
-        uint8_t expected_state;
-        size_t space_index;
-        size_t other;
-
-        for (
-            space_index = 0;
-            space_index < info->header.address_space_count;
-            ++space_index
-        ) {
-            uint32_t first =
-                info->address_spaces[space_index].mapping_index;
-            uint32_t end = first
-                + info->address_spaces[space_index].mapping_count;
-
-            if (index >= first && index < end) {
-                space = &info->address_spaces[space_index];
-                break;
-            }
-        }
-        if (
-            space == NULL
-            || mapping->process_slot != space->process_slot
-            || mapping->process_generation
-                != space->process_generation
-            || mapping->process_generation
-                > MICROS_PROCESS_GENERATION_MAX
-            || !vm_boot_permissions_are_valid(mapping->permissions)
-            || mapping->virtual_address % MICROS_FRAME_SIZE != 0
-            || mapping->virtual_address < MICROS_USER_VIRTUAL_BASE
-            || mapping->virtual_address >= MICROS_USER_VIRTUAL_END
-            || !vm_boot_physical_to_frame_index(
-                info,
-                mapping->physical_address,
-                &frame_index
-            )
-        ) {
-            return MICROS_VM_BOOT_ERROR_MAPPING;
-        }
-        expected_state = space->service_id
-                == info->header.service_id
+    if (!micros_vm_keys_begin32(&keys)) {
+        return MICROS_VM_BOOT_ERROR_STATE;
+    }
+    for (size_t space_index = 0; space_index < info->header.address_space_count; ++space_index) {
+        const struct micros_vm_address_space *space = &info->address_spaces[space_index];
+        uint8_t expected_state = space->service_id == info->header.service_id
             ? MICROS_VM_FRAME_SELF_WIRED
             : MICROS_VM_FRAME_SERVICE_WIRED;
-        if (
-            mapping->role
-                != (
-                    expected_state == MICROS_VM_FRAME_SELF_WIRED
-                    ? MICROS_VM_MAPPING_SELF_WIRED
-                    : MICROS_VM_MAPPING_SERVICE_WIRED
-                )
-            || info->frame_states[frame_index] != expected_state
-            || (
-                index != space->mapping_index
-                && info->mappings[index - 1].virtual_address
-                    >= mapping->virtual_address
-            )
-        ) {
-            return MICROS_VM_BOOT_ERROR_MAPPING;
-        }
-        for (other = 0; other < index; ++other) {
+
+        for (size_t offset = 0; offset < space->mapping_count; ++offset) {
+            size_t index = space->mapping_index + offset;
+            const struct micros_vm_mapping *mapping = &info->mappings[index];
+            uint64_t frame_index;
+
             if (
-                info->mappings[other].physical_address
-                    == mapping->physical_address
+                mapping->process_slot != space->process_slot
+                || mapping->process_generation != space->process_generation
+                || mapping->process_generation > MICROS_PROCESS_GENERATION_MAX
+                || !vm_boot_permissions_are_valid(mapping->permissions)
+                || mapping->virtual_address % MICROS_FRAME_SIZE != 0
+                || mapping->virtual_address < MICROS_USER_VIRTUAL_BASE
+                || mapping->virtual_address >= MICROS_USER_VIRTUAL_END
+                || !vm_boot_physical_to_frame_index(info, mapping->physical_address, &frame_index)
+                || mapping->role != (expected_state == MICROS_VM_FRAME_SELF_WIRED
+                                    ? MICROS_VM_MAPPING_SELF_WIRED : MICROS_VM_MAPPING_SERVICE_WIRED)
+                || info->frame_states[frame_index] != expected_state
+                || (offset != 0
+                    && info->mappings[index - 1].virtual_address >= mapping->virtual_address)
             ) {
-                return MICROS_VM_BOOT_ERROR_MAPPING;
+                error = MICROS_VM_BOOT_ERROR_MAPPING;
+                goto done;
             }
+            if (frame_index > UINT32_MAX
+                || !micros_vm_keys_append32(&keys, (uint32_t)frame_index)) {
+                error = MICROS_VM_BOOT_ERROR_STATE;
+                goto done;
+            }
+            ++counts->wired_mappings;
         }
-        ++counts->wired_mappings;
+    }
+    if (!micros_vm_keys_sort(&keys)) {
+        error = MICROS_VM_BOOT_ERROR_STATE;
+        goto done;
+    }
+    for (size_t index = 1; index < keys.count; ++index) {
+        if (keys.keys32[index - 1] == keys.keys32[index]) {
+            error = MICROS_VM_BOOT_ERROR_MAPPING;
+            goto done;
+        }
     }
     if (
         !vm_boot_bytes_are_zero(
@@ -642,9 +639,10 @@ static enum micros_vm_boot_error vm_boot_validate_mappings(
             ) * sizeof(info->mappings[0])
         )
     ) {
-        return MICROS_VM_BOOT_ERROR_MAPPING;
+        error = MICROS_VM_BOOT_ERROR_MAPPING;
     }
-    return MICROS_VM_BOOT_OK;
+done:
+    return micros_vm_keys_end(&keys) ? error : MICROS_VM_BOOT_ERROR_STATE;
 }
 
 static enum micros_vm_boot_error vm_boot_validate_frame_counts(

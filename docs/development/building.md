@@ -689,6 +689,31 @@ Select `riscv64-panic-trace-test` or `riscv64-elf-spawn-test` instead of
 `riscv64-debug` in this same development command to check the closed trace
 fixture or the composed VM lifecycle images, respectively.
 
+For an observed VM image/stack check while an unrelated guest work gate is
+still Red, use the same builder and actual image certifier without launching
+another guest:
+
+```bash
+"${MICROS_PYTHON}" -E -S -B - <<'PY'
+import os
+from pathlib import Path
+from tools.stack_bound_build import build_observed_profile, static_profiles
+from tools.stack_bound_certify import certify_image
+from tools.validation_context import capture_candidate
+root = Path.cwd()
+assert capture_candidate(root).clean
+profile, = (item for item in static_profiles(root) if item.configure == "riscv64-elf-spawn-test")
+directory = build_observed_profile(root, profile, os.environ["MICROS_PYTHON"])
+proof = certify_image(root, directory, "bootstrap/micros-vm-server.elf", profile.configure, "observed")
+print("DEVELOPMENT_ONLY: observed VM image", [
+    (item.root.identifier, item.bytes_used, item.bytes_remaining) for item in proof.roots
+])
+PY
+```
+
+This is only the current linked VM image proof. It does not execute QEMU,
+publish the complete stack certificate or satisfy composed/final acceptance.
+
 For a focused observed bootstrap/TTY reporting check, use the existing
 sealed observed-profile builder and runner:
 

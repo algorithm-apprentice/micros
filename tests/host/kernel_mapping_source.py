@@ -14,6 +14,7 @@ RECIPE_ADMISSION = {
         "MICROS_SCHEDULER_CORE_SOURCES",
     ),
     "native_source_members": (
+        "lib/vm/vm_keys.c",
         "kernel/memory/frame_allocator.c",
         "kernel/memory/frame_ownership.c",
         "kernel/memory/frame_ownership_validation.c",

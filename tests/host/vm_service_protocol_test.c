@@ -70,8 +70,8 @@ static bool service_rejection_is_exact(
 bool test_vm_service_protocol_boundaries(struct vm_core_test_context *context)
 {
     struct vm_service_test_fixture fixture;
-    const uint64_t frozen[5] = {201, 301, 2, 0, 0};
-    const uint64_t exit[5] = {701, 201, 301, 2, 0};
+    const uint64_t frozen[5] = {195, 301, 2, 0, 0};
+    const uint64_t exit[5] = {701, 195, 301, 2, 0};
     const uint64_t load[5] = {101, 2, UINT64_C(1) << 32 | 11, UINT64_C(256) << 32 | 12, 0};
     uint32_t command;
 
@@ -146,7 +146,7 @@ static bool service_stale_release_preserves_state(
 bool test_vm_service_release_identity(struct vm_core_test_context *context)
 {
     struct vm_service_test_fixture fixture;
-    const uint64_t exact[5] = {201, 301, 2, 0, 0};
+    const uint64_t exact[5] = {195, 301, 2, 0, 0};
     struct micros_ipc_message request;
     struct micros_ipc_message reply;
     uint32_t command;
@@ -155,7 +155,7 @@ bool test_vm_service_release_identity(struct vm_core_test_context *context)
     VM_SERVICE_EXPECT(vm_service_test_initialize(&fixture, context) && vm_service_test_load(&fixture));
     for (command = MICROS_VM_CONTROL_ABORT_LOAD; command <= MICROS_VM_CONTROL_COMMIT_LOAD; ++command) {
         for (field = 0; field < 3; ++field) {
-            uint64_t stale[5] = {201, 301, 2, 0, 0};
+            uint64_t stale[5] = {195, 301, 2, 0, 0};
 
             ++stale[field];
             VM_SERVICE_EXPECT(service_stale_release_preserves_state(&fixture, command, stale));
@@ -169,7 +169,7 @@ bool test_vm_service_release_identity(struct vm_core_test_context *context)
     VM_SERVICE_EXPECT(service_stale_release_preserves_state(&fixture, MICROS_VM_CONTROL_ABORT_LOAD, exact));
     VM_SERVICE_EXPECT(service_stale_release_preserves_state(&fixture, MICROS_VM_CONTROL_COMMIT_LOAD, exact));
     for (field = 1; field < 4; ++field) {
-        uint64_t stale[5] = {701, 201, 301, 2, 0};
+        uint64_t stale[5] = {701, 195, 301, 2, 0};
 
         ++stale[field];
         VM_SERVICE_EXPECT(service_stale_release_preserves_state(

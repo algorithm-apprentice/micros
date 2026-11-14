@@ -1,4 +1,5 @@
 #include "servers/vm/vm_internal.h"
+#include "lib/vm/vm_load_token.h"
 
 enum micros_vm_core_error micros_vm_exit_release_begin(
     struct micros_vm_state *state,
@@ -10,8 +11,8 @@ enum micros_vm_core_error micros_vm_exit_release_begin(
 {
     struct micros_vm_exit_action candidate;
     enum micros_vm_core_error error = vm_core_validate_selected_state(state);
+    const struct micros_vm_mapping_record *record;
     size_t slot;
-    size_t found_slot = MICROS_VM_MAPPING_RECORD_CAPACITY;
 
     if (action == NULL) {
         return MICROS_VM_CORE_ERROR_ARGUMENT;
@@ -27,33 +28,18 @@ enum micros_vm_core_error micros_vm_exit_release_begin(
     ) {
         return MICROS_VM_CORE_ERROR_STATE;
     }
-    for (
-        slot = 0;
-        slot < MICROS_VM_MAPPING_RECORD_CAPACITY;
-        ++slot
-    ) {
-        const struct micros_vm_mapping_record *record =
-            &state->mapping_records[slot];
-
-        if (!vm_core_record_header_is_valid(state, slot)) {
-            return MICROS_VM_CORE_ERROR_INVARIANT;
-        }
-        if (
-            record->phase == MICROS_VM_MAPPING_RECORD_ACTIVE
-            && record->load_token == load_token
-            && record->mapping_generation == mapping_generation
-            && record->semantic_pid == semantic_pid
-        ) {
-            if (found_slot != MICROS_VM_MAPPING_RECORD_CAPACITY) {
-                return MICROS_VM_CORE_ERROR_INVARIANT;
-            }
-            found_slot = slot;
-        }
+    slot = micros_vm_load_token_slot(load_token);
+    if (!vm_core_record_header_is_valid(state, slot)) {
+        return MICROS_VM_CORE_ERROR_INVARIANT;
     }
-    if (found_slot == MICROS_VM_MAPPING_RECORD_CAPACITY) {
+    record = &state->mapping_records[slot];
+    if (record->phase != MICROS_VM_MAPPING_RECORD_ACTIVE
+        || record->load_token != load_token
+        || record->mapping_generation != mapping_generation
+        || record->semantic_pid != semantic_pid) {
         return MICROS_VM_CORE_ERROR_STATE;
     }
-    if (!vm_core_selected_record_is_valid(state, found_slot)) {
+    if (!vm_core_selected_record_is_valid(state, slot)) {
         return MICROS_VM_CORE_ERROR_INVARIANT;
     }
     vm_core_zero_bytes(&candidate, sizeof(candidate));
@@ -61,10 +47,10 @@ enum micros_vm_core_error micros_vm_exit_release_begin(
     candidate.mapping_generation = mapping_generation;
     candidate.semantic_pid = semantic_pid;
     candidate.process_generation =
-        state->mapping_records[found_slot].process_generation;
-    candidate.process_slot = (uint16_t)found_slot;
+        record->process_generation;
+    candidate.process_slot = (uint16_t)slot;
 
-    state->mapping_records[found_slot].phase =
+    state->mapping_records[slot].phase =
         MICROS_VM_MAPPING_RECORD_EXIT_RELEASING;
     state->phase = MICROS_VM_LOADER_EXIT_RELEASING;
     *action = candidate;

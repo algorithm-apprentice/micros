@@ -69,10 +69,12 @@ micros_frame_ownership_vm_transition_preflight(
     const struct micros_frame_ownership *ownership
 );
 
-bool micros_frame_ownership_frame_index_is_duplicate(
-    const uint64_t *frame_indices,
-    size_t frame_index_count,
-    uint64_t frame_index
+bool micros_frame_ownership_first_duplicate_page(
+    const uint64_t *data_frames,
+    size_t data_count,
+    const uint64_t *table_frames,
+    size_t table_count,
+    size_t *first_duplicate
 );
 
 enum micros_frame_ownership_error

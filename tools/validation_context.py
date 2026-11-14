@@ -49,7 +49,7 @@ PROFILES = {
     "build-tty-service-image": ("riscv64-tty-service-image", "micros_tty_service", True),
 }
 RECIPE_DIGESTS = {
-    "CMakeLists.txt": "695ba370a13ce2302d04ffc658a5d2ad423d2411808e1cc347acd6cd299898da",
+    "CMakeLists.txt": "c931cab25d5e5fb4b264ddd2b55e51c540a21e387f6fc66ea0b57b12a2d6ae46",
     "cmake/toolchains/riscv64-clang.cmake": "1a1bbab2b91b54222bfbae93cdf2ae9d7847f521760dcba9119d306d3a36d459",
     "tests/work/WorkCounts.cmake": "61bee706c6b45f70712021cf4df49829a39bac82e6fb28c446bf84ed83013fc5",
 }

@@ -50,6 +50,7 @@ static micros_runtime_result_t model_vm_begin(
 {
     struct elf_spawn_model_context *context = opaque;
     struct elf_model_kernel_process *process;
+    uint64_t token = context->last_load;
 
     if (!elf_model_kernel_require(context, context->kernel_slot < MICROS_PROCESS_CAPACITY)) {
         return MICROS_SYSCALL_ABI_STATE;
@@ -59,8 +60,15 @@ static micros_runtime_result_t model_vm_begin(
         process->phase == ELF_KERNEL_RESERVED && process->reservation == reservation)) {
         return MICROS_SYSCALL_ABI_STATE;
     }
+    do {
+        if (token == UINT64_MAX) {
+            return MICROS_SYSCALL_ABI_CAPACITY;
+        }
+        ++token;
+    } while (token % 64 != context->kernel_slot);
+    context->last_load = token;
     process->phase = ELF_KERNEL_LOADING;
-    process->load = ++context->last_load;
+    process->load = token;
     context->supplied_load = process->load;
     memset(result, 0, sizeof(*result));
     result->version = MICROS_VM_LOAD_BEGIN_RESULT_VERSION;

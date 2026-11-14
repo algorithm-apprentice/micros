@@ -1,4 +1,5 @@
 #include "micros/user_address_space_core.h"
+#include "lib/vm/vm_keys.h"
 #include "user_address_space_core_test_suites.h"
 
 #include <stddef.h>
@@ -162,11 +163,64 @@ static bool table_alias_is_rejected_without_output_change(struct vm_plan_fixture
     return true;
 }
 
+static bool duplicate_checks_preserve_first_error(struct vm_plan_fixture *fixture) {
+    initialize_vm_plan_fixture(fixture);
+    EXPECT_TRUE(valid_vm_table_plan_is_exact(fixture));
+    fixture->mappings[1].permissions = MICROS_SV39_PERMISSION_USER | MICROS_SV39_PERMISSION_WRITE;
+    fixture->mappings[15].physical_address = fixture->mappings[14].physical_address;
+    EXPECT_ADDRESS_ERROR(MICROS_USER_ADDRESS_SPACE_ERROR_PERMISSION,
+                         micros_user_address_space_prepare_vm_table_plan(
+                             fixture->process, fixture->table_frames, fixture->mappings,
+                             MICROS_APPLICATION_RESIDENT_PAGE_MAX, &fixture->plan));
+    EXPECT_TRUE(bytes_equal(&fixture->plan, &fixture->sentinel, sizeof(fixture->plan)));
+    fixture->mappings[1].permissions = MICROS_SV39_PERMISSION_USER | MICROS_SV39_PERMISSION_READ;
+    fixture->mappings[2].physical_address = fixture->mappings[0].physical_address;
+    fixture->mappings[3].physical_address |= 1;
+    EXPECT_ADDRESS_ERROR(MICROS_USER_ADDRESS_SPACE_ERROR_OWNERSHIP,
+                         micros_user_address_space_prepare_vm_table_plan(
+                             fixture->process, fixture->table_frames, fixture->mappings,
+                             MICROS_APPLICATION_RESIDENT_PAGE_MAX, &fixture->plan));
+    EXPECT_TRUE(bytes_equal(&fixture->plan, &fixture->sentinel, sizeof(fixture->plan)));
+    fixture->table_frames[1] = fixture->table_frames[0];
+    fixture->table_frames[2] |= 1;
+    EXPECT_ADDRESS_ERROR(MICROS_USER_ADDRESS_SPACE_ERROR_OWNERSHIP,
+                         micros_user_address_space_prepare_vm_table_plan(
+                             fixture->process, fixture->table_frames, fixture->mappings,
+                             MICROS_APPLICATION_RESIDENT_PAGE_MAX, &fixture->plan));
+    EXPECT_TRUE(bytes_equal(&fixture->plan, &fixture->sentinel, sizeof(fixture->plan)));
+    fixture->table_frames[0] |= 1;
+    EXPECT_ADDRESS_ERROR(MICROS_USER_ADDRESS_SPACE_ERROR_ARGUMENT,
+                         micros_user_address_space_prepare_vm_table_plan(
+                             fixture->process, fixture->table_frames, fixture->mappings,
+                             MICROS_APPLICATION_RESIDENT_PAGE_MAX, &fixture->plan));
+    EXPECT_TRUE(bytes_equal(&fixture->plan, &fixture->sentinel, sizeof(fixture->plan)));
+    return true;
+}
+
+static bool busy_key_storage_preserves_output(struct vm_plan_fixture *fixture) {
+    struct micros_vm_key_view keys;
+    enum micros_user_address_space_error error;
+
+    initialize_vm_plan_fixture(fixture);
+    EXPECT_TRUE(valid_vm_table_plan_is_exact(fixture));
+    EXPECT_TRUE(micros_vm_keys_begin64(&keys));
+    error = micros_user_address_space_prepare_vm_table_plan(
+        fixture->process, fixture->table_frames, fixture->mappings,
+        MICROS_APPLICATION_RESIDENT_PAGE_MAX, &fixture->plan);
+    EXPECT_TRUE(micros_vm_keys_end(&keys));
+    EXPECT_TRUE(error == MICROS_USER_ADDRESS_SPACE_ERROR_INVARIANT);
+    EXPECT_TRUE(bytes_equal(&fixture->plan, &fixture->sentinel, sizeof(fixture->plan)));
+    EXPECT_TRUE(valid_vm_table_plan_is_exact(fixture));
+    return true;
+}
+
 bool micros_user_address_space_vm_plan_test_run(void) {
     struct vm_plan_fixture fixture;
 
     initialize_vm_plan_fixture(&fixture);
     return (valid_vm_table_plan_is_exact(&fixture) &&
             permission_failure_preserves_output(&fixture) &&
-            table_alias_is_rejected_without_output_change(&fixture));
+            table_alias_is_rejected_without_output_change(&fixture) &&
+            duplicate_checks_preserve_first_error(&fixture) &&
+            busy_key_storage_preserves_output(&fixture));
 }

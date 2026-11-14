@@ -1,4 +1,6 @@
 #include "kernel/vm/vm_handoff_internal.h"
+#include "lib/vm/vm_keys.h"
+#include "lib/vm/vm_load_token.h"
 #include "micros/work_observation.h"
 #include "micros/user_address_space_core.h"
 #include "tests/qemu/vm_validation_work.h"
@@ -14,6 +16,9 @@
 
 #define MICROS_VM_PAGE_DIGEST_OFFSET UINT64_C(14695981039346656037)
 #define MICROS_VM_PAGE_DIGEST_PRIME UINT64_C(1099511628211)
+
+static bool record_frames_are_unique(
+    const struct micros_vm_kernel_mapping_record *record, size_t table_count);
 
 bool micros_vm_handoff_bytes_are_zero(const void *storage, size_t size)
 {
@@ -211,7 +216,7 @@ static int permission_group(uint32_t permissions)
     return permissions == writable ? 2 : -1;
 }
 
-static bool record_entries_are_loading_shape(
+static bool record_entries_have_loading_layout(
     const struct micros_vm_kernel_mapping_record *record
 )
 {
@@ -225,18 +230,8 @@ static bool record_entries_are_loading_shape(
         const struct micros_vm_kernel_mapping_entry *entry =
             &record->entries[index];
         int next_group;
-        size_t prior_index;
-
         if (!micros_vm_handoff_mapping_entry_is_valid(entry)) {
             return false;
-        }
-        for (prior_index = 0; prior_index < index; ++prior_index) {
-            if (
-                record->entries[prior_index].physical_address
-                == entry->physical_address
-            ) {
-                return false;
-            }
         }
         if (entry->virtual_address == MICROS_APPLICATION_STACK_BASE) {
             if (
@@ -303,7 +298,8 @@ bool micros_vm_handoff_loading_record_can_append(
     size_t index;
 
     if (
-        !record_entries_are_loading_shape(record)
+        !record_entries_have_loading_layout(record)
+        || !record_frames_are_unique(record, 0)
         || !micros_vm_handoff_mapping_entry_is_valid(entry)
         || record->entry_count >= MICROS_APPLICATION_RESIDENT_PAGE_MAX
     ) {
@@ -356,7 +352,7 @@ bool micros_vm_handoff_loading_record_can_append(
     );
 }
 
-bool micros_vm_handoff_record_entries_are_frozen_shape(
+static bool record_entries_have_frozen_layout(
     const struct micros_vm_kernel_mapping_record *record
 )
 {
@@ -368,7 +364,7 @@ bool micros_vm_handoff_record_entries_are_frozen_shape(
     if (
         record->entry_count < MICROS_APPLICATION_IMAGE_PAGE_MIN + 1
         || record->entry_count > MICROS_APPLICATION_RESIDENT_PAGE_MAX
-        || !record_entries_are_loading_shape(record)
+        || !record_entries_have_loading_layout(record)
     ) {
         return false;
     }
@@ -392,12 +388,18 @@ bool micros_vm_handoff_record_entries_are_frozen_shape(
     return saw_read_only && saw_writable;
 }
 
-bool micros_vm_handoff_frozen_record_is_valid(
+bool micros_vm_handoff_record_entries_are_frozen_shape(
+    const struct micros_vm_kernel_mapping_record *record
+)
+{
+    return record_entries_have_frozen_layout(record) && record_frames_are_unique(record, 0);
+}
+
+static bool frozen_record_has_valid_shape(
     const struct micros_vm_kernel_mapping_record *record
 )
 {
     size_t table_index;
-    size_t entry_index;
 
     if (
         record->mapping_generation == 0
@@ -405,7 +407,7 @@ bool micros_vm_handoff_frozen_record_is_valid(
         || record->root_physical_address != record->table_frames[0]
         || record->entry != MICROS_APPLICATION_ENTRY
         || !micros_vm_handoff_stack_pointer_is_valid(record->stack_pointer)
-        || !micros_vm_handoff_record_entries_are_frozen_shape(record)
+        || !record_entries_have_frozen_layout(record)
     ) {
         return false;
     }
@@ -417,28 +419,16 @@ bool micros_vm_handoff_frozen_record_is_valid(
         if (!micros_vm_handoff_address_is_page_aligned(record->table_frames[table_index])) {
             return false;
         }
-        for (entry_index = 0; entry_index < table_index; ++entry_index) {
-            if (
-                record->table_frames[entry_index]
-                == record->table_frames[table_index]
-            ) {
-                return false;
-            }
-        }
-        for (
-            entry_index = 0;
-            entry_index < record->entry_count;
-            ++entry_index
-        ) {
-            if (
-                record->entries[entry_index].physical_address
-                == record->table_frames[table_index]
-            ) {
-                return false;
-            }
-        }
     }
     return true;
+}
+
+bool micros_vm_handoff_frozen_record_is_valid(
+    const struct micros_vm_kernel_mapping_record *record
+)
+{
+    return frozen_record_has_valid_shape(record)
+        && record_frames_are_unique(record, MICROS_VM_LOAD_PAGE_TABLE_FRAME_COUNT);
 }
 
 bool micros_vm_handoff_record_contains_physical_address(
@@ -464,85 +454,140 @@ bool micros_vm_handoff_record_contains_physical_address(
     return false;
 }
 
-static bool record_overlaps_prior_records(
+enum micros_vm_handoff_error micros_vm_handoff_frame_membership_prevalidated(
     const struct micros_vm_handoff_state *state,
-    size_t slot
+    const struct micros_frame_ownership *ownership,
+    uint64_t physical_address,
+    bool *present
 )
 {
-    const struct micros_vm_kernel_mapping_record *record =
-        &state->mappings[slot];
-    size_t prior_slot;
-    size_t index;
+    struct micros_frame_reference reference;
+    const struct micros_vm_kernel_mapping_record *record;
+    enum micros_frame_ownership_error error;
+    size_t slot;
 
-    for (prior_slot = 0; prior_slot < slot; ++prior_slot) {
-        const struct micros_vm_kernel_mapping_record *prior =
-            &state->mappings[prior_slot];
+    error = micros_frame_ownership_lookup_prevalidated(ownership, physical_address, &reference);
+    if (error == MICROS_FRAME_OWNERSHIP_ERROR_UNMANAGED) {
+        *present = false;
+        return MICROS_VM_HANDOFF_OK;
+    }
+    if (error != MICROS_FRAME_OWNERSHIP_OK) {
+        return MICROS_VM_HANDOFF_ERROR_INVARIANT;
+    }
+    if (reference.owner.kind == MICROS_FRAME_OWNER_VM_TRANSFERABLE) {
+        slot = state->load.process.slot;
+    } else if (reference.owner.kind == MICROS_FRAME_OWNER_VM_WIRED
+               || reference.owner.kind == MICROS_FRAME_OWNER_PROCESS_PAGE_TABLE) {
+        slot = reference.owner.slot;
+    } else {
+        *present = false;
+        return MICROS_VM_HANDOFF_OK;
+    }
+    if (!micros_vm_handoff_record_header_is_valid(state, slot)) {
+        return MICROS_VM_HANDOFF_ERROR_INVARIANT;
+    }
+    record = &state->mappings[slot];
+    if (record->phase == MICROS_VM_KERNEL_MAPPING_UNUSED) {
+        *present = false;
+        return MICROS_VM_HANDOFF_OK;
+    }
+    if (!micros_vm_handoff_selected_record_is_valid(state, slot)
+        || (reference.owner.kind == MICROS_FRAME_OWNER_VM_TRANSFERABLE
+            ? record->phase != MICROS_VM_KERNEL_MAPPING_LOADING
+                || !micros_vm_handoff_process_handles_equal(record->process, state->load.process)
+                || record->load_token != state->load.load_token
+            : record->phase == MICROS_VM_KERNEL_MAPPING_LOADING
+                || record->process.generation != reference.owner.generation)
+        || !micros_vm_handoff_record_contains_physical_address(record, physical_address)) {
+        return MICROS_VM_HANDOFF_ERROR_INVARIANT;
+    }
+    *present = true;
+    return MICROS_VM_HANDOFF_OK;
+}
 
-        if (prior->phase == MICROS_VM_KERNEL_MAPPING_UNUSED) {
-            continue;
-        }
-        for (index = 0; index < record->entry_count; ++index) {
-            if (
-                micros_vm_handoff_record_contains_physical_address(
-                    prior,
-                    record->entries[index].physical_address
-                )
-            ) {
-                return true;
-            }
-        }
-        if (record->phase != MICROS_VM_KERNEL_MAPPING_LOADING) {
-            for (
-                index = 0;
-                index < MICROS_VM_LOAD_PAGE_TABLE_FRAME_COUNT;
-                ++index
-            ) {
-                if (
-                    micros_vm_handoff_record_contains_physical_address(
-                        prior,
-                        record->table_frames[index]
-                    )
-                ) {
-                    return true;
-                }
+static bool finish_mapping_key_check(struct micros_vm_key_view *keys)
+{
+    bool unique = micros_vm_keys_sort(keys);
+
+    if (unique) {
+        for (size_t index = 1; index < keys->count; ++index) {
+            if (keys->keys64[index - 1] == keys->keys64[index]) {
+                unique = false;
+                break;
             }
         }
     }
-    return false;
+    return micros_vm_keys_end(keys) && unique;
 }
 
-static bool record_tokens_are_unique(
-    const struct micros_vm_handoff_state *state,
-    size_t slot
+static bool record_frames_are_unique(
+    const struct micros_vm_kernel_mapping_record *record, size_t table_count
 )
 {
-    const struct micros_vm_kernel_mapping_record *record =
-        &state->mappings[slot];
-    size_t prior_slot;
+    struct micros_vm_key_view keys;
 
-    for (prior_slot = 0; prior_slot < slot; ++prior_slot) {
-        const struct micros_vm_kernel_mapping_record *prior =
-            &state->mappings[prior_slot];
+    if (record->entry_count > MICROS_APPLICATION_RESIDENT_PAGE_MAX
+        || table_count > MICROS_VM_LOAD_PAGE_TABLE_FRAME_COUNT
+        || !micros_vm_keys_begin64(&keys)) {
+        return false;
+    }
+    for (size_t index = 0; index < record->entry_count + table_count; ++index) {
+        uint64_t physical = index < record->entry_count
+            ? record->entries[index].physical_address
+            : record->table_frames[index - record->entry_count];
 
-        if (prior->phase == MICROS_VM_KERNEL_MAPPING_UNUSED) {
-            continue;
+        if (!micros_vm_keys_append64(&keys, physical)) {
+            (void)micros_vm_keys_end(&keys);
+            return false;
         }
-        if (
-            prior->load_token == record->load_token
-            || (
-                record->mapping_generation != 0
-                && prior->mapping_generation
-                    == record->mapping_generation
-            )
-            || (
-                record->exit_token != 0
-                && prior->exit_token == record->exit_token
-            )
-        ) {
+    }
+    return finish_mapping_key_check(&keys);
+}
+
+static bool mapping_keys_are_unique(const struct micros_vm_handoff_state *state)
+{
+    struct micros_vm_key_view keys;
+
+    for (unsigned domain = 0; domain < 3; ++domain) {
+        if (!micros_vm_keys_begin64(&keys)) {
+            return false;
+        }
+        for (size_t slot = 0; slot < MICROS_PROCESS_CAPACITY; ++slot) {
+            const struct micros_vm_kernel_mapping_record *record = &state->mappings[slot];
+
+            if (record->phase == MICROS_VM_KERNEL_MAPPING_UNUSED) {
+                continue;
+            }
+            if (domain == 0) {
+                size_t count = record->entry_count
+                    + (record->phase == MICROS_VM_KERNEL_MAPPING_LOADING
+                       ? 0 : MICROS_VM_LOAD_PAGE_TABLE_FRAME_COUNT);
+
+                for (size_t index = 0; index < count; ++index) {
+                    uint64_t physical = index < record->entry_count
+                        ? record->entries[index].physical_address
+                        : record->table_frames[index - record->entry_count];
+
+                    if (!micros_vm_keys_append64(&keys, physical)) {
+                        goto invalid;
+                    }
+                }
+            } else {
+                uint64_t token = domain == 1 ? record->mapping_generation : record->exit_token;
+
+                if (token != 0 && !micros_vm_keys_append64(&keys, token)) {
+                    goto invalid;
+                }
+            }
+        }
+        if (!finish_mapping_key_check(&keys)) {
             return false;
         }
     }
     return true;
+invalid:
+    (void)micros_vm_keys_end(&keys);
+    return false;
 }
 
 bool micros_vm_handoff_record_header_is_valid(
@@ -567,6 +612,7 @@ bool micros_vm_handoff_record_header_is_valid(
         || record->process.slot != slot
         || micros_vm_handoff_process_handles_equal(record->process, state->process)
         || record->load_token == 0
+        || micros_vm_load_token_slot(record->load_token) != slot
         || record->load_token > state->last_load_token
     ) {
         return false;
@@ -609,7 +655,7 @@ bool micros_vm_handoff_record_header_is_valid(
     );
 }
 
-bool micros_vm_handoff_selected_record_is_valid(
+static bool mapping_slot_has_valid_shape(
     const struct micros_vm_handoff_state *state, size_t slot
 )
 {
@@ -626,15 +672,23 @@ bool micros_vm_handoff_selected_record_is_valid(
         return false;
     }
     return record->phase == MICROS_VM_KERNEL_MAPPING_LOADING
-        ? record_entries_are_loading_shape(record)
-        : micros_vm_handoff_frozen_record_is_valid(record);
+        ? record_entries_have_loading_layout(record)
+        : frozen_record_has_valid_shape(record);
 }
 
-static bool mapping_record_is_valid(const struct micros_vm_handoff_state *state, size_t slot)
+bool micros_vm_handoff_selected_record_is_valid(
+    const struct micros_vm_handoff_state *state, size_t slot
+)
 {
-    return micros_vm_handoff_selected_record_is_valid(state, slot)
-        && (state->mappings[slot].phase == MICROS_VM_KERNEL_MAPPING_UNUSED
-            || (record_tokens_are_unique(state, slot) && !record_overlaps_prior_records(state, slot)));
+    const struct micros_vm_kernel_mapping_record *record;
+
+    if (!mapping_slot_has_valid_shape(state, slot)) {
+        return false;
+    }
+    record = &state->mappings[slot];
+    return record->phase == MICROS_VM_KERNEL_MAPPING_UNUSED
+        || record_frames_are_unique(record, record->phase == MICROS_VM_KERNEL_MAPPING_LOADING
+                                     ? 0 : MICROS_VM_LOAD_PAGE_TABLE_FRAME_COUNT);
 }
 
 bool micros_vm_handoff_identity_is_valid(
@@ -716,7 +770,7 @@ static bool mapping_slots_are_valid(
         const struct micros_vm_kernel_mapping_record *record =
             &state->mappings[slot];
 
-        if (!mapping_record_is_valid(state, slot)) {
+        if (!mapping_slot_has_valid_shape(state, slot)) {
             return false;
         }
         if (record->phase == MICROS_VM_KERNEL_MAPPING_LOADING) {
@@ -750,6 +804,7 @@ static bool active_load_identity_is_valid(
         )
         && state->load.process_reservation_token != 0
         && state->load.load_token != 0
+        && micros_vm_load_token_slot(state->load.load_token) == state->load.process.slot
         && state->load.load_token <= state->last_load_token
         && micros_vm_handoff_process_is_valid(state->load.process)
         && !micros_vm_handoff_process_handles_equal(
@@ -920,6 +975,7 @@ enum micros_vm_handoff_error micros_vm_handoff_state_validate(
             &loading_slot,
             &frozen_slot
         )
+        || !mapping_keys_are_unique(state)
     ) {
         return MICROS_VM_HANDOFF_ERROR_INVARIANT;
     }

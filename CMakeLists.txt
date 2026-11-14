@@ -1104,6 +1104,8 @@ set(
 set(
     MICROS_VM_BOOT_VALIDATION_SOURCES
     lib/vm/vm_boot_validate.c
+    lib/vm/vm_keys.c
+    lib/vm/vm_load_token.c
 )
 
 set(
@@ -1404,6 +1406,7 @@ if(MICROS_BUILD_HOST_TESTS)
     add_executable(
         frame_ownership_test
         kernel/memory/frame_allocator.c
+        lib/vm/vm_keys.c
         ${MICROS_FRAME_OWNERSHIP_SOURCES}
         ${MICROS_KERNEL_OBJECT_CORE_SOURCES}
         ${MICROS_SCHEDULER_CORE_SOURCES}
@@ -1419,6 +1422,7 @@ if(MICROS_BUILD_HOST_TESTS)
     )
     add_executable(
         endpoint_test
+        lib/vm/vm_keys.c
         ${MICROS_KERNEL_OBJECT_CORE_SOURCES}
         ${MICROS_SCHEDULER_CORE_SOURCES}
         ${MICROS_ENDPOINT_CORE_SOURCES}
@@ -1504,6 +1508,8 @@ if(MICROS_BUILD_HOST_TESTS)
     )
     add_executable(
         pm_test
+        lib/vm/vm_keys.c
+        lib/vm/vm_load_token.c
         kernel/memory/frame_allocator.c
         ${MICROS_FRAME_OWNERSHIP_SOURCES}
         ${MICROS_ENDPOINT_CORE_SOURCES}
@@ -1784,6 +1790,10 @@ if(MICROS_BUILD_HOST_TESTS)
     )
     add_executable(
         vm_handoff_syscall_test
+        lib/vm/vm_keys.c
+        lib/vm/vm_load_token.c
+        kernel/memory/frame_allocator.c
+        ${MICROS_FRAME_OWNERSHIP_SOURCES}
         kernel/tty/tty_handoff_core.c
         ${MICROS_VM_HANDOFF_CORE_SOURCES}
         ${MICROS_VM_HANDOFF_SYSCALL_SOURCES}
@@ -3052,6 +3062,7 @@ if(MICROS_BUILD_HOST_TESTS)
 
     set(MEM01_NATIVE_ROOT "${CMAKE_CURRENT_BINARY_DIR}/bootstrap-allocation")
     set(MEM01_NATIVE_INPUTS
+        lib/vm/vm_keys.c
         kernel/memory/frame_allocator.c
         kernel/memory/frame_ownership.c
         kernel/memory/frame_ownership_validation.c
@@ -3085,6 +3096,7 @@ if(MICROS_BUILD_HOST_TESTS)
         list(APPEND MEM01_NATIVE_OUTPUTS "${MEM01_NATIVE_ROOT}/${mem01_source}")
     endforeach()
     file(GLOB_RECURSE MEM01_NATIVE_HEADERS
+        "${CMAKE_CURRENT_SOURCE_DIR}/lib/vm/vm_keys.h"
         "${CMAKE_CURRENT_SOURCE_DIR}/include/*.h"
         "${CMAKE_CURRENT_SOURCE_DIR}/arch/*.h"
         "${CMAKE_CURRENT_SOURCE_DIR}/kernel/*.h"
@@ -3135,6 +3147,7 @@ if(MICROS_BUILD_HOST_TESTS)
 
     set(MEM02_NATIVE_ROOT "${CMAKE_CURRENT_BINARY_DIR}/kernel-mapping")
     set(MEM02_NATIVE_INPUTS
+        lib/vm/vm_keys.c
         kernel/memory/frame_allocator.c
         kernel/memory/frame_ownership.c
         kernel/memory/frame_ownership_validation.c
@@ -3171,6 +3184,7 @@ if(MICROS_BUILD_HOST_TESTS)
         list(APPEND MEM02_NATIVE_OUTPUTS "${MEM02_NATIVE_ROOT}/${mem02_source}")
     endforeach()
     file(GLOB_RECURSE MEM02_NATIVE_HEADERS
+        "${CMAKE_CURRENT_SOURCE_DIR}/lib/vm/vm_keys.h"
         "${CMAKE_CURRENT_SOURCE_DIR}/include/*.h"
         "${CMAKE_CURRENT_SOURCE_DIR}/arch/*.h"
         "${CMAKE_CURRENT_SOURCE_DIR}/kernel/*.h"
@@ -3222,6 +3236,8 @@ if(MICROS_BUILD_HOST_TESTS)
 
     set(MEM03_NATIVE_ROOT "${CMAKE_CURRENT_BINARY_DIR}/selected-ownership")
     set(MEM03_NATIVE_INPUTS
+        lib/vm/vm_keys.c
+        lib/vm/vm_load_token.c
         kernel/memory/frame_allocator.c
         kernel/memory/bootstrap_memory.c
         kernel/pm/pm_control_core.c
@@ -3275,6 +3291,8 @@ if(MICROS_BUILD_HOST_TESTS)
         kernel/ipc/ipc.c
     )
     file(GLOB_RECURSE MEM03_NATIVE_HEADERS
+        "${CMAKE_CURRENT_SOURCE_DIR}/lib/vm/vm_keys.h"
+        "${CMAKE_CURRENT_SOURCE_DIR}/lib/vm/vm_load_token.h"
         "${CMAKE_CURRENT_SOURCE_DIR}/include/*.h"
         "${CMAKE_CURRENT_SOURCE_DIR}/arch/*.h"
         "${CMAKE_CURRENT_SOURCE_DIR}/kernel/*.h"
@@ -3456,6 +3474,8 @@ if(MICROS_BUILD_HOST_TESTS)
 
     set(MEM04_NATIVE_ROOT "${CMAKE_CURRENT_BINARY_DIR}/selected-address-space")
     set(MEM04_NATIVE_INPUTS
+        lib/vm/vm_keys.c
+        lib/vm/vm_load_token.c
         kernel/memory/frame_allocator.c
         kernel/memory/bootstrap_memory.c
         kernel/memory/frame_ownership.c
@@ -3516,6 +3536,8 @@ if(MICROS_BUILD_HOST_TESTS)
         kernel/boot/bootstrap_transitions.c
     )
     file(GLOB_RECURSE MEM04_NATIVE_HEADERS
+        "${CMAKE_CURRENT_SOURCE_DIR}/lib/vm/vm_keys.h"
+        "${CMAKE_CURRENT_SOURCE_DIR}/lib/vm/vm_load_token.h"
         "${CMAKE_CURRENT_SOURCE_DIR}/include/*.h"
         "${CMAKE_CURRENT_SOURCE_DIR}/arch/*.h"
         "${CMAKE_CURRENT_SOURCE_DIR}/kernel/*.h"
@@ -3661,6 +3683,9 @@ if(MICROS_BUILD_HOST_TESTS)
 
     set(MEM05_NATIVE_ROOT "${CMAKE_CURRENT_BINARY_DIR}/selected-release-handoff")
     set(MEM05_NATIVE_INPUTS
+        lib/vm/vm_keys.c
+        lib/vm/vm_load_token.c
+        kernel/memory/user_address_space_vm_plan.c
         kernel/memory/frame_allocator.c
         kernel/memory/bootstrap_memory.c
         kernel/memory/frame_ownership.c
@@ -3722,6 +3747,8 @@ if(MICROS_BUILD_HOST_TESTS)
         kernel/execution/user_execution_validation.c
     )
     file(GLOB_RECURSE MEM05_NATIVE_HEADERS
+        "${CMAKE_CURRENT_SOURCE_DIR}/lib/vm/vm_keys.h"
+        "${CMAKE_CURRENT_SOURCE_DIR}/lib/vm/vm_load_token.h"
         "${CMAKE_CURRENT_SOURCE_DIR}/include/*.h"
         "${CMAKE_CURRENT_SOURCE_DIR}/arch/*.h"
         "${CMAKE_CURRENT_SOURCE_DIR}/kernel/*.h"
@@ -4506,6 +4533,7 @@ if(MICROS_BUILD_HOST_TESTS)
     set(VM01_NATIVE_ROOT "${CMAKE_BINARY_DIR}/selected-vm")
     set(VM01_NATIVE_INPUTS
         ${MICROS_VM_HANDOFF_CORE_SOURCES} kernel/vm/vm_bootstrap.c
+        kernel/memory/frame_allocator.c ${MICROS_FRAME_OWNERSHIP_SOURCES}
         ${MICROS_VM_BOOT_VALIDATION_SOURCES} ${MICROS_SPAWN_REQUEST_SOURCES}
         ${MICROS_VM_IMAGE_SOURCES} ${MICROS_VM_CORE_SOURCES} ${MICROS_VM_SERVICE_CORE_SOURCES})
     set(VM01_NATIVE_HEADERS
@@ -4517,7 +4545,9 @@ if(MICROS_BUILD_HOST_TESTS)
         include/micros/user_context.h include/micros/vm.h include/micros/vm_bootstrap.h
         include/micros/vm_service.h include/micros/work_observation.h
         kernel/vm/vm_handoff_core.h kernel/vm/vm_handoff_internal.h
-        lib/spawn/spawn_request.h lib/vm/vm_boot_internal.h servers/vm/vm_core.h servers/vm/vm_image.h
+        kernel/memory/frame_ownership_internal.h
+        lib/spawn/spawn_request.h lib/vm/vm_boot_internal.h lib/vm/vm_keys.h lib/vm/vm_load_token.h
+        servers/vm/vm_core.h servers/vm/vm_image.h
         servers/vm/vm_image_internal.h servers/vm/vm_internal.h servers/vm/vm_admission.h
         servers/vm/vm_service_core.h servers/vm/vm_service_internal.h
         tests/qemu/vm_validation_work.h tests/work/work_counts.h)

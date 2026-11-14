@@ -30,6 +30,7 @@ MEASURED_ARRAY_FIELDS = frozenset((
     "process_frames", "words", "positions", "entries", "managed_ranges",
     "processes", "threads", "harts", "endpoints", "owner_counts", "mappings",
     "ready_head", "ready_tail", "requests", "transitions",
+    "keys32", "keys64", "key_partitions", "leaves",
 ))
 
 
@@ -133,9 +134,13 @@ def declarations(root=ROOT):
 def native_inputs(root, family):
     root = Path(root)
     members = declarations(root)["families"][family]["native_sources"]
+    libraries = {"lib/runtime/memory.c"} if family == "GRANT01" else set()
+    if family in ("MEM01", "MEM02", "MEM03", "MEM04", "MEM05"):
+        libraries.add("lib/vm/vm_keys.c")
+    if family in ("MEM03", "MEM04", "MEM05"):
+        libraries.add("lib/vm/vm_load_token.c")
     if len(set(members)) != len(members) or any(
-        (not name.startswith("kernel/")
-         and not (family == "GRANT01" and name == "lib/runtime/memory.c"))
+        (not name.startswith("kernel/") and name not in libraries)
         or not name.endswith(".c") or ".." in Path(name).parts
         for name in members
     ):
@@ -147,6 +152,8 @@ def native_inputs(root, family):
     }
     if family == "GRANT01" and "lib/runtime/memory.c" in members:
         headers.add("lib/runtime/memory.h")
+    for source in libraries & set(members):
+        headers.add(source.removesuffix(".c") + ".h")
     if family in ("MEM04", "MEM05"):
         headers.update(("tests/qemu/vm_validation_work.h", "tests/work/work_counts.h"))
     return tuple(sorted({*members, *headers}))

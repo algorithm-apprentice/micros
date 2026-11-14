@@ -60,13 +60,13 @@ static bool prepare_and_bind_load(
         micros_vm_load_bind(
             &context->state,
             (struct micros_process_handle){2, 7},
-            UINT64_C(0x2222)
+            UINT64_C(0x2202)
         ) == MICROS_VM_CORE_OK
         && context->state.phase == MICROS_VM_LOADER_LOADING
     );
     record = &context->state.mapping_records[2];
     EXPECT_TRUE(
-        record->load_token == UINT64_C(0x2222)
+        record->load_token == UINT64_C(0x2202)
         && record->semantic_pid == 7
         && record->process_generation == 7
         && record->process_slot == 2
@@ -187,7 +187,7 @@ static bool freeze_load(
     EXPECT_TRUE(
         micros_vm_load_freeze_plan(&context->state, &freeze_plan)
             == MICROS_VM_CORE_OK
-        && freeze_plan.load_token == UINT64_C(0x2222)
+        && freeze_plan.load_token == UINT64_C(0x2202)
         && freeze_plan.entry == MICROS_APPLICATION_ENTRY
         && freeze_plan.stack_pointer
             == context->state.transaction.stack_plan.stack_pointer
@@ -229,7 +229,7 @@ static bool commit_and_preserve_active_load(
     EXPECT_TRUE(
         micros_vm_load_committed(
             &context->state,
-            UINT64_C(0x2222),
+            UINT64_C(0x2202),
             UINT64_C(0x3333),
             7
         ) == MICROS_VM_CORE_OK
@@ -271,11 +271,11 @@ static bool commit_and_preserve_active_load(
             && micros_vm_load_bind(
                 &context->state,
                 (struct micros_process_handle){3, 9},
-                UINT64_C(0x5555)
+                UINT64_C(0x5543)
             ) == MICROS_VM_CORE_OK
             && micros_vm_load_aborted(
                 &context->state,
-                UINT64_C(0x5555),
+                UINT64_C(0x5543),
                 0
             ) == MICROS_VM_CORE_OK
             && context->state.mapping_records[2].phase
@@ -324,7 +324,7 @@ static bool release_active_load(
     EXPECT_TRUE(
         micros_vm_exit_release_begin(
             &context->state,
-            UINT64_C(0x2222),
+            UINT64_C(0x2202),
             UINT64_C(0x3333),
             7,
             &exit_action

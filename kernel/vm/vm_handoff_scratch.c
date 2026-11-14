@@ -6,6 +6,7 @@
 
 enum micros_vm_handoff_error micros_vm_scratch_map_preflight(
     const struct micros_vm_handoff_state *state,
+    const struct micros_frame_ownership *ownership,
     const struct micros_vm_scratch_map_request *request,
     struct micros_vm_scratch_plan *plan
 )
@@ -14,7 +15,7 @@ enum micros_vm_handoff_error micros_vm_scratch_map_preflight(
     struct micros_vm_kernel_mapping_entry entry;
     const struct micros_vm_kernel_mapping_record *record;
     enum micros_vm_handoff_error error;
-    size_t slot;
+    bool present;
 
     if (
         request == NULL
@@ -51,18 +52,17 @@ enum micros_vm_handoff_error micros_vm_scratch_map_preflight(
     if (!micros_vm_handoff_loading_record_can_append(record, &entry)) {
         return MICROS_VM_HANDOFF_ERROR_STATE;
     }
-    for (slot = 0; slot < MICROS_PROCESS_CAPACITY; ++slot) {
-        if (!micros_vm_handoff_record_header_is_valid(state, slot)) {
-            return MICROS_VM_HANDOFF_ERROR_INVARIANT;
-        }
-        if (
-            micros_vm_handoff_record_contains_physical_address(
-                &state->mappings[slot],
-                entry.physical_address
-            )
-        ) {
-            return MICROS_VM_HANDOFF_ERROR_STATE;
-        }
+    if (micros_frame_ownership_validate_metadata(ownership) != MICROS_FRAME_OWNERSHIP_OK
+        || ownership->phase != MICROS_FRAME_OWNERSHIP_PHASE_HANDED_OFF) {
+        return MICROS_VM_HANDOFF_ERROR_INVARIANT;
+    }
+    error = micros_vm_handoff_frame_membership_prevalidated(
+        state, ownership, entry.physical_address, &present);
+    if (error != MICROS_VM_HANDOFF_OK) {
+        return error;
+    }
+    if (present) {
+        return MICROS_VM_HANDOFF_ERROR_STATE;
     }
 
     micros_vm_handoff_clear_bytes(&candidate, sizeof(candidate));

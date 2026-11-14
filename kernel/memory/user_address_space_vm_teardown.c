@@ -107,7 +107,7 @@ static enum micros_user_address_space_error acquire_scratch(
     struct micros_user_address_space_scratch_lease *lease
 )
 {
-    return micros_user_address_space_acquire_scratch(view, lease);
+    return micros_user_address_space_acquire_selected_scratch(view, lease);
 }
 
 static void release_scratch(
@@ -133,20 +133,6 @@ static void copy_vm_action_mappings(
         mappings[index].permissions = entries[index].permissions;
         mappings[index].reserved = entries[index].reserved;
     }
-}
-
-static bool owner_is_exact_process_kind(
-    struct micros_frame_owner owner,
-    enum micros_frame_owner_kind kind,
-    struct micros_process_handle process
-)
-{
-    return (
-        owner.kind == kind
-        && owner.slot == process.slot
-        && owner.generation == process.generation
-        && owner.reserved == 0
-    );
 }
 
 static bool teardown_record_matches(
@@ -275,77 +261,14 @@ preflight_vm_teardown(
 }
 
 static enum micros_user_address_space_error
-validate_vm_teardown_data_frames(
-    const struct micros_frame_ownership *ledger,
-    struct micros_process_handle process,
-    const struct micros_vm_kernel_mapping_entry *entries,
-    size_t entry_count
-)
-{
-    struct micros_frame_owner owner;
-    size_t index;
-
-    for (index = 0; index < entry_count; ++index) {
-        if (
-            micros_frame_ownership_lookup(
-                ledger,
-                entries[index].physical_address,
-                &owner
-            ) != MICROS_FRAME_OWNERSHIP_OK
-            || !owner_is_exact_process_kind(
-                owner,
-                MICROS_FRAME_OWNER_VM_WIRED,
-                process
-            )
-        ) {
-            return MICROS_USER_ADDRESS_SPACE_ERROR_OWNERSHIP;
-        }
-    }
-    return MICROS_USER_ADDRESS_SPACE_OK;
-}
-
-static enum micros_user_address_space_error
-validate_vm_teardown_table_frames(
-    const struct micros_frame_ownership *ledger,
-    struct micros_process_handle process,
-    const uint64_t
-        table_frames[MICROS_VM_LOAD_PAGE_TABLE_FRAME_COUNT]
-)
-{
-    struct micros_frame_owner owner;
-    size_t index;
-
-    for (
-        index = 0;
-        index < MICROS_VM_LOAD_PAGE_TABLE_FRAME_COUNT;
-        ++index
-    ) {
-        if (
-            micros_frame_ownership_lookup(
-                ledger,
-                table_frames[index],
-                &owner
-            ) != MICROS_FRAME_OWNERSHIP_OK
-            || !owner_is_exact_process_kind(
-                owner,
-                MICROS_FRAME_OWNER_PROCESS_PAGE_TABLE,
-                process
-            )
-        ) {
-            return MICROS_USER_ADDRESS_SPACE_ERROR_OWNERSHIP;
-        }
-    }
-    return MICROS_USER_ADDRESS_SPACE_OK;
-}
-
-static enum micros_user_address_space_error
 validate_vm_teardown_table_plan(
+    struct micros_user_address_space_runtime_view *runtime,
+    struct micros_user_address_space_scratch_lease *scratch,
     struct micros_process_handle process,
     const uint64_t
         table_frames[MICROS_VM_LOAD_PAGE_TABLE_FRAME_COUNT],
     const struct micros_vm_kernel_mapping_entry *entries,
-    size_t entry_count,
-    const struct micros_kernel_address_space_report *kernel_report
+    size_t entry_count
 )
 {
     struct micros_user_address_space_vm_mapping
@@ -365,12 +288,7 @@ validate_vm_teardown_table_plan(
     if (error != MICROS_USER_ADDRESS_SPACE_OK) {
         return error;
     }
-    return micros_user_address_space_vm_table_plan_matches_memory(
-        &table_plan,
-        kernel_report
-    )
-        ? MICROS_USER_ADDRESS_SPACE_OK
-        : MICROS_USER_ADDRESS_SPACE_ERROR_PTE;
+    return micros_user_address_space_validate_vm_table_plan_locked(runtime, scratch, &table_plan);
 }
 
 static void prepare_vm_teardown_candidate(
@@ -446,38 +364,13 @@ micros_user_address_space_prepare_vm_teardown(
     if (error != MICROS_USER_ADDRESS_SPACE_OK) {
         goto done;
     }
-    error =
-        micros_user_address_space_validate_vm_plan_roots_locked(
-        &runtime,
-        context.objects,
-        &scratch
-    );
-    if (error != MICROS_USER_ADDRESS_SPACE_OK) {
-        goto done_with_scratch;
-    }
-    error = validate_vm_teardown_data_frames(
-        context.ledger,
-        process,
-        entries,
-        entry_count
-    );
-    if (error != MICROS_USER_ADDRESS_SPACE_OK) {
-        goto done_with_scratch;
-    }
-    error = validate_vm_teardown_table_frames(
-        context.ledger,
-        process,
-        table_frames
-    );
-    if (error != MICROS_USER_ADDRESS_SPACE_OK) {
-        goto done_with_scratch;
-    }
     error = validate_vm_teardown_table_plan(
+        &runtime,
+        &scratch,
         process,
         table_frames,
         entries,
-        entry_count,
-        context.kernel_report
+        entry_count
     );
     if (error != MICROS_USER_ADDRESS_SPACE_OK) {
         goto done_with_scratch;
