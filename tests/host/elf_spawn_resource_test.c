@@ -70,6 +70,14 @@ static void reset_resources(void)
     baseline->services.pm.last_pid = 1;
     baseline->services.coordinator.last_spawn_token = 1;
     baseline->services.vm.phase = MICROS_VM_LOADER_IDLE;
+    baseline->services.vm.boot_summary.managed_frame_count = 8;
+    baseline->services.vm.free_bitmap[0] = UINT64_C(0xfe);
+    baseline->services.vm.allocation_origin = 8;
+    baseline->services.boot_info.header.managed_frame_count = 8;
+    baseline->services.boot_info.frame_states[0] = MICROS_VM_LOCAL_FRAME_KERNEL;
+    for (size_t index = 1; index < 8; ++index) {
+        baseline->services.boot_info.frame_states[index] = MICROS_VM_LOCAL_FRAME_FREE;
+    }
     baseline->services.vfs.processes[0].state = MICROS_VFS_PROCESS_ACTIVE;
     baseline->services.vfs.processes[0].endpoint = init->endpoint;
     baseline->services.vfs.open_files[0].state = MICROS_VFS_OPEN_FILE_ACTIVE;
@@ -277,6 +285,29 @@ bool test_elf_spawn_service_resource_oracle(void)
 
     reset_resources();
     CHECK(micros_elf_spawn_same_service_resources(baseline, current));
+    current->vm.allocation_origin = 2;
+    current->vm.free_page_cache_count = 2;
+    current->vm.free_page_cache[0] = 3;
+    current->vm.free_page_cache[1] = 5;
+    current->vm.free_page_cache[19] = UINT32_MAX;
+    CHECK(micros_elf_spawn_same_service_resources(baseline, current));
+    current->vm.free_page_cache_count = 21;
+    CHECK(!micros_elf_spawn_same_service_resources(current, current));
+    current->vm.free_page_cache_count = 2;
+    current->vm.allocation_origin = 9;
+    CHECK(!micros_elf_spawn_same_service_resources(current, current));
+    current->vm.allocation_origin = 2;
+    current->vm.free_page_cache[1] = 8;
+    CHECK(!micros_elf_spawn_same_service_resources(current, current));
+    current->vm.free_page_cache[1] = 0;
+    CHECK(!micros_elf_spawn_same_service_resources(current, current));
+    current->vm.free_page_cache[1] = 5;
+    current->vm.free_bitmap[0] ^= UINT64_C(1) << 5;
+    CHECK(!micros_elf_spawn_same_service_resources(current, current));
+    reset_resources();
+    current->vm.free_bitmap[0] ^= UINT64_C(1) << 6;
+    CHECK(!micros_elf_spawn_same_service_resources(baseline, current));
+    reset_resources();
     current->pm.records[1].state = MICROS_PM_PROCESS_ZOMBIE;
     CHECK(!micros_elf_spawn_same_service_resources(baseline, current));
     reset_resources();

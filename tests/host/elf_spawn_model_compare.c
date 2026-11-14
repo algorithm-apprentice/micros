@@ -167,6 +167,13 @@ static bool compare_vm_frames(const struct elf_spawn_model_context *context)
     size_t slot;
     size_t index;
 
+    if (context->vm->state.free_page_cache_count != context->reference.cached_page_count
+        || context->vm->state.allocation_origin != (context->reference.scan_start < 0
+            ? TEST_MANAGED_FRAME_COUNT : (uint32_t)context->reference.scan_start)
+        || memcmp(context->vm->state.free_page_cache, context->reference.cached_pages,
+                  context->reference.cached_page_count * sizeof(uint32_t)) != 0) {
+        return false;
+    }
     memcpy(expected, context->initial_frames, sizeof(expected));
     for (index = 0; index < TEST_MANAGED_FRAME_COUNT; ++index) {
         kernel[index] = index < TEST_FIRST_FREE_FRAME ? ELF_FRAME_BOOT : ELF_FRAME_FREE;

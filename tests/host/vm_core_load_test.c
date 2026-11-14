@@ -41,16 +41,16 @@ static bool prepare_and_bind_load(
     for (index = 0; index < MICROS_VM_PAGE_TABLE_FRAME_COUNT; ++index) {
         EXPECT_TRUE(
             context->state.transaction.table_frames[index]
-                == vm_core_test_frame_address(TEST_FIRST_FREE_FRAME + index)
-            && context->boot_info.frame_states[TEST_FIRST_FREE_FRAME + index]
-                == MICROS_VM_LOCAL_FRAME_FREE
+                == vm_core_test_frame_address(TEST_FIRST_LOAD_FRAME + index)
+            && context->boot_info.frame_states[TEST_FIRST_LOAD_FRAME + index]
+                == MICROS_VM_LOCAL_FRAME_LOAD_RESERVED
         );
     }
     for (index = 0; index < context->state.transaction.page_count; ++index) {
         EXPECT_TRUE(
             context->state.transaction.data_frames[index]
                 == vm_core_test_frame_address(
-                    TEST_FIRST_FREE_FRAME
+                    TEST_FIRST_LOAD_FRAME
                         + MICROS_VM_PAGE_TABLE_FRAME_COUNT
                         + index
                 )
@@ -89,7 +89,7 @@ static bool prepare_and_bind_load(
     }
     for (index = 0; index < MICROS_VM_PAGE_TABLE_FRAME_COUNT; ++index) {
         EXPECT_TRUE(
-            context->boot_info.frame_states[TEST_FIRST_FREE_FRAME + index]
+            context->boot_info.frame_states[TEST_FIRST_LOAD_FRAME + index]
                 == MICROS_VM_LOCAL_FRAME_LOAD_RESERVED
         );
     }
@@ -120,7 +120,7 @@ static bool fill_and_commit_pages(
             && micros_vm_load_scratch_mapped(&context->state, page_index)
                 == MICROS_VM_CORE_OK
             && context->boot_info.frame_states[
-                TEST_FIRST_FREE_FRAME
+                TEST_FIRST_LOAD_FRAME
                     + MICROS_VM_PAGE_TABLE_FRAME_COUNT
                     + page_index
             ] == MICROS_VM_LOCAL_FRAME_TRANSFERABLE
@@ -203,14 +203,14 @@ static bool freeze_load(
     );
     for (index = 0; index < MICROS_VM_PAGE_TABLE_FRAME_COUNT; ++index) {
         EXPECT_TRUE(
-            context->boot_info.frame_states[TEST_FIRST_FREE_FRAME + index]
+            context->boot_info.frame_states[TEST_FIRST_LOAD_FRAME + index]
                 == MICROS_VM_LOCAL_FRAME_PROCESS_PAGE_TABLE
         );
     }
     for (index = 0; index < 4; ++index) {
         EXPECT_TRUE(
             context->boot_info.frame_states[
-                TEST_FIRST_FREE_FRAME
+                TEST_FIRST_LOAD_FRAME
                     + MICROS_VM_PAGE_TABLE_FRAME_COUNT
                     + index
             ] == MICROS_VM_LOCAL_FRAME_PROCESS_WIRED
@@ -267,7 +267,7 @@ static bool commit_and_preserve_active_load(
                 &values
             ) == MICROS_VM_CORE_OK
             && context->state.transaction.table_frames[0]
-                == vm_core_test_frame_address(14)
+                == vm_core_test_frame_address(10)
             && micros_vm_load_bind(
                 &context->state,
                 (struct micros_process_handle){3, 9},
@@ -340,7 +340,7 @@ static bool release_active_load(
         && vm_core_test_bytes_are_zero(record, sizeof(*record))
         && micros_vm_state_validate(&context->state) == MICROS_VM_CORE_OK
     );
-    for (index = TEST_FIRST_FREE_FRAME; index < 14; ++index) {
+    for (index = TEST_FIRST_FREE_FRAME; index < TEST_MANAGED_FRAME_COUNT; ++index) {
         EXPECT_TRUE(
             context->boot_info.frame_states[index] == MICROS_VM_LOCAL_FRAME_FREE
         );

@@ -54,36 +54,18 @@ static uint64_t vm_validation_digest_active_frame_states(
     uint64_t digest
 )
 {
-    size_t frame_index = 0;
-    size_t word_index;
+    for (size_t frame_index = 0; frame_index < managed_frame_count; ++frame_index) {
+        uint8_t local = state->boot_info->frame_states[frame_index];
+        uint8_t byte = local >= MICROS_VM_LOCAL_FRAME_TRANSFERABLE
+                && local <= MICROS_VM_LOCAL_FRAME_PROCESS_PAGE_TABLE
+            ? MICROS_VM_FRAME_FREE : local;
 
-    for (
-        word_index = 0;
-        frame_index < managed_frame_count;
-        ++word_index
-    ) {
-        uint64_t initial_free_word =
-            state->initial_free_bitmap[word_index];
-        uint64_t bit = UINT64_C(1);
-
-        for (
-            ;
-            frame_index < managed_frame_count && bit != 0;
-            ++frame_index, bit <<= 1
-        ) {
-            uint8_t byte = (initial_free_word & bit) != 0
-                ? MICROS_VM_FRAME_FREE
-                : state->boot_info->frame_states[frame_index];
-
-            digest = (
-                digest ^ byte
-            ) * MICROS_VM_PAGE_DIGEST_PRIME;
-        }
+        digest = (digest ^ byte) * MICROS_VM_PAGE_DIGEST_PRIME;
     }
     return digest;
 }
 
-static bool vm_validation_initial_free_tail_is_zero(
+static bool vm_validation_free_tail_is_zero(
     const struct micros_vm_state *state,
     size_t managed_frame_count
 )
@@ -96,7 +78,7 @@ static bool vm_validation_initial_free_tail_is_zero(
 
         if (
             (
-                state->initial_free_bitmap[first_word]
+                state->free_bitmap[first_word]
                 & inactive_mask
             ) != 0
         ) {
@@ -106,10 +88,10 @@ static bool vm_validation_initial_free_tail_is_zero(
     }
     for (
         ;
-        first_word < MICROS_VM_INITIAL_FREE_BITMAP_WORDS;
+        first_word < MICROS_VM_FREE_BITMAP_WORDS;
         ++first_word
     ) {
-        if (state->initial_free_bitmap[first_word] != 0) {
+        if (state->free_bitmap[first_word] != 0) {
             return false;
         }
     }
@@ -195,7 +177,7 @@ static bool vm_core_boot_database_is_immutable(
             &state->boot_info->frame_states[active_frame_count],
             inactive_frame_count
         )
-        || !vm_validation_initial_free_tail_is_zero(
+        || !vm_validation_free_tail_is_zero(
             state,
             active_frame_count
         )
@@ -487,6 +469,9 @@ static bool validate_local_frame_states(
     ) {
         uint8_t local = state->boot_info->frame_states[frame_index];
 
+        if (!vm_core_frame_availability_is_valid(state, frame_index)) {
+            return false;
+        }
         if (!vm_core_initial_frame_is_free(state, frame_index)) {
             if (
                 local != MICROS_VM_FRAME_KERNEL
@@ -593,7 +578,7 @@ static bool validate_data_entry(
             data_index < state->transaction.completed_page_count
                 || state->transaction.scratch_page == data_index + 1
                 ? MICROS_VM_LOCAL_FRAME_TRANSFERABLE
-                : MICROS_VM_LOCAL_FRAME_FREE;
+                : MICROS_VM_LOCAL_FRAME_LOAD_RESERVED;
     }
     return state->boot_info->frame_states[frame_index] == expected_state;
 }
@@ -620,6 +605,7 @@ static bool validate_record_entries(
                 state, entry->physical_address, &frame_index
             )
             || !vm_core_initial_frame_is_free(state, frame_index)
+            || !vm_core_frame_availability_is_valid(state, frame_index)
             || !vm_core_bytes_are_zero(entry->reserved, sizeof(entry->reserved))
             || (
                 entry_index != 0
@@ -779,7 +765,7 @@ static bool validate_input_copied_phase(
         counts->loading_records == 0
         && counts->frozen_records == 0
         && counts->exit_records == 0
-        && counts->local_load_reserved == 0
+        && counts->local_load_reserved == MICROS_VM_PAGE_TABLE_FRAME_COUNT + state->transaction.page_count
         && counts->local_transferable == 0
         && state->transaction.load_token == 0
         && state->transaction.mapping_generation == 0
@@ -787,7 +773,7 @@ static bool validate_input_copied_phase(
         && state->transaction.process.generation == 0
         && state->transaction.completed_page_count == 0
         && state->transaction.scratch_page == 0
-        && vm_core_selected_frames_match(state, MICROS_VM_MAPPING_RECORD_CAPACITY)
+        && vm_core_transaction_frames_match(state)
     );
 }
 
@@ -800,7 +786,8 @@ static bool validate_loading_phase(
         counts->loading_records == 1
         && counts->frozen_records == 0
         && counts->exit_records == 0
-        && counts->local_load_reserved == MICROS_VM_PAGE_TABLE_FRAME_COUNT
+        && counts->local_load_reserved == MICROS_VM_PAGE_TABLE_FRAME_COUNT + state->transaction.page_count
+            - state->transaction.completed_page_count - (state->transaction.scratch_page == 0 ? 0 : 1)
         && counts->local_transferable
             == state->transaction.completed_page_count
                 + (state->transaction.scratch_page == 0 ? 0 : 1)
@@ -811,7 +798,7 @@ static bool validate_loading_phase(
         && vm_core_record_matches_transaction(
             state, &state->mapping_records[counts->loading_slot]
         )
-        && vm_core_selected_frames_match(state, counts->loading_slot)
+        && vm_core_transaction_frames_match(state)
     );
 }
 
@@ -835,7 +822,7 @@ static bool validate_frozen_phase(
         && vm_core_record_matches_transaction(
             state, &state->mapping_records[counts->frozen_slot]
         )
-        && vm_core_selected_frames_match(state, counts->frozen_slot)
+        && vm_core_transaction_frames_match(state)
     );
 }
 
@@ -886,6 +873,16 @@ static bool validate_loader_phase(
     }
 }
 
+static bool cached_frames_are_valid(const struct micros_vm_state *state)
+{
+    for (size_t index = 0; index < state->free_page_cache_count; ++index) {
+        if (!vm_core_initial_frame_is_free(state, state->free_page_cache[index])) {
+            return false;
+        }
+    }
+    return true;
+}
+
 enum micros_vm_core_error vm_core_validate_state(
     const struct micros_vm_state *state,
     bool allow_staged_idle_inputs
@@ -909,6 +906,7 @@ enum micros_vm_core_error vm_core_validate_state(
             state, sizeof(*state), state->boot_info, sizeof(*state->boot_info)
         )
         || !vm_core_boot_header_matches_summary(state)
+        || !vm_core_allocator_metadata_is_valid(state)
         || !vm_core_boot_database_is_immutable(state)
         || state->phase < MICROS_VM_LOADER_IDLE
         || state->phase > MICROS_VM_LOADER_EXIT_RELEASING
@@ -930,6 +928,7 @@ enum micros_vm_core_error vm_core_validate_state(
     }
     if (
         !validate_local_frame_states(state, &counts)
+        || !cached_frames_are_valid(state)
         || !validate_mapping_records(state, &counts)
         || !validate_loader_phase(state, &counts, allow_staged_idle_inputs)
     ) {
@@ -998,6 +997,7 @@ bool vm_core_selected_record_is_valid(const struct micros_vm_state *state, size_
 
         if (!vm_core_physical_to_frame_index(state, entry->physical_address, &frame_index)
             || !vm_core_initial_frame_is_free(state, frame_index)
+            || !vm_core_frame_availability_is_valid(state, frame_index)
             || !vm_core_bytes_are_zero(entry->reserved, sizeof(entry->reserved))
             || (index != 0 && record->entries[index - 1].physical_address >= entry->physical_address)
             || !(index < MICROS_VM_PAGE_TABLE_FRAME_COUNT
@@ -1012,7 +1012,7 @@ bool vm_core_selected_record_is_valid(const struct micros_vm_state *state, size_
     );
 }
 
-static bool selected_input_frames_are_free(const struct micros_vm_state *state)
+static bool selected_input_frames_are_reserved(const struct micros_vm_state *state)
 {
     const struct micros_vm_service_load_transaction *transaction = &state->transaction;
 
@@ -1024,7 +1024,8 @@ static bool selected_input_frames_are_free(const struct micros_vm_state *state)
 
         if (!vm_core_physical_to_frame_index(state, physical, &frame_index)
             || !vm_core_initial_frame_is_free(state, frame_index)
-            || state->boot_info->frame_states[frame_index] != MICROS_VM_LOCAL_FRAME_FREE) {
+            || !vm_core_frame_availability_is_valid(state, frame_index)
+            || state->boot_info->frame_states[frame_index] != MICROS_VM_LOCAL_FRAME_LOAD_RESERVED) {
             return false;
         }
     }
@@ -1137,6 +1138,7 @@ static bool selected_load_page_is_valid(const struct micros_vm_state *state, siz
         && entry->permissions == permissions
         && vm_core_physical_to_frame_index(state, entry->physical_address, &frame_index)
         && vm_core_initial_frame_is_free(state, frame_index)
+        && vm_core_frame_availability_is_valid(state, frame_index)
         && vm_core_bytes_are_zero(entry->reserved, sizeof(entry->reserved))
         && validate_data_entry(state, record, entry_index, frame_index);
 }
@@ -1152,7 +1154,7 @@ static bool retained_load_set_is_valid(const struct micros_vm_state *state)
         }
     }
     if (state->phase == MICROS_VM_LOADER_INPUT_COPIED) {
-        return selected_input_frames_are_free(state);
+        return selected_input_frames_are_reserved(state);
     }
     return vm_core_selected_record_is_valid(state, state->transaction.process.slot)
         && vm_core_record_matches_transaction(state, &state->mapping_records[state->transaction.process.slot]);
@@ -1173,6 +1175,7 @@ enum micros_vm_core_error vm_core_validate_selected_state(const struct micros_vm
         || (uintptr_t)state->boot_info % MICROS_VM_BOOT_INFO_ALIGNMENT != 0
         || vm_core_ranges_overlap(state, sizeof(*state), state->boot_info, sizeof(*state->boot_info))
         || state->phase < MICROS_VM_LOADER_IDLE || state->phase > MICROS_VM_LOADER_EXIT_RELEASING
+        || !vm_core_allocator_metadata_is_valid(state)
         || !selected_geometry_is_valid(state)) {
         return MICROS_VM_CORE_ERROR_INVARIANT;
     }

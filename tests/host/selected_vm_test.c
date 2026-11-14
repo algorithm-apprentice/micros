@@ -188,8 +188,8 @@ static bool service_load_cases(void)
     REQUIRE(report("service-prepare", result, MICROS_VM_CORE_OK, false));
     REQUIRE(context->state.transaction.page_count == 4);
     for (size_t index = 0; index < 4; ++index) {
-        REQUIRE(context->state.transaction.table_frames[index] == vm_core_test_frame_address(6 + index));
-        REQUIRE(context->state.transaction.data_frames[index] == vm_core_test_frame_address(10 + index));
+        REQUIRE(context->state.transaction.table_frames[index] == vm_core_test_frame_address(TEST_FIRST_LOAD_FRAME + index));
+        REQUIRE(context->state.transaction.data_frames[index] == vm_core_test_frame_address(TEST_FIRST_LOAD_FRAME + 4 + index));
     }
     REQUIRE(begin(false));
     result = micros_vm_load_bind(&context->state, (struct micros_process_handle){2, 7}, 0x2202);
@@ -199,14 +199,14 @@ static bool service_load_cases(void)
     result = micros_vm_load_next_page(&context->state, &page);
     REQUIRE(report("service-next-page", result, MICROS_VM_CORE_OK, false));
     REQUIRE(page.page_index == 0 && page.virtual_address == MICROS_APPLICATION_ENTRY
-            && page.physical_address == vm_core_test_frame_address(10)
+            && page.physical_address == vm_core_test_frame_address(TEST_FIRST_LOAD_FRAME + 4)
             && page.permissions == (MICROS_SV39_PERMISSION_USER | MICROS_SV39_PERMISSION_READ
                                     | MICROS_SV39_PERMISSION_EXECUTE));
     REQUIRE(begin(false));
     result = micros_vm_load_scratch_mapped(&context->state, 0);
     REQUIRE(report("service-map", result, MICROS_VM_CORE_OK, false));
     REQUIRE(context->state.transaction.scratch_page == 1
-            && context->boot_info.frame_states[10] == MICROS_VM_LOCAL_FRAME_TRANSFERABLE);
+            && context->boot_info.frame_states[TEST_FIRST_LOAD_FRAME + 4] == MICROS_VM_LOCAL_FRAME_TRANSFERABLE);
     memset(context->scratch_page, 0xa5, sizeof(context->scratch_page));
     REQUIRE(begin(false));
     result = micros_vm_load_fill_scratch(&context->state, 0, context->scratch_page, sizeof(context->scratch_page));
@@ -477,7 +477,7 @@ static bool service_scope_cases(void)
                               false, false));
         if (index < 3) {
             REQUIRE(page.virtual_address == MICROS_APPLICATION_ENTRY
-                    && page.physical_address == vm_core_test_frame_address(10) && page.page_index == 0);
+                    && page.physical_address == vm_core_test_frame_address(TEST_FIRST_LOAD_FRAME + 4) && page.page_index == 0);
         } else {
             REQUIRE(memcmp(&page, &sentinel, sizeof(page)) == 0);
         }
@@ -502,7 +502,7 @@ static bool message_preflight_cases(void)
 
     for (uint32_t command = MICROS_VM_CONTROL_ABORT_LOAD; command <= MICROS_VM_CONTROL_COMMIT_LOAD; ++command) {
         REQUIRE(vm_service_test_initialize(&service, context) && vm_service_test_load(&service));
-        context->boot_info.frame_states[13] = MICROS_VM_LOCAL_FRAME_FREE;
+        context->boot_info.frame_states[TEST_FIRST_LOAD_FRAME + 7] = MICROS_VM_LOCAL_FRAME_FREE;
         request = vm_service_test_message(command, arguments);
         memset(&sentinel, 0xa5, sizeof(sentinel));
         reply = sentinel;
@@ -664,7 +664,9 @@ static bool service_extent_cases(void)
         result = micros_vm_load_next_page(&context->state, &page);
         REQUIRE(report(shape == 0 ? "service-max-frames" : "service-max-ranges-pages",
                        result, MICROS_VM_CORE_OK, false));
-        REQUIRE(page.page_index == 0 && page.physical_address == vm_core_test_frame_address(10)
+        REQUIRE(page.page_index == 0 && page.physical_address == (shape == 0
+                    ? vm_core_test_frame_address(TEST_FIRST_LOAD_FRAME + 4)
+                    : context->boot_info.managed_ranges[80].base)
                 && page.virtual_address == MICROS_APPLICATION_ENTRY);
     }
     return true;
@@ -977,58 +979,87 @@ static bool kernel_global_record_cases(void)
     return true;
 }
 
+static bool check_membership(
+    const struct micros_vm_state *state, uint64_t physical, size_t ignored_slot, bool expected
+)
+{
+    struct vm_core_membership_view view;
+    bool present = !expected;
+
+    REQUIRE(vm_core_membership_begin(state, &view) == MICROS_VM_CORE_OK);
+    REQUIRE(vm_core_membership_query(&view, physical, ignored_slot, &present) == MICROS_VM_CORE_OK);
+    REQUIRE(vm_core_membership_end(&view) && present == expected);
+    return true;
+}
+
 static bool service_membership_cases(struct vm_core_test_context *context, size_t frames)
 {
-    uint64_t tables[MICROS_VM_PAGE_TABLE_FRAME_COUNT];
-    uint64_t data[MICROS_APPLICATION_RESIDENT_PAGE_MAX];
     struct micros_vm_mapping_record *ignored = &context->state.mapping_records[63];
     uint64_t saved = ignored->entries[1].physical_address;
     uint64_t foreign = context->state.mapping_records[0].entries[0].physical_address;
     struct vm_core_membership_view view, copied;
+    struct micros_application_stack_values values = vm_core_test_stack_values(900);
+    size_t executable_size = vm_core_test_build_elf(context, 13, 1, 1);
+    size_t request_size = vm_core_test_build_request(context);
     bool present = true;
     int result;
 
-    REQUIRE(vm_core_select_lowest_frames(&context->state, 63, 16, tables, data) == MICROS_VM_CORE_OK);
+    REQUIRE(vm_core_membership_begin(&context->state, &view) == MICROS_VM_CORE_OK);
     for (size_t index = 0; index < 20; ++index) {
-        REQUIRE((index < 4 ? tables[index] : data[index - 4])
-                == vm_core_test_frame_address(frames - 20 + index));
+        REQUIRE(vm_core_membership_query(&view, ignored->entries[index].physical_address, 63, &present)
+                == MICROS_VM_CORE_OK && !present);
     }
+    REQUIRE(vm_core_membership_end(&view));
     ignored->entries[1].physical_address = ignored->entries[0].physical_address;
-    REQUIRE(vm_core_select_lowest_frames(&context->state, 63, 16, tables, data) == MICROS_VM_CORE_OK);
-    REQUIRE(tables[0] == vm_core_test_frame_address(frames - 20)
-            && data[15] == vm_core_test_frame_address(frames));
+    REQUIRE(check_membership(&context->state, ignored->entries[0].physical_address, 63, false));
     context->state.mapping_records[0].entries[0].physical_address = ignored->entries[0].physical_address;
-    REQUIRE(vm_core_select_lowest_frames(&context->state, 63, 16, tables, data)
-            == MICROS_VM_CORE_ERROR_INVARIANT);
+    REQUIRE(check_membership(&context->state, ignored->entries[0].physical_address, 63, true));
+    REQUIRE(check_membership(&context->state, ignored->entries[0].physical_address, 64, true));
     context->state.mapping_records[0].entries[0].physical_address = foreign;
     ignored->entries[1].physical_address = saved;
     context->state.mapping_records[0].entries[0].physical_address = ignored->entries[0].physical_address + 1;
-    REQUIRE(vm_core_select_lowest_frames(&context->state, 63, 16, tables, data) == MICROS_VM_CORE_OK);
+    REQUIRE(check_membership(&context->state, ignored->entries[0].physical_address, 63, false));
     context->state.mapping_records[0].entries[0].physical_address = foreign;
     REQUIRE(vm_core_membership_begin(&context->state, &view) == MICROS_VM_CORE_OK);
     copied = view;
+    present = true;
     REQUIRE(vm_core_membership_query(&copied, ignored->entries[0].physical_address, 63, &present)
             == MICROS_VM_CORE_ERROR_INVARIANT && present);
     REQUIRE(!vm_core_membership_end(&copied));
-    tables[0] = UINT64_MAX;
-    REQUIRE(vm_core_select_lowest_frames(&context->state, 63, 16, tables, data)
-            == MICROS_VM_CORE_ERROR_INVARIANT && tables[0] == UINT64_MAX);
+    before_service = context->state;
+    before_boot = context->boot_info;
+    REQUIRE(micros_vm_load_prepare(&context->state, 0x1111, values.pid, context->executable,
+        executable_size, context->request, request_size, &values) == MICROS_VM_CORE_ERROR_INVARIANT);
+    REQUIRE(memcmp(&before_service, &context->state, sizeof(before_service)) == 0
+            && memcmp(&before_boot, &context->boot_info, sizeof(before_boot)) == 0);
     REQUIRE(vm_core_membership_query(&view, ignored->entries[0].physical_address, 63, &present)
             == MICROS_VM_CORE_OK && !present);
     REQUIRE(vm_core_membership_end(&view));
 
     for (size_t index = TEST_FIRST_FREE_FRAME; index < frames; ++index) {
         context->boot_info.frame_states[index] = MICROS_VM_LOCAL_FRAME_FREE;
+        context->state.free_bitmap[index / 64] |= UINT64_C(1) << (index % 64);
     }
     REQUIRE(begin(false));
     case_extent = frames - TEST_FIRST_FREE_FRAME;
-    result = vm_core_select_lowest_frames(&context->state, MICROS_VM_MAPPING_RECORD_CAPACITY,
-                                         16, tables, data);
-    REQUIRE(report_scoped("service-membership-max", result, MICROS_VM_CORE_OK, false, false));
-    for (size_t index = 0; index < 20; ++index) {
-        REQUIRE((index < 4 ? tables[index] : data[index - 4])
-                == vm_core_test_frame_address(frames + index));
+    result = vm_core_membership_begin(&context->state, &view);
+    REQUIRE(result == MICROS_VM_CORE_OK);
+    for (size_t index = TEST_FIRST_FREE_FRAME; index < frames + 20; ++index) {
+        REQUIRE(vm_core_membership_query(&view, vm_core_test_frame_address(index), 64, &present)
+                == MICROS_VM_CORE_OK && present == (index < frames));
     }
+    REQUIRE(vm_core_membership_end(&view));
+    REQUIRE(report_scoped("service-membership-max", result, MICROS_VM_CORE_OK, false, false));
+    memset(ignored, 0, sizeof(*ignored));
+    REQUIRE(micros_vm_load_prepare(&context->state, 0x1111, values.pid, context->executable,
+        executable_size, context->request, request_size, &values) == MICROS_VM_CORE_OK);
+    before_service = context->state;
+    before_boot = context->boot_info;
+    REQUIRE(micros_vm_load_bind(&context->state, (struct micros_process_handle){63, 7}, 127)
+            == MICROS_VM_CORE_ERROR_INVARIANT);
+    REQUIRE(memcmp(&before_service, &context->state, sizeof(before_service)) == 0
+            && memcmp(&before_boot, &context->boot_info, sizeof(before_boot)) == 0);
+    REQUIRE(micros_vm_load_aborted(&context->state, 0, 0) == MICROS_VM_CORE_OK);
     return true;
 }
 
@@ -1075,6 +1106,7 @@ static bool service_global_record_cases(void)
                 entry->permissions = maximal_page_permissions(page);
                 context->boot_info.frame_states[frames] = MICROS_VM_LOCAL_FRAME_PROCESS_WIRED;
             }
+            context->state.free_bitmap[frames / 64] &= ~(UINT64_C(1) << (frames % 64));
             ++frames;
         }
     }
@@ -1359,7 +1391,8 @@ static bool service_retained_page_cases(void)
         result = micros_vm_load_next_page(&context->state, &page);
         REQUIRE(report(names[shape][0], result, MICROS_VM_CORE_OK, false));
         REQUIRE(page.page_index == 0 && page.virtual_address == MICROS_APPLICATION_ENTRY
-                && page.physical_address == vm_core_test_frame_address(10));
+                && page.physical_address == vm_core_test_frame_address(
+                    shape == 0 ? TEST_FIRST_FREE_FRAME + 4 : TEST_FIRST_LOAD_FRAME + 4));
         REQUIRE(begin(false));
         result = micros_vm_load_scratch_mapped(&context->state, 0);
         REQUIRE(report(names[shape][1], result, MICROS_VM_CORE_OK, false));
@@ -1481,7 +1514,7 @@ static bool service_retained_scope_cases(void)
             context->state.mapping_records[2].entries[4].role = MICROS_VM_MAPPING_ENTRY_ROOT_PAGE_TABLE;
             break;
         default:
-            context->boot_info.frame_states[10] = MICROS_VM_LOCAL_FRAME_TRANSFERABLE;
+            context->boot_info.frame_states[TEST_FIRST_LOAD_FRAME + 4] = MICROS_VM_LOCAL_FRAME_TRANSFERABLE;
             break;
         }
         page = sentinel;
@@ -1650,6 +1683,295 @@ static bool retained_stack_cases(void)
     return true;
 }
 
+struct allocator_reference {
+    bool free[TEST_MANAGED_FRAME_COUNT];
+    uint32_t cache[20];
+    size_t count;
+    int origin;
+};
+
+static bool reference_allocate(struct allocator_reference *reference, uint32_t frames[8])
+{
+    struct allocator_reference before = *reference;
+
+    for (size_t page = 0; page < 8; ++page) {
+        int selected = -1;
+
+        while (reference->count != 0 && selected < 0) {
+            uint32_t candidate = reference->cache[--reference->count];
+
+            if (reference->free[candidate]) {
+                selected = (int)candidate;
+            }
+        }
+        for (unsigned pass = 0; pass < 2 && selected < 0; ++pass) {
+            int first = pass == 0 && reference->origin < TEST_MANAGED_FRAME_COUNT
+                ? reference->origin : TEST_MANAGED_FRAME_COUNT - 1;
+
+            for (int index = first; index >= 0; --index) {
+                if (reference->free[index]) {
+                    selected = index;
+                    break;
+                }
+            }
+        }
+        if (selected < 0) {
+            *reference = before;
+            return false;
+        }
+        reference->free[selected] = false;
+        reference->origin = selected;
+        frames[page] = (uint32_t)selected;
+    }
+    for (size_t index = 1; index < 8; ++index) {
+        uint32_t value = frames[index];
+        size_t position = index;
+
+        while (position != 0 && frames[position - 1] > value) {
+            frames[position] = frames[position - 1];
+            --position;
+        }
+        frames[position] = value;
+    }
+    return true;
+}
+
+static void reference_release(struct allocator_reference *reference, const uint32_t frames[8])
+{
+    for (size_t index = 0; index < 8; ++index) {
+        reference->free[frames[index]] = true;
+        if (reference->count < 20) {
+            reference->cache[reference->count++] = frames[index];
+        }
+    }
+}
+
+static bool check_reference_selection(
+    const struct vm_core_test_context *context, const uint32_t frames[8]
+)
+{
+    for (size_t index = 0; index < 8; ++index) {
+        uint64_t actual = index < 4 ? context->state.transaction.table_frames[index]
+            : context->state.transaction.data_frames[index - 4];
+        uint64_t expected = vm_core_test_frame_address(frames[index]);
+
+        if (actual != expected) {
+            fprintf(stderr, "VM04_SELECTION index=%zu actual=%" PRIx64 " expected=%" PRIx64 "\n",
+                    index, actual, expected);
+            return false;
+        }
+        REQUIRE(context->boot_info.frame_states[frames[index]] == UINT8_C(0x86));
+    }
+    return true;
+}
+
+static bool allocator_reference_cases(void)
+{
+    struct vm_core_test_context *context = vm_core_test_context_get();
+    struct allocator_reference reference = {.origin = TEST_MANAGED_FRAME_COUNT};
+    uint32_t selections[5][8], replacement[8];
+    struct micros_vm_exit_action exit;
+
+    REQUIRE(initialize_service_state());
+    for (uint32_t index = TEST_FIRST_FREE_FRAME; index < TEST_MANAGED_FRAME_COUNT; ++index) {
+        reference.free[index] = true;
+        if (reference.count < 20) {
+            reference.cache[reference.count++] = index;
+        }
+    }
+    for (uint16_t slot = 2; slot < 7; ++slot) {
+        struct micros_application_stack_values values = vm_core_test_stack_values(100 + slot);
+        size_t executable_size = vm_core_test_build_elf(context, 1, 1, 1);
+        size_t request_size = vm_core_test_build_request(context);
+        uint64_t token = UINT64_C(0x2200) + slot;
+
+        REQUIRE(reference_allocate(&reference, selections[slot - 2]));
+        REQUIRE(micros_vm_load_prepare(&context->state, 0x1100 + slot, values.pid, context->executable,
+            executable_size, context->request, request_size, &values) == MICROS_VM_CORE_OK);
+        REQUIRE(check_reference_selection(context, selections[slot - 2]));
+        REQUIRE(micros_vm_load_bind(&context->state, (struct micros_process_handle){slot, 7}, token)
+                == MICROS_VM_CORE_OK);
+        for (uint32_t page = 0; page < 4; ++page) {
+            REQUIRE(micros_vm_load_scratch_mapped(&context->state, page) == MICROS_VM_CORE_OK);
+            REQUIRE(micros_vm_load_fill_scratch(&context->state, page, context->scratch_page,
+                                               sizeof(context->scratch_page)) == MICROS_VM_CORE_OK);
+            REQUIRE(micros_vm_load_scratch_committed(&context->state, page) == MICROS_VM_CORE_OK);
+        }
+        REQUIRE(micros_vm_load_frozen(&context->state, 200 + slot) == MICROS_VM_CORE_OK);
+        REQUIRE(micros_vm_load_committed(&context->state, token, 200 + slot, values.pid) == MICROS_VM_CORE_OK);
+        REQUIRE(micros_vm_state_validate(&context->state) == MICROS_VM_CORE_OK);
+    }
+    {
+        struct micros_application_stack_values values = vm_core_test_stack_values(107);
+        size_t executable_size = vm_core_test_build_elf(context, 1, 1, 1);
+        size_t request_size = vm_core_test_build_request(context);
+
+        REQUIRE(!reference_allocate(&reference, replacement));
+        before_service = context->state;
+        before_boot = context->boot_info;
+        REQUIRE(micros_vm_load_prepare(&context->state, 0x1107, values.pid, context->executable,
+            executable_size, context->request, request_size, &values) == MICROS_VM_CORE_ERROR_NO_SPACE);
+        REQUIRE(memcmp(&before_service, &context->state, sizeof(before_service)) == 0
+                && memcmp(&before_boot, &context->boot_info, sizeof(before_boot)) == 0);
+    }
+    REQUIRE(micros_vm_exit_release_begin(&context->state, 0x2204, 204, 104, &exit) == MICROS_VM_CORE_OK);
+    REQUIRE(micros_vm_exit_release_complete(&context->state, &exit) == MICROS_VM_CORE_OK);
+    reference_release(&reference, selections[2]);
+    REQUIRE(reference_allocate(&reference, replacement));
+    REQUIRE(vm_core_test_prepare_minimal_load(context));
+    REQUIRE(check_reference_selection(context, replacement));
+    REQUIRE(micros_vm_load_aborted(&context->state, 0, 0) == MICROS_VM_CORE_OK);
+    reference_release(&reference, replacement);
+    for (size_t index = TEST_FIRST_FREE_FRAME; index < TEST_MANAGED_FRAME_COUNT; ++index) {
+        REQUIRE((context->boot_info.frame_states[index] == MICROS_VM_LOCAL_FRAME_FREE) == reference.free[index]);
+    }
+    REQUIRE(micros_vm_state_validate(&context->state) == MICROS_VM_CORE_OK);
+    return true;
+}
+
+static bool allocator_guard_cases(void)
+{
+    static const char *const names[] = {
+        "service-cache-count", "service-cache-origin", "service-cache-index",
+        "service-cache-static", "service-cache-bit", "service-cache-late", "service-cache-tag",
+    };
+    struct vm_core_test_context *context = vm_core_test_context_get();
+    struct micros_application_stack_values values = vm_core_test_stack_values(8);
+
+    for (size_t mutation = 0; mutation < sizeof(names) / sizeof(names[0]); ++mutation) {
+        size_t executable_size, request_size;
+        int result;
+
+        REQUIRE(initialize_service_state());
+        executable_size = vm_core_test_build_elf(context, 1, 1, 1);
+        request_size = vm_core_test_build_request(context);
+        switch (mutation) {
+        case 0: context->state.free_page_cache_count = 21; break;
+        case 1: context->state.allocation_origin = TEST_MANAGED_FRAME_COUNT + 1; break;
+        case 2: context->state.free_page_cache[19] = TEST_MANAGED_FRAME_COUNT; break;
+        case 3: context->state.free_page_cache[19] = 0; break;
+        case 4: context->state.free_bitmap[0] ^= UINT64_C(1) << 25; break;
+        case 5: context->state.free_page_cache[18] = TEST_MANAGED_FRAME_COUNT; break;
+        default: context->boot_info.frame_states[25] = MICROS_VM_FRAME_TRANSFERABLE; break;
+        }
+        REQUIRE(begin(false));
+        result = micros_vm_load_prepare(&context->state, 0x1111, values.pid, context->executable,
+            executable_size, context->request, request_size, &values);
+        REQUIRE(report_scoped(names[mutation], result, MICROS_VM_CORE_ERROR_INVARIANT, false, false));
+        REQUIRE(memcmp(&before_service, &context->state, sizeof(before_service)) == 0
+                && memcmp(&before_boot, &context->boot_info, sizeof(before_boot)) == 0);
+    }
+    REQUIRE(initialize_service_state() && vm_core_test_run_to_frozen(context, 0x3333));
+    REQUIRE(micros_vm_load_committed(&context->state, 0x2202, 0x3333, 7) == MICROS_VM_CORE_OK);
+    context->state.free_page_cache[context->state.free_page_cache_count++] = TEST_FIRST_LOAD_FRAME;
+    REQUIRE(micros_vm_state_validate(&context->state) == MICROS_VM_CORE_OK);
+    {
+        size_t executable_size = vm_core_test_build_elf(context, 1, 1, 1);
+        size_t request_size = vm_core_test_build_request(context);
+        int result;
+
+        REQUIRE(begin(false));
+        result = micros_vm_load_prepare(&context->state, 0x1112, values.pid, context->executable,
+            executable_size, context->request, request_size, &values);
+        REQUIRE(report("service-cache-stale", result, MICROS_VM_CORE_OK, false));
+        REQUIRE(context->state.free_page_cache_count == 4 && context->state.allocation_origin == 10);
+        for (size_t index = 0; index < 4; ++index) {
+            REQUIRE(context->state.transaction.table_frames[index] == vm_core_test_frame_address(10 + index));
+            REQUIRE(context->state.transaction.data_frames[index] == vm_core_test_frame_address(14 + index));
+        }
+        REQUIRE(micros_vm_load_aborted(&context->state, 0, 0) == MICROS_VM_CORE_OK);
+    }
+    return true;
+}
+
+static bool allocator_word_cases(void)
+{
+    struct vm_core_test_context *context = vm_core_test_context_get();
+    struct micros_vm_boot_summary summary;
+
+    for (unsigned shape = 0; shape < 2; ++shape) {
+        size_t managed = shape == 0 ? 130 : MICROS_VM_MAX_MANAGED_FRAMES;
+        struct micros_application_stack_values values = vm_core_test_stack_values(7);
+        size_t executable_size, request_size;
+        int result;
+
+        REQUIRE(vm_core_test_initialize_boot_info(context, managed));
+        for (size_t index = TEST_FIRST_FREE_FRAME; index < managed; ++index) {
+            if (index >= 26 && (index < 64 || index >= 84)) {
+                context->boot_info.frame_states[index] = MICROS_VM_FRAME_KERNEL;
+            }
+        }
+        context->boot_info.header.free_frame_count = 40;
+        context->boot_info.header.kernel_frame_count = managed - 43;
+        context->boot_info.header.digest = 0;
+        REQUIRE(micros_vm_boot_finalize(&context->boot_info, &summary) == MICROS_VM_BOOT_OK);
+        REQUIRE(vm_core_test_initialize_state(context) == MICROS_VM_CORE_OK);
+        executable_size = vm_core_test_build_elf(context, 13, 1, 1);
+        request_size = vm_core_test_build_request(context);
+        REQUIRE(micros_vm_load_prepare(&context->state, 0x1111, values.pid, context->executable,
+            executable_size, context->request, request_size, &values) == MICROS_VM_CORE_OK);
+        REQUIRE(micros_vm_load_bind(&context->state, (struct micros_process_handle){2, 7}, 0x2202)
+                == MICROS_VM_CORE_OK);
+        for (uint32_t page = 0; page < 16; ++page) {
+            REQUIRE(micros_vm_load_scratch_mapped(&context->state, page) == MICROS_VM_CORE_OK);
+            REQUIRE(micros_vm_load_fill_scratch(&context->state, page, context->scratch_page,
+                                               sizeof(context->scratch_page)) == MICROS_VM_CORE_OK);
+            REQUIRE(micros_vm_load_scratch_committed(&context->state, page) == MICROS_VM_CORE_OK);
+        }
+        REQUIRE(micros_vm_load_frozen(&context->state, 0x3333) == MICROS_VM_CORE_OK);
+        REQUIRE(micros_vm_load_committed(&context->state, 0x2202, 0x3333, 7) == MICROS_VM_CORE_OK);
+        REQUIRE(context->state.free_page_cache_count == 0 && context->state.allocation_origin == 6);
+        values.pid = 8;
+        executable_size = vm_core_test_build_elf(context, 1, 1, 1);
+        request_size = vm_core_test_build_request(context);
+        REQUIRE(begin(false));
+        case_extent = managed;
+        result = micros_vm_load_prepare(&context->state, 0x1112, values.pid, context->executable,
+            executable_size, context->request, request_size, &values);
+        REQUIRE(report(shape == 0 ? "service-bitmap-boundary" : "service-bitmap-max",
+                       result, MICROS_VM_CORE_OK, false));
+        REQUIRE(context->state.transaction.table_frames[0] == vm_core_test_frame_address(76)
+                && context->state.transaction.data_frames[3] == vm_core_test_frame_address(83)
+                && context->state.allocation_origin == 76 && context->state.free_page_cache_count == 0);
+        REQUIRE(micros_vm_load_aborted(&context->state, 0, 0) == MICROS_VM_CORE_OK);
+    }
+    return true;
+}
+
+static bool allocator_backend_guard_cases(void)
+{
+    struct vm_core_test_context *context = vm_core_test_context_get();
+    struct micros_ipc_message request, reply, sentinel;
+
+    memset(&sentinel, 0xa5, sizeof(sentinel));
+    for (unsigned mutation = 0; mutation < 2; ++mutation) {
+        uint64_t arguments[5];
+        int result;
+
+        REQUIRE(vm_service_test_initialize(&service, context));
+        arguments[0] = 101;
+        arguments[1] = 2;
+        arguments[2] = (uint64_t)service.executable_size << 32 | 11;
+        arguments[3] = (uint64_t)service.request_size << 32 | 12;
+        arguments[4] = 0;
+        request = vm_service_test_message(MICROS_VM_CONTROL_LOAD, arguments);
+        if (mutation == 0) {
+            context->state.free_page_cache_count = 21;
+        } else {
+            context->state.allocation_origin = TEST_MANAGED_FRAME_COUNT + 1;
+        }
+        reply = sentinel;
+        REQUIRE(begin(false));
+        result = micros_vm_service_handle_message(
+            &service.service, vm_service_test_backend(), &service, &request, &reply);
+        REQUIRE(report_scoped(mutation == 0 ? "message-cache-count" : "message-cache-origin",
+                               result, MICROS_VM_SERVICE_ERROR_INVARIANT, false, false));
+        REQUIRE(service.copies == 0 && service.begins == 0
+                && memcmp(&reply, &sentinel, sizeof(reply)) == 0);
+    }
+    return true;
+}
+
 int main(int argc, char **argv)
 {
 #if defined(MICROS_SELECTED_VM_LAUNCHER)
@@ -1688,7 +2010,9 @@ int main(int argc, char **argv)
         || !geometry_lookup_cases() || !kernel_global_record_cases() || !service_global_record_cases()
         || !load_token_issuance_cases() || !exit_token_scope_cases() || !kernel_owner_collision_cases()
         || !service_retained_page_cases() || !kernel_retained_prefix_cases()
-        || !service_retained_scope_cases() || !kernel_retained_scope_cases() || !retained_stack_cases()) {
+        || !service_retained_scope_cases() || !kernel_retained_scope_cases() || !retained_stack_cases()
+        || !allocator_reference_cases() || !allocator_guard_cases() || !allocator_word_cases()
+        || !allocator_backend_guard_cases()) {
         return 1;
     }
     printf("MICROS_VM01_NATIVE_PASS cases=%zu\n", case_count);

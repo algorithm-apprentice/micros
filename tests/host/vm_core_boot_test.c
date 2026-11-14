@@ -30,7 +30,7 @@ bool test_record_abi(
         sizeof(struct micros_vm_mapping_entry) == 24
         && sizeof(struct micros_vm_mapping_record) == 512
         && sizeof(context->state.mapping_records) == 32768
-        && sizeof(context->state.initial_free_bitmap) == 32768
+        && sizeof(context->state.free_bitmap) == 32768
         && sizeof(struct micros_vm_state)
             <= 50 * MICROS_APPLICATION_STACK_PAGE_SIZE
         && offsetof(struct micros_vm_mapping_record, entries) == 32
@@ -85,7 +85,7 @@ bool test_boot_import(
         && context->state.boot_info == &context->boot_info
         && context->state.boot_summary.managed_frame_count
             == TEST_MANAGED_FRAME_COUNT
-        && context->state.initial_free_bitmap[0]
+        && context->state.free_bitmap[0]
             == (
                 (
                 (UINT64_C(1) << TEST_MANAGED_FRAME_COUNT) - 1
@@ -94,9 +94,9 @@ bool test_boot_import(
                 )
             )
         && vm_core_test_bytes_are_zero(
-            &context->state.initial_free_bitmap[1],
-            sizeof(context->state.initial_free_bitmap)
-                - sizeof(context->state.initial_free_bitmap[0])
+            &context->state.free_bitmap[1],
+            sizeof(context->state.free_bitmap)
+                - sizeof(context->state.free_bitmap[0])
         )
         && vm_core_test_bytes_are_zero(
             context->state.mapping_records,

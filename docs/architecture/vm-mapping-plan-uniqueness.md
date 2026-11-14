@@ -8,6 +8,12 @@ This is the Accepted VM02 contract under
 are separately merged. Complete acceptance closes the three findings below;
 the next load-plan correction remains separately owned by VM03.
 
+[VM04's allocation contract](vm-frame-allocation.md) later replaces the
+deliberately retained lowest-frame allocator and its diagnostic replay.
+The temporary membership view remains at bind and explicit set/diagnostic
+boundaries, not as a prerequisite for every allocator candidate.
+The selected kernel/root authority and key-workspace bounds here remain.
+
 Close only B02-F008, B02-F009 and B07-F004: replace all-process VM mapping
 audits and pairwise uniqueness searches with selected-root/owner indexes
 and bounded ordered key proofs. The

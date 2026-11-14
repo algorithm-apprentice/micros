@@ -153,8 +153,8 @@ static enum micros_vm_core_error vm_load_prepare_transaction(
         return error;
     }
     page_count = elf_plan.page_count + 1;
-    error = vm_core_select_lowest_frames(
-        state, MICROS_VM_MAPPING_RECORD_CAPACITY, page_count, table_frames, data_frames
+    error = vm_core_reserve_frames(
+        state, page_count, table_frames, data_frames
     );
     if (error == MICROS_VM_CORE_ERROR_NO_SPACE) {
         return vm_core_prepare_failure(state, MICROS_VM_CORE_ERROR_NO_SPACE);
@@ -263,7 +263,8 @@ static bool selected_frame_is_available(
 
     return (
         vm_core_physical_to_frame_index(state, physical_address, &frame_index)
-        && state->boot_info->frame_states[frame_index] == MICROS_VM_LOCAL_FRAME_FREE
+        && vm_core_frame_availability_is_valid(state, frame_index)
+        && state->boot_info->frame_states[frame_index] == MICROS_VM_LOCAL_FRAME_LOAD_RESERVED
         && vm_core_membership_query(membership, physical_address,
             MICROS_VM_MAPPING_RECORD_CAPACITY, &present) == MICROS_VM_CORE_OK
         && !present
@@ -460,7 +461,7 @@ enum micros_vm_core_error micros_vm_load_scratch_mapped(
             &frame_index
         )
         || state->boot_info->frame_states[frame_index]
-            != MICROS_VM_LOCAL_FRAME_FREE
+            != MICROS_VM_LOCAL_FRAME_LOAD_RESERVED
     ) {
         return MICROS_VM_CORE_ERROR_STATE;
     }
@@ -739,6 +740,15 @@ enum micros_vm_core_error micros_vm_load_aborted(
         if (load_token != 0 || mapping_generation != 0) {
             return MICROS_VM_CORE_ERROR_STATE;
         }
+        for (index = 0; index < MICROS_VM_PAGE_TABLE_FRAME_COUNT + state->transaction.page_count; ++index) {
+            uint64_t frame_index;
+            uint64_t physical = index < MICROS_VM_PAGE_TABLE_FRAME_COUNT
+                ? state->transaction.table_frames[index]
+                : state->transaction.data_frames[index - MICROS_VM_PAGE_TABLE_FRAME_COUNT];
+
+            (void)vm_core_physical_to_frame_index(state, physical, &frame_index);
+            vm_core_release_frame_prevalidated(state, frame_index);
+        }
         vm_core_clear_transaction(state);
         state->phase = MICROS_VM_LOADER_IDLE;
         return MICROS_VM_CORE_OK;
@@ -764,8 +774,7 @@ enum micros_vm_core_error micros_vm_load_aborted(
         (void)vm_core_physical_to_frame_index(
             state, state->transaction.table_frames[index], &frame_index
         );
-        state->boot_info->frame_states[frame_index] =
-            MICROS_VM_LOCAL_FRAME_FREE;
+        vm_core_release_frame_prevalidated(state, frame_index);
     }
     for (index = 0; index < state->transaction.page_count; ++index) {
         uint64_t frame_index;
@@ -773,8 +782,7 @@ enum micros_vm_core_error micros_vm_load_aborted(
         (void)vm_core_physical_to_frame_index(
             state, state->transaction.data_frames[index], &frame_index
         );
-        state->boot_info->frame_states[frame_index] =
-            MICROS_VM_LOCAL_FRAME_FREE;
+        vm_core_release_frame_prevalidated(state, frame_index);
     }
     vm_core_zero_bytes(
         &state->mapping_records[state->transaction.process.slot],

@@ -32,6 +32,8 @@ bool vm_core_initial_frame_is_free(
     const struct micros_vm_state *state,
     uint64_t frame_index
 );
+bool vm_core_frame_availability_is_valid(const struct micros_vm_state *state, uint64_t frame_index);
+bool vm_core_allocator_metadata_is_valid(const struct micros_vm_state *state);
 uint64_t vm_core_load_page_digest(const struct micros_vm_state *state);
 bool vm_core_physical_to_frame_index(
     const struct micros_vm_state *state,
@@ -67,17 +69,14 @@ enum micros_vm_core_error vm_core_membership_query(
     bool *present
 );
 bool vm_core_membership_end(struct vm_core_membership_view *view);
-enum micros_vm_core_error vm_core_select_lowest_frames(
-    const struct micros_vm_state *state,
-    size_t ignored_slot,
+enum micros_vm_core_error vm_core_reserve_frames(
+    struct micros_vm_state *state,
     size_t data_count,
     uint64_t table_frames[MICROS_VM_PAGE_TABLE_FRAME_COUNT],
     uint64_t data_frames[MICROS_APPLICATION_RESIDENT_PAGE_MAX]
 );
-bool vm_core_selected_frames_match(
-    const struct micros_vm_state *state,
-    size_t ignored_slot
-);
+void vm_core_release_frame_prevalidated(struct micros_vm_state *state, uint64_t frame_index);
+bool vm_core_transaction_frames_match(const struct micros_vm_state *state);
 enum micros_vm_core_error vm_core_validate_state(
     const struct micros_vm_state *state,
     bool allow_staged_idle_inputs

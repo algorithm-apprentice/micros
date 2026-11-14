@@ -132,6 +132,9 @@ struct elf_reference_state {
     uint64_t spawn_tokens;
     uint64_t image_tokens;
     uint64_t descriptor_tokens;
+    uint32_t cached_pages[20];
+    uint32_t cached_page_count;
+    int scan_start;
 };
 
 struct elf_model_spawn_plan {

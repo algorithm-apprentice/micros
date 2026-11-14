@@ -121,5 +121,11 @@ bool elf_model_initialize(struct elf_spawn_model_context *context)
     for (slot = 0; slot < TEST_MANAGED_FRAME_COUNT; ++slot) {
         context->frame_owners[slot] = slot < TEST_FIRST_FREE_FRAME ? ELF_FRAME_BOOT : ELF_FRAME_FREE;
     }
+    context->reference.scan_start = -1;
+    for (slot = TEST_FIRST_FREE_FRAME;
+         slot < TEST_MANAGED_FRAME_COUNT && context->reference.cached_page_count < 20;
+         ++slot) {
+        context->reference.cached_pages[context->reference.cached_page_count++] = (uint32_t)slot;
+    }
     return initialize_services(context);
 }

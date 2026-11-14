@@ -135,6 +135,50 @@ static bool same_tty(
     );
 }
 
+static bool vm_allocator_hints_are_valid(const struct micros_elf_spawn_service_resources *snapshot)
+{
+    const struct micros_vm_state *state = &snapshot->vm;
+    uint64_t managed = state->boot_summary.managed_frame_count;
+
+    if (managed == 0 || managed > MICROS_VM_MAX_MANAGED_FRAMES
+        || managed != snapshot->boot_info.header.managed_frame_count
+        || state->free_page_cache_count > MICROS_VM_FREE_PAGE_CACHE_CAPACITY
+        || state->allocation_origin > managed) {
+        return false;
+    }
+    for (size_t index = 0; index < state->free_page_cache_count; ++index) {
+        uint32_t frame = state->free_page_cache[index];
+        uint8_t local;
+        bool available;
+
+        if (frame >= managed) {
+            return false;
+        }
+        local = snapshot->boot_info.frame_states[frame];
+        available = (state->free_bitmap[frame / 64] & (UINT64_C(1) << (frame % 64))) != 0;
+        if ((local != MICROS_VM_LOCAL_FRAME_FREE
+             && (local < MICROS_VM_LOCAL_FRAME_TRANSFERABLE || local > MICROS_VM_LOCAL_FRAME_PROCESS_PAGE_TABLE))
+            || available != (local == MICROS_VM_LOCAL_FRAME_FREE)) {
+            return false;
+        }
+    }
+    return true;
+}
+
+static bool same_vm(
+    const struct micros_elf_spawn_service_resources *a,
+    const struct micros_elf_spawn_service_resources *b
+)
+{
+    size_t suffix = offsetof(struct micros_vm_state, executable_bytes);
+
+    return vm_allocator_hints_are_valid(a) && vm_allocator_hints_are_valid(b)
+        && micros_elf_spawn_resource_bytes_equal(&a->vm, &b->vm,
+            offsetof(struct micros_vm_state, allocation_origin))
+        && micros_elf_spawn_resource_bytes_equal(
+            (const uint8_t *)&a->vm + suffix, (const uint8_t *)&b->vm + suffix, sizeof(a->vm) - suffix);
+}
+
 bool micros_elf_spawn_same_service_resources(
     const struct micros_elf_spawn_service_resources *baseline,
     const struct micros_elf_spawn_service_resources *current
@@ -144,7 +188,7 @@ bool micros_elf_spawn_same_service_resources(
         baseline != NULL && current != NULL
         && same_pm(&baseline->pm, &current->pm)
         && same_coordinator(&baseline->coordinator, &current->coordinator)
-        && SAME(baseline, current, vm)
+        && same_vm(baseline, current)
         && SAME(baseline, current, boot_info)
         && same_vfs(&baseline->vfs, &current->vfs)
         && micros_elf_spawn_resource_bytes_equal(

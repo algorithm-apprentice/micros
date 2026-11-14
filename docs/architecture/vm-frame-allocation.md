@@ -7,6 +7,9 @@ This is the Accepted VM04 contract under
 VM03 #276 satisfy its actual predecessors. The
 [fixed study](../research/minix-vm-frame-allocation.md) owns provenance,
 reference behavior and measured current resource limits.
+Independent design review is clean and design #277 is separately merged.
+Implementation is active; B07-F003 remains open until its complete author
+acceptance, independent implementation review and merge.
 
 Close B07-F003 only: replace repeated lowest-address construction with the
 reference current-bitmap/cache/retained-origin allocator. Kernel bootstrap
@@ -305,4 +308,20 @@ blocked.
 
 Current metadata and artifact ownership updates belong here under
 ADR-0123. Run one sufficient final author plan, not a second correction
-recertification execution. This design itself contains documentation only.
+recertification execution. The separate design contained documentation only.
+
+## Current implementation and evidence owners
+
+| Responsibility | Owner |
+| --- | --- |
+| Current bitmap, typed eligibility and cache seed | `vm_core.h` / `vm_core.c`; the wire boot enum and initial frame bytes remain unchanged. |
+| Cache, descending word scan, batch reservation and local release | `vm_frames.c`; existing temporary arrays and key workspace retain the selected set, while scalar count/origin rollback preserves failed batches. |
+| Lifecycle integration | `vm_load.c` / `vm_exit.c`; local reservation precedes input publication, and actual kernel effects retain their original order. |
+| Selected and complete proofs | `vm_validation.c`; selected class/bit checks and bounded metadata stay separate from full cache/bitmap/digest/record equality. |
+| Native allocator/reference evidence | Existing `selected_vm_test.c` / `selected_vm_evidence.py`, including original cases, malformed/stale cache, partial rollback, boundary/maximal word scans and before-backend header rejection. |
+| Complete mixed lifecycle reference | Existing `elf_spawn_model_reference.c` / `elf_spawn_model_compare.c`; independent cache/origin, allocation/release and active-hint agreement retain the original seed and transition count. |
+| Same-guest work and resource equality | Existing `vm_command_evidence.py` and `elf_spawn_test_service_compare.c`; actual cache/search primitives and validated hint differences do not waive exact availability, mapping, input or boot-object equality. |
+
+The [build guide](../development/building.md#validation-planning) owns
+commands. The implementation PR owns exact Red/Green, final-tree and review
+records rather than duplicating them here.

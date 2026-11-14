@@ -106,6 +106,12 @@ CASES = (
     ("kernel-unvisited-prefix", 0, 1, 1, 0), ("kernel-prefix-cleanup", 7, 1, 1, 0),
     ("kernel-selected-predecessor", 7, 1, 1, 0),
     ("service-stack-min", 0, 3, 0, 0), ("service-stack-max", 0, 3, 0, 0),
+    ("service-cache-count", 8, 1, 1, 0), ("service-cache-origin", 8, 1, 1, 0),
+    ("service-cache-index", 8, 1, 1, 0), ("service-cache-static", 8, 1, 1, 0),
+    ("service-cache-bit", 8, 1, 1, 0), ("service-cache-late", 8, 1, 1, 0),
+    ("service-cache-tag", 8, 1, 1, 0), ("service-cache-stale", 0, 2, 0, 0),
+    ("service-bitmap-boundary", 0, 2, 0, 0), ("service-bitmap-max", 0, 2, 0, 0),
+    ("message-cache-count", 2, 1, 1, 0), ("message-cache-origin", 2, 1, 1, 0),
 )
 IMAGE_PAGE_GROUPS = (
     ("service-next-page", "service-large-next", "service-long-next"),
@@ -128,9 +134,10 @@ GLOBAL_RECORD_EXTENTS = {
 }
 MEMBERSHIP_EXTENTS = {"service-membership-max": 1260}
 STACK_EXTENTS = {"service-stack-min": (273, 1, 1), "service-stack-max": (2073, 8, 8)}
+ALLOCATOR_EXTENTS = {"service-bitmap-boundary": 130, "service-bitmap-max": 262144}
 CASE_EXTENTS = {
     **BOOT_MAPPING_EXTENTS, **GEOMETRY_EXTENTS, **GLOBAL_RECORD_EXTENTS, **MEMBERSHIP_EXTENTS,
-    **{name: shape[0] for name, shape in STACK_EXTENTS.items()},
+    **{name: shape[0] for name, shape in STACK_EXTENTS.items()}, **ALLOCATOR_EXTENTS,
 }
 POINT_CASES = frozenset((
     "service-next-page", "service-map", "service-page-commit", "service-freeze-plan",
@@ -205,6 +212,15 @@ def work_failures(records, work):
         audits = totals.per_kind[Kind.COMPLETE_VALIDATOR_CALL]
         if audits != spec[4]:
             failures.append((row["name"], "complete-audits", audits, spec[4]))
+        if row["name"] in ("service-prepare", "message-load", "service-cache-stale"):
+            searched = totals.per_owner[Owner.VM_SERVICE][Kind.BITMAP_WORD_LOAD]
+            if searched:
+                failures.append((row["name"], "allocator-search", searched, 0))
+        if row["name"] in ALLOCATOR_EXTENTS:
+            expected = (ALLOCATOR_EXTENTS[row["name"]] + 63) // 64 + 7
+            searched = totals.per_owner[Owner.VM_SERVICE][Kind.BITMAP_WORD_LOAD]
+            if searched != expected:
+                failures.append((row["name"], "allocator-search", searched, expected))
         if row["name"] in ("kernel-owner-unvisited", "kernel-scanned-count"):
             visits = totals.per_owner[Owner.KERNEL_VM][Kind.RECORD_VISIT]
             # Two local checks of the empty loading record; no other slot loop.

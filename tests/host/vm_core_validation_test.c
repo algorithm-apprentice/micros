@@ -205,28 +205,28 @@ static bool inactive_bitmap_corruption_is_rejected(
 )
 {
     EXPECT_TRUE(initialize_valid_state(context, 63));
-    context->state.initial_free_bitmap[0] |= UINT64_C(1) << 63;
+    context->state.free_bitmap[0] |= UINT64_C(1) << 63;
     EXPECT_TRUE(
         micros_vm_state_validate(&context->state)
             == MICROS_VM_CORE_ERROR_INVARIANT
     );
 
     EXPECT_TRUE(initialize_valid_state(context, 64));
-    context->state.initial_free_bitmap[1] |= UINT64_C(1);
+    context->state.free_bitmap[1] |= UINT64_C(1);
     EXPECT_TRUE(
         micros_vm_state_validate(&context->state)
             == MICROS_VM_CORE_ERROR_INVARIANT
     );
 
     EXPECT_TRUE(initialize_valid_state(context, 65));
-    context->state.initial_free_bitmap[1] |= UINT64_C(1) << 1;
+    context->state.free_bitmap[1] |= UINT64_C(1) << 1;
     EXPECT_TRUE(
         micros_vm_state_validate(&context->state)
             == MICROS_VM_CORE_ERROR_INVARIANT
     );
 
     EXPECT_TRUE(initialize_valid_state(context, 65));
-    context->state.initial_free_bitmap[2] |= UINT64_C(1);
+    context->state.free_bitmap[2] |= UINT64_C(1);
     EXPECT_TRUE(
         micros_vm_state_validate(&context->state)
             == MICROS_VM_CORE_ERROR_INVARIANT
@@ -235,8 +235,8 @@ static bool inactive_bitmap_corruption_is_rejected(
     EXPECT_TRUE(
         initialize_valid_state(context, TEST_FIRST_FREE_FRAME)
     );
-    context->state.initial_free_bitmap[
-        MICROS_VM_INITIAL_FREE_BITMAP_WORDS - 1
+    context->state.free_bitmap[
+        MICROS_VM_FREE_BITMAP_WORDS - 1
     ] |= UINT64_C(1) << 63;
     EXPECT_TRUE(
         micros_vm_state_validate(&context->state)
@@ -262,7 +262,7 @@ static bool active_boot_database_corruption_is_rejected(
     EXPECT_TRUE(
         initialize_valid_state(context, TEST_MANAGED_FRAME_COUNT)
     );
-    context->state.initial_free_bitmap[0] ^=
+    context->state.free_bitmap[0] ^=
         UINT64_C(1) << TEST_FIRST_FREE_FRAME;
     EXPECT_TRUE(
         micros_vm_state_validate(&context->state)
@@ -354,7 +354,7 @@ bool test_staged_inputs_and_immutable_database(
     );
     context->boot_info.mappings[0].physical_address -= MICROS_FRAME_SIZE;
     EXPECT_TRUE(micros_vm_state_validate(&context->state) == MICROS_VM_CORE_OK);
-    context->state.initial_free_bitmap[0] ^= UINT64_C(1) << TEST_FIRST_FREE_FRAME;
+    context->state.free_bitmap[0] ^= UINT64_C(1) << TEST_FIRST_FREE_FRAME;
     EXPECT_TRUE(
         micros_vm_state_validate(&context->state)
             == MICROS_VM_CORE_ERROR_INVARIANT

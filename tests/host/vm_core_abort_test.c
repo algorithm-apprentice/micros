@@ -75,7 +75,7 @@ bool test_abort_paths(
         )
         && micros_vm_state_validate(&context->state) == MICROS_VM_CORE_OK
     );
-    for (index = TEST_FIRST_FREE_FRAME; index < 14; ++index) {
+    for (index = TEST_FIRST_FREE_FRAME; index < TEST_MANAGED_FRAME_COUNT; ++index) {
         EXPECT_TRUE(
             context->boot_info.frame_states[index] == MICROS_VM_LOCAL_FRAME_FREE
         );
@@ -104,7 +104,7 @@ bool test_abort_paths(
         )
         && micros_vm_state_validate(&context->state) == MICROS_VM_CORE_OK
     );
-    for (index = TEST_FIRST_FREE_FRAME; index < 14; ++index) {
+    for (index = TEST_FIRST_FREE_FRAME; index < TEST_MANAGED_FRAME_COUNT; ++index) {
         EXPECT_TRUE(
             context->boot_info.frame_states[index] == MICROS_VM_LOCAL_FRAME_FREE
         );

@@ -131,14 +131,18 @@ static void reference_clear_process(struct elf_reference_process *process)
 }
 
 static bool reference_allocate_frames(
-    const struct elf_reference_state *reference, uint32_t selected[8]
+    struct elf_reference_state *reference, uint32_t selected[8]
 )
 {
     bool used[TEST_MANAGED_FRAME_COUNT] = {false};
+    uint32_t old_count = reference->cached_page_count;
+    int old_start = reference->scan_start;
     size_t slot;
     size_t index;
-    size_t count = 0;
 
+    for (index = 0; index < TEST_FIRST_FREE_FRAME; ++index) {
+        used[index] = true;
+    }
     for (slot = 0; slot < MICROS_PM_PROCESS_CAPACITY; ++slot) {
         const struct elf_reference_process *process = &reference->processes[slot];
 
@@ -148,12 +152,54 @@ static bool reference_allocate_frames(
             }
         }
     }
-    for (index = TEST_FIRST_FREE_FRAME; index < TEST_MANAGED_FRAME_COUNT && count < 8; ++index) {
-        if (!used[index]) {
-            selected[count++] = (uint32_t)index;
+    for (size_t page = 0; page < 8; ++page) {
+        int chosen = -1;
+
+        while (reference->cached_page_count != 0 && chosen < 0) {
+            uint32_t candidate = reference->cached_pages[--reference->cached_page_count];
+
+            if (!used[candidate]) {
+                chosen = (int)candidate;
+            }
         }
+        for (unsigned pass = 0; pass < 2 && chosen < 0; ++pass) {
+            int first = pass == 0 && reference->scan_start >= 0
+                ? reference->scan_start : TEST_MANAGED_FRAME_COUNT - 1;
+
+            for (int candidate = first; candidate >= 0; --candidate) {
+                if (!used[candidate]) {
+                    chosen = candidate;
+                    break;
+                }
+            }
+        }
+        if (chosen < 0) {
+            reference->cached_page_count = old_count;
+            reference->scan_start = old_start;
+            return false;
+        }
+        used[chosen] = true;
+        reference->scan_start = chosen;
+        selected[page] = (uint32_t)chosen;
     }
-    return count == 8;
+    for (index = 1; index < 8; ++index) {
+        uint32_t frame = selected[index];
+        size_t position = index;
+
+        while (position != 0 && selected[position - 1] > frame) {
+            selected[position] = selected[position - 1];
+            --position;
+        }
+        selected[position] = frame;
+    }
+    return true;
+}
+
+static void reference_release_frames(struct elf_reference_state *reference, const uint32_t frames[8])
+{
+    for (size_t index = 0; index < 8 && reference->cached_page_count < 20; ++index) {
+        reference->cached_pages[reference->cached_page_count++] = frames[index];
+    }
 }
 
 static size_t reference_allocate_vfs_slot(const struct elf_reference_state *reference)
@@ -197,14 +243,22 @@ bool elf_reference_apply_spawn(struct elf_spawn_model_context *context)
     reference->descriptor_tokens += plan->descriptors;
     if (plan->image && !plan->frozen && plan->result == MICROS_PM_RESULT_NO_SPACE) {
         ++context->vm_capacity_rejections;
+        if (reference_allocate_frames(reference, frames)) {
+            return false;
+        }
+    }
+    if (plan->frozen && !reference_allocate_frames(reference, frames)) {
+        return false;
     }
     if (!plan->active) {
+        if (plan->frozen) {
+            reference_release_frames(reference, frames);
+        }
         reference_clear_process(process);
         return true;
     }
     vfs_slot = reference_allocate_vfs_slot(reference);
-    if (!reference_allocate_frames(reference, frames)
-        || vfs_slot == MICROS_VFS_PROCESS_CAPACITY || context->supplied_slot == ELF_MODEL_NO_SLOT
+    if (!plan->frozen || vfs_slot == MICROS_VFS_PROCESS_CAPACITY || context->supplied_slot == ELF_MODEL_NO_SLOT
         || context->supplied_load == 0 || context->supplied_mapping == 0) {
         return false;
     }
@@ -284,6 +338,7 @@ void elf_reference_apply_exit(struct elf_spawn_model_context *context)
             child->parent = 0;
         }
     }
+    reference_release_frames(&context->reference, process->frames);
     process->state = ELF_REFERENCE_ZOMBIE;
     process->status = (int32_t)context->argument;
     process->load = 0;
