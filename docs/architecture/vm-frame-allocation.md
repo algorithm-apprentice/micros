@@ -6,10 +6,10 @@ This is the Accepted VM04 contract under
 [ADR-0138](../adr/0138-minix-vm-frame-allocation.md). MEM01 #210 and
 VM03 #276 satisfy its actual predecessors. The
 [fixed study](../research/minix-vm-frame-allocation.md) owns provenance,
-reference behavior and measured current resource limits.
+reference behavior and measured pre-implementation resource limits.
 Independent design review is clean and design #277 is separately merged.
-Implementation is active; B07-F003 remains open until its complete author
-acceptance, independent implementation review and merge.
+Implementation #278 completed its full author gate and clean independent
+review before merge, closing B07-F003.
 
 Close B07-F003 only: replace repeated lowest-address construction with the
 reference current-bitmap/cache/retained-origin allocator. Kernel bootstrap
@@ -266,11 +266,11 @@ count and origin occupy 88 bytes before layout padding. No new capacity
 buffer, automatic bitmap/cache copy, heap, VLA or recursive search is
 permitted. Keep ADR-0087's preparation-helper lifetime.
 
-The current limiting observed VM has only one resident page of image
-headroom. All 160-page VM, four-KiB user/16-KiB kernel stack and deadline
-budgets remain unchanged. Actual compiler/linked evidence must prove fit;
-the proposed field arithmetic is not a measured future `sizeof` or image
-certificate.
+The design-time observed VM had one resident page of image headroom.
+The accepted implementation occupies 160/160 resident pages and retains
+the 3,744/4,096-byte observed VM stack bound. All image, four-KiB user/
+16-KiB kernel stack and deadline budgets remain unchanged; later changes
+must establish actual compiler/linked fit rather than assume spare space.
 
 ## Acceptance and implementation sequence
 
