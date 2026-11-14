@@ -6,6 +6,7 @@
 
 #include "micros/sv39.h"
 #include "micros/user_address_space.h"
+#include "tests/qemu/vm_validation_work.h"
 
 enum {
     ELF_HEADER_SIZE = 64,
@@ -221,6 +222,8 @@ enum micros_vm_elf_error micros_vm_elf_plan(
     struct micros_vm_elf_plan *plan
 )
 {
+    MICROS_VM01_WORK_HIT("vm01-elf-plan", MICROS_WORK_OWNER_VM_SERVICE,
+                        MICROS_WORK_KIND_RANGE_VISIT, 1);
     struct micros_vm_elf_plan candidate = {0};
     uint64_t previous_virtual_end = 0;
     uint64_t previous_file_end = 0;

@@ -269,13 +269,12 @@ static bool vm_core_transaction_plans_are_canonical(
     );
 }
 
-static bool vm_core_transaction_common_is_canonical(
+static bool vm_core_transaction_header_is_canonical(
     const struct micros_vm_state *state
 )
 {
     const struct micros_vm_service_load_transaction *transaction =
         &state->transaction;
-    size_t index;
 
     if (
         transaction->process_reservation_token == 0
@@ -315,10 +314,19 @@ static bool vm_core_transaction_common_is_canonical(
             transaction->scratch_page == 0
             && transaction->scratch_filled != 0
         )
-        || !vm_core_transaction_plans_are_canonical(state)
     ) {
         return false;
     }
+    return true;
+}
+
+static bool vm_core_transaction_frames_are_ordered(
+    const struct micros_vm_state *state
+)
+{
+    const struct micros_vm_service_load_transaction *transaction = &state->transaction;
+    size_t index;
+
     for (
         index = 1;
         index < MICROS_VM_PAGE_TABLE_FRAME_COUNT;
@@ -356,6 +364,15 @@ static bool vm_core_transaction_common_is_canonical(
         }
     }
     return true;
+}
+
+static bool vm_core_transaction_common_is_canonical(
+    const struct micros_vm_state *state
+)
+{
+    return vm_core_transaction_header_is_canonical(state)
+        && vm_core_transaction_plans_are_canonical(state)
+        && vm_core_transaction_frames_are_ordered(state);
 }
 
 static bool vm_core_record_matches_transaction(
@@ -1014,6 +1031,133 @@ static bool selected_input_frames_are_free(const struct micros_vm_state *state)
     return true;
 }
 
+static bool retained_segments_are_valid(const struct micros_vm_state *state)
+{
+    const struct micros_vm_elf_plan *plan = &state->transaction.elf_plan;
+    uint64_t virtual_end = MICROS_APPLICATION_ENTRY;
+    uint64_t file_end = 0;
+    uint64_t pages = 0;
+
+    if (plan->entry != MICROS_APPLICATION_ENTRY
+        || plan->segment_count != MICROS_APPLICATION_ELF_SEGMENT_COUNT) {
+        return false;
+    }
+    for (size_t index = 0; index < MICROS_APPLICATION_ELF_SEGMENT_COUNT; ++index) {
+        const struct micros_vm_elf_segment *segment = &plan->segments[index];
+        uint32_t permissions = MICROS_SV39_PERMISSION_USER | MICROS_SV39_PERMISSION_READ
+            | (index == 0 ? MICROS_SV39_PERMISSION_EXECUTE : index == 2 ? MICROS_SV39_PERMISSION_WRITE : 0);
+
+        if (segment->reserved != 0 || segment->permissions != permissions
+            || segment->virtual_address != virtual_end
+            || segment->memory_size == 0 || segment->memory_size % MICROS_FRAME_SIZE != 0
+            || segment->memory_size / MICROS_FRAME_SIZE > MICROS_APPLICATION_IMAGE_PAGE_MAX - pages
+            || segment->file_size > segment->memory_size
+            || segment->file_offset % MICROS_FRAME_SIZE != 0
+            || segment->file_offset < file_end
+            || segment->file_offset > state->transaction.executable_size
+            || segment->file_size > state->transaction.executable_size - segment->file_offset) {
+            return false;
+        }
+        pages += segment->memory_size / MICROS_FRAME_SIZE;
+        virtual_end += segment->memory_size;
+        file_end = segment->file_offset + segment->file_size;
+    }
+    return pages == plan->page_count;
+}
+
+static bool retained_stack_is_valid(const struct micros_application_stack_plan *plan)
+{
+    uint32_t start;
+
+    if (plan->occupied_size == 0 || plan->occupied_size > MICROS_APPLICATION_STACK_OCCUPIED_MAX
+        || plan->occupied_size % 16 != 0 || plan->frame_size == 0
+        || plan->frame_size > plan->occupied_size || plan->occupied_size - plan->frame_size >= 16
+        || plan->stack_pointer != MICROS_APPLICATION_STACK_TOP - plan->occupied_size) {
+        return false;
+    }
+    start = MICROS_APPLICATION_STACK_PAGE_SIZE - plan->occupied_size;
+    return plan->argc_offset == start
+        && plan->arguments_offset == start + sizeof(uint64_t)
+        && plan->environment_offset > plan->arguments_offset
+        && plan->environment_offset % sizeof(uint64_t) == 0
+        && plan->auxiliary_offset > plan->environment_offset
+        && plan->auxiliary_offset % 16 == 0
+        && plan->auxiliary_offset <= MICROS_APPLICATION_STACK_PAGE_SIZE - MICROS_APPLICATION_AUXV_COUNT * 16
+        && plan->strings_offset == plan->auxiliary_offset + MICROS_APPLICATION_AUXV_COUNT * 16
+        && plan->strings_offset < start + plan->frame_size;
+}
+
+static bool retained_image_page_is_valid(const struct micros_vm_state *state, size_t page_index)
+{
+    const struct micros_vm_elf_plan *plan = &state->transaction.elf_plan;
+    const struct micros_vm_image_page *page = &plan->pages[page_index];
+    uint64_t virtual_address = MICROS_APPLICATION_ENTRY + page_index * MICROS_FRAME_SIZE;
+
+    if (page->virtual_address != virtual_address) {
+        return false;
+    }
+    for (size_t index = 0; index < MICROS_APPLICATION_ELF_SEGMENT_COUNT; ++index) {
+        const struct micros_vm_elf_segment *segment = &plan->segments[index];
+        uint64_t offset, file_offset = 0, file_size = 0;
+
+        if (virtual_address < segment->virtual_address
+            || virtual_address - segment->virtual_address >= segment->memory_size) {
+            continue;
+        }
+        offset = virtual_address - segment->virtual_address;
+        if (offset < segment->file_size) {
+            file_offset = segment->file_offset + offset;
+            file_size = segment->file_size - offset;
+            if (file_size > MICROS_FRAME_SIZE) {
+                file_size = MICROS_FRAME_SIZE;
+            }
+        }
+        return page->permissions == segment->permissions
+            && page->file_offset == file_offset && page->file_size == file_size;
+    }
+    return false;
+}
+
+static bool selected_load_page_is_valid(const struct micros_vm_state *state, size_t index)
+{
+    const struct micros_vm_service_load_transaction *transaction = &state->transaction;
+    const struct micros_vm_mapping_record *record = &state->mapping_records[transaction->process.slot];
+    size_t entry_index = MICROS_VM_PAGE_TABLE_FRAME_COUNT + index;
+    const struct micros_vm_mapping_entry *entry = &record->entries[entry_index];
+    uint32_t permissions = MICROS_SV39_PERMISSION_USER | MICROS_SV39_PERMISSION_READ | MICROS_SV39_PERMISSION_WRITE;
+    uint64_t frame_index;
+
+    if (index < transaction->elf_plan.page_count) {
+        if (!retained_image_page_is_valid(state, index)) {
+            return false;
+        }
+        permissions = transaction->elf_plan.pages[index].permissions;
+    }
+    return entry->physical_address == transaction->data_frames[index]
+        && entry->permissions == permissions
+        && vm_core_physical_to_frame_index(state, entry->physical_address, &frame_index)
+        && vm_core_initial_frame_is_free(state, frame_index)
+        && vm_core_bytes_are_zero(entry->reserved, sizeof(entry->reserved))
+        && validate_data_entry(state, record, entry_index, frame_index);
+}
+
+static bool retained_load_set_is_valid(const struct micros_vm_state *state)
+{
+    if (!vm_core_transaction_frames_are_ordered(state)) {
+        return false;
+    }
+    for (size_t index = 0; index < state->transaction.elf_plan.page_count; ++index) {
+        if (!retained_image_page_is_valid(state, index)) {
+            return false;
+        }
+    }
+    if (state->phase == MICROS_VM_LOADER_INPUT_COPIED) {
+        return selected_input_frames_are_free(state);
+    }
+    return vm_core_selected_record_is_valid(state, state->transaction.process.slot)
+        && vm_core_record_matches_transaction(state, &state->mapping_records[state->transaction.process.slot]);
+}
+
 enum micros_vm_core_error vm_core_validate_selected_state(const struct micros_vm_state *state)
 {
     MICROS_VM01_WORK_HIT("vm01-service-selected", MICROS_WORK_OWNER_VM_SERVICE,
@@ -1037,22 +1181,29 @@ enum micros_vm_core_error vm_core_validate_selected_state(const struct micros_vm
         return vm_core_bytes_are_zero(transaction, sizeof(*transaction))
             ? MICROS_VM_CORE_OK : MICROS_VM_CORE_ERROR_INVARIANT;
     }
-    if (!vm_core_transaction_common_is_canonical(state)) {
+    if (!vm_core_transaction_header_is_canonical(state)
+        || !retained_segments_are_valid(state)
+        || !retained_stack_is_valid(&transaction->stack_plan)) {
         return MICROS_VM_CORE_ERROR_INVARIANT;
     }
     if (state->phase == MICROS_VM_LOADER_INPUT_COPIED) {
         return transaction->load_token == 0 && transaction->mapping_generation == 0
             && transaction->process.slot == 0 && transaction->process.generation == 0
             && transaction->completed_page_count == 0 && transaction->scratch_page == 0
-            && selected_input_frames_are_free(state)
+            && retained_load_set_is_valid(state)
             ? MICROS_VM_CORE_OK : MICROS_VM_CORE_ERROR_INVARIANT;
     }
     if (!vm_core_process_is_canonical(transaction->process) || transaction->load_token == 0) {
         return MICROS_VM_CORE_ERROR_INVARIANT;
     }
     record = &state->mapping_records[transaction->process.slot];
-    if (!vm_core_selected_record_is_valid(state, transaction->process.slot)
-        || !vm_core_record_matches_transaction(state, record)
+    if (!vm_core_record_header_is_valid(state, transaction->process.slot)
+        || record->load_token != transaction->load_token
+        || record->mapping_generation != transaction->mapping_generation
+        || record->semantic_pid != transaction->semantic_pid
+        || record->process_generation != transaction->process.generation
+        || record->process_slot != transaction->process.slot
+        || record->entry_count != MICROS_VM_PAGE_TABLE_FRAME_COUNT + transaction->page_count
         || (state->phase == MICROS_VM_LOADER_LOADING
             && (transaction->mapping_generation != 0 || record->phase != MICROS_VM_MAPPING_RECORD_LOADING))
         || (state->phase == MICROS_VM_LOADER_FROZEN
@@ -1060,5 +1211,29 @@ enum micros_vm_core_error vm_core_validate_selected_state(const struct micros_vm
                 || transaction->completed_page_count != transaction->page_count || transaction->scratch_page != 0))) {
         return MICROS_VM_CORE_ERROR_INVARIANT;
     }
+    if (state->phase == MICROS_VM_LOADER_FROZEN) {
+        /* The service facade may invoke abort/commit immediately after this admission. */
+        return retained_load_set_is_valid(state) ? MICROS_VM_CORE_OK : MICROS_VM_CORE_ERROR_INVARIANT;
+    }
+    if (transaction->completed_page_count < transaction->page_count) {
+        size_t index = transaction->completed_page_count;
+
+        if (!selected_load_page_is_valid(state, index)
+            || (index != 0 && (!selected_load_page_is_valid(state, index - 1)
+                || transaction->data_frames[index - 1] >= transaction->data_frames[index]))) {
+            return MICROS_VM_CORE_ERROR_INVARIANT;
+        }
+    }
     return MICROS_VM_CORE_OK;
+}
+
+enum micros_vm_core_error vm_core_validate_selected_load_plan(const struct micros_vm_state *state)
+{
+    enum micros_vm_core_error error = vm_core_validate_selected_state(state);
+
+    if (error != MICROS_VM_CORE_OK) {
+        return error;
+    }
+    return state->phase != MICROS_VM_LOADER_LOADING || retained_load_set_is_valid(state)
+        ? MICROS_VM_CORE_OK : MICROS_VM_CORE_ERROR_INVARIANT;
 }

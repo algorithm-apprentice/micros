@@ -84,5 +84,6 @@ enum micros_vm_core_error vm_core_validate_state(
 );
 bool vm_core_record_header_is_valid(const struct micros_vm_state *state, size_t slot);
 bool vm_core_selected_record_is_valid(const struct micros_vm_state *state, size_t slot);
+enum micros_vm_core_error vm_core_validate_selected_load_plan(const struct micros_vm_state *state);
 
 #endif

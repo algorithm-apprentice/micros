@@ -73,8 +73,8 @@ All nine B02 findings, the pre-node B04 findings, six B05 and four B06
 runtime findings are closed; B04-F005 retains its post-node staged
 replacement point. The next preferred runtime outcome
 is **VM03**, whose VM01 and VM02 prerequisites are merged. Its retained
-load-plan design is independently reviewed and Accepted; implementation
-remains pending the separate design merge.
+load-plan design is independently reviewed, Accepted and merged as #275;
+its separate implementation is active.
 VM02's [Accepted contract](../architecture/vm-mapping-plan-uniqueness.md)
 and implementation #274 preserve complete diagnostics, real frame/index
 authority, exact error/publication order and the original composed/stack
@@ -258,7 +258,7 @@ blocking queue.
 | `BOOT03` | Runtime correction | `B06-F004` | `COPY01` | Independently reviewed implementation #270 follows the [shared-transfer contract](../architecture/bootstrap-memory-transfers.md), preserving caller extents and lifecycle behavior. | Actual byte/unit and linked helper/provider evidence, original models and complete current acceptance passed. |
 | `VM01` | Runtime correction | `B07-F001` | `BOOT02`, `MEM04`, `GRANT01` | Independently reviewed implementation #272 follows the [selected-validation contract](../architecture/selected-vm-validation.md), retaining complete diagnostics and consumed service/kernel/PM/memory authority. | Actual native and same-guest zero ordinary audits, pre-backend/failure/corruption evidence and all inherited target/composed/stack gates passed. |
 | `VM02` | Runtime correction | `B02-F008`, `B02-F009`, `B07-F004` | `VM01`, `MEM04` | Independently reviewed implementation #274 follows the [mapping-plan contract](../architecture/vm-mapping-plan-uniqueness.md): selected root/owner indexes, bounded ordered uniqueness and direct load-record selection. | Actual root/frame/identity work, exact errors/owners, adversarial plans and complete target/stack acceptance passed. |
-| `VM03` | Runtime correction | `B07-F002` | `VM01`, `VM02` | [Accepted retained-plan contract](../architecture/retained-vm-load-plan.md): consume the existing generation-bound plan and selected loading prefix without repeated reconstruction. Design is independently reviewed; implementation remains pending its separate merge. | Exact per-page and full load/abort/commit/exit counts. |
+| `VM03` | Runtime correction | `B07-F002` | `VM01`, `VM02` | [Accepted retained-plan contract](../architecture/retained-vm-load-plan.md): consume the existing generation-bound plan and selected loading prefix without repeated reconstruction. Design #275 is separately merged; implementation is active. | Exact per-page and full load/abort/commit/exit counts. |
 | `VM04` | Runtime correction | `B07-F003` | `MEM01`, `VM03` | Reproduce bitmap/cache/chunk search and retained origin behavior for VM-managed frames. | Allocator probe/chunk counts, fragmentation, exhaustion, release, and replayable model traces. |
 | `VM05` | Runtime correction | `B07-F005` | `COPY01`, `GRANT03`, `BOOT03`, `VM03` | Use reusable span/block movement for pages and snapshots while preserving scratch/freeze authority. | 4 KiB/128 KiB transfer counts, alignment, scratch, rollback, and target contents. |
 | `VM06` | Runtime correction | `B07-F006` | `BOOT02`, `VM03`, `VM05` | Transfer or release bootstrap snapshot ownership after handoff instead of permanently retaining duplicate state. | Lifetime/storage accounting, post-handoff rejection, and VM restart/fatal-boundary cases. |

@@ -5581,6 +5581,9 @@
             [["aggregate"],["mem03/shared/vm01/kernel/vm/vm_handoff_core.c/frozen_record_has_valid_shape/index-77","wrap","KERNEL_VM","INDEX_PROBE",1,"value","table_index",[["for ( table_index = 0 ; table_index < MICROS_VM_LOAD_PAGE_TABLE_FRAME_COUNT ; ++ table_index ) {",0]],0,1]]
           ],
           "frozen_transaction_is_valid": [],
+          "loading_record_has_valid_selected_prefix": [
+            [["aggregate"],["mem03/shared/vm03/kernel/vm/vm_handoff_core.c/loading_record_has_valid_selected_prefix/index-52","wrap","KERNEL_VM","INDEX_PROBE",1,"value","index",[],2,6]]
+          ],
           "loading_transaction_is_valid": [],
           "mapping_keys_are_unique": [
             [["aggregate"],["mem03/shared/vm01/kernel/vm/vm_handoff_core.c/mapping_keys_are_unique/loop-18","insert","KERNEL_VM","RECORD_VISIT",1,"entry","",[["for ( unsigned domain = 0 ; domain < 3 ; ++ domain ) {",0]],0,0]],
@@ -5609,11 +5612,9 @@
           "micros_vm_handoff_identity_is_valid": [],
           "micros_vm_handoff_inspect_scratch_binding": [],
           "micros_vm_handoff_loading_record_can_append": [
-            [["aggregate"],["mem03/shared/vm01/kernel/vm/vm_handoff_core.c/micros_vm_handoff_loading_record_can_append/loop-59","insert","KERNEL_VM","RECORD_VISIT",1,"entry","",[["for ( index = 0 ; index < record -> entry_count ; ++ index ) {",0]],0,0]],
-            [["aggregate"],["mem03/shared/vm01/kernel/vm/vm_handoff_core.c/micros_vm_handoff_loading_record_can_append/index-65","wrap","KERNEL_VM","INDEX_PROBE",1,"value","index",[["for ( index = 0 ; index < record -> entry_count ; ++ index ) {",0]],0,1]],
-            [["aggregate"],["mem03/shared/vm01/kernel/vm/vm_handoff_core.c/micros_vm_handoff_loading_record_can_append/index-92","wrap","KERNEL_VM","INDEX_PROBE",1,"value","record -> entry_count - 1",[],0,2]],
-            [["aggregate"],["mem03/shared/vm01/kernel/vm/vm_handoff_core.c/micros_vm_handoff_loading_record_can_append/index-150","wrap","KERNEL_VM","INDEX_PROBE",1,"value","record -> entry_count - 1",[["if ( entry -> virtual_address == MICROS_APPLICATION_STACK_BASE ) {",0]],0,1]],
-            [["aggregate"],["mem03/shared/vm01/kernel/vm/vm_handoff_core.c/micros_vm_handoff_loading_record_can_append/index-216","wrap","KERNEL_VM","INDEX_PROBE",1,"value","record -> entry_count - 1",[],1,2]]
+            [["aggregate"],["mem03/shared/vm03/kernel/vm/vm_handoff_core.c/micros_vm_handoff_loading_record_can_append/index-44","wrap","KERNEL_VM","INDEX_PROBE",1,"value","record -> entry_count - 1",[],0,2]],
+            [["aggregate"],["mem03/shared/vm03/kernel/vm/vm_handoff_core.c/micros_vm_handoff_loading_record_can_append/index-102","wrap","KERNEL_VM","INDEX_PROBE",1,"value","record -> entry_count - 1",[["if ( entry -> virtual_address == MICROS_APPLICATION_STACK_BASE ) {",0]],0,1]],
+            [["aggregate"],["mem03/shared/vm03/kernel/vm/vm_handoff_core.c/micros_vm_handoff_loading_record_can_append/index-168","wrap","KERNEL_VM","INDEX_PROBE",1,"value","record -> entry_count - 1",[],1,2]]
           ],
           "micros_vm_handoff_mapping_entry_is_valid": [],
           "micros_vm_handoff_mapping_record_is_zero": [],
@@ -5635,8 +5636,11 @@
           "micros_vm_handoff_thread_is_valid": [],
           "micros_vm_handoff_user_page_is_valid": [],
           "micros_vm_handoff_user_permissions_are_valid": [],
+          "micros_vm_handoff_validate_load_plan": [
+            [["aggregate"],["mem03/shared/vm03/kernel/vm/vm_handoff_core.c/micros_vm_handoff_validate_load_plan/index-40","wrap","KERNEL_VM","INDEX_PROBE",1,"value","state -> load . process . slot",[],0,2]]
+          ],
           "micros_vm_handoff_validate_selected": [
-            [["aggregate"],["mem03/shared/vm01/kernel/vm/vm_handoff_core.c/micros_vm_handoff_validate_selected/index-160","wrap","KERNEL_VM","INDEX_PROBE",1,"value","state -> load . process . slot",[],1,2]]
+            [["aggregate"],["mem03/shared/vm03/kernel/vm/vm_handoff_core.c/micros_vm_handoff_validate_selected/index-160","wrap","KERNEL_VM","INDEX_PROBE",1,"value","state -> load . process . slot",[],1,3]]
           ],
           "micros_vm_load_page_plan_digest": [],
           "page_digest_byte": [],
@@ -7218,6 +7222,9 @@
             [["aggregate","context"],["mem04/shared/vm01/kernel/vm/vm_handoff_core.c/frozen_record_has_valid_shape/index-77","wrap","KERNEL_VM","INDEX_PROBE",1,"value","table_index",[["for ( table_index = 0 ; table_index < MICROS_VM_LOAD_PAGE_TABLE_FRAME_COUNT ; ++ table_index ) {",0]],0,1]]
           ],
           "frozen_transaction_is_valid": [],
+          "loading_record_has_valid_selected_prefix": [
+            [["aggregate","context"],["mem04/shared/vm03/kernel/vm/vm_handoff_core.c/loading_record_has_valid_selected_prefix/index-52","wrap","KERNEL_VM","INDEX_PROBE",1,"value","index",[],2,6]]
+          ],
           "loading_transaction_is_valid": [
             [["aggregate","context"],["mem04-431b3e7a6a1726e32d57","wrap","KERNEL_VM","INDEX_PROBE",1,"value","& state -> mappings [ loading_slot ]",[],0,1]],
             [["aggregate","context"],["mem04-6582465f481eb742d9eb","insert","KERNEL_VM","INDEX_PROBE",1,"entry","",[["for ( slot = 0 ; slot < MICROS_PROCESS_CAPACITY ; ++ slot ) {",0]],0,0]],
@@ -7258,11 +7265,9 @@
           ],
           "micros_vm_handoff_inspect_scratch_binding": [],
           "micros_vm_handoff_loading_record_can_append": [
-            [["aggregate","context"],["mem04/shared/vm01/kernel/vm/vm_handoff_core.c/micros_vm_handoff_loading_record_can_append/loop-59","insert","KERNEL_VM","RECORD_VISIT",1,"entry","",[["for ( index = 0 ; index < record -> entry_count ; ++ index ) {",0]],0,0]],
-            [["aggregate","context"],["mem04/shared/vm01/kernel/vm/vm_handoff_core.c/micros_vm_handoff_loading_record_can_append/index-65","wrap","KERNEL_VM","INDEX_PROBE",1,"value","index",[["for ( index = 0 ; index < record -> entry_count ; ++ index ) {",0]],0,1]],
-            [["aggregate","context"],["mem04/shared/vm01/kernel/vm/vm_handoff_core.c/micros_vm_handoff_loading_record_can_append/index-92","wrap","KERNEL_VM","INDEX_PROBE",1,"value","record -> entry_count - 1",[],0,2]],
-            [["aggregate","context"],["mem04/shared/vm01/kernel/vm/vm_handoff_core.c/micros_vm_handoff_loading_record_can_append/index-150","wrap","KERNEL_VM","INDEX_PROBE",1,"value","record -> entry_count - 1",[["if ( entry -> virtual_address == MICROS_APPLICATION_STACK_BASE ) {",0]],0,1]],
-            [["aggregate","context"],["mem04/shared/vm01/kernel/vm/vm_handoff_core.c/micros_vm_handoff_loading_record_can_append/index-216","wrap","KERNEL_VM","INDEX_PROBE",1,"value","record -> entry_count - 1",[],1,2]]
+            [["aggregate","context"],["mem04/shared/vm03/kernel/vm/vm_handoff_core.c/micros_vm_handoff_loading_record_can_append/index-44","wrap","KERNEL_VM","INDEX_PROBE",1,"value","record -> entry_count - 1",[],0,2]],
+            [["aggregate","context"],["mem04/shared/vm03/kernel/vm/vm_handoff_core.c/micros_vm_handoff_loading_record_can_append/index-102","wrap","KERNEL_VM","INDEX_PROBE",1,"value","record -> entry_count - 1",[["if ( entry -> virtual_address == MICROS_APPLICATION_STACK_BASE ) {",0]],0,1]],
+            [["aggregate","context"],["mem04/shared/vm03/kernel/vm/vm_handoff_core.c/micros_vm_handoff_loading_record_can_append/index-168","wrap","KERNEL_VM","INDEX_PROBE",1,"value","record -> entry_count - 1",[],1,2]]
           ],
           "micros_vm_handoff_mapping_entry_is_valid": [],
           "micros_vm_handoff_mapping_record_is_zero": [],
@@ -7289,8 +7294,11 @@
           "micros_vm_handoff_thread_is_valid": [],
           "micros_vm_handoff_user_page_is_valid": [],
           "micros_vm_handoff_user_permissions_are_valid": [],
+          "micros_vm_handoff_validate_load_plan": [
+            [["aggregate","context"],["mem04/shared/vm03/kernel/vm/vm_handoff_core.c/micros_vm_handoff_validate_load_plan/index-40","wrap","KERNEL_VM","INDEX_PROBE",1,"value","state -> load . process . slot",[],0,2]]
+          ],
           "micros_vm_handoff_validate_selected": [
-            [["aggregate","context"],["mem04-shared-vm01/kernel/vm/vm_handoff_core.c/micros_vm_handoff_validate_selected/index-160","wrap","KERNEL_VM","INDEX_PROBE",1,"value","state -> load . process . slot",[],1,2]]
+            [["aggregate","context"],["mem04/shared/vm03/kernel/vm/vm_handoff_core.c/micros_vm_handoff_validate_selected/index-160","wrap","KERNEL_VM","INDEX_PROBE",1,"value","state -> load . process . slot",[],1,3]]
           ],
           "micros_vm_load_page_plan_digest": [
             [["aggregate","context"],["mem04-7b38a9c720d75040335f","insert","KERNEL_VM","INDEX_PROBE",1,"entry","",[["for ( index = 0 ; index < data_page_count ; ++ index ) {",0]],0,0]]
@@ -9139,6 +9147,9 @@
             [["aggregate","context"],["mem05-current-937fe78ecb76c799b2c3","wrap","KERNEL_VM","INDEX_PROBE",1,"value","frozen_slot",[],1,3]],
             [["aggregate","context"],["mem05-current-80b2131ce81b90b4b78a","wrap","KERNEL_VM","INDEX_PROBE",1,"value","frozen_slot",[],2,3]]
           ],
+          "loading_record_has_valid_selected_prefix": [
+            [["aggregate","context"],["mem05/shared/vm03/kernel/vm/vm_handoff_core.c/loading_record_has_valid_selected_prefix/index-52","wrap","KERNEL_VM","INDEX_PROBE",1,"value","index",[],2,6]]
+          ],
           "loading_transaction_is_valid": [
             [["aggregate","context"],["mem05-current-74061c0e84ec2c90d309","wrap","KERNEL_VM","INDEX_PROBE",1,"value","loading_slot",[],1,2]],
             [["aggregate","context"],["mem05-current-7359559a16245620860a","insert","KERNEL_VM","INDEX_PROBE",1,"entry","",[["for ( slot = 0 ; slot < MICROS_PROCESS_CAPACITY ; ++ slot ) {",0]],0,0]],
@@ -9177,11 +9188,9 @@
           "micros_vm_handoff_identity_is_valid": [],
           "micros_vm_handoff_inspect_scratch_binding": [],
           "micros_vm_handoff_loading_record_can_append": [
-            [["aggregate","context"],["mem05/shared/vm01/kernel/vm/vm_handoff_core.c/micros_vm_handoff_loading_record_can_append/loop-59","insert","KERNEL_VM","RECORD_VISIT",1,"entry","",[["for ( index = 0 ; index < record -> entry_count ; ++ index ) {",0]],0,0]],
-            [["aggregate","context"],["mem05/shared/vm01/kernel/vm/vm_handoff_core.c/micros_vm_handoff_loading_record_can_append/index-65","wrap","KERNEL_VM","INDEX_PROBE",1,"value","index",[["for ( index = 0 ; index < record -> entry_count ; ++ index ) {",0]],0,1]],
-            [["aggregate","context"],["mem05/shared/vm01/kernel/vm/vm_handoff_core.c/micros_vm_handoff_loading_record_can_append/index-92","wrap","KERNEL_VM","INDEX_PROBE",1,"value","record -> entry_count - 1",[],0,2]],
-            [["aggregate","context"],["mem05/shared/vm01/kernel/vm/vm_handoff_core.c/micros_vm_handoff_loading_record_can_append/index-150","wrap","KERNEL_VM","INDEX_PROBE",1,"value","record -> entry_count - 1",[["if ( entry -> virtual_address == MICROS_APPLICATION_STACK_BASE ) {",0]],0,1]],
-            [["aggregate","context"],["mem05/shared/vm01/kernel/vm/vm_handoff_core.c/micros_vm_handoff_loading_record_can_append/index-216","wrap","KERNEL_VM","INDEX_PROBE",1,"value","record -> entry_count - 1",[],1,2]]
+            [["aggregate","context"],["mem05/shared/vm03/kernel/vm/vm_handoff_core.c/micros_vm_handoff_loading_record_can_append/index-44","wrap","KERNEL_VM","INDEX_PROBE",1,"value","record -> entry_count - 1",[],0,2]],
+            [["aggregate","context"],["mem05/shared/vm03/kernel/vm/vm_handoff_core.c/micros_vm_handoff_loading_record_can_append/index-102","wrap","KERNEL_VM","INDEX_PROBE",1,"value","record -> entry_count - 1",[["if ( entry -> virtual_address == MICROS_APPLICATION_STACK_BASE ) {",0]],0,1]],
+            [["aggregate","context"],["mem05/shared/vm03/kernel/vm/vm_handoff_core.c/micros_vm_handoff_loading_record_can_append/index-168","wrap","KERNEL_VM","INDEX_PROBE",1,"value","record -> entry_count - 1",[],1,2]]
           ],
           "micros_vm_handoff_mapping_entry_is_valid": [],
           "micros_vm_handoff_mapping_record_is_zero": [],
@@ -9208,8 +9217,11 @@
           "micros_vm_handoff_thread_is_valid": [],
           "micros_vm_handoff_user_page_is_valid": [],
           "micros_vm_handoff_user_permissions_are_valid": [],
+          "micros_vm_handoff_validate_load_plan": [
+            [["aggregate","context"],["mem05/shared/vm03/kernel/vm/vm_handoff_core.c/micros_vm_handoff_validate_load_plan/index-40","wrap","KERNEL_VM","INDEX_PROBE",1,"value","state -> load . process . slot",[],0,2]]
+          ],
           "micros_vm_handoff_validate_selected": [
-            [["aggregate","context"],["mem05-shared-vm01/kernel/vm/vm_handoff_core.c/micros_vm_handoff_validate_selected/index-160","wrap","KERNEL_VM","INDEX_PROBE",1,"value","state -> load . process . slot",[],1,2]]
+            [["aggregate","context"],["mem05/shared/vm03/kernel/vm/vm_handoff_core.c/micros_vm_handoff_validate_selected/index-160","wrap","KERNEL_VM","INDEX_PROBE",1,"value","state -> load . process . slot",[],1,3]]
           ],
           "micros_vm_load_page_plan_digest": [
             [["aggregate","context"],["mem05-current-a26e3fa539932586d721","insert","KERNEL_VM","INDEX_PROBE",1,"entry","",[["for ( index = 0 ; index < data_page_count ; ++ index ) {",0]],0,0]]
@@ -10836,6 +10848,9 @@
             [["work"],["vm01/kernel/vm/vm_handoff_core.c/frozen_transaction_is_valid/index-48","wrap","KERNEL_VM","INDEX_PROBE",1,"value","frozen_slot",[],1,3]],
             [["work"],["vm01/kernel/vm/vm_handoff_core.c/frozen_transaction_is_valid/index-64","wrap","KERNEL_VM","INDEX_PROBE",1,"value","frozen_slot",[],2,3]]
           ],
+          "loading_record_has_valid_selected_prefix": [
+            [["work"],["vm03/kernel/vm/vm_handoff_core.c/loading_record_has_valid_selected_prefix/index-52","wrap","KERNEL_VM","INDEX_PROBE",1,"value","index",[],2,6]]
+          ],
           "loading_transaction_is_valid": [
             [["work"],["vm01/kernel/vm/vm_handoff_core.c/loading_transaction_is_valid/index-36","wrap","KERNEL_VM","INDEX_PROBE",1,"value","loading_slot",[],1,2]],
             [["work"],["vm01/kernel/vm/vm_handoff_core.c/loading_transaction_is_valid/loop-136","insert","KERNEL_VM","RECORD_VISIT",1,"entry","",[["for ( slot = 0 ; slot < MICROS_PROCESS_CAPACITY ; ++ slot ) {",0]],0,0]],
@@ -10874,11 +10889,9 @@
           "micros_vm_handoff_identity_is_valid": [],
           "micros_vm_handoff_inspect_scratch_binding": [],
           "micros_vm_handoff_loading_record_can_append": [
-            [["work"],["vm01/kernel/vm/vm_handoff_core.c/micros_vm_handoff_loading_record_can_append/loop-59","insert","KERNEL_VM","RECORD_VISIT",1,"entry","",[["for ( index = 0 ; index < record -> entry_count ; ++ index ) {",0]],0,0]],
-            [["work"],["vm01/kernel/vm/vm_handoff_core.c/micros_vm_handoff_loading_record_can_append/index-65","wrap","KERNEL_VM","INDEX_PROBE",1,"value","index",[["for ( index = 0 ; index < record -> entry_count ; ++ index ) {",0]],0,1]],
-            [["work"],["vm01/kernel/vm/vm_handoff_core.c/micros_vm_handoff_loading_record_can_append/index-92","wrap","KERNEL_VM","INDEX_PROBE",1,"value","record -> entry_count - 1",[],0,2]],
-            [["work"],["vm01/kernel/vm/vm_handoff_core.c/micros_vm_handoff_loading_record_can_append/index-150","wrap","KERNEL_VM","INDEX_PROBE",1,"value","record -> entry_count - 1",[["if ( entry -> virtual_address == MICROS_APPLICATION_STACK_BASE ) {",0]],0,1]],
-            [["work"],["vm01/kernel/vm/vm_handoff_core.c/micros_vm_handoff_loading_record_can_append/index-216","wrap","KERNEL_VM","INDEX_PROBE",1,"value","record -> entry_count - 1",[],1,2]]
+            [["work"],["vm03/kernel/vm/vm_handoff_core.c/micros_vm_handoff_loading_record_can_append/index-44","wrap","KERNEL_VM","INDEX_PROBE",1,"value","record -> entry_count - 1",[],0,2]],
+            [["work"],["vm03/kernel/vm/vm_handoff_core.c/micros_vm_handoff_loading_record_can_append/index-102","wrap","KERNEL_VM","INDEX_PROBE",1,"value","record -> entry_count - 1",[["if ( entry -> virtual_address == MICROS_APPLICATION_STACK_BASE ) {",0]],0,1]],
+            [["work"],["vm03/kernel/vm/vm_handoff_core.c/micros_vm_handoff_loading_record_can_append/index-168","wrap","KERNEL_VM","INDEX_PROBE",1,"value","record -> entry_count - 1",[],1,2]]
           ],
           "micros_vm_handoff_mapping_entry_is_valid": [],
           "micros_vm_handoff_mapping_record_is_zero": [],
@@ -10905,8 +10918,11 @@
           "micros_vm_handoff_thread_is_valid": [],
           "micros_vm_handoff_user_page_is_valid": [],
           "micros_vm_handoff_user_permissions_are_valid": [],
+          "micros_vm_handoff_validate_load_plan": [
+            [["work"],["vm03/kernel/vm/vm_handoff_core.c/micros_vm_handoff_validate_load_plan/index-40","wrap","KERNEL_VM","INDEX_PROBE",1,"value","state -> load . process . slot",[],0,2]]
+          ],
           "micros_vm_handoff_validate_selected": [
-            [["work"],["vm01/kernel/vm/vm_handoff_core.c/micros_vm_handoff_validate_selected/index-160","wrap","KERNEL_VM","INDEX_PROBE",1,"value","state -> load . process . slot",[],1,2]]
+            [["work"],["vm03/kernel/vm/vm_handoff_core.c/micros_vm_handoff_validate_selected/index-160","wrap","KERNEL_VM","INDEX_PROBE",1,"value","state -> load . process . slot",[],1,3]]
           ],
           "micros_vm_load_page_plan_digest": [
             [["work"],["vm01/kernel/vm/vm_handoff_core.c/micros_vm_load_page_plan_digest/loop-80","insert","KERNEL_VM","RECORD_VISIT",1,"entry","",[["for ( index = 0 ; index < data_page_count ; ++ index ) {",0]],0,0]]
@@ -10960,10 +10976,10 @@
             [["work"],["vm01/kernel/vm/vm_handoff_freeze.c/micros_vm_load_freeze_commit_prevalidated/index-9","wrap","KERNEL_VM","INDEX_PROBE",1,"value","state -> load . process . slot",[],0,1]]
           ],
           "micros_vm_load_freeze_preflight": [
-            [["work"],["vm01/kernel/vm/vm_handoff_freeze.c/micros_vm_load_freeze_preflight/index-152","wrap","KERNEL_VM","INDEX_PROBE",1,"value","state -> load . process . slot",[],0,1]],
-            [["work"],["vm01/kernel/vm/vm_handoff_freeze.c/micros_vm_load_freeze_preflight/loop-237","insert","KERNEL_VM","RECORD_VISIT",1,"entry","",[["for ( size_t index = 0 ; index < MICROS_VM_LOAD_PAGE_TABLE_FRAME_COUNT ; ++ index ) {",0]],0,0]],
-            [["work"],["vm01/kernel/vm/vm_handoff_freeze.c/micros_vm_load_freeze_preflight/index-252","wrap","KERNEL_VM","INDEX_PROBE",1,"value","index",[["for ( size_t index = 0 ; index < MICROS_VM_LOAD_PAGE_TABLE_FRAME_COUNT ; ++ index ) {",0]],0,1]],
-            [["work"],["vm01/kernel/vm/vm_handoff_freeze.c/micros_vm_load_freeze_preflight/index-385","wrap","KERNEL_VM","INDEX_PROBE",1,"value","0",[],2,3]]
+            [["work"],["vm03/kernel/vm/vm_handoff_freeze.c/micros_vm_load_freeze_preflight/index-152","wrap","KERNEL_VM","INDEX_PROBE",1,"value","state -> load . process . slot",[],0,1]],
+            [["work"],["vm03/kernel/vm/vm_handoff_freeze.c/micros_vm_load_freeze_preflight/loop-237","insert","KERNEL_VM","RECORD_VISIT",1,"entry","",[["for ( size_t index = 0 ; index < MICROS_VM_LOAD_PAGE_TABLE_FRAME_COUNT ; ++ index ) {",0]],0,0]],
+            [["work"],["vm03/kernel/vm/vm_handoff_freeze.c/micros_vm_load_freeze_preflight/index-252","wrap","KERNEL_VM","INDEX_PROBE",1,"value","index",[["for ( size_t index = 0 ; index < MICROS_VM_LOAD_PAGE_TABLE_FRAME_COUNT ; ++ index ) {",0]],0,1]],
+            [["work"],["vm03/kernel/vm/vm_handoff_freeze.c/micros_vm_load_freeze_preflight/index-385","wrap","KERNEL_VM","INDEX_PROBE",1,"value","0",[],2,3]]
           ]
         },
         "kernel/vm/vm_handoff_load.c": {
@@ -10988,7 +11004,7 @@
             [["work"],["vm01/kernel/vm/vm_handoff_release.c/micros_vm_load_abort_commit_prevalidated/index-21","wrap","KERNEL_VM","INDEX_PROBE",1,"value","state -> load . process . slot",[],1,2]]
           ],
           "micros_vm_load_abort_preflight": [
-            [["work"],["vm01/kernel/vm/vm_handoff_release.c/micros_vm_load_abort_preflight/index-94","wrap","KERNEL_VM","INDEX_PROBE",1,"value","state -> load . process . slot",[],0,1]]
+            [["work"],["vm03/kernel/vm/vm_handoff_release.c/micros_vm_load_abort_preflight/index-94","wrap","KERNEL_VM","INDEX_PROBE",1,"value","state -> load . process . slot",[],0,1]]
           ],
           "micros_vm_load_mark_exit_detached": [
             [["work"],["vm01/kernel/vm/vm_handoff_release.c/micros_vm_load_mark_exit_detached/index-54","wrap","KERNEL_VM","INDEX_PROBE",1,"value","process . slot",[],0,2]]
@@ -11218,11 +11234,11 @@
           "decode_segment": [],
           "elf_header_is_valid": [],
           "micros_vm_elf_plan": [
-            [["work"],["vm01/servers/vm/vm_elf.c/micros_vm_elf_plan/loop-94","insert","VM_SERVICE","RECORD_VISIT",1,"entry","",[["for ( index = 0 ; index < candidate . segment_count ; ++ index ) {",0]],0,0]],
-            [["work"],["vm01/servers/vm/vm_elf.c/micros_vm_elf_plan/index-120","wrap","VM_SERVICE","INDEX_PROBE",1,"value","index",[["for ( index = 0 ; index < candidate . segment_count ; ++ index ) {",0]],1,3]],
-            [["work"],["vm01/servers/vm/vm_elf.c/micros_vm_elf_plan/index-149","wrap","VM_SERVICE","INDEX_PROBE",1,"value","index",[["for ( index = 0 ; index < candidate . segment_count ; ++ index ) {",0]],2,3]],
-            [["work"],["vm01/servers/vm/vm_elf.c/micros_vm_elf_plan/index-165","wrap","VM_SERVICE","INDEX_PROBE",1,"value","0",[],4,6]],
-            [["work"],["vm01/servers/vm/vm_elf.c/micros_vm_elf_plan/index-174","wrap","VM_SERVICE","INDEX_PROBE",1,"value","0",[],5,6]]
+            [["work"],["vm03/servers/vm/vm_elf.c/micros_vm_elf_plan/loop-105","insert","VM_SERVICE","RECORD_VISIT",1,"entry","",[["for ( index = 0 ; index < candidate . segment_count ; ++ index ) {",0]],0,0]],
+            [["work"],["vm03/servers/vm/vm_elf.c/micros_vm_elf_plan/index-131","wrap","VM_SERVICE","INDEX_PROBE",1,"value","index",[["for ( index = 0 ; index < candidate . segment_count ; ++ index ) {",0]],1,3]],
+            [["work"],["vm03/servers/vm/vm_elf.c/micros_vm_elf_plan/index-160","wrap","VM_SERVICE","INDEX_PROBE",1,"value","index",[["for ( index = 0 ; index < candidate . segment_count ; ++ index ) {",0]],2,3]],
+            [["work"],["vm03/servers/vm/vm_elf.c/micros_vm_elf_plan/index-176","wrap","VM_SERVICE","INDEX_PROBE",1,"value","0",[],4,6]],
+            [["work"],["vm03/servers/vm/vm_elf.c/micros_vm_elf_plan/index-185","wrap","VM_SERVICE","INDEX_PROBE",1,"value","0",[],5,6]]
           ]
         },
         "servers/vm/vm_exit.c": {
@@ -11323,14 +11339,14 @@
             [["work"],["vm01/servers/vm/vm_load.c/load_record_identity_is_available/index-27","wrap","VM_SERVICE","INDEX_PROBE",1,"value","slot",[["for ( slot = 0 ; slot < MICROS_VM_MAPPING_RECORD_CAPACITY ; ++ slot ) {",0]],0,1]]
           ],
           "micros_vm_load_aborted": [
-            [["work"],["vm01/servers/vm/vm_load.c/micros_vm_load_aborted/loop-112","insert","VM_SERVICE","RECORD_VISIT",1,"entry","",[["for ( index = 0 ; index < MICROS_VM_PAGE_TABLE_FRAME_COUNT ; ++ index ) {",0]],0,0]],
-            [["work"],["vm01/servers/vm/vm_load.c/micros_vm_load_aborted/index-128","wrap","VM_SERVICE","INDEX_PROBE",1,"value","index",[["for ( index = 0 ; index < MICROS_VM_PAGE_TABLE_FRAME_COUNT ; ++ index ) {",0]],0,1]],
-            [["work"],["vm01/servers/vm/vm_load.c/micros_vm_load_aborted/index-141","wrap","VM_SERVICE","INDEX_PROBE",1,"value","frame_index",[["for ( index = 0 ; index < MICROS_VM_PAGE_TABLE_FRAME_COUNT ; ++ index ) {",0]],2,3]],
-            [["work"],["vm01/servers/vm/vm_load.c/micros_vm_load_aborted/loop-165","insert","VM_SERVICE","RECORD_VISIT",1,"entry","",[["for ( index = 0 ; index < state -> transaction . page_count ; ++ index ) {",0]],0,0]],
-            [["work"],["vm01/servers/vm/vm_load.c/micros_vm_load_aborted/index-181","wrap","VM_SERVICE","INDEX_PROBE",1,"value","index",[["for ( index = 0 ; index < state -> transaction . page_count ; ++ index ) {",0]],0,1]],
-            [["work"],["vm01/servers/vm/vm_load.c/micros_vm_load_aborted/index-194","wrap","VM_SERVICE","INDEX_PROBE",1,"value","frame_index",[["for ( index = 0 ; index < state -> transaction . page_count ; ++ index ) {",0]],2,3]],
-            [["work"],["vm01/servers/vm/vm_load.c/micros_vm_load_aborted/index-207","wrap","VM_SERVICE","INDEX_PROBE",1,"value","state -> transaction . process . slot",[],0,1]],
-            [["work"],["vm01/servers/vm/vm_load.c/micros_vm_load_aborted/index-222","wrap","VM_SERVICE","INDEX_PROBE",1,"value","0",[],2,3]]
+            [["work"],["vm03/servers/vm/vm_load.c/micros_vm_load_aborted/loop-112","insert","VM_SERVICE","RECORD_VISIT",1,"entry","",[["for ( index = 0 ; index < MICROS_VM_PAGE_TABLE_FRAME_COUNT ; ++ index ) {",0]],0,0]],
+            [["work"],["vm03/servers/vm/vm_load.c/micros_vm_load_aborted/index-128","wrap","VM_SERVICE","INDEX_PROBE",1,"value","index",[["for ( index = 0 ; index < MICROS_VM_PAGE_TABLE_FRAME_COUNT ; ++ index ) {",0]],0,1]],
+            [["work"],["vm03/servers/vm/vm_load.c/micros_vm_load_aborted/index-141","wrap","VM_SERVICE","INDEX_PROBE",1,"value","frame_index",[["for ( index = 0 ; index < MICROS_VM_PAGE_TABLE_FRAME_COUNT ; ++ index ) {",0]],2,3]],
+            [["work"],["vm03/servers/vm/vm_load.c/micros_vm_load_aborted/loop-165","insert","VM_SERVICE","RECORD_VISIT",1,"entry","",[["for ( index = 0 ; index < state -> transaction . page_count ; ++ index ) {",0]],0,0]],
+            [["work"],["vm03/servers/vm/vm_load.c/micros_vm_load_aborted/index-181","wrap","VM_SERVICE","INDEX_PROBE",1,"value","index",[["for ( index = 0 ; index < state -> transaction . page_count ; ++ index ) {",0]],0,1]],
+            [["work"],["vm03/servers/vm/vm_load.c/micros_vm_load_aborted/index-194","wrap","VM_SERVICE","INDEX_PROBE",1,"value","frame_index",[["for ( index = 0 ; index < state -> transaction . page_count ; ++ index ) {",0]],2,3]],
+            [["work"],["vm03/servers/vm/vm_load.c/micros_vm_load_aborted/index-207","wrap","VM_SERVICE","INDEX_PROBE",1,"value","state -> transaction . process . slot",[],0,1]],
+            [["work"],["vm03/servers/vm/vm_load.c/micros_vm_load_aborted/index-222","wrap","VM_SERVICE","INDEX_PROBE",1,"value","0",[],2,3]]
           ],
           "micros_vm_load_bind": [
             [["work"],["vm01/servers/vm/vm_load.c/micros_vm_load_bind/index-78","wrap","VM_SERVICE","INDEX_PROBE",1,"value","process . slot",[],1,8]],
@@ -11349,19 +11365,19 @@
           ],
           "micros_vm_load_freeze_plan": [],
           "micros_vm_load_frozen": [
-            [["work"],["vm01/servers/vm/vm_load.c/micros_vm_load_frozen/index-71","wrap","VM_SERVICE","INDEX_PROBE",1,"value","state -> transaction . process . slot",[],0,1]],
-            [["work"],["vm01/servers/vm/vm_load.c/micros_vm_load_frozen/loop-94","insert","VM_SERVICE","RECORD_VISIT",1,"entry","",[["for ( index = 0 ; index < MICROS_VM_PAGE_TABLE_FRAME_COUNT ; ++ index ) {",0]],0,0]],
-            [["work"],["vm01/servers/vm/vm_load.c/micros_vm_load_frozen/index-110","wrap","VM_SERVICE","INDEX_PROBE",1,"value","index",[["for ( index = 0 ; index < MICROS_VM_PAGE_TABLE_FRAME_COUNT ; ++ index ) {",0]],0,1]],
-            [["work"],["vm01/servers/vm/vm_load.c/micros_vm_load_frozen/index-123","wrap","VM_SERVICE","INDEX_PROBE",1,"value","frame_index",[["for ( index = 0 ; index < MICROS_VM_PAGE_TABLE_FRAME_COUNT ; ++ index ) {",0]],2,3]],
-            [["work"],["vm01/servers/vm/vm_load.c/micros_vm_load_frozen/loop-152","insert","VM_SERVICE","RECORD_VISIT",1,"entry","",[["for ( index = 0 ; index < state -> transaction . page_count ; ++ index ) {",0]],0,0]],
-            [["work"],["vm01/servers/vm/vm_load.c/micros_vm_load_frozen/index-168","wrap","VM_SERVICE","INDEX_PROBE",1,"value","index",[["for ( index = 0 ; index < state -> transaction . page_count ; ++ index ) {",0]],0,1]],
-            [["work"],["vm01/servers/vm/vm_load.c/micros_vm_load_frozen/index-181","wrap","VM_SERVICE","INDEX_PROBE",1,"value","frame_index",[["for ( index = 0 ; index < state -> transaction . page_count ; ++ index ) {",0]],2,3]],
-            [["work"],["vm01/servers/vm/vm_load.c/micros_vm_load_frozen/loop-206","insert","VM_SERVICE","RECORD_VISIT",1,"entry","",[["for ( index = 0 ; index < MICROS_VM_PAGE_TABLE_FRAME_COUNT ; ++ index ) {",1]],0,0]],
-            [["work"],["vm01/servers/vm/vm_load.c/micros_vm_load_frozen/index-222","wrap","VM_SERVICE","INDEX_PROBE",1,"value","index",[["for ( index = 0 ; index < MICROS_VM_PAGE_TABLE_FRAME_COUNT ; ++ index ) {",1]],0,1]],
-            [["work"],["vm01/servers/vm/vm_load.c/micros_vm_load_frozen/index-235","wrap","VM_SERVICE","INDEX_PROBE",1,"value","frame_index",[["for ( index = 0 ; index < MICROS_VM_PAGE_TABLE_FRAME_COUNT ; ++ index ) {",1]],2,3]],
-            [["work"],["vm01/servers/vm/vm_load.c/micros_vm_load_frozen/loop-259","insert","VM_SERVICE","RECORD_VISIT",1,"entry","",[["for ( index = 0 ; index < state -> transaction . page_count ; ++ index ) {",1]],0,0]],
-            [["work"],["vm01/servers/vm/vm_load.c/micros_vm_load_frozen/index-275","wrap","VM_SERVICE","INDEX_PROBE",1,"value","index",[["for ( index = 0 ; index < state -> transaction . page_count ; ++ index ) {",1]],0,1]],
-            [["work"],["vm01/servers/vm/vm_load.c/micros_vm_load_frozen/index-288","wrap","VM_SERVICE","INDEX_PROBE",1,"value","frame_index",[["for ( index = 0 ; index < state -> transaction . page_count ; ++ index ) {",1]],2,3]]
+            [["work"],["vm03/servers/vm/vm_load.c/micros_vm_load_frozen/index-71","wrap","VM_SERVICE","INDEX_PROBE",1,"value","state -> transaction . process . slot",[],0,1]],
+            [["work"],["vm03/servers/vm/vm_load.c/micros_vm_load_frozen/loop-94","insert","VM_SERVICE","RECORD_VISIT",1,"entry","",[["for ( index = 0 ; index < MICROS_VM_PAGE_TABLE_FRAME_COUNT ; ++ index ) {",0]],0,0]],
+            [["work"],["vm03/servers/vm/vm_load.c/micros_vm_load_frozen/index-110","wrap","VM_SERVICE","INDEX_PROBE",1,"value","index",[["for ( index = 0 ; index < MICROS_VM_PAGE_TABLE_FRAME_COUNT ; ++ index ) {",0]],0,1]],
+            [["work"],["vm03/servers/vm/vm_load.c/micros_vm_load_frozen/index-123","wrap","VM_SERVICE","INDEX_PROBE",1,"value","frame_index",[["for ( index = 0 ; index < MICROS_VM_PAGE_TABLE_FRAME_COUNT ; ++ index ) {",0]],2,3]],
+            [["work"],["vm03/servers/vm/vm_load.c/micros_vm_load_frozen/loop-152","insert","VM_SERVICE","RECORD_VISIT",1,"entry","",[["for ( index = 0 ; index < state -> transaction . page_count ; ++ index ) {",0]],0,0]],
+            [["work"],["vm03/servers/vm/vm_load.c/micros_vm_load_frozen/index-168","wrap","VM_SERVICE","INDEX_PROBE",1,"value","index",[["for ( index = 0 ; index < state -> transaction . page_count ; ++ index ) {",0]],0,1]],
+            [["work"],["vm03/servers/vm/vm_load.c/micros_vm_load_frozen/index-181","wrap","VM_SERVICE","INDEX_PROBE",1,"value","frame_index",[["for ( index = 0 ; index < state -> transaction . page_count ; ++ index ) {",0]],2,3]],
+            [["work"],["vm03/servers/vm/vm_load.c/micros_vm_load_frozen/loop-206","insert","VM_SERVICE","RECORD_VISIT",1,"entry","",[["for ( index = 0 ; index < MICROS_VM_PAGE_TABLE_FRAME_COUNT ; ++ index ) {",1]],0,0]],
+            [["work"],["vm03/servers/vm/vm_load.c/micros_vm_load_frozen/index-222","wrap","VM_SERVICE","INDEX_PROBE",1,"value","index",[["for ( index = 0 ; index < MICROS_VM_PAGE_TABLE_FRAME_COUNT ; ++ index ) {",1]],0,1]],
+            [["work"],["vm03/servers/vm/vm_load.c/micros_vm_load_frozen/index-235","wrap","VM_SERVICE","INDEX_PROBE",1,"value","frame_index",[["for ( index = 0 ; index < MICROS_VM_PAGE_TABLE_FRAME_COUNT ; ++ index ) {",1]],2,3]],
+            [["work"],["vm03/servers/vm/vm_load.c/micros_vm_load_frozen/loop-259","insert","VM_SERVICE","RECORD_VISIT",1,"entry","",[["for ( index = 0 ; index < state -> transaction . page_count ; ++ index ) {",1]],0,0]],
+            [["work"],["vm03/servers/vm/vm_load.c/micros_vm_load_frozen/index-275","wrap","VM_SERVICE","INDEX_PROBE",1,"value","index",[["for ( index = 0 ; index < state -> transaction . page_count ; ++ index ) {",1]],0,1]],
+            [["work"],["vm03/servers/vm/vm_load.c/micros_vm_load_frozen/index-288","wrap","VM_SERVICE","INDEX_PROBE",1,"value","frame_index",[["for ( index = 0 ; index < state -> transaction . page_count ; ++ index ) {",1]],2,3]]
           ],
           "micros_vm_load_next_page": [
             [["work"],["vm01/servers/vm/vm_load.c/micros_vm_load_next_page/index-111","wrap","VM_SERVICE","INDEX_PROBE",1,"value","page_index",[],3,10]],
@@ -11483,6 +11499,20 @@
             [["work"],["vm01/servers/vm/vm_validation.c/mapping_keys_are_unique/index-109","wrap","VM_SERVICE","INDEX_PROBE",1,"value","index",[["for ( unsigned domain = 0 ; domain < 2 ; ++ domain ) {",0],["for ( size_t slot = 0 ; slot < MICROS_VM_MAPPING_RECORD_CAPACITY ; ++ slot ) {",0],["if ( domain == 0 ) {",0],["for ( size_t index = 0 ; index < record -> entry_count ; ++ index ) {",0]],0,1]]
           ],
           "micros_vm_state_validate": [],
+          "retained_image_page_is_valid": [
+            [["work"],["vm03/servers/vm/vm_validation.c/retained_image_page_is_valid/index-23","wrap","VM_SERVICE","INDEX_PROBE",1,"value","page_index",[],0,2]],
+            [["work"],["vm03/servers/vm/vm_validation.c/retained_image_page_is_valid/loop-63","insert","VM_SERVICE","RECORD_VISIT",1,"entry","",[["for ( size_t index = 0 ; index < MICROS_APPLICATION_ELF_SEGMENT_COUNT ; ++ index ) {",0]],0,0]],
+            [["work"],["vm03/servers/vm/vm_validation.c/retained_image_page_is_valid/index-74","wrap","VM_SERVICE","INDEX_PROBE",1,"value","index",[["for ( size_t index = 0 ; index < MICROS_APPLICATION_ELF_SEGMENT_COUNT ; ++ index ) {",0]],0,1]]
+          ],
+          "retained_load_set_is_valid": [
+            [["work"],["vm03/servers/vm/vm_validation.c/retained_load_set_is_valid/loop-33","insert","VM_SERVICE","RECORD_VISIT",1,"entry","",[["for ( size_t index = 0 ; index < state -> transaction . elf_plan . page_count ; ++ index ) {",0]],0,0]],
+            [["work"],["vm03/servers/vm/vm_validation.c/retained_load_set_is_valid/index-88","wrap","VM_SERVICE","INDEX_PROBE",1,"value","state -> transaction . process . slot",[],1,2]]
+          ],
+          "retained_segments_are_valid": [
+            [["work"],["vm03/servers/vm/vm_validation.c/retained_segments_are_valid/loop-61","insert","VM_SERVICE","RECORD_VISIT",1,"entry","",[["for ( size_t index = 0 ; index < MICROS_APPLICATION_ELF_SEGMENT_COUNT ; ++ index ) {",0]],0,0]],
+            [["work"],["vm03/servers/vm/vm_validation.c/retained_segments_are_valid/index-72","wrap","VM_SERVICE","INDEX_PROBE",1,"value","index",[["for ( size_t index = 0 ; index < MICROS_APPLICATION_ELF_SEGMENT_COUNT ; ++ index ) {",0]],0,3]]
+          ],
+          "retained_stack_is_valid": [],
           "selected_geometry_is_valid": [
             [["work"],["vm01/servers/vm/vm_validation.c/selected_geometry_is_valid/loop-136","insert","VM_SERVICE","RECORD_VISIT",1,"entry","",[["for ( size_t index = 0 ; index < header -> managed_range_count ; ++ index ) {",0]],0,0]],
             [["work"],["vm01/servers/vm/vm_validation.c/selected_geometry_is_valid/index-149","wrap","VM_SERVICE","INDEX_PROBE",1,"value","index",[["for ( size_t index = 0 ; index < header -> managed_range_count ; ++ index ) {",0]],0,2]]
@@ -11492,6 +11522,12 @@
             [["work"],["vm01/servers/vm/vm_validation.c/selected_input_frames_are_free/index-40","wrap","VM_SERVICE","INDEX_PROBE",1,"value","index",[["for ( size_t index = 0 ; index < MICROS_VM_PAGE_TABLE_FRAME_COUNT + transaction -> page_count ; ++ index ) {",0]],1,3]],
             [["work"],["vm01/servers/vm/vm_validation.c/selected_input_frames_are_free/index-47","wrap","VM_SERVICE","INDEX_PROBE",1,"value","index - MICROS_VM_PAGE_TABLE_FRAME_COUNT",[["for ( size_t index = 0 ; index < MICROS_VM_PAGE_TABLE_FRAME_COUNT + transaction -> page_count ; ++ index ) {",0]],0,1]],
             [["work"],["vm01/servers/vm/vm_validation.c/selected_input_frames_are_free/index-82","wrap","VM_SERVICE","INDEX_PROBE",1,"value","frame_index",[["for ( size_t index = 0 ; index < MICROS_VM_PAGE_TABLE_FRAME_COUNT + transaction -> page_count ; ++ index ) {",0]],3,4]]
+          ],
+          "selected_load_page_is_valid": [
+            [["work"],["vm03/servers/vm/vm_validation.c/selected_load_page_is_valid/index-21","wrap","VM_SERVICE","INDEX_PROBE",1,"value","transaction -> process . slot",[],0,1]],
+            [["work"],["vm03/servers/vm/vm_validation.c/selected_load_page_is_valid/index-46","wrap","VM_SERVICE","INDEX_PROBE",1,"value","entry_index",[],1,3]],
+            [["work"],["vm03/servers/vm/vm_validation.c/selected_load_page_is_valid/index-95","wrap","VM_SERVICE","INDEX_PROBE",1,"value","index",[["if ( index < transaction -> elf_plan . page_count ) {",0]],1,2]],
+            [["work"],["vm03/servers/vm/vm_validation.c/selected_load_page_is_valid/index-110","wrap","VM_SERVICE","INDEX_PROBE",1,"value","index",[],2,3]]
           ],
           "validate_data_entry": [
             [["work"],["vm01/servers/vm/vm_validation.c/validate_data_entry/index-10","wrap","VM_SERVICE","INDEX_PROBE",1,"value","entry_index",[],0,2]],
@@ -11551,21 +11587,26 @@
             [["work"],["vm01/servers/vm/vm_validation.c/vm_core_selected_record_is_valid/index-201","wrap","VM_SERVICE","INDEX_PROBE",1,"value","0",[],1,2]]
           ],
           "vm_core_transaction_buffers_are_canonical": [],
-          "vm_core_transaction_common_is_canonical": [
-            [["work"],["vm01/servers/vm/vm_validation.c/vm_core_transaction_common_is_canonical/loop-194","insert","VM_SERVICE","RECORD_VISIT",1,"entry","",[["for ( index = 1 ; index < MICROS_VM_PAGE_TABLE_FRAME_COUNT ; ++ index ) {",0]],0,0]],
-            [["work"],["vm01/servers/vm/vm_validation.c/vm_core_transaction_common_is_canonical/index-200","wrap","VM_SERVICE","INDEX_PROBE",1,"value","index - 1",[["for ( index = 1 ; index < MICROS_VM_PAGE_TABLE_FRAME_COUNT ; ++ index ) {",0]],0,1]],
-            [["work"],["vm01/servers/vm/vm_validation.c/vm_core_transaction_common_is_canonical/index-209","wrap","VM_SERVICE","INDEX_PROBE",1,"value","index",[["for ( index = 1 ; index < MICROS_VM_PAGE_TABLE_FRAME_COUNT ; ++ index ) {",0]],1,2]],
-            [["work"],["vm01/servers/vm/vm_validation.c/vm_core_transaction_common_is_canonical/index-224","wrap","VM_SERVICE","INDEX_PROBE",1,"value","MICROS_VM_PAGE_TABLE_FRAME_COUNT - 1",[],0,1]],
-            [["work"],["vm01/servers/vm/vm_validation.c/vm_core_transaction_common_is_canonical/index-233","wrap","VM_SERVICE","INDEX_PROBE",1,"value","0",[],6,7]],
-            [["work"],["vm01/servers/vm/vm_validation.c/vm_core_transaction_common_is_canonical/loop-257","insert","VM_SERVICE","RECORD_VISIT",1,"entry","",[["for ( index = 1 ; index < transaction -> page_count ; ++ index ) {",0]],0,0]],
-            [["work"],["vm01/servers/vm/vm_validation.c/vm_core_transaction_common_is_canonical/index-263","wrap","VM_SERVICE","INDEX_PROBE",1,"value","index - 1",[["for ( index = 1 ; index < transaction -> page_count ; ++ index ) {",0]],0,1]],
-            [["work"],["vm01/servers/vm/vm_validation.c/vm_core_transaction_common_is_canonical/index-272","wrap","VM_SERVICE","INDEX_PROBE",1,"value","index",[["for ( index = 1 ; index < transaction -> page_count ; ++ index ) {",0]],1,2]],
-            [["work"],["vm01/servers/vm/vm_validation.c/vm_core_transaction_common_is_canonical/loop-297","insert","VM_SERVICE","RECORD_VISIT",1,"entry","",[["for ( index = transaction -> page_count ; index < MICROS_APPLICATION_RESIDENT_PAGE_MAX ; ++ index ) {",0]],0,0]],
-            [["work"],["vm01/servers/vm/vm_validation.c/vm_core_transaction_common_is_canonical/index-303","wrap","VM_SERVICE","INDEX_PROBE",1,"value","index",[["for ( index = transaction -> page_count ; index < MICROS_APPLICATION_RESIDENT_PAGE_MAX ; ++ index ) {",0]],0,1]]
+          "vm_core_transaction_common_is_canonical": [],
+          "vm_core_transaction_frames_are_ordered": [
+            [["work"],["vm03/servers/vm/vm_validation.c/vm_core_transaction_frames_are_ordered/loop-27","insert","VM_SERVICE","RECORD_VISIT",1,"entry","",[["for ( index = 1 ; index < MICROS_VM_PAGE_TABLE_FRAME_COUNT ; ++ index ) {",0]],0,0]],
+            [["work"],["vm03/servers/vm/vm_validation.c/vm_core_transaction_frames_are_ordered/index-33","wrap","VM_SERVICE","INDEX_PROBE",1,"value","index - 1",[["for ( index = 1 ; index < MICROS_VM_PAGE_TABLE_FRAME_COUNT ; ++ index ) {",0]],0,1]],
+            [["work"],["vm03/servers/vm/vm_validation.c/vm_core_transaction_frames_are_ordered/index-42","wrap","VM_SERVICE","INDEX_PROBE",1,"value","index",[["for ( index = 1 ; index < MICROS_VM_PAGE_TABLE_FRAME_COUNT ; ++ index ) {",0]],1,2]],
+            [["work"],["vm03/servers/vm/vm_validation.c/vm_core_transaction_frames_are_ordered/index-57","wrap","VM_SERVICE","INDEX_PROBE",1,"value","MICROS_VM_PAGE_TABLE_FRAME_COUNT - 1",[],0,1]],
+            [["work"],["vm03/servers/vm/vm_validation.c/vm_core_transaction_frames_are_ordered/index-66","wrap","VM_SERVICE","INDEX_PROBE",1,"value","0",[],0,1]],
+            [["work"],["vm03/servers/vm/vm_validation.c/vm_core_transaction_frames_are_ordered/loop-90","insert","VM_SERVICE","RECORD_VISIT",1,"entry","",[["for ( index = 1 ; index < transaction -> page_count ; ++ index ) {",0]],0,0]],
+            [["work"],["vm03/servers/vm/vm_validation.c/vm_core_transaction_frames_are_ordered/index-96","wrap","VM_SERVICE","INDEX_PROBE",1,"value","index - 1",[["for ( index = 1 ; index < transaction -> page_count ; ++ index ) {",0]],0,1]],
+            [["work"],["vm03/servers/vm/vm_validation.c/vm_core_transaction_frames_are_ordered/index-105","wrap","VM_SERVICE","INDEX_PROBE",1,"value","index",[["for ( index = 1 ; index < transaction -> page_count ; ++ index ) {",0]],1,2]],
+            [["work"],["vm03/servers/vm/vm_validation.c/vm_core_transaction_frames_are_ordered/loop-130","insert","VM_SERVICE","RECORD_VISIT",1,"entry","",[["for ( index = transaction -> page_count ; index < MICROS_APPLICATION_RESIDENT_PAGE_MAX ; ++ index ) {",0]],0,0]],
+            [["work"],["vm03/servers/vm/vm_validation.c/vm_core_transaction_frames_are_ordered/index-136","wrap","VM_SERVICE","INDEX_PROBE",1,"value","index",[["for ( index = transaction -> page_count ; index < MICROS_APPLICATION_RESIDENT_PAGE_MAX ; ++ index ) {",0]],0,1]]
           ],
+          "vm_core_transaction_header_is_canonical": [],
           "vm_core_transaction_plans_are_canonical": [],
+          "vm_core_validate_selected_load_plan": [],
           "vm_core_validate_selected_state": [
-            [["work"],["vm01/servers/vm/vm_validation.c/vm_core_validate_selected_state/index-250","wrap","VM_SERVICE","INDEX_PROBE",1,"value","transaction -> process . slot",[],0,2]]
+            [["work"],["vm03/servers/vm/vm_validation.c/vm_core_validate_selected_state/index-265","wrap","VM_SERVICE","INDEX_PROBE",1,"value","transaction -> process . slot",[],0,3]],
+            [["work"],["vm03/servers/vm/vm_validation.c/vm_core_validate_selected_state/index-471","wrap","VM_SERVICE","INDEX_PROBE",1,"value","index - 1",[["if ( transaction -> completed_page_count < transaction -> page_count ) {",0]],1,2]],
+            [["work"],["vm03/servers/vm/vm_validation.c/vm_core_validate_selected_state/index-480","wrap","VM_SERVICE","INDEX_PROBE",1,"value","index",[["if ( transaction -> completed_page_count < transaction -> page_count ) {",0]],5,6]]
           ],
           "vm_core_validate_state": [],
           "vm_validation_digest_active_frame_states": [
@@ -25419,6 +25460,20 @@
           "signature": "static bool frozen_transaction_is_valid ( const struct micros_vm_handoff_state * state , size_t loading_slot , size_t frozen_slot )",
           "storage": []
         },
+        "loading_record_has_valid_selected_prefix": {
+          "accesses": [
+            ["entries [ index ]",[]]
+          ],
+          "aliases": [
+            ["entries",["["]]
+          ],
+          "calls": ["micros_vm_handoff_mapping_entry_is_valid","permission_group"],
+          "directives": [],
+          "guards": [],
+          "loops": [],
+          "signature": "static bool loading_record_has_valid_selected_prefix ( const struct micros_vm_kernel_mapping_record * record )",
+          "storage": []
+        },
         "loading_transaction_is_valid": {
           "accesses": [
             ["mappings [ loading_slot ]",[]],
@@ -25597,7 +25652,6 @@
         },
         "micros_vm_handoff_loading_record_can_append": {
           "accesses": [
-            ["entries [ index ]",[["for ( index = 0 ; index < record -> entry_count ; ++ index ) {",0]]],
             ["entries [ record -> entry_count - 1 ]",[]],
             ["entries [ record -> entry_count - 1 ]",[["if ( entry -> virtual_address == MICROS_APPLICATION_STACK_BASE ) {",0]]],
             ["entries [ record -> entry_count - 1 ]",[]]
@@ -25605,15 +25659,12 @@
           "aliases": [
             ["entries",["["]],
             ["entries",["["]],
-            ["entries",["["]],
             ["entries",["["]]
           ],
-          "calls": ["micros_vm_handoff_mapping_entry_is_valid","permission_group","record_entries_have_loading_layout","record_frames_are_unique"],
+          "calls": ["loading_record_has_valid_selected_prefix","micros_vm_handoff_mapping_entry_is_valid","permission_group"],
           "directives": [],
           "guards": [],
-          "loops": [
-            ["for ( index = 0 ; index < record -> entry_count ; ++ index ) {",[]]
-          ],
+          "loops": [],
           "signature": "bool micros_vm_handoff_loading_record_can_append ( const struct micros_vm_kernel_mapping_record * record , const struct micros_vm_kernel_mapping_entry * entry )",
           "storage": []
         },
@@ -25793,6 +25844,20 @@
           "signature": "bool micros_vm_handoff_user_permissions_are_valid ( uint32_t permissions )",
           "storage": []
         },
+        "micros_vm_handoff_validate_load_plan": {
+          "accesses": [
+            ["mappings [ state -> load . process . slot ]",[]]
+          ],
+          "aliases": [
+            ["mappings",["["]]
+          ],
+          "calls": ["micros_vm_handoff_record_contains_physical_address","micros_vm_handoff_selected_record_is_valid","micros_vm_handoff_validate_selected"],
+          "directives": [],
+          "guards": [],
+          "loops": [],
+          "signature": "enum micros_vm_handoff_error micros_vm_handoff_validate_load_plan ( const struct micros_vm_handoff_state * state )",
+          "storage": []
+        },
         "micros_vm_handoff_validate_selected": {
           "accesses": [
             ["mappings [ state -> load . process . slot ]",[]]
@@ -25800,7 +25865,7 @@
           "aliases": [
             ["mappings",["["]]
           ],
-          "calls": ["MICROS_VM01_WORK_HIT","active_load_identity_is_valid","micros_vm_handoff_bytes_are_zero","micros_vm_handoff_identity_is_valid","micros_vm_handoff_loading_record_can_append","micros_vm_handoff_pointer_is_aligned","micros_vm_handoff_process_handles_equal","micros_vm_handoff_selected_record_is_valid"],
+          "calls": ["MICROS_VM01_WORK_HIT","active_load_identity_is_valid","loading_record_has_valid_selected_prefix","micros_vm_handoff_bytes_are_zero","micros_vm_handoff_identity_is_valid","micros_vm_handoff_loading_record_can_append","micros_vm_handoff_pointer_is_aligned","micros_vm_handoff_process_handles_equal","micros_vm_handoff_record_header_is_valid","micros_vm_handoff_selected_record_is_valid"],
           "directives": [],
           "guards": [],
           "loops": [],
@@ -26031,7 +26096,7 @@
             ["entries",[","]],
             ["entries",[")"]]
           ],
-          "calls": ["freeze_frames_are_unique","freeze_request_fields_are_valid","micros_frame_ownership_validate_metadata","micros_vm_handoff_clear_bytes","micros_vm_handoff_copy_bytes","micros_vm_handoff_frame_membership_prevalidated","micros_vm_handoff_next_nonzero_token","micros_vm_handoff_pointer_is_aligned","micros_vm_handoff_record_entries_are_frozen_shape","micros_vm_handoff_validate_selected","micros_vm_load_page_plan_digest"],
+          "calls": ["freeze_frames_are_unique","freeze_request_fields_are_valid","micros_frame_ownership_validate_metadata","micros_vm_handoff_clear_bytes","micros_vm_handoff_copy_bytes","micros_vm_handoff_frame_membership_prevalidated","micros_vm_handoff_next_nonzero_token","micros_vm_handoff_pointer_is_aligned","micros_vm_handoff_record_entries_are_frozen_shape","micros_vm_handoff_validate_load_plan","micros_vm_load_page_plan_digest"],
           "directives": [],
           "guards": [],
           "loops": [
@@ -26149,7 +26214,7 @@
             ["entries",[","]],
             ["entries",[")"]]
           ],
-          "calls": ["micros_vm_handoff_clear_bytes","micros_vm_handoff_copy_bytes","micros_vm_handoff_pointer_is_aligned","micros_vm_handoff_validate_selected"],
+          "calls": ["micros_vm_handoff_clear_bytes","micros_vm_handoff_copy_bytes","micros_vm_handoff_pointer_is_aligned","micros_vm_handoff_validate_load_plan"],
           "directives": [],
           "guards": [],
           "loops": [],
@@ -26367,7 +26432,7 @@
         "micros_spawn_request_decode": {
           "accesses": [],
           "aliases": [],
-          "calls": ["spawn_request_decode_descriptors","spawn_request_decode_header","spawn_request_decode_strings"],
+          "calls": ["MICROS_VM01_WORK_HIT","spawn_request_decode_descriptors","spawn_request_decode_header","spawn_request_decode_strings"],
           "directives": [],
           "guards": [],
           "loops": [],
@@ -27432,7 +27497,7 @@
             ["segments [ 0 ]",[]]
           ],
           "aliases": [],
-          "calls": ["build_page_plan","decode_segment","elf_header_is_valid"],
+          "calls": ["MICROS_VM01_WORK_HIT","build_page_plan","decode_segment","elf_header_is_valid"],
           "directives": [],
           "guards": [],
           "loops": [
@@ -27849,7 +27914,7 @@
             ["mapping_records [ 0 ]",[]]
           ],
           "aliases": [],
-          "calls": ["vm_core_clear_transaction","vm_core_physical_to_frame_index","vm_core_validate_selected_state","vm_core_zero_bytes"],
+          "calls": ["vm_core_clear_transaction","vm_core_physical_to_frame_index","vm_core_validate_selected_load_plan","vm_core_zero_bytes"],
           "directives": [],
           "guards": [],
           "loops": [
@@ -27906,7 +27971,7 @@
         "micros_vm_load_freeze_plan": {
           "accesses": [],
           "aliases": [],
-          "calls": ["vm_core_copy_bytes","vm_core_load_page_digest","vm_core_validate_selected_state","vm_core_zero_bytes"],
+          "calls": ["vm_core_copy_bytes","vm_core_load_page_digest","vm_core_validate_selected_load_plan","vm_core_zero_bytes"],
           "directives": [],
           "guards": [],
           "loops": [],
@@ -27926,7 +27991,7 @@
             ["frame_states [ frame_index ]",[["for ( index = 0 ; index < state -> transaction . page_count ; ++ index ) {",1]]]
           ],
           "aliases": [],
-          "calls": ["vm_core_physical_to_frame_index","vm_core_validate_selected_state"],
+          "calls": ["vm_core_physical_to_frame_index","vm_core_validate_selected_load_plan"],
           "directives": [],
           "guards": [],
           "loops": [
@@ -28500,6 +28565,59 @@
           "signature": "enum micros_vm_core_error micros_vm_state_validate ( const struct micros_vm_state * state )",
           "storage": []
         },
+        "retained_image_page_is_valid": {
+          "accesses": [
+            ["pages [ page_index ]",[]],
+            ["segments [ index ]",[["for ( size_t index = 0 ; index < MICROS_APPLICATION_ELF_SEGMENT_COUNT ; ++ index ) {",0]]]
+          ],
+          "aliases": [],
+          "calls": [],
+          "directives": [],
+          "guards": [],
+          "loops": [
+            ["for ( size_t index = 0 ; index < MICROS_APPLICATION_ELF_SEGMENT_COUNT ; ++ index ) {",[]]
+          ],
+          "signature": "static bool retained_image_page_is_valid ( const struct micros_vm_state * state , size_t page_index )",
+          "storage": []
+        },
+        "retained_load_set_is_valid": {
+          "accesses": [
+            ["mapping_records [ state -> transaction . process . slot ]",[]]
+          ],
+          "aliases": [],
+          "calls": ["retained_image_page_is_valid","selected_input_frames_are_free","vm_core_record_matches_transaction","vm_core_selected_record_is_valid","vm_core_transaction_frames_are_ordered"],
+          "directives": [],
+          "guards": [],
+          "loops": [
+            ["for ( size_t index = 0 ; index < state -> transaction . elf_plan . page_count ; ++ index ) {",[]]
+          ],
+          "signature": "static bool retained_load_set_is_valid ( const struct micros_vm_state * state )",
+          "storage": []
+        },
+        "retained_segments_are_valid": {
+          "accesses": [
+            ["segments [ index ]",[["for ( size_t index = 0 ; index < MICROS_APPLICATION_ELF_SEGMENT_COUNT ; ++ index ) {",0]]]
+          ],
+          "aliases": [],
+          "calls": [],
+          "directives": [],
+          "guards": [],
+          "loops": [
+            ["for ( size_t index = 0 ; index < MICROS_APPLICATION_ELF_SEGMENT_COUNT ; ++ index ) {",[]]
+          ],
+          "signature": "static bool retained_segments_are_valid ( const struct micros_vm_state * state )",
+          "storage": []
+        },
+        "retained_stack_is_valid": {
+          "accesses": [],
+          "aliases": [],
+          "calls": [],
+          "directives": [],
+          "guards": [],
+          "loops": [],
+          "signature": "static bool retained_stack_is_valid ( const struct micros_application_stack_plan * plan )",
+          "storage": []
+        },
         "selected_geometry_is_valid": {
           "accesses": [
             ["managed_ranges [ index ]",[["for ( size_t index = 0 ; index < header -> managed_range_count ; ++ index ) {",0]]]
@@ -28530,6 +28648,23 @@
             ["for ( size_t index = 0 ; index < MICROS_VM_PAGE_TABLE_FRAME_COUNT + transaction -> page_count ; ++ index ) {",[]]
           ],
           "signature": "static bool selected_input_frames_are_free ( const struct micros_vm_state * state )",
+          "storage": []
+        },
+        "selected_load_page_is_valid": {
+          "accesses": [
+            ["mapping_records [ transaction -> process . slot ]",[]],
+            ["entries [ entry_index ]",[]],
+            ["pages [ index ]",[["if ( index < transaction -> elf_plan . page_count ) {",0]]],
+            ["data_frames [ index ]",[]]
+          ],
+          "aliases": [
+            ["entries",["["]]
+          ],
+          "calls": ["retained_image_page_is_valid","validate_data_entry","vm_core_bytes_are_zero","vm_core_initial_frame_is_free","vm_core_physical_to_frame_index"],
+          "directives": [],
+          "guards": [],
+          "loops": [],
+          "signature": "static bool selected_load_page_is_valid ( const struct micros_vm_state * state , size_t index )",
           "storage": []
         },
         "validate_data_entry": {
@@ -28765,6 +28900,16 @@
           "storage": []
         },
         "vm_core_transaction_common_is_canonical": {
+          "accesses": [],
+          "aliases": [],
+          "calls": ["vm_core_transaction_frames_are_ordered","vm_core_transaction_header_is_canonical","vm_core_transaction_plans_are_canonical"],
+          "directives": [],
+          "guards": [],
+          "loops": [],
+          "signature": "static bool vm_core_transaction_common_is_canonical ( const struct micros_vm_state * state )",
+          "storage": []
+        },
+        "vm_core_transaction_frames_are_ordered": {
           "accesses": [
             ["table_frames [ index - 1 ]",[["for ( index = 1 ; index < MICROS_VM_PAGE_TABLE_FRAME_COUNT ; ++ index ) {",0]]],
             ["table_frames [ index ]",[["for ( index = 1 ; index < MICROS_VM_PAGE_TABLE_FRAME_COUNT ; ++ index ) {",0]]],
@@ -28775,7 +28920,7 @@
             ["data_frames [ index ]",[["for ( index = transaction -> page_count ; index < MICROS_APPLICATION_RESIDENT_PAGE_MAX ; ++ index ) {",0]]]
           ],
           "aliases": [],
-          "calls": ["vm_core_endpoint_is_canonical","vm_core_transaction_plans_are_canonical"],
+          "calls": [],
           "directives": [],
           "guards": [],
           "loops": [
@@ -28783,7 +28928,17 @@
             ["for ( index = 1 ; index < transaction -> page_count ; ++ index ) {",[]],
             ["for ( index = transaction -> page_count ; index < MICROS_APPLICATION_RESIDENT_PAGE_MAX ; ++ index ) {",[]]
           ],
-          "signature": "static bool vm_core_transaction_common_is_canonical ( const struct micros_vm_state * state )",
+          "signature": "static bool vm_core_transaction_frames_are_ordered ( const struct micros_vm_state * state )",
+          "storage": []
+        },
+        "vm_core_transaction_header_is_canonical": {
+          "accesses": [],
+          "aliases": [],
+          "calls": ["vm_core_endpoint_is_canonical"],
+          "directives": [],
+          "guards": [],
+          "loops": [],
+          "signature": "static bool vm_core_transaction_header_is_canonical ( const struct micros_vm_state * state )",
           "storage": []
         },
         "vm_core_transaction_plans_are_canonical": {
@@ -28796,12 +28951,24 @@
           "signature": "static bool vm_core_transaction_plans_are_canonical ( const struct micros_vm_state * state )",
           "storage": []
         },
+        "vm_core_validate_selected_load_plan": {
+          "accesses": [],
+          "aliases": [],
+          "calls": ["retained_load_set_is_valid","vm_core_validate_selected_state"],
+          "directives": [],
+          "guards": [],
+          "loops": [],
+          "signature": "enum micros_vm_core_error vm_core_validate_selected_load_plan ( const struct micros_vm_state * state )",
+          "storage": []
+        },
         "vm_core_validate_selected_state": {
           "accesses": [
-            ["mapping_records [ transaction -> process . slot ]",[]]
+            ["mapping_records [ transaction -> process . slot ]",[]],
+            ["data_frames [ index - 1 ]",[["if ( transaction -> completed_page_count < transaction -> page_count ) {",0]]],
+            ["data_frames [ index ]",[["if ( transaction -> completed_page_count < transaction -> page_count ) {",0]]]
           ],
           "aliases": [],
-          "calls": ["MICROS_VM01_WORK_HIT","selected_geometry_is_valid","selected_input_frames_are_free","vm_core_bytes_are_zero","vm_core_process_is_canonical","vm_core_ranges_overlap","vm_core_record_matches_transaction","vm_core_selected_record_is_valid","vm_core_transaction_common_is_canonical"],
+          "calls": ["MICROS_VM01_WORK_HIT","retained_load_set_is_valid","retained_segments_are_valid","retained_stack_is_valid","selected_geometry_is_valid","selected_load_page_is_valid","vm_core_bytes_are_zero","vm_core_process_is_canonical","vm_core_ranges_overlap","vm_core_record_header_is_valid","vm_core_transaction_header_is_canonical"],
           "directives": [],
           "guards": [],
           "loops": [],

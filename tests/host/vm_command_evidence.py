@@ -39,6 +39,8 @@ SITES = (
     ("kernel/boot/bootstrap_runtime_validation.c", "micros_bootstrap_runtime_validate", "bootstrap-runtime", "KERNEL_BOOT", "COMPLETE_VALIDATOR_CALL"),
     ("kernel/pm/pm_control_runtime.c", "micros_pm_control_runtime_validate", "pm-runtime", "KERNEL_PM", "COMPLETE_VALIDATOR_CALL"),
     ("servers/vm/vm_validation.c", "vm_core_validate_selected_state", "service-selected", "VM_SERVICE", "INDEX_PROBE"),
+    ("servers/vm/vm_elf.c", "micros_vm_elf_plan", "elf-plan", "VM_SERVICE", "RANGE_VISIT"),
+    ("lib/spawn/spawn_request.c", "micros_spawn_request_decode", "request-decode", "LIB_SPAWN", "INDEX_PROBE"),
     ("kernel/vm/vm_handoff_core.c", "micros_vm_handoff_validate_selected", "kernel-selected", "KERNEL_VM", "INDEX_PROBE"),
     ("kernel/vm/vm_handoff_runtime.c", "micros_vm_handoff_runtime_validate_command", "command-selected", "KERNEL_VM", "INDEX_PROBE"),
     ("kernel/pm/pm_control_runtime.c", "micros_pm_control_runtime_validate_vm_command", "pm-selected", "KERNEL_PM", "INDEX_PROBE"),
@@ -147,6 +149,14 @@ def target_failures(measured):
     enumerations = totals.per_owner[Owner.KERNEL_MEMORY][Kind.RECORD_VISIT]
     if enumerations:
         failures.append(("KERNEL_MEMORY", "root-enumeration", enumerations, 0))
+    loads = captures[1]["commands"][0]
+    for owner, kind, label, expected in (
+        (Owner.VM_SERVICE, Kind.RANGE_VISIT, "elf-plans", loads),
+        (Owner.LIB_SPAWN, Kind.INDEX_PROBE, "request-decodes", 3 * loads),
+    ):
+        actual = captures[1]["counts"][owner][kind]
+        if actual != expected:
+            failures.append((owner.name, label, actual, expected))
     return tuple(failures)
 
 
@@ -285,7 +295,8 @@ def validate_target_products(root):
             "tests/work/work_counts.c", *UNSCOPED_SOURCES, *KEY_SOURCES,
         ),
         "bootstrap/micros-vm-server.elf": (
-            "servers/vm/vm_validation.c", "tests/qemu/vm_server_control.c",
+            "servers/vm/vm_validation.c", "servers/vm/vm_elf.c", "lib/spawn/spawn_request.c",
+            "tests/qemu/vm_server_control.c",
             "tests/qemu/selected_vm_work.c",
             "tests/qemu/vm_server_fixture.c", "tests/work/work_counts.c", "lib/runtime/memory.c",
             *KEY_SOURCES,
@@ -297,6 +308,8 @@ def validate_target_products(root):
             *(name for paths in subjects.values() for name in paths), "CMakeLists.txt",
             "tests/qemu/vm_validation_work.h", "tests/qemu/vm_command_work.h",
             "tests/qemu/vm_server_internal.h", "tests/work/work_counts.h", "include/micros/work_observation.h",
+            "include/micros/spawn.h", "lib/spawn/spawn_request.h",
+            "servers/vm/vm_image.h", "servers/vm/vm_image_internal.h",
         }
     }
     artifacts, maps, results = {}, {}, {}

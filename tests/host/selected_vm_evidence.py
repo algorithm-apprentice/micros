@@ -92,7 +92,32 @@ CASES = (
     ("kernel-owner-collision", 3, 1, 1, 0), ("kernel-owner-bit", 7, 1, 1, 0),
     ("kernel-owner-link", 7, 1, 1, 0), ("kernel-owner-generation", 7, 1, 1, 0),
     ("kernel-table-collision", 1, 1, 1, 0),
+    ("service-large-next", 0, 3, 1, 0), ("service-large-map", 0, 3, 0, 0),
+    ("service-large-fill", 0, 3, 0, 0), ("service-large-commit", 0, 3, 0, 0),
+    ("service-long-next", 0, 3, 1, 0), ("service-long-map", 0, 3, 0, 0),
+    ("service-long-fill", 0, 3, 0, 0), ("service-long-commit", 0, 3, 0, 0),
+    ("kernel-short-map", 0, 1, 0, 0), ("kernel-short-commit", 0, 1, 0, 0),
+    ("kernel-long-map", 0, 1, 0, 0), ("kernel-long-commit", 0, 1, 0, 0),
+    ("service-unvisited-page-plan", 0, 3, 1, 0), ("service-unvisited-old-page", 0, 3, 1, 0),
+    ("service-unvisited-plan-tail", 0, 3, 1, 0), ("service-unvisited-elf-header", 0, 3, 1, 0),
+    ("service-unvisited-request-header", 0, 3, 1, 0), ("service-selected-segment", 8, 3, 1, 0),
+    ("service-selected-file-slice", 8, 3, 1, 0), ("service-selected-page-role", 8, 3, 1, 0),
+    ("service-selected-frame-state", 8, 3, 1, 0),
+    ("kernel-unvisited-prefix", 0, 1, 1, 0), ("kernel-prefix-cleanup", 7, 1, 1, 0),
+    ("kernel-selected-predecessor", 7, 1, 1, 0),
+    ("service-stack-min", 0, 3, 0, 0), ("service-stack-max", 0, 3, 0, 0),
 )
+IMAGE_PAGE_GROUPS = (
+    ("service-next-page", "service-large-next", "service-long-next"),
+    ("service-map", "service-large-map", "service-long-map"),
+    ("service-fill", "service-large-fill", "service-long-fill"),
+    ("service-page-commit", "service-large-commit", "service-long-commit"),
+    ("kernel-short-map", "kernel-long-map"),
+    ("kernel-short-commit", "kernel-long-commit"),
+)
+IMAGE_PAGE_RANGES = {
+    name: 1 for group in IMAGE_PAGE_GROUPS for name in group
+} | {"service-max-frames": 1, "service-max-ranges-pages": 96}
 BOOT_MAPPING_EXTENTS = {
     "boot-mapping-sparse": 257, "boot-mapping-max": 4096, "boot-mapping-duplicate": 4096,
 }
@@ -102,7 +127,11 @@ GLOBAL_RECORD_EXTENTS = {
     "service-global-records": 1260, "service-global-duplicate": 1260,
 }
 MEMBERSHIP_EXTENTS = {"service-membership-max": 1260}
-CASE_EXTENTS = {**BOOT_MAPPING_EXTENTS, **GEOMETRY_EXTENTS, **GLOBAL_RECORD_EXTENTS, **MEMBERSHIP_EXTENTS}
+STACK_EXTENTS = {"service-stack-min": (273, 1, 1), "service-stack-max": (2073, 8, 8)}
+CASE_EXTENTS = {
+    **BOOT_MAPPING_EXTENTS, **GEOMETRY_EXTENTS, **GLOBAL_RECORD_EXTENTS, **MEMBERSHIP_EXTENTS,
+    **{name: shape[0] for name, shape in STACK_EXTENTS.items()},
+}
 POINT_CASES = frozenset((
     "service-next-page", "service-map", "service-page-commit", "service-freeze-plan",
     "service-stale-token", "kernel-page-commit", "kernel-prepare", "kernel-unprepare",
@@ -213,6 +242,26 @@ def work_failures(records, work):
             for kind in (Kind.RECORD_VISIT, Kind.INDEX_PROBE):
                 if totals.per_kind[kind] > bound:
                     failures.append((row["name"], kind.name.lower(), totals.per_kind[kind], bound))
+        if row["name"] in IMAGE_PAGE_RANGES:
+            ranges = IMAGE_PAGE_RANGES[row["name"]]
+            bound = 1024 + 256 * ranges if row["name"].startswith("kernel-") else 256 + 32 * ranges
+            for kind in (Kind.COMPARISON, Kind.RECORD_VISIT, Kind.INDEX_PROBE):
+                if totals.per_kind[kind] > bound:
+                    failures.append((row["name"], kind.name.lower(), totals.per_kind[kind], bound))
+        if row["name"] in STACK_EXTENTS:
+            size, argc, envc = STACK_EXTENTS[row["name"]]
+            bound = 256 + 32 + 16 * size + 64 * (argc + envc) + 512
+            for kind in (Kind.COMPARISON, Kind.RECORD_VISIT, Kind.INDEX_PROBE):
+                if totals.per_kind[kind] > bound:
+                    failures.append((row["name"], kind.name.lower(), totals.per_kind[kind], bound))
+    by_name = {row["name"]: work_totals(capture) for row, capture in zip(records, work, strict=True)}
+    for group in IMAGE_PAGE_GROUPS:
+        baseline = by_name[group[0]]
+        for name in group[1:]:
+            for kind in (Kind.COMPARISON, Kind.RECORD_VISIT, Kind.INDEX_PROBE):
+                actual, expected = by_name[name].per_kind[kind], baseline.per_kind[kind]
+                if actual != expected:
+                    failures.append((name, "selected-" + kind.name.lower(), actual, expected))
     return tuple(failures)
 
 
