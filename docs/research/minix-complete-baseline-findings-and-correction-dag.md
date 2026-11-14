@@ -75,8 +75,9 @@ Its [selected-validation study](minix-selected-vm-validation.md) and
 ordinary service/kernel checks and their consumed PM/memory dependencies.
 BOOT03 preserved the original models and actual composed/stack evidence,
 with clean independent review before its implementation commit and merge.
-VM01 is design-only with clean independent review; its implementation remains
-pending the separate design merge. B07-F001 remains open.
+VM01's independently reviewed design is merged as #271; its separate
+implementation is active. B07-F001 remains open until implementation
+acceptance and merge.
 
 Validation simplification #248 follows separate design #247 / ADR-0123.
 It changes no runtime finding, node or edge. Current contracts replace the

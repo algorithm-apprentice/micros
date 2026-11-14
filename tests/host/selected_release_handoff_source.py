@@ -149,6 +149,8 @@ def _call_rows(path, text, callees):
 AUDIT_CALLEES = (
     "micros_user_address_space_validate", "micros_user_address_space_validate_locked",
     "micros_user_address_space_validate_all_process_roots_locked",
+    "micros_user_address_space_validate_vm_plan_roots_locked",
+    "micros_user_address_space_validate_vm_constructed_root", "validate_vm_plan_root_locked",
 )
 CURRENT_AUDIT_BOUNDARIES = (
     ("kernel/boot/bootstrap_preparation.c", "validate_prepared_services", "micros_user_address_space_validate", 1),
@@ -160,12 +162,13 @@ CURRENT_AUDIT_BOUNDARIES = (
     ("kernel/memory/user_address_space_tty.c", "micros_user_address_space_validate_tty_uart_mapping", "micros_user_address_space_validate_locked", 1),
     ("kernel/memory/user_address_space_validation.c", "micros_user_address_space_validate", "micros_user_address_space_validate_locked", 1),
     ("kernel/memory/user_address_space_validation.c", "micros_user_address_space_validate_all_process_roots_locked", "micros_user_address_space_validate_locked", 1),
-    ("kernel/memory/user_address_space_vm_freeze.c", "micros_user_address_space_install_vm_freeze_prevalidated", "micros_user_address_space_validate", 1),
-    ("kernel/memory/user_address_space_vm_freeze.c", "validate_vm_freeze_address_spaces", "micros_user_address_space_validate_all_process_roots_locked", 1),
-    ("kernel/memory/user_address_space_vm_scratch.c", "micros_user_address_space_prepare_vm_scratch_mapping", "micros_user_address_space_validate_all_process_roots_locked", 1),
-    ("kernel/memory/user_address_space_vm_scratch.c", "micros_user_address_space_prepare_vm_scratch_removal", "micros_user_address_space_validate_all_process_roots_locked", 1),
-    ("kernel/memory/user_address_space_vm_teardown.c", "micros_user_address_space_prepare_vm_teardown", "micros_user_address_space_validate_all_process_roots_locked", 1),
-    ("kernel/vm/vm_handoff_syscall.c", "require_post_handoff_runtime", "micros_user_address_space_validate", 1),
+    ("kernel/memory/user_address_space_validation.c", "micros_user_address_space_validate_vm_constructed_root", "validate_vm_plan_root_locked", 1),
+    ("kernel/memory/user_address_space_validation.c", "micros_user_address_space_validate_vm_plan_roots_locked", "validate_vm_plan_root_locked", 1),
+    ("kernel/memory/user_address_space_vm_freeze.c", "micros_user_address_space_install_vm_freeze_prevalidated", "micros_user_address_space_validate_vm_constructed_root", 1),
+    ("kernel/memory/user_address_space_vm_freeze.c", "validate_vm_freeze_address_spaces", "micros_user_address_space_validate_vm_plan_roots_locked", 1),
+    ("kernel/memory/user_address_space_vm_scratch.c", "micros_user_address_space_prepare_vm_scratch_mapping", "micros_user_address_space_validate_vm_plan_roots_locked", 1),
+    ("kernel/memory/user_address_space_vm_scratch.c", "micros_user_address_space_prepare_vm_scratch_removal", "micros_user_address_space_validate_vm_plan_roots_locked", 1),
+    ("kernel/memory/user_address_space_vm_teardown.c", "micros_user_address_space_prepare_vm_teardown", "micros_user_address_space_validate_vm_plan_roots_locked", 1),
     ("kernel/vm/vm_handoff_syscall_boot.c", "require_tty_mapping_runtime", "micros_user_address_space_validate", 1),
 )
 CURRENT_PLAN_BOUNDARIES = (

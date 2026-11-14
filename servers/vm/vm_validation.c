@@ -1,4 +1,6 @@
 #include "servers/vm/vm_internal.h"
+#include "lib/vm/vm_boot_internal.h"
+#include "tests/qemu/vm_validation_work.h"
 
 #include "micros/endpoint.h"
 #include "micros/sv39.h"
@@ -312,7 +314,6 @@ static bool vm_core_transaction_common_is_canonical(
             transaction->scratch_page == 0
             && transaction->scratch_filled != 0
         )
-        || !vm_core_transaction_buffers_are_canonical(state)
         || !vm_core_transaction_plans_are_canonical(state)
     ) {
         return false;
@@ -510,8 +511,7 @@ static bool validate_table_entry(
     const struct micros_vm_state *state,
     const struct micros_vm_mapping_record *record,
     size_t entry_index,
-    uint64_t frame_index,
-    struct vm_validation_counts *counts
+    uint64_t frame_index
 )
 {
     static const uint8_t roles[MICROS_VM_PAGE_TABLE_FRAME_COUNT] = {
@@ -536,9 +536,6 @@ static bool validate_table_entry(
     ) {
         return false;
     }
-    if (record->phase != MICROS_VM_MAPPING_RECORD_LOADING) {
-        ++counts->record_process_table;
-    }
     return true;
 }
 
@@ -546,8 +543,7 @@ static bool validate_data_entry(
     const struct micros_vm_state *state,
     const struct micros_vm_mapping_record *record,
     size_t entry_index,
-    uint64_t frame_index,
-    struct vm_validation_counts *counts
+    uint64_t frame_index
 )
 {
     const struct micros_vm_mapping_entry *entry =
@@ -580,8 +576,6 @@ static bool validate_data_entry(
                 || state->transaction.scratch_page == data_index + 1
                 ? MICROS_VM_LOCAL_FRAME_TRANSFERABLE
                 : MICROS_VM_LOCAL_FRAME_FREE;
-    } else {
-        ++counts->record_process_wired;
     }
     return state->boot_info->frame_states[frame_index] == expected_state;
 }
@@ -645,10 +639,17 @@ static bool validate_record_entries(
             return false;
         }
         role_is_valid = entry_index < MICROS_VM_PAGE_TABLE_FRAME_COUNT
-            ? validate_table_entry(state, record, entry_index, frame_index, counts)
-            : validate_data_entry(state, record, entry_index, frame_index, counts);
+            ? validate_table_entry(state, record, entry_index, frame_index)
+            : validate_data_entry(state, record, entry_index, frame_index);
         if (!role_is_valid || !record_entry_is_unique(state, slot, entry_index)) {
             return false;
+        }
+        if (record->phase != MICROS_VM_MAPPING_RECORD_LOADING) {
+            if (entry_index < MICROS_VM_PAGE_TABLE_FRAME_COUNT) {
+                ++counts->record_process_table;
+            } else {
+                ++counts->record_process_wired;
+            }
         }
     }
     return vm_core_bytes_are_zero(
@@ -703,25 +704,8 @@ static bool validate_mapping_records(
             continue;
         }
         if (
-            record->load_token == 0
-            || record->semantic_pid == 0
-            || record->process_slot != slot
-            || record->process_generation == 0
-            || record->process_generation > MICROS_PROCESS_GENERATION_MAX
-            || record->entry_count
-                < MICROS_VM_PAGE_TABLE_FRAME_COUNT
-                    + MICROS_APPLICATION_IMAGE_PAGE_MIN + 1
-            || record->entry_count > MICROS_VM_MAPPING_ENTRY_CAPACITY
-            || record->phase < MICROS_VM_MAPPING_RECORD_LOADING
-            || record->phase > MICROS_VM_MAPPING_RECORD_EXIT_RELEASING
-            || (
-                record->phase == MICROS_VM_MAPPING_RECORD_LOADING
-                && record->mapping_generation != 0
-            )
-            || (
-                record->phase != MICROS_VM_MAPPING_RECORD_LOADING
-                && record->mapping_generation == 0
-            )
+            !vm_core_record_header_is_valid(state, slot)
+            || record->phase == MICROS_VM_MAPPING_RECORD_UNUSED
             || !validate_record_entries(state, slot, counts)
             || !record_identity_is_unique(state, slot)
         ) {
@@ -896,6 +880,8 @@ enum micros_vm_core_error vm_core_validate_state(
     bool allow_staged_idle_inputs
 )
 {
+    MICROS_VM01_WORK_HIT("vm01-service-state", MICROS_WORK_OWNER_VM_SERVICE,
+                        MICROS_WORK_KIND_COMPLETE_VALIDATOR_CALL, 1);
     struct vm_validation_counts counts = {
         .loading_slot = MICROS_VM_MAPPING_RECORD_CAPACITY,
         .frozen_slot = MICROS_VM_MAPPING_RECORD_CAPACITY,
@@ -924,7 +910,10 @@ enum micros_vm_core_error vm_core_validate_state(
             || state->phase == MICROS_VM_LOADER_LOADING
             || state->phase == MICROS_VM_LOADER_FROZEN
         )
-        && !vm_core_transaction_common_is_canonical(state)
+        && (
+            !vm_core_transaction_buffers_are_canonical(state)
+            || !vm_core_transaction_common_is_canonical(state)
+        )
     ) {
         return MICROS_VM_CORE_ERROR_INVARIANT;
     }
@@ -943,4 +932,139 @@ enum micros_vm_core_error micros_vm_state_validate(
 )
 {
     return vm_core_validate_state(state, false);
+}
+
+static bool selected_geometry_is_valid(const struct micros_vm_state *state)
+{
+    const struct micros_vm_boot_header *header = &state->boot_info->header;
+    uint64_t total = 0;
+    uint64_t previous_end = 0;
+
+    if (!vm_boot_header_is_valid(state->boot_info)
+        || !vm_core_boot_header_matches_summary(state)
+        || header->free_frame_count > header->managed_frame_count
+        || header->kernel_frame_count > header->managed_frame_count
+        || header->vm_self_wired_frame_count == 0
+        || header->vm_self_wired_frame_count > header->managed_frame_count
+        || header->service_wired_frame_count > header->managed_frame_count
+        || header->transferable_frame_count != 0
+        || header->free_frame_count + header->kernel_frame_count
+            + header->vm_self_wired_frame_count + header->service_wired_frame_count
+            != header->managed_frame_count
+        || header->mapping_count != header->vm_self_wired_frame_count + header->service_wired_frame_count) {
+        return false;
+    }
+    for (size_t index = 0; index < header->managed_range_count; ++index) {
+        const struct micros_vm_managed_range *range = &state->boot_info->managed_ranges[index];
+
+        if (range->base % MICROS_FRAME_SIZE != 0 || range->frame_count == 0
+            || range->frame_count > (UINT64_MAX - range->base) / MICROS_FRAME_SIZE
+            || range->frame_index != total
+            || range->frame_count > header->managed_frame_count - total
+            || (index != 0 && range->base < previous_end)) {
+            return false;
+        }
+        total += range->frame_count;
+        previous_end = range->base + range->frame_count * MICROS_FRAME_SIZE;
+    }
+    return total == header->managed_frame_count;
+}
+
+bool vm_core_selected_record_is_valid(const struct micros_vm_state *state, size_t slot)
+{
+    const struct micros_vm_mapping_record *record;
+
+    if (!vm_core_record_header_is_valid(state, slot)) {
+        return false;
+    }
+    record = &state->mapping_records[slot];
+    if (record->phase == MICROS_VM_MAPPING_RECORD_UNUSED) {
+        return vm_core_record_is_zero(record);
+    }
+    for (size_t index = 0; index < record->entry_count; ++index) {
+        const struct micros_vm_mapping_entry *entry = &record->entries[index];
+        uint64_t frame_index;
+
+        if (!vm_core_physical_to_frame_index(state, entry->physical_address, &frame_index)
+            || !vm_core_initial_frame_is_free(state, frame_index)
+            || !vm_core_bytes_are_zero(entry->reserved, sizeof(entry->reserved))
+            || (index != 0 && record->entries[index - 1].physical_address >= entry->physical_address)
+            || !(index < MICROS_VM_PAGE_TABLE_FRAME_COUNT
+                 ? validate_table_entry(state, record, index, frame_index)
+                 : validate_data_entry(state, record, index, frame_index))) {
+            return false;
+        }
+    }
+    return vm_core_bytes_are_zero(
+        &record->entries[record->entry_count],
+        (MICROS_VM_MAPPING_ENTRY_CAPACITY - record->entry_count) * sizeof(record->entries[0])
+    );
+}
+
+static bool selected_input_frames_are_free(const struct micros_vm_state *state)
+{
+    const struct micros_vm_service_load_transaction *transaction = &state->transaction;
+
+    for (size_t index = 0; index < MICROS_VM_PAGE_TABLE_FRAME_COUNT + transaction->page_count; ++index) {
+        uint64_t physical = index < MICROS_VM_PAGE_TABLE_FRAME_COUNT
+            ? transaction->table_frames[index]
+            : transaction->data_frames[index - MICROS_VM_PAGE_TABLE_FRAME_COUNT];
+        uint64_t frame_index;
+
+        if (!vm_core_physical_to_frame_index(state, physical, &frame_index)
+            || !vm_core_initial_frame_is_free(state, frame_index)
+            || state->boot_info->frame_states[frame_index] != MICROS_VM_LOCAL_FRAME_FREE) {
+            return false;
+        }
+    }
+    return true;
+}
+
+enum micros_vm_core_error vm_core_validate_selected_state(const struct micros_vm_state *state)
+{
+    MICROS_VM01_WORK_HIT("vm01-service-selected", MICROS_WORK_OWNER_VM_SERVICE,
+                        MICROS_WORK_KIND_INDEX_PROBE, 1);
+    const struct micros_vm_service_load_transaction *transaction;
+    const struct micros_vm_mapping_record *record;
+
+    if (state == NULL) {
+        return MICROS_VM_CORE_ERROR_ARGUMENT;
+    }
+    if (state->initialization_magic != MICROS_VM_INITIALIZATION_MAGIC || state->reserved != 0
+        || state->boot_info == NULL
+        || (uintptr_t)state->boot_info % MICROS_VM_BOOT_INFO_ALIGNMENT != 0
+        || vm_core_ranges_overlap(state, sizeof(*state), state->boot_info, sizeof(*state->boot_info))
+        || state->phase < MICROS_VM_LOADER_IDLE || state->phase > MICROS_VM_LOADER_EXIT_RELEASING
+        || !selected_geometry_is_valid(state)) {
+        return MICROS_VM_CORE_ERROR_INVARIANT;
+    }
+    transaction = &state->transaction;
+    if (state->phase == MICROS_VM_LOADER_IDLE || state->phase == MICROS_VM_LOADER_EXIT_RELEASING) {
+        return vm_core_bytes_are_zero(transaction, sizeof(*transaction))
+            ? MICROS_VM_CORE_OK : MICROS_VM_CORE_ERROR_INVARIANT;
+    }
+    if (!vm_core_transaction_common_is_canonical(state)) {
+        return MICROS_VM_CORE_ERROR_INVARIANT;
+    }
+    if (state->phase == MICROS_VM_LOADER_INPUT_COPIED) {
+        return transaction->load_token == 0 && transaction->mapping_generation == 0
+            && transaction->process.slot == 0 && transaction->process.generation == 0
+            && transaction->completed_page_count == 0 && transaction->scratch_page == 0
+            && selected_input_frames_are_free(state)
+            ? MICROS_VM_CORE_OK : MICROS_VM_CORE_ERROR_INVARIANT;
+    }
+    if (!vm_core_process_is_canonical(transaction->process) || transaction->load_token == 0) {
+        return MICROS_VM_CORE_ERROR_INVARIANT;
+    }
+    record = &state->mapping_records[transaction->process.slot];
+    if (!vm_core_selected_record_is_valid(state, transaction->process.slot)
+        || !vm_core_record_matches_transaction(state, record)
+        || (state->phase == MICROS_VM_LOADER_LOADING
+            && (transaction->mapping_generation != 0 || record->phase != MICROS_VM_MAPPING_RECORD_LOADING))
+        || (state->phase == MICROS_VM_LOADER_FROZEN
+            && (transaction->mapping_generation == 0 || record->phase != MICROS_VM_MAPPING_RECORD_FROZEN
+                || transaction->completed_page_count != transaction->page_count || transaction->scratch_page != 0))) {
+        return MICROS_VM_CORE_ERROR_INVARIANT;
+    }
+    return MICROS_VM_CORE_OK;
 }

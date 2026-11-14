@@ -36,6 +36,16 @@ static bool elf_spawn_read_vm_boot_info(struct micros_vm_boot_info *info)
     );
 }
 
+#if defined(MICROS_TEST_VM_COMMAND_COUNTS)
+bool elf_spawn_test_read_vm_work(struct micros_vm01_work_capture *capture)
+{
+    return elf_spawn_read_object(
+        MICROS_ELF_SPAWN_OBJECT_VM_CONTEXT, offsetof(struct vm_server_context, work),
+        capture, sizeof(*capture)
+    );
+}
+#endif
+
 bool elf_spawn_test_capture_services(struct micros_elf_spawn_service_resources *snapshot)
 {
     return (

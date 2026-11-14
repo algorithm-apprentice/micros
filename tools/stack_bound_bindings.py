@@ -32,13 +32,42 @@ def anchored_function(root, key, source_unit=None):
         raise StackEvidenceError(f"diagnostic callback constructor: {error}") from error
     actual = function_records(source).get(key.symbol)
     expected = function_records(reference_source(str(root), unit)).get(key.symbol)
+    body = () if actual is None else tokens(actual.body)
+    if unit == "servers/vm/vm_service_load.c" and key.symbol == "vm_service_load":
+        guard = tokens("""
+            if (!vm_core_record_headers_are_valid(state)) {
+                return MICROS_VM_SERVICE_ERROR_INVARIANT;
+            }
+        """)
+        copy = tokens("error = service_copy_inputs(service, backend, backend_context, request);")
+        positions = tuple(index for index in range(len(body) - len(guard + copy) + 1)
+                          if body[index:index + len(guard + copy)] == guard + copy)
+        if len(positions) != 1 or body.count("vm_core_record_headers_are_valid") != 1:
+            raise StackEvidenceError("VM callback admission lost its exact before-copy scope")
+        index, = positions
+        body = body[:index] + body[index + len(guard):]
     if (
         actual is None or expected is None
         or tokens(actual.signature) != tokens(expected.signature)
-        or actual.guards != expected.guards or tokens(actual.body) != tokens(expected.body)
+        or actual.guards != expected.guards or body != tokens(expected.body)
     ):
         raise StackEvidenceError("callback source-stage function anchor changed")
     return actual
+
+
+def require_vm_callback_admission(obj, symbol):
+    from tools.stack_bound_flow import function_flow, reachable_instructions
+    from tools.stack_bound_types import EdgeKind
+
+    flow = function_flow(obj, symbol)
+    guards = tuple(call for call in flow.calls if call.target_symbol == "vm_core_record_headers_are_valid")
+    copies = tuple(call for call in flow.calls if call.target_symbol == "service_copy_inputs")
+    if len(guards) != 1 or len(copies) != 1 or guards[0].kind is not EdgeKind.CALL:
+        raise StackEvidenceError("VM callback admission lacks its exact actual calls")
+    continuation = flow.continuations.get(guards[0].offset)
+    if (continuation is None or copies[0].offset not in reachable_instructions(flow)
+        or copies[0].offset in reachable_instructions(flow, excluded=continuation)):
+        raise StackEvidenceError("VM callback copy bypasses selected admission")
 
 
 def parameter_names(signature):
@@ -241,6 +270,8 @@ def bind_current_callbacks(root, directory, catalog):
                     raise StackEvidenceError("callback machine-indirect occurrence inventory is incomplete")
                 machine[key] = obj, symbol, calls
             obj, symbol, calls = machine[key]
+            if key.translation_unit == origin == "servers/vm/vm_service_load.c" and key.symbol == "vm_service_load":
+                require_vm_callback_admission(obj, symbol)
             if key.translation_unit == origin == "servers/vm/vm_load.c" and key.symbol == "vm_load_prepare_transaction":
                 from tools.stack_bound_vm_lifetime import require_vm_prepare_lifetime
 

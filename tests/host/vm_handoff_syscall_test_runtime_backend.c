@@ -138,6 +138,16 @@ micros_pm_control_runtime_state(void)
     return &fixture->pm_state;
 }
 
+enum micros_vm_handoff_error micros_vm_handoff_runtime_validate_command(
+    const struct micros_bootstrap_control_state *state,
+    const struct micros_endpoint_registry *endpoint_registry,
+    const struct micros_kernel_objects *kernel_objects
+)
+{
+    /* Retain this legacy dispatch seam; VM01 authority evidence uses the real owners and guest. */
+    return micros_vm_handoff_runtime_validate(state, endpoint_registry, kernel_objects);
+}
+
 enum micros_pm_control_error micros_pm_control_state_validate(
     const struct micros_pm_control_state *state
 )
@@ -193,6 +203,15 @@ micros_ipc_runtime_authoritative_registry(void)
     (void)fixture;
 
     return &fixture->registry;
+}
+
+enum micros_pm_control_error micros_pm_control_runtime_validate_vm_command(
+    const struct micros_bootstrap_control_state *state,
+    const struct micros_endpoint_registry *endpoint_registry,
+    const struct micros_kernel_objects *kernel_objects
+)
+{
+    return micros_pm_control_runtime_validate(state, endpoint_registry, kernel_objects);
 }
 
 const struct micros_frame_ownership *

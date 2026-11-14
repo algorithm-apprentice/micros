@@ -48,6 +48,7 @@ NATIVE_HEADERS = IPC_HEADERS + (
     "kernel/tty/tty_handoff_runtime.h", "kernel/tty/tty_handoff_runtime_internal.h",
     "kernel/vm/vm_snapshot.h",
     "lib/runtime/memory.h",
+    "tests/qemu/vm_validation_work.h", "tests/work/work_counts.h",
 )
 OBSERVED_HEADERS = ("kernel/boot/bootstrap_control_internal.h",)
 TARGETS = ("indexed_bootstrap_ordinary", "indexed_bootstrap_test")

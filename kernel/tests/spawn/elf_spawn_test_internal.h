@@ -5,6 +5,7 @@
 #include "kernel/tests/spawn/elf_spawn_test.h"
 #include "kernel/tests/spawn/elf_spawn_test_fixture.h"
 #include "tests/qemu/elf_spawn_resources.h"
+#include "tests/qemu/vm_validation_work.h"
 
 enum elf_spawn_test_phase {
     ELF_SPAWN_TEST_BASELINE = 0,
@@ -32,6 +33,9 @@ bool elf_spawn_test_current_process(struct micros_process_handle *process, micro
 bool elf_spawn_test_runtime_valid(void);
 bool elf_spawn_test_capture_kernel(struct micros_elf_spawn_kernel_resources *snapshot);
 bool elf_spawn_test_capture_services(struct micros_elf_spawn_service_resources *snapshot);
+#if defined(MICROS_TEST_VM_COMMAND_COUNTS)
+bool elf_spawn_test_read_vm_work(struct micros_vm01_work_capture *capture);
+#endif
 bool elf_spawn_test_services_idle(const struct micros_elf_spawn_service_resources *snapshot,
                                    micros_endpoint_t init_endpoint);
 bool elf_spawn_test_child_descriptors(const struct micros_elf_spawn_service_resources *snapshot,

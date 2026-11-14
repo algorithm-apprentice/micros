@@ -12,6 +12,15 @@
 bool micros_vm_handoff_identity_is_valid(
     const struct micros_vm_handoff_state *state
 );
+enum micros_vm_handoff_error micros_vm_handoff_validate_selected(
+    const struct micros_vm_handoff_state *state
+);
+bool micros_vm_handoff_record_header_is_valid(
+    const struct micros_vm_handoff_state *state, size_t slot
+);
+bool micros_vm_handoff_selected_record_is_valid(
+    const struct micros_vm_handoff_state *state, size_t slot
+);
 
 bool micros_vm_handoff_bytes_are_zero(
     const void *storage,

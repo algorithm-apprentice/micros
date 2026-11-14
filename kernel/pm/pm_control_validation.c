@@ -220,6 +220,7 @@ static enum micros_pm_control_error validate_stopped_objects(
 )
 {
     const struct micros_thread *thread;
+    const struct micros_hart *hart;
 
     if (
         process->live_thread_count != 1
@@ -246,6 +247,7 @@ static enum micros_pm_control_error validate_stopped_objects(
                 | MICROS_THREAD_RTS_IPC_REPLY
             )
         || !thread->scheduler_assigned
+        || micros_hart_resolve(objects, thread->scheduler_hart, &hart) != MICROS_KERNEL_OBJECT_OK
         || !thread->scheduler_preemptible
         || thread->scheduler_priority
             != MICROS_APPLICATION_SCHEDULER_PRIORITY
@@ -298,6 +300,7 @@ static enum micros_pm_control_error validate_prepared_objects(
 )
 {
     const struct micros_thread *thread;
+    const struct micros_hart *hart;
 
     if (
         process->live_thread_count != 1
@@ -320,6 +323,7 @@ static enum micros_pm_control_error validate_prepared_objects(
         || !thread->context_attached
         || thread->runtime_flags != MICROS_THREAD_RTS_INACTIVE
         || !thread->scheduler_assigned
+        || micros_hart_resolve(objects, state->prepared.hart, &hart) != MICROS_KERNEL_OBJECT_OK
         || !thread->scheduler_preemptible
         || thread->scheduler_priority
             != MICROS_APPLICATION_SCHEDULER_PRIORITY
@@ -342,7 +346,7 @@ static enum micros_pm_control_error validate_prepared_objects(
     return MICROS_PM_CONTROL_OK;
 }
 
-enum micros_pm_control_error micros_pm_control_state_validate_objects(
+enum micros_pm_control_error micros_pm_control_validate_vm_objects(
     const struct micros_pm_control_state *state,
     const struct micros_kernel_objects *objects
 )
@@ -362,8 +366,6 @@ enum micros_pm_control_error micros_pm_control_state_validate_objects(
     if (
         micros_pm_control_state_validate(state)
             != MICROS_PM_CONTROL_OK
-        || micros_kernel_objects_validate(objects)
-            != MICROS_KERNEL_OBJECT_OK
     ) {
         return MICROS_PM_CONTROL_ERROR_INVARIANT;
     }
@@ -406,6 +408,22 @@ enum micros_pm_control_error micros_pm_control_state_validate_objects(
     return validate_prepared_objects(state, process, objects);
 }
 
+enum micros_pm_control_error micros_pm_control_state_validate_objects(
+    const struct micros_pm_control_state *state,
+    const struct micros_kernel_objects *objects
+)
+{
+    if (state == NULL || objects == NULL
+        || !micros_pm_control_pointer_is_aligned(objects, _Alignof(struct micros_kernel_objects))) {
+        return MICROS_PM_CONTROL_ERROR_ARGUMENT;
+    }
+    if (micros_pm_control_state_validate(state) != MICROS_PM_CONTROL_OK
+        || micros_kernel_objects_validate(objects) != MICROS_KERNEL_OBJECT_OK) {
+        return MICROS_PM_CONTROL_ERROR_INVARIANT;
+    }
+    return micros_pm_control_validate_vm_objects(state, objects);
+}
+
 bool micros_pm_control_application_profile_is_exact(
     const struct micros_endpoint_registry *registry
 )
@@ -434,15 +452,11 @@ bool micros_pm_control_application_profile_is_exact(
     );
 }
 
-enum micros_pm_control_error micros_pm_control_validate_prepared_shape(
+bool micros_pm_control_vm_prepared_binding_is_valid(
     const struct micros_pm_control_state *state,
     const struct micros_kernel_objects *objects,
     const struct micros_endpoint_registry *registry,
-    const struct micros_vm_handoff_state *vm,
-    uint64_t reservation_token,
-    uint64_t load_token,
-    uint64_t mapping_generation,
-    uint64_t prepared_token
+    const struct micros_vm_handoff_state *vm
 )
 {
     const struct micros_vm_kernel_mapping_record *record;
@@ -450,31 +464,9 @@ enum micros_pm_control_error micros_pm_control_validate_prepared_shape(
     const struct micros_thread *thread;
 
     if (
-        micros_pm_control_state_validate_objects(state, objects)
-            != MICROS_PM_CONTROL_OK
-        || micros_endpoint_registry_validate_objects(registry, objects)
-            != MICROS_ENDPOINT_OK
-        || micros_vm_handoff_state_validate(vm)
-            != MICROS_VM_HANDOFF_OK
-        || micros_scheduler_core_validate(objects)
-            != MICROS_KERNEL_OBJECT_OK
-        || !micros_pm_control_application_profile_is_exact(registry)
-    ) {
-        return MICROS_PM_CONTROL_ERROR_INVARIANT;
-    }
-    if (
-        prepared_token == 0
-        || state->prepared.token != prepared_token
-        || state->prepared.reservation_token != reservation_token
-        || state->prepared.load_token != load_token
-        || state->prepared.mapping_generation != mapping_generation
-    ) {
-        return MICROS_PM_CONTROL_ERROR_STATE;
-    }
-    if (
         vm->load.phase != MICROS_VM_LOAD_PHASE_FROZEN
-        || vm->load.process_reservation_token != reservation_token
-        || vm->load.load_token != load_token
+        || vm->load.process_reservation_token != state->prepared.reservation_token
+        || vm->load.load_token != state->prepared.load_token
         || !micros_pm_control_process_handles_equal(
             vm->load.process,
             state->prepared.process
@@ -491,13 +483,13 @@ enum micros_pm_control_error micros_pm_control_validate_prepared_shape(
             state->prepared.process
         )
     ) {
-        return MICROS_PM_CONTROL_ERROR_INVARIANT;
+        return false;
     }
     record = &vm->mappings[state->prepared.process.slot];
     return (
         record->phase == MICROS_VM_KERNEL_MAPPING_PREPARED
-        && record->mapping_generation == mapping_generation
-        && record->load_token == load_token
+        && record->mapping_generation == state->prepared.mapping_generation
+        && record->load_token == state->prepared.load_token
         && micros_pm_control_process_handles_equal(
             record->process,
             state->prepared.process
@@ -512,6 +504,33 @@ enum micros_pm_control_error micros_pm_control_validate_prepared_shape(
             record,
             state->prepared.initial_sstatus
         )
-    ) ? MICROS_PM_CONTROL_OK
-      : MICROS_PM_CONTROL_ERROR_INVARIANT;
+    );
+}
+
+enum micros_pm_control_error micros_pm_control_validate_prepared_shape(
+    const struct micros_pm_control_state *state,
+    const struct micros_kernel_objects *objects,
+    const struct micros_endpoint_registry *registry,
+    const struct micros_vm_handoff_state *vm,
+    uint64_t reservation_token,
+    uint64_t load_token,
+    uint64_t mapping_generation,
+    uint64_t prepared_token
+)
+{
+    if (micros_pm_control_state_validate_objects(state, objects) != MICROS_PM_CONTROL_OK
+        || micros_endpoint_registry_validate_objects(registry, objects) != MICROS_ENDPOINT_OK
+        || micros_vm_handoff_state_validate(vm) != MICROS_VM_HANDOFF_OK
+        || micros_scheduler_core_validate(objects) != MICROS_KERNEL_OBJECT_OK
+        || !micros_pm_control_application_profile_is_exact(registry)) {
+        return MICROS_PM_CONTROL_ERROR_INVARIANT;
+    }
+    if (prepared_token == 0 || state->prepared.token != prepared_token
+        || state->prepared.reservation_token != reservation_token
+        || state->prepared.load_token != load_token
+        || state->prepared.mapping_generation != mapping_generation) {
+        return MICROS_PM_CONTROL_ERROR_STATE;
+    }
+    return micros_pm_control_vm_prepared_binding_is_valid(state, objects, registry, vm)
+        ? MICROS_PM_CONTROL_OK : MICROS_PM_CONTROL_ERROR_INVARIANT;
 }

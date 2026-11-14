@@ -86,6 +86,15 @@ def run_observed_scope(root, directory):
             terminal_prefix = checked_terminal_prefix(result.output, result.return_code, bootstrap_scope)
         except ValueError as error:
             raise StackEvidenceError(str(error)) from error
+    elif configure == "riscv64-elf-spawn-test":
+        from tests.host.vm_command_evidence import checked_terminal_prefix
+
+        if arguments.require_current_evidence != "selected-vm":
+            raise StackEvidenceError("ELF-spawn observation omitted its owned VM evidence scope")
+        try:
+            terminal_prefix = checked_terminal_prefix(result.output, result.return_code)
+        except ValueError as error:
+            raise StackEvidenceError(str(error)) from error
     legacy = replace(result, output=legacy_transcript(terminal_prefix))
     if not _matches_observed_run(
         arguments, legacy, outcome, SmokeOutcome.PASS, None, None,

@@ -175,21 +175,16 @@ static void require_post_handoff_runtime(
 {
     authorities->pm = micros_pm_control_runtime_state();
     if (
-        micros_bootstrap_runtime_validate()
-            != MICROS_BOOTSTRAP_OK
-        || micros_vm_handoff_runtime_validate(
+        micros_vm_handoff_runtime_validate_command(
             authorities->bootstrap,
             authorities->registry,
             context->objects
         ) != MICROS_VM_HANDOFF_OK
-        || micros_pm_control_runtime_validate(
+        || micros_pm_control_runtime_validate_vm_command(
             authorities->bootstrap,
             authorities->registry,
             context->objects
         ) != MICROS_PM_CONTROL_OK
-        || micros_user_address_space_validate(
-            authorities->state->process
-        ) != MICROS_USER_ADDRESS_SPACE_OK
     ) {
         micros_vm_handoff_syscall_fail(
             hart,

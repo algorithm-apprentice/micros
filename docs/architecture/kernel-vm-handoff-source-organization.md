@@ -8,9 +8,9 @@ repository source-module audit.
 
 The [Accepted VM01 contract](selected-vm-validation.md) defines a later selected
 dynamic-validation boundary while retaining these owners, full diagnostics
-and commit/ABI contracts. It requires its own separate design merge before
-implementation; the historical source-only preservation below is not an
-authorization to change current runtime cadence.
+and commit/ABI contracts. Its separate design is merged as #271; that
+contract, not the historical source-only preservation below, authorizes
+the selected runtime cadence.
 
 Implementation must not begin until
 [ADR-0055](../adr/0055-kernel-vm-handoff-source-decomposition.md) is Accepted

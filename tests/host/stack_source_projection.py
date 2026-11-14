@@ -161,6 +161,10 @@ def source_hooks(unit, source):
             if "MICROS_BOOT02_REPORT" in lexical(source[begin:end]):
                 # Authenticate users before the terminal command report seizes UART.
                 primitive = "    if (!MICROS_BOOT02_REPORT()) {"
+        elif unit == "kernel/tests/spawn/elf_spawn_test_report.c":
+            begin, end = function_range(source, function)
+            if "MICROS_VM01_REPORT" in lexical(source[begin:end]):
+                primitive = "            if (!MICROS_VM01_REPORT()) {"
         yield function, primitive, hook, placement
 
 

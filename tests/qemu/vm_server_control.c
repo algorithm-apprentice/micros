@@ -36,6 +36,13 @@ bool vm_server_serve_control(
 )
 {
     struct micros_ipc_message reply;
+#if defined(MICROS_TEST_VM_COMMAND_COUNTS)
+    uint32_t command = (uint32_t)(vm_server_read_u64_le(request->payload) >> 32);
+
+    if (!micros_vm01_service_begin(command)) {
+        return false;
+    }
+#endif
 
     if (
         context->control_mode != VM_SERVER_CONTROL_READY
@@ -45,5 +52,11 @@ bool vm_server_serve_control(
     ) {
         return false;
     }
+#if defined(MICROS_TEST_VM_COMMAND_COUNTS)
+    if (vm_server_read_u64_le(&reply.payload[8]) != MICROS_VM_CONTROL_RESULT_OK
+        || !micros_vm01_service_finish(command)) {
+        return false;
+    }
+#endif
     return micros_runtime_reply(request->reply_token, &reply) == MICROS_SYSCALL_ABI_OK;
 }

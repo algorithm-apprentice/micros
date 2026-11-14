@@ -1,4 +1,5 @@
 #include "servers/vm/vm_service_internal.h"
+#include "servers/vm/vm_admission.h"
 
 static enum micros_vm_service_error service_copy_inputs(
     struct micros_vm_service *service, const struct micros_vm_service_backend *backend,
@@ -182,6 +183,9 @@ enum micros_vm_service_error vm_service_load(
     ) {
         *result = MICROS_VM_CONTROL_RESULT_TOO_BIG;
         return MICROS_VM_SERVICE_OK;
+    }
+    if (!vm_core_record_headers_are_valid(state)) {
+        return MICROS_VM_SERVICE_ERROR_INVARIANT;
     }
     error = service_copy_inputs(service, backend, backend_context, request);
     if (error != MICROS_VM_SERVICE_OK) {

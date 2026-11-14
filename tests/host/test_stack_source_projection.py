@@ -28,6 +28,23 @@ class StackSourceProjectionTest(unittest.TestCase):
             with self.assertRaises(AssertionError):
                 project_stack_source(unit, moved)
 
+    def test_current_vm_terminal_hook_precedes_uart_seizure(self):
+        from tests.host.stack_source_projection import instrument_source, project_stack_source
+
+        unit = "kernel/tests/spawn/elf_spawn_test_report.c"
+        source = (ROOT / unit).read_text()
+        projected = project_stack_source(unit, source)
+        self.assertEqual(source.count("\n"), projected.count("\n"))
+        self.assertEqual(source, instrument_source(unit, projected))
+        self.assertLess(source.index("MICROS_VM01_FINISH()"), source.index("MICROS_TEST_STACK_REPORT()"))
+        self.assertLess(source.index("MICROS_TEST_STACK_REPORT()"), source.index("MICROS_VM01_REPORT()"))
+        moved = source.replace("MICROS_TEST_STACK_REPORT(); ", "", 1).replace(
+            "            (void)sbi_system_reset(",
+            "            MICROS_TEST_STACK_REPORT(); (void)sbi_system_reset(", 1,
+        )
+        with self.assertRaises(AssertionError):
+            project_stack_source(unit, moved)
+
     def test_only_declared_inline_hooks_project_to_the_exact_fixed_source(self):
         from tests.host.stack_source_projection import HOOKS, instrument_source, project_stack_source
 

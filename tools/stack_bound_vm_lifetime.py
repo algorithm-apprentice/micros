@@ -1,4 +1,4 @@
-"""Actual ADR-0087 preparation/validation frame separation."""
+"""Actual ADR-0087/0135 selected preflight and preparation frame separation."""
 
 from dataclasses import dataclass
 from pathlib import Path
@@ -17,8 +17,9 @@ from tools.stack_bound_types import EdgeKind, StackEvidenceError
 class PrepareLifetime:
     facade_frame: int
     worker_frame: int
+    initial_validation: int
     worker_call: int
-    final_validation: int
+    worker_continuation: int
     return_sites: tuple
 
 
@@ -38,22 +39,27 @@ def require_vm_prepare_lifetime(root, obj):
         require_c_frame_movement(obj, symbol, sizes[symbol.name])
     flow, work = function_flow(obj, facade), function_flow(obj, worker)
     calls = tuple(call for call in flow.calls if call.target_symbol == WORKER_NAME)
-    validators = tuple(call for call in flow.calls if call.target_symbol == "vm_core_validate_state")
+    validators = tuple(call for call in flow.calls if call.target_symbol == "vm_core_validate_selected_state")
     if (
-        len(calls) != 1 or calls[0].kind is not EdgeKind.CALL or len(validators) != 2
-        or any(call.target_symbol == "vm_core_validate_state" for call in work.calls)
+        len(calls) != 1 or calls[0].kind is not EdgeKind.CALL or len(validators) != 1
+        or any(call.target_symbol in ("vm_core_validate_state", "vm_core_validate_selected_state") for call in work.calls)
+        or any(call.target_symbol == "vm_core_validate_state" for call in flow.calls)
     ):
         raise StackEvidenceError("VM preparation has an unbound or overlapping validator call")
     call, = calls
-    initial, final = validators
+    initial, = validators
     continuation = flow.continuations.get(call.offset)
+    initial_continuation = flow.continuations.get(initial.offset)
     if (
-        initial.offset >= call.offset or final.offset <= call.offset or continuation is None
-        or final.offset in reachable_instructions(flow, excluded=continuation)
-        or call.offset in reachable_instructions(flow, excluded=flow.continuations[initial.offset])
+        initial.offset >= call.offset or continuation is None or initial_continuation is None
+        or call.offset not in reachable_instructions(flow)
+        or call.offset in reachable_instructions(flow, excluded=initial_continuation)
+        or not any(is_return(*flow.instructions[point])
+                   for point in reachable_instructions(flow, start=continuation))
     ):
-        raise StackEvidenceError("VM final validation bypasses the released preparation continuation")
-    returns = tuple(point for point, instruction in work.instructions.items() if is_return(*instruction))
+        raise StackEvidenceError("VM preparation bypasses preflight or has no released normal-return continuation")
+    reached = reachable_instructions(work)
+    returns = tuple(point for point, instruction in work.instructions.items() if point in reached and is_return(*instruction))
     if not returns:
         raise StackEvidenceError("VM preparation has no exact normal-return frame release")
-    return PrepareLifetime(sizes[PREPARE_NAME], sizes[WORKER_NAME], call.offset, final.offset, returns)
+    return PrepareLifetime(sizes[PREPARE_NAME], sizes[WORKER_NAME], initial.offset, call.offset, continuation, returns)

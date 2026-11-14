@@ -2,6 +2,7 @@
 
 #include "arch/riscv64/mmu.h"
 #include "kernel/vm/vm_handoff_runtime.h"
+#include "kernel/vm/vm_handoff_internal.h"
 #include "micros/frame_ownership_runtime.h"
 #include "micros/kernel_object_runtime.h"
 
@@ -235,8 +236,10 @@ preflight_vm_teardown(
     state = micros_vm_handoff_runtime_state();
     if (
         state == NULL
-        || micros_vm_handoff_state_validate(state)
+        || micros_vm_handoff_validate_selected(state)
             != MICROS_VM_HANDOFF_OK
+        || !micros_vm_handoff_process_is_valid(process)
+        || !micros_vm_handoff_selected_record_is_valid(state, process.slot)
         || !teardown_record_matches(
             state,
             process,
@@ -444,7 +447,7 @@ micros_user_address_space_prepare_vm_teardown(
         goto done;
     }
     error =
-        micros_user_address_space_validate_all_process_roots_locked(
+        micros_user_address_space_validate_vm_plan_roots_locked(
         &runtime,
         context.objects,
         &scratch

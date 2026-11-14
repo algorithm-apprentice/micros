@@ -86,6 +86,7 @@ def _add_execution_arguments(
             "runtime-memory", "diagnostic-history",
             "selected-ipc",
             "bootstrap-command", "tty-bootstrap-command",
+            "selected-vm",
         ),
         help="Require the current semantic/work witnesses from this same guest execution",
     )

@@ -1,5 +1,6 @@
 #include "kernel/boot/bootstrap_runtime_internal.h"
 #include "micros/work_observation.h"
+#include "tests/qemu/vm_validation_work.h"
 
 #include "arch/riscv64/platform.h"
 #include "kernel/ipc/ipc_runtime_internal.h"
@@ -17,6 +18,8 @@ enum micros_bootstrap_error micros_bootstrap_runtime_validate(void)
     MICROS_TEST_WORK_HIT("boot02-runtime", MICROS_WORK_OWNER_KERNEL_BOOT,
                          MICROS_WORK_KIND_COMPLETE_VALIDATOR_CALL, 1);
 #endif
+    MICROS_VM01_WORK_HIT("vm01-bootstrap-runtime", MICROS_WORK_OWNER_KERNEL_BOOT,
+                        MICROS_WORK_KIND_COMPLETE_VALIDATOR_CALL, 1);
     struct micros_kernel_objects *objects =
         micros_kernel_object_runtime_authoritative_registry();
     struct micros_endpoint_registry *registry =

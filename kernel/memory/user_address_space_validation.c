@@ -1,5 +1,6 @@
 #include "kernel/memory/user_address_space_internal.h"
 #include "micros/work_observation.h"
+#include "tests/qemu/vm_validation_work.h"
 
 #include "kernel/tty/tty_handoff_runtime.h"
 #include "kernel/vm/vm_handoff_runtime.h"
@@ -459,7 +460,7 @@ struct user_address_space_validation_context {
 };
 
 static enum micros_user_address_space_error
-load_validation_context(
+initialize_validation_context(
     struct micros_user_address_space_runtime_view *runtime,
     const struct micros_user_address_space_scratch_lease *lease,
     struct micros_process_handle process,
@@ -487,6 +488,42 @@ load_validation_context(
     if (error != MICROS_USER_ADDRESS_SPACE_OK) {
         return error;
     }
+    return MICROS_USER_ADDRESS_SPACE_OK;
+}
+
+static enum micros_user_address_space_error bind_validation_process(
+    struct micros_user_address_space_runtime_view *runtime,
+    struct user_address_space_validation_context *context
+)
+{
+    enum micros_user_address_space_error error;
+
+    if (micros_frame_ownership_runtime_validate_metadata(runtime->objects) != MICROS_FRAME_OWNERSHIP_OK) {
+        return MICROS_USER_ADDRESS_SPACE_ERROR_INVARIANT;
+    }
+    error = resolve_process(runtime, context->process, &context->resolved);
+    if (error != MICROS_USER_ADDRESS_SPACE_OK) {
+        return error;
+    }
+    if (context->resolved->address_space_root == 0) {
+        return MICROS_USER_ADDRESS_SPACE_ERROR_STATE;
+    }
+    return mark_owned_frame(context->ledger, context->lease, context->resolved->address_space_root,
+                            MICROS_USER_ADDRESS_SPACE_FRAME_PRIVATE_TABLE, context->process);
+}
+
+static enum micros_user_address_space_error load_validation_context(
+    struct micros_user_address_space_runtime_view *runtime,
+    const struct micros_user_address_space_scratch_lease *lease,
+    struct micros_process_handle process,
+    struct user_address_space_validation_context *context
+)
+{
+    enum micros_user_address_space_error error = initialize_validation_context(runtime, lease, process, context);
+
+    if (error != MICROS_USER_ADDRESS_SPACE_OK) {
+        return error;
+    }
     error = micros_user_address_space_load_vm_scratch_authority(
         &context->scratch_authority_active,
         &context->scratch_authority
@@ -501,26 +538,35 @@ load_validation_context(
     if (error != MICROS_USER_ADDRESS_SPACE_OK) {
         return error;
     }
-    if (
-        micros_frame_ownership_runtime_validate_metadata(objects)
-            != MICROS_FRAME_OWNERSHIP_OK
-    ) {
-        return MICROS_USER_ADDRESS_SPACE_ERROR_INVARIANT;
-    }
-    error = resolve_process(runtime, process, &context->resolved);
+    return bind_validation_process(runtime, context);
+}
+
+static enum micros_user_address_space_error load_vm_plan_validation_context(
+    struct micros_user_address_space_runtime_view *runtime,
+    const struct micros_user_address_space_scratch_lease *lease,
+    struct micros_process_handle process,
+    struct user_address_space_validation_context *context
+)
+{
+    enum micros_vm_scratch_authority_status vm_status;
+    enum micros_tty_device_authority_status tty_status;
+    enum micros_user_address_space_error error = initialize_validation_context(runtime, lease, process, context);
+
     if (error != MICROS_USER_ADDRESS_SPACE_OK) {
         return error;
     }
-    if (context->resolved->address_space_root == 0) {
-        return MICROS_USER_ADDRESS_SPACE_ERROR_STATE;
+    if (runtime->ownership_phase != MICROS_FRAME_OWNERSHIP_PHASE_HANDED_OFF) {
+        return MICROS_USER_ADDRESS_SPACE_ERROR_PHASE;
     }
-    return mark_owned_frame(
-        context->ledger,
-        lease,
-        context->resolved->address_space_root,
-        MICROS_USER_ADDRESS_SPACE_FRAME_PRIVATE_TABLE,
-        process
-    );
+    vm_status = micros_vm_handoff_runtime_inspect_scratch_binding(&context->scratch_authority);
+    tty_status = micros_tty_handoff_runtime_inspect_device_binding(runtime->objects, &context->device_authority);
+    if ((vm_status != MICROS_VM_SCRATCH_AUTHORITY_NONE && vm_status != MICROS_VM_SCRATCH_AUTHORITY_ACTIVE)
+        || (tty_status != MICROS_TTY_DEVICE_AUTHORITY_NONE && tty_status != MICROS_TTY_DEVICE_AUTHORITY_ACTIVE)) {
+        return MICROS_USER_ADDRESS_SPACE_ERROR_INVARIANT;
+    }
+    context->scratch_authority_active = vm_status == MICROS_VM_SCRATCH_AUTHORITY_ACTIVE;
+    context->device_authority_active = tty_status == MICROS_TTY_DEVICE_AUTHORITY_ACTIVE;
+    return bind_validation_process(runtime, context);
 }
 
 static enum micros_user_address_space_error
@@ -814,8 +860,36 @@ validate_owned_frame_set(
     return MICROS_USER_ADDRESS_SPACE_OK;
 }
 
-enum micros_user_address_space_error
-micros_user_address_space_validate_locked(
+static enum micros_user_address_space_error validate_context_root(
+    struct user_address_space_validation_context *context,
+    const struct micros_process **resolved_process
+)
+{
+    enum micros_user_address_space_error error;
+
+    error = validate_shared_kernel_entries(context);
+    if (error != MICROS_USER_ADDRESS_SPACE_OK) {
+        return error;
+    }
+    error = validate_user_tree(context);
+    if (error != MICROS_USER_ADDRESS_SPACE_OK) {
+        return error;
+    }
+    error = validate_required_exceptional_leaves(context);
+    if (error != MICROS_USER_ADDRESS_SPACE_OK) {
+        return error;
+    }
+    error = validate_owned_frame_set(context);
+    if (error != MICROS_USER_ADDRESS_SPACE_OK) {
+        return error;
+    }
+    if (resolved_process != NULL) {
+        *resolved_process = context->resolved;
+    }
+    return MICROS_USER_ADDRESS_SPACE_OK;
+}
+
+enum micros_user_address_space_error micros_user_address_space_validate_locked(
     struct micros_user_address_space_runtime_view *runtime,
     const struct micros_user_address_space_scratch_lease *lease,
     struct micros_process_handle process,
@@ -827,37 +901,23 @@ micros_user_address_space_validate_locked(
                          MICROS_WORK_KIND_COMPLETE_VALIDATOR_CALL, 1);
 #endif
     struct user_address_space_validation_context context;
-    enum micros_user_address_space_error error;
+    enum micros_user_address_space_error error = load_validation_context(runtime, lease, process, &context);
 
-    error = load_validation_context(
-        runtime,
-        lease,
-        process,
-        &context
-    );
-    if (error != MICROS_USER_ADDRESS_SPACE_OK) {
-        return error;
-    }
-    error = validate_shared_kernel_entries(&context);
-    if (error != MICROS_USER_ADDRESS_SPACE_OK) {
-        return error;
-    }
-    error = validate_user_tree(&context);
-    if (error != MICROS_USER_ADDRESS_SPACE_OK) {
-        return error;
-    }
-    error = validate_required_exceptional_leaves(&context);
-    if (error != MICROS_USER_ADDRESS_SPACE_OK) {
-        return error;
-    }
-    error = validate_owned_frame_set(&context);
-    if (error != MICROS_USER_ADDRESS_SPACE_OK) {
-        return error;
-    }
-    if (resolved_process != NULL) {
-        *resolved_process = context.resolved;
-    }
-    return MICROS_USER_ADDRESS_SPACE_OK;
+    return error == MICROS_USER_ADDRESS_SPACE_OK ? validate_context_root(&context, resolved_process) : error;
+}
+
+static enum micros_user_address_space_error validate_vm_plan_root_locked(
+    struct micros_user_address_space_runtime_view *runtime,
+    const struct micros_user_address_space_scratch_lease *lease,
+    struct micros_process_handle process
+)
+{
+    MICROS_VM01_WORK_HIT("vm01-memory-root", MICROS_WORK_OWNER_KERNEL_MEMORY,
+                        MICROS_WORK_KIND_COMPLETE_VALIDATOR_CALL, 1);
+    struct user_address_space_validation_context context;
+    enum micros_user_address_space_error error = load_vm_plan_validation_context(runtime, lease, process, &context);
+
+    return error == MICROS_USER_ADDRESS_SPACE_OK ? validate_context_root(&context, NULL) : error;
 }
 
 enum micros_user_address_space_error
@@ -1059,20 +1119,17 @@ enum micros_user_address_space_error micros_user_address_space_validate_selected
     return validate_selected_controller_slots(runtime, process, bindings);
 }
 
-enum micros_user_address_space_error
-micros_user_address_space_validate_all_process_roots_locked(
-    struct micros_user_address_space_runtime_view *runtime,
+static bool next_root_process(
     const struct micros_kernel_objects *objects,
-    const struct micros_user_address_space_scratch_lease *lease
+    size_t *cursor,
+    struct micros_process_handle *process
 )
 {
     size_t index;
 
-    for (index = 0; index < MICROS_PROCESS_CAPACITY; ++index) {
+    for (index = *cursor; index < MICROS_PROCESS_CAPACITY; ++index) {
         const struct micros_process *record =
             &objects->processes[index];
-        struct micros_process_handle process;
-        enum micros_user_address_space_error error;
 
         if (
             record->slot_state != MICROS_KERNEL_OBJECT_SLOT_LIVE
@@ -1080,16 +1137,49 @@ micros_user_address_space_validate_all_process_roots_locked(
         ) {
             continue;
         }
-        process = (struct micros_process_handle){
+        *process = (struct micros_process_handle){
             .slot = (uint16_t)index,
             .generation = record->generation,
         };
-        error = micros_user_address_space_validate_locked(
-            runtime,
-            lease,
-            process,
-            NULL
-        );
+        *cursor = index + 1;
+        return true;
+    }
+    *cursor = MICROS_PROCESS_CAPACITY;
+    return false;
+}
+
+enum micros_user_address_space_error micros_user_address_space_validate_all_process_roots_locked(
+    struct micros_user_address_space_runtime_view *runtime,
+    const struct micros_kernel_objects *objects,
+    const struct micros_user_address_space_scratch_lease *lease
+)
+{
+    struct micros_process_handle process;
+    size_t cursor = 0;
+
+    while (next_root_process(objects, &cursor, &process)) {
+        enum micros_user_address_space_error error =
+            micros_user_address_space_validate_locked(runtime, lease, process, NULL);
+
+        if (error != MICROS_USER_ADDRESS_SPACE_OK) {
+            return error;
+        }
+    }
+    return MICROS_USER_ADDRESS_SPACE_OK;
+}
+
+enum micros_user_address_space_error micros_user_address_space_validate_vm_plan_roots_locked(
+    struct micros_user_address_space_runtime_view *runtime,
+    const struct micros_kernel_objects *objects,
+    const struct micros_user_address_space_scratch_lease *lease
+)
+{
+    struct micros_process_handle process;
+    size_t cursor = 0;
+
+    while (next_root_process(objects, &cursor, &process)) {
+        enum micros_user_address_space_error error = validate_vm_plan_root_locked(runtime, lease, process);
+
         if (error != MICROS_USER_ADDRESS_SPACE_OK) {
             return error;
         }
@@ -1147,6 +1237,46 @@ done:
     (void)objects;
     (void)kernel_report;
     (void)resolved;
+    micros_user_address_space_runtime_unlock(saved_status);
+    return error;
+}
+
+enum micros_user_address_space_error micros_user_address_space_validate_vm_constructed_root(
+    const struct micros_user_address_space_vm_table_plan *plan
+)
+{
+    const struct micros_frame_ownership *ledger;
+    const struct micros_kernel_objects *objects;
+    const struct micros_kernel_address_space_report *kernel_report;
+    const struct micros_process *resolved;
+    struct micros_user_address_space_runtime_view runtime;
+    struct micros_user_address_space_scratch_lease scratch;
+    enum micros_user_address_space_error error;
+    uintptr_t saved_status;
+
+    if (plan == NULL) {
+        return MICROS_USER_ADDRESS_SPACE_ERROR_ARGUMENT;
+    }
+    saved_status = micros_user_address_space_runtime_lock();
+    error = require_read_authority(&runtime, &ledger, &objects, &kernel_report, NULL);
+    if (error != MICROS_USER_ADDRESS_SPACE_OK) {
+        goto done;
+    }
+    error = resolve_process_with_root(&runtime, plan->process, &resolved);
+    if (error != MICROS_USER_ADDRESS_SPACE_OK) {
+        goto done;
+    }
+    if (resolved->address_space_root != plan->table_frames[MICROS_USER_ADDRESS_SPACE_VM_TABLE_ROOT]) {
+        error = MICROS_USER_ADDRESS_SPACE_ERROR_STATE;
+        goto done;
+    }
+    error = acquire_scratch(&runtime, &scratch);
+    if (error != MICROS_USER_ADDRESS_SPACE_OK) {
+        goto done;
+    }
+    error = validate_vm_plan_root_locked(&runtime, &scratch, plan->process);
+    release_scratch(&scratch);
+done:
     micros_user_address_space_runtime_unlock(saved_status);
     return error;
 }

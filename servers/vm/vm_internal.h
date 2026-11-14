@@ -4,6 +4,7 @@
 #include <stdbool.h>
 
 #include "servers/vm/vm_core.h"
+#include "servers/vm/vm_admission.h"
 
 #define MICROS_VM_INITIALIZATION_MAGIC UINT64_C(0x4d4943524f53564d)
 #define MICROS_VM_PAGE_DIGEST_OFFSET UINT64_C(14695981039346656037)
@@ -51,7 +52,7 @@ bool vm_core_physical_is_in_record_other_than(
     uint64_t physical_address,
     size_t ignored_slot
 );
-bool vm_core_select_lowest_frames(
+enum micros_vm_core_error vm_core_select_lowest_frames(
     const struct micros_vm_state *state,
     size_t ignored_slot,
     size_t data_count,
@@ -66,5 +67,7 @@ enum micros_vm_core_error vm_core_validate_state(
     const struct micros_vm_state *state,
     bool allow_staged_idle_inputs
 );
+bool vm_core_record_header_is_valid(const struct micros_vm_state *state, size_t slot);
+bool vm_core_selected_record_is_valid(const struct micros_vm_state *state, size_t slot);
 
 #endif

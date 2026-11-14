@@ -38,7 +38,6 @@ RETAINED_AUDITS = (
     ("kernel/pm/pm_control_syscall.c", "runtime_state_is_valid", "micros_bootstrap_runtime_validate", 1),
     ("kernel/tty/tty_control_syscall.c", "common_invariants_hold", "micros_bootstrap_runtime_validate", 1),
     ("kernel/tty/tty_interrupt.c", "micros_tty_interrupt_dispatch", "micros_bootstrap_runtime_validate", 1),
-    ("kernel/vm/vm_handoff_syscall.c", "require_post_handoff_runtime", "micros_bootstrap_runtime_validate", 1),
     ("kernel/vm/vm_handoff_syscall_boot.c", "micros_vm_handoff_syscall_handle_ready", "micros_bootstrap_runtime_validate", 1),
     ("kernel/vm/vm_handoff_syscall_boot.c", "require_tty_mapping_runtime", "micros_bootstrap_runtime_validate", 1),
 )

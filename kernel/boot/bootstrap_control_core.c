@@ -226,15 +226,10 @@ static bool binding_matches_objects(
     return endpoint->state == MICROS_ENDPOINT_STATE_ACTIVE;
 }
 
-static enum micros_bootstrap_error require_running_header(
+static enum micros_bootstrap_error require_selection_header(
     const struct micros_bootstrap_control_state *state
 )
 {
-    if (state->phase != MICROS_BOOTSTRAP_PHASE_RUNNING) {
-        return state->phase == MICROS_BOOTSTRAP_PHASE_PREPARING
-                || state->phase == MICROS_BOOTSTRAP_PHASE_SEALED
-            ? MICROS_BOOTSTRAP_ERROR_STATE : MICROS_BOOTSTRAP_ERROR_INVARIANT;
-    }
     if (
         state->entry_count == 0
         || state->entry_count > MICROS_BOOTSTRAP_SERVICE_CAPACITY
@@ -246,9 +241,24 @@ static enum micros_bootstrap_error require_running_header(
         || state->transitions.service_slots[0] != 0
         || state->plan.controller_service_id == 0
         || state->plan.controller_service_id > MICROS_BOOTSTRAP_SERVICE_ID_LIMIT
-        || state->transitions.controller_service_id != state->plan.controller_service_id
         || state->transitions.starting_service_id > MICROS_BOOTSTRAP_SERVICE_ID_LIMIT
     ) {
+        return MICROS_BOOTSTRAP_ERROR_INVARIANT;
+    }
+    return MICROS_BOOTSTRAP_OK;
+}
+
+static enum micros_bootstrap_error require_running_header(
+    const struct micros_bootstrap_control_state *state
+)
+{
+    if (state->phase != MICROS_BOOTSTRAP_PHASE_RUNNING) {
+        return state->phase == MICROS_BOOTSTRAP_PHASE_PREPARING
+                || state->phase == MICROS_BOOTSTRAP_PHASE_SEALED
+            ? MICROS_BOOTSTRAP_ERROR_STATE : MICROS_BOOTSTRAP_ERROR_INVARIANT;
+    }
+    if (require_selection_header(state) != MICROS_BOOTSTRAP_OK
+        || state->transitions.controller_service_id != state->plan.controller_service_id) {
         return MICROS_BOOTSTRAP_ERROR_INVARIANT;
     }
     return MICROS_BOOTSTRAP_OK;
@@ -276,7 +286,7 @@ static bool selected_runtime_shape(
     return false;
 }
 
-enum micros_bootstrap_error micros_bootstrap_control_select_service(
+static enum micros_bootstrap_error select_service_relation(
     const struct micros_bootstrap_control_state *state,
     const struct micros_endpoint_registry *registry,
     const struct micros_kernel_objects *objects,
@@ -291,13 +301,6 @@ enum micros_bootstrap_error micros_bootstrap_control_select_service(
     uint16_t runtime_index;
     uint8_t binding_slot;
 
-    if (state == NULL || registry == NULL || objects == NULL || selection == NULL) {
-        return MICROS_BOOTSTRAP_ERROR_ARGUMENT;
-    }
-    error = require_running_header(state);
-    if (error != MICROS_BOOTSTRAP_OK) {
-        return error;
-    }
     if (service_id == 0 || service_id > MICROS_BOOTSTRAP_SERVICE_ID_LIMIT) {
         return MICROS_BOOTSTRAP_ERROR_ARGUMENT;
     }
@@ -336,6 +339,69 @@ enum micros_bootstrap_error micros_bootstrap_control_select_service(
     selection->endpoint = &registry->endpoints[binding->process.slot];
     selection->binding_index = (uint16_t)(binding_slot - 1);
     selection->runtime_index = runtime_index;
+    return MICROS_BOOTSTRAP_OK;
+}
+
+enum micros_bootstrap_error micros_bootstrap_control_select_service(
+    const struct micros_bootstrap_control_state *state,
+    const struct micros_endpoint_registry *registry,
+    const struct micros_kernel_objects *objects,
+    uint32_t service_id,
+    struct micros_bootstrap_service_selection *selection
+)
+{
+    enum micros_bootstrap_error error;
+
+    if (state == NULL || registry == NULL || objects == NULL || selection == NULL) {
+        return MICROS_BOOTSTRAP_ERROR_ARGUMENT;
+    }
+    error = require_running_header(state);
+    return error == MICROS_BOOTSTRAP_OK
+        ? select_service_relation(state, registry, objects, service_id, selection) : error;
+}
+
+enum micros_bootstrap_error micros_bootstrap_control_select_sealed_service(
+    const struct micros_bootstrap_control_state *state,
+    const struct micros_endpoint_registry *registry,
+    const struct micros_kernel_objects *objects,
+    uint32_t service_id,
+    struct micros_bootstrap_service_selection *selection
+)
+{
+    struct micros_bootstrap_service_selection selected;
+    enum micros_bootstrap_error error;
+
+    if (state == NULL || registry == NULL || objects == NULL || selection == NULL) {
+        return MICROS_BOOTSTRAP_ERROR_ARGUMENT;
+    }
+    if (state->phase != MICROS_BOOTSTRAP_PHASE_SEALED) {
+        return state->phase == MICROS_BOOTSTRAP_PHASE_PREPARING
+                || state->phase == MICROS_BOOTSTRAP_PHASE_RUNNING
+            ? MICROS_BOOTSTRAP_ERROR_STATE : MICROS_BOOTSTRAP_ERROR_INVARIANT;
+    }
+    if (require_selection_header(state) != MICROS_BOOTSTRAP_OK
+        || state->reserved != 0 || state->transitions.next_order_index != state->entry_count
+        || state->transitions.controller_service_id != 0
+        || state->transitions.starting_service_id != 0
+        || state->controller_process.slot != 0 || state->controller_process.generation != 0
+        || state->controller_thread.slot != 0 || state->controller_thread.generation != 0
+        || state->controller_endpoint != 0) {
+        return MICROS_BOOTSTRAP_ERROR_INVARIANT;
+    }
+    if (service_id == state->plan.controller_service_id) {
+        return MICROS_BOOTSTRAP_ERROR_STATE;
+    }
+    error = select_service_relation(state, registry, objects, service_id, &selected);
+    if (error != MICROS_BOOTSTRAP_OK) {
+        return error;
+    }
+    if (selected.manifest->role_flags == MICROS_BOOTSTRAP_ROLE_CONTROLLER
+        || selected.manifest->profile_id == 0
+        || selected.manifest->profile_id >= MICROS_PRIVILEGE_PROFILE_CAPACITY
+        || selected.runtime->state != MICROS_BOOTSTRAP_SERVICE_READY) {
+        return MICROS_BOOTSTRAP_ERROR_INVARIANT;
+    }
+    *selection = selected;
     return MICROS_BOOTSTRAP_OK;
 }
 

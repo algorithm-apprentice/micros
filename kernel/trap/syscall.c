@@ -8,6 +8,7 @@
 #include "kernel/tty/tty_control_syscall.h"
 #include "kernel/vm/vm_handoff_syscall.h"
 #include "tests/qemu/bootstrap_command_work.h"
+#include "tests/qemu/vm_command_work.h"
 
 static struct micros_syscall_arguments capture_arguments(
     const struct micros_trap_frame *frame
@@ -64,7 +65,7 @@ static enum micros_syscall_return syscall_dispatch_operation(
             arguments
         );
     case MICROS_SYSCALL_ABI_VM_HANDOFF:
-        return micros_vm_handoff_handle_captured_user_ecall(
+        return MICROS_VM01_DISPATCH(
             hart,
             frame,
             context,

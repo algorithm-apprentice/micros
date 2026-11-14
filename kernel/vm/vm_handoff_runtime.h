@@ -35,6 +35,11 @@ enum micros_vm_handoff_error micros_vm_handoff_runtime_validate(
     const struct micros_endpoint_registry *registry,
     const struct micros_kernel_objects *objects
 );
+enum micros_vm_handoff_error micros_vm_handoff_runtime_validate_command(
+    const struct micros_bootstrap_control_state *bootstrap,
+    const struct micros_endpoint_registry *registry,
+    const struct micros_kernel_objects *objects
+);
 
 bool micros_vm_handoff_runtime_role_ready(
     const struct micros_bootstrap_control_state *bootstrap,
